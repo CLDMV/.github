@@ -1,0 +1,80 @@
+name: Reusable Semantic Release
+on:
+  workflow_call:
+    inputs:
+      npm_publish:
+        type: boolean
+        default: true
+      node_version:
+        type: string
+        default: "lts/*"
+      dry_run:
+        type: boolean
+        default: false
+    secrets:
+      NPM_TOKEN:
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Write semantic-release config
+        run: |
+          cat > release.config.cjs <<'EOF'
+          module.exports = {
+            branches: ['master','main'],
+            plugins: [
+              ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
+              ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
+              ['@semantic-release/changelog', { changelogFile: 'CHANGELOG.md' }],
+              ['@semantic-release/npm', { npmPublish: process.env.NPM_PUBLISH === 'true' }],
+              ['@semantic-release/github', { assets: [] }],
+              ['@semantic-release/git', {
+                assets: ['package.json','package-lock.json','CHANGELOG.md'],
+                message: 'chore(release): ${nextRelease.version}\n\n${nextRelease.notes}'
+              }]
+            ]
+          };
+          EOF
+        env:
+          NPM_PUBLISH: ${{ inputs.npm_publish && 'true' || 'false' }}
+
+      - name: Release
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Running semantic-release in DRY RUN mode"
+            npx -y \
+              -p semantic-release \
+              -p @semantic-release/changelog \
+              -p @semantic-release/git \
+              -p @semantic-release/github \
+              -p @semantic-release/npm \
+              -p conventional-changelog-conventionalcommits \
+              semantic-release --dry-run
+          else
+            npx -y \
+              -p semantic-release \
+              -p @semantic-release/changelog \
+              -p @semantic-release/git \
+              -p @semantic-release/github \
+              -p @semantic-release/npm \
+              -p conventional-changelog-conventionalcommits \
+              semantic-release
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_PUBLISH: ${{ inputs.npm_publish }}
