@@ -1,0 +1,56 @@
+name: Reusable Semantic Release
+on:
+  workflow_call:
+    inputs:
+      npm_publish:
+        type: boolean
+        default: true
+      node_version:
+        type: string
+        default: "lts/*"
+    secrets:
+      NPM_TOKEN:
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Write semantic-release config
+        run: |
+          cat > release.config.cjs <<'EOF'
+          module.exports = {
+            branches: ['master','main'],
+            plugins: [
+              ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
+              ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
+              ['@semantic-release/changelog', { changelogFile: 'CHANGELOG.md' }],
+              ['@semantic-release/npm', { npmPublish: ${NPM_PUBLISH} }],
+              ['@semantic-release/github', { assets: [] }],
+              ['@semantic-release/git', {
+                assets: ['package.json','package-lock.json','CHANGELOG.md'],
+                message: 'chore(release): ${nextRelease.version}\n\n${nextRelease.notes}'
+              }]
+            ]
+          };
+          EOF
+        env:
+          NPM_PUBLISH: ${{ inputs.npm_publish && 'true' || 'false' }}
+
+      - name: Release
+        run: npx -y semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
