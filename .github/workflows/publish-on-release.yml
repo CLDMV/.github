@@ -1,0 +1,32 @@
+name: Reusable Publish on Release
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        type: string
+        default: "lts/*"
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: "https://registry.npmjs.org"
+
+      # Your build runs automatically via "prepack" if you add it (recommended)
+      # Otherwise run an explicit build: npm ci && npm run build
+      - run: npm ci
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
