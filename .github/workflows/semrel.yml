@@ -8,6 +8,9 @@ on:
       node_version:
         type: string
         default: "lts/*"
+      dry_run:
+        type: boolean
+        default: false
     secrets:
       NPM_TOKEN:
         required: false
