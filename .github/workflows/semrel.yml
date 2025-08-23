@@ -53,7 +53,13 @@ jobs:
           NPM_PUBLISH: ${{ inputs.npm_publish && 'true' || 'false' }}
 
       - name: Release
-        run: npx -y semantic-release
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Running semantic-release in DRY RUN mode"
+            npx -y semantic-release --dry-run
+          else
+            npx -y semantic-release
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
