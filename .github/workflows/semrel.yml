@@ -56,9 +56,23 @@ jobs:
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "Running semantic-release in DRY RUN mode"
-            npx -y semantic-release --dry-run
+            npx -y \
+              -p semantic-release \
+              -p @semantic-release/changelog \
+              -p @semantic-release/git \
+              -p @semantic-release/github \
+              -p @semantic-release/npm \
+              -p conventional-changelog-conventionalcommits \
+              semantic-release --dry-run
           else
-            npx -y semantic-release
+            npx -y \
+              -p semantic-release \
+              -p @semantic-release/changelog \
+              -p @semantic-release/git \
+              -p @semantic-release/github \
+              -p @semantic-release/npm \
+              -p conventional-changelog-conventionalcommits \
+              semantic-release
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
