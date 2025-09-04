@@ -51,6 +51,10 @@ on:
 
 jobs:
   detect-release:
+    if: |
+      github.event.pull_request.merged == true &&
+      (startsWith(github.event.pull_request.title, 'release:') ||
+       contains(github.event.pull_request.labels.*.name, 'release'))
     runs-on: ubuntu-latest
     outputs:
       should-release: ${{ steps.check.outputs.should-release }}
@@ -63,35 +67,39 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check if this is a release merge
+      - name: Extract version from PR
         id: check
         run: |
-          # Get the latest commit message
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          echo "Latest commit: $COMMIT_MSG"
-
-          # Check for version bump commit or release PR merge
-          if [[ $COMMIT_MSG =~ ^chore:\ bump\ version\ to\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+          # Extract version from PR title or check for release label
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          HAS_RELEASE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'release') }}"
+          
+          echo "PR Title: $PR_TITLE"
+          echo "Has release label: $HAS_RELEASE_LABEL"
+          
+          # Check if title starts with "release:" and extract version
+          if [[ $PR_TITLE =~ ^release:\ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
             VERSION="${BASH_REMATCH[1]}"
             echo "should-release=true" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "is-prerelease=false" >> $GITHUB_OUTPUT
-            echo "🚀 Version bump commit detected for version $VERSION"
-          elif [[ $COMMIT_MSG =~ release:\ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            echo "should-release=true" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "is-prerelease=false" >> $GITHUB_OUTPUT
-            echo "🚀 Release PR merge detected for version $VERSION"
-          elif [[ $COMMIT_MSG =~ Merge\ pull\ request.*release.*v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            echo "should-release=true" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "is-prerelease=false" >> $GITHUB_OUTPUT
-            echo "🚀 Release PR merge detected for version $VERSION"
+            echo "🚀 Release PR merged for version $VERSION (from title)"
+          # Check if has release label (fallback for manual releases)
+          elif [[ "$HAS_RELEASE_LABEL" == "true" ]]; then
+            # Try to extract version from title even if it doesn't start with "release:"
+            if [[ $PR_TITLE =~ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+              VERSION="${BASH_REMATCH[1]}"
+              echo "should-release=true" >> $GITHUB_OUTPUT
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "is-prerelease=false" >> $GITHUB_OUTPUT
+              echo "🚀 Release PR merged for version $VERSION (from label + title)"
+            else
+              echo "should-release=false" >> $GITHUB_OUTPUT
+              echo "❌ Release label found but could not extract version from title: $PR_TITLE"
+            fi
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Not a release commit"
+            echo "ℹ️ Not a release PR (title doesn't start with 'release:' and no release label)"
           fi
 
   build-and-test:

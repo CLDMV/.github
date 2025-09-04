@@ -192,7 +192,7 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Update package.json version
+      - name: Prepare files for PR
         run: |
           NEW_VERSION="${{ steps.version.outputs.new-version }}"
           if [ "${{ inputs.package_manager }}" = "yarn" ]; then
@@ -324,17 +324,6 @@ jobs:
           cat CHANGELOG_ENTRY.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Commit version update
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json package-lock.json 2>/dev/null || git add package.json
-          git commit -m "chore: bump version to ${{ steps.version.outputs.new-version }}" || exit 0
-
-      - name: Push version update to branch
-        run: |
-          git push origin ${{ github.ref_name }}
-
       - name: Detect default branch
         id: default-branch
         run: |
@@ -353,49 +342,89 @@ jobs:
           echo "default-branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
           echo "🎯 Default branch detected: $DEFAULT_BRANCH"
 
+      - name: Commit version bump and build artifacts using GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if there are changes to commit
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Get current branch and commit info
+          CURRENT_BRANCH="${{ github.ref_name }}"
+          BASE_SHA=$(git rev-parse HEAD)
+
+          # Create tree with all changes using GitHub API
+          echo "📦 Creating tree with version bump and build artifacts..."
+          TREE_SHA=$(git write-tree)
+
+          # Create commit using GitHub API (automatically signed)
+          echo "✍️ Creating signed commit via GitHub API..."
+          COMMIT_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/commits" \
+            -d "{
+              \"message\": \"chore: bump version to ${{ steps.version.outputs.new-version }}\",
+              \"tree\": \"$TREE_SHA\",
+              \"parents\": [\"$BASE_SHA\"]
+            }")
+
+          # Extract new commit SHA and verification status
+          NEW_COMMIT_SHA=$(echo "$COMMIT_RESPONSE" | jq -r '.sha')
+          VERIFIED=$(echo "$COMMIT_RESPONSE" | jq -r '.verification.verified')
+          VERIFICATION_REASON=$(echo "$COMMIT_RESPONSE" | jq -r '.verification.reason')
+
+          if [ "$NEW_COMMIT_SHA" = "null" ] || [ -z "$NEW_COMMIT_SHA" ]; then
+            echo "❌ Failed to create commit via API"
+            echo "Response: $COMMIT_RESPONSE"
+            exit 1
+          fi
+
+          echo "✅ Created commit: $NEW_COMMIT_SHA"
+          echo "🔐 Verified: $VERIFIED (reason: $VERIFICATION_REASON)"
+
+          # Update branch reference to new signed commit
+          echo "📌 Updating branch reference..."
+          curl -s -X PATCH \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$CURRENT_BRANCH" \
+            -d "{
+              \"sha\": \"$NEW_COMMIT_SHA\"
+            }"
+
+          echo "✅ Updated branch $CURRENT_BRANCH to signed commit"
+
       - name: Create Pull Request
         id: create-pr
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: ${{ steps.default-branch.outputs.default-branch }}
-          branch: ${{ github.ref_name }}
-          title: "release: v${{ steps.version.outputs.new-version }}"
-          body: |
-            ## 🚀 Release v${{ steps.version.outputs.new-version }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head ${{ github.ref_name }} --base ${{ steps.default-branch.outputs.default-branch }} --json number --jq '.[0].number' 2>/dev/null || echo "")
 
-            **Type:** ${{ needs.check-release-commit.outputs.version-bump }} version bump
-            **Branch:** `${{ github.ref_name }}`
-            **Trigger Commit:** ${{ needs.check-release-commit.outputs.commit-message }}
-
-            ### 📋 Changes
-
-            ${{ steps.changelog.outputs.changelog-content }}
-
-            ### ✅ Automated Actions Completed
-
-            - [x] Pre-build tests passed (${{ inputs.test_command }})
-            - [x] Package built successfully (${{ inputs.build_command }})
-            - [x] Post-build tests passed (included in build)
-            - [x] Version bumped in package.json (${{ steps.version.outputs.current-version }} → ${{ steps.version.outputs.new-version }})
-            - [x] Changelog entry generated
-            - [x] Ready for review and merge
-
-            ### 🎯 Next Steps
-
-            1. **Review** the changes in this PR
-            2. **Approve and merge** (squash recommended)
-            3. **GitHub Release** will be created automatically
-            4. **NPM publish** will happen automatically
-
-            ---
-
-            🤖 *This PR was created automatically by the release workflow*
-          labels: |
-            release
-            ${{ needs.check-release-commit.outputs.version-bump }}
-          draft: false
-          delete-branch: false
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR already exists: #$EXISTING_PR"
+            echo "pull-request-number=$EXISTING_PR" >> $GITHUB_OUTPUT
+          else
+            # Create new PR
+            PR_URL=$(gh pr create \
+              --title "release: v${{ steps.version.outputs.new-version }}" \
+              --base ${{ steps.default-branch.outputs.default-branch }} \
+              --head ${{ github.ref_name }} \
+              --body-file PR_BODY.md \
+              --label "release,${{ needs.check-release-commit.outputs.version-bump }}")
+            
+            # Extract PR number from URL
+            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]\+$')
+            
+            echo "Created PR: #$PR_NUMBER"
+            echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set outputs
         id: outputs
