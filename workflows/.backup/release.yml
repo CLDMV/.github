@@ -359,7 +359,51 @@ jobs:
 
           # Create tree with all changes using GitHub API
           echo "📦 Creating tree with version bump and build artifacts..."
+
+          # First, ensure all objects are pushed to GitHub
+          git update-index --refresh || true
+
+          # Create tree SHA locally and verify it exists
           TREE_SHA=$(git write-tree)
+          echo "Local tree SHA: $TREE_SHA"
+
+          # Verify the tree exists locally
+          if ! git cat-file -e "$TREE_SHA"; then
+            echo "❌ Tree SHA $TREE_SHA does not exist locally"
+            exit 1
+          fi
+
+          # Create the tree via GitHub API to ensure it exists remotely
+          echo "🔄 Creating tree via GitHub API..."
+
+          # Get all files in the staging area
+          FILES_JSON=$(git diff --cached --name-only | while read file; do
+            if [ -f "$file" ]; then
+              BLOB_SHA=$(git hash-object "$file")
+              echo "{\"path\":\"$file\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"$BLOB_SHA\"}"
+            fi
+          done | jq -s .)
+
+          # Create tree via API
+          TREE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/trees" \
+            -d "{
+              \"base_tree\": \"$(git rev-parse HEAD^{tree})\",
+              \"tree\": $FILES_JSON
+            }")
+
+          API_TREE_SHA=$(echo "$TREE_RESPONSE" | jq -r '.sha')
+
+          if [ "$API_TREE_SHA" = "null" ] || [ -z "$API_TREE_SHA" ]; then
+            echo "⚠️ Failed to create tree via API, using local tree SHA"
+            echo "Tree response: $TREE_RESPONSE"
+            FINAL_TREE_SHA="$TREE_SHA"
+          else
+            echo "✅ Created tree via API: $API_TREE_SHA"
+            FINAL_TREE_SHA="$API_TREE_SHA"
+          fi
 
           # Create commit using GitHub API (automatically signed)
           echo "✍️ Creating signed commit via GitHub API..."
@@ -369,7 +413,7 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/git/commits" \
             -d "{
               \"message\": \"chore: bump version to ${{ steps.version.outputs.new-version }}\",
-              \"tree\": \"$TREE_SHA\",
+              \"tree\": \"$FINAL_TREE_SHA\",
               \"parents\": [\"$BASE_SHA\"]
             }")
 
@@ -389,15 +433,16 @@ jobs:
 
           # Update branch reference to new signed commit
           echo "📌 Updating branch reference..."
-          curl -s -X PATCH \
+          UPDATE_RESPONSE=$(curl -s -X PATCH \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$CURRENT_BRANCH" \
             -d "{
               \"sha\": \"$NEW_COMMIT_SHA\"
-            }"
+            }")
 
           echo "✅ Updated branch $CURRENT_BRANCH to signed commit"
+          echo "Update response: $UPDATE_RESPONSE"
 
       - name: Create Pull Request
         id: create-pr

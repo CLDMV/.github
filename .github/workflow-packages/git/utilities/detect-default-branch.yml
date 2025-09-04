@@ -1,0 +1,29 @@
+name: "Detect Default Branch"
+description: "Detect the default branch of the repository (master or main)"
+
+outputs:
+  default-branch:
+    description: "The detected default branch name"
+    value: ${{ steps.detect.outputs.default-branch }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Detect default branch
+      id: detect
+      shell: bash
+      run: |
+        # Try to detect the default branch
+        DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5 2>/dev/null || echo "")
+        if [ -z "$DEFAULT_BRANCH" ]; then
+          # Fallback: check if master or main exists (prefer master)
+          if git show-ref --verify --quiet refs/remotes/origin/master; then
+            DEFAULT_BRANCH="master"
+          elif git show-ref --verify --quiet refs/remotes/origin/main; then
+            DEFAULT_BRANCH="main"
+          else
+            DEFAULT_BRANCH="master"  # Final fallback to master
+          fi
+        fi
+        echo "default-branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+        echo "🎯 Default branch detected: $DEFAULT_BRANCH"

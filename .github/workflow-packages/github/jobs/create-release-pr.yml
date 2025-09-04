@@ -1,0 +1,112 @@
+name: "Create Release PR"
+description: "Complete reusable workflow for creating release pull requests"
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        description: "NPM package name"
+        required: true
+        type: string
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "lts/*"
+      package-manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+      build-command:
+        description: "Command to build package"
+        required: false
+        type: string
+        default: "npm run build:ci"
+      version-bump:
+        description: "Type of version bump (major, minor, patch)"
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+    outputs:
+      pr-created:
+        description: "Whether a release PR was created"
+        value: ${{ jobs.create-release-pr.outputs.pr-created }}
+      pr-number:
+        description: "The release PR number if created"
+        value: ${{ jobs.create-release-pr.outputs.pr-number }}
+      new-version:
+        description: "The new version that was set"
+        value: ${{ jobs.create-release-pr.outputs.new-version }}
+
+jobs:
+  create-release-pr:
+    name: "📋 Create Release PR"
+    runs-on: ubuntu-latest
+    outputs:
+      pr-created: ${{ steps.create-pr.outputs.pr-created }}
+      pr-number: ${{ steps.create-pr.outputs.pr-number }}
+      new-version: ${{ steps.version.outputs.new-version }}
+
+    steps:
+      - name: Checkout code
+        uses: ../../common/steps/checkout-code.yml
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: ../../common/steps/setup-node.yml
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        uses: ../../npm/steps/install-dependencies.yml
+        with:
+          package-manager: ${{ inputs.package-manager }}
+
+      - name: Calculate new version
+        id: version
+        uses: ../../npm/steps/calculate-version.yml
+        with:
+          version-bump: ${{ inputs.version-bump }}
+
+      - name: Build package
+        uses: ../../common/steps/build-project.yml
+        with:
+          build-command: ${{ inputs.build-command }}
+          environment: production
+
+      - name: Update package version
+        uses: ../../npm/steps/update-package-version.yml
+        with:
+          new-version: ${{ steps.version.outputs.new-version }}
+          package-manager: ${{ inputs.package-manager }}
+
+      - name: Generate comprehensive changelog
+        id: changelog
+        uses: ../../git/steps/generate-comprehensive-changelog.yml
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect default branch
+        id: default-branch
+        uses: ../../git/utilities/detect-default-branch.yml
+
+      - name: Create signed commit
+        id: commit
+        uses: ../../github/api/commits.yml
+        with:
+          commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create pull request
+        id: create-pr
+        uses: ../../github/api/pull-requests.yml
+        with:
+          title: "release: v${{ steps.version.outputs.new-version }}"
+          base-branch: ${{ steps.default-branch.outputs.default-branch }}
+          head-branch: ${{ github.ref_name }}
+          body-content: ${{ steps.changelog.outputs.changelog-content }}
+          labels: "release,${{ inputs.version-bump }}"

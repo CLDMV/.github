@@ -1,0 +1,101 @@
+name: "Generate Release Notes"
+description: "Generate comprehensive release notes from git history"
+
+inputs:
+  version:
+    description: "Version number for the release"
+    required: true
+  package-name:
+    description: "Name of the package being released"
+    required: true
+  package-manager:
+    description: "Package manager used (npm or yarn)"
+    required: false
+    default: "npm"
+
+outputs:
+  release-notes:
+    description: "Generated release notes in markdown format"
+    value: ${{ steps.generate.outputs.release-notes }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate release notes
+      id: generate
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+
+        # Try to find the last release tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$LAST_TAG" ]; then
+          echo "No previous tags found, using initial commit"
+          COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
+        else
+          echo "Last tag: $LAST_TAG"
+          COMMIT_RANGE="$LAST_TAG..HEAD"
+        fi
+
+        echo "## 🚀 What's Changed" > RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+
+        # Breaking Changes
+        echo "### 💥 Breaking Changes" >> RELEASE_NOTES.md
+        BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
+        BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
+          echo "$BREAKING" >> RELEASE_NOTES.md
+          echo "$BREAKING_BODY" >> RELEASE_NOTES.md
+        else
+          echo "_No breaking changes_" >> RELEASE_NOTES.md
+        fi
+        echo "" >> RELEASE_NOTES.md
+
+        # Features
+        echo "### ✨ Features" >> RELEASE_NOTES.md
+        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$FEATURES" ]]; then
+          echo "$FEATURES" >> RELEASE_NOTES.md
+        else
+          echo "_No new features_" >> RELEASE_NOTES.md
+        fi
+        echo "" >> RELEASE_NOTES.md
+
+        # Bug Fixes
+        echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
+        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$FIXES" ]]; then
+          echo "$FIXES" >> RELEASE_NOTES.md
+        else
+          echo "_No bug fixes_" >> RELEASE_NOTES.md
+        fi
+        echo "" >> RELEASE_NOTES.md
+
+        # Other Changes
+        echo "### 🔧 Other Changes" >> RELEASE_NOTES.md
+        OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)" | head -5)
+        if [[ -n "$OTHER" ]]; then
+          echo "$OTHER" >> RELEASE_NOTES.md
+        else
+          echo "_No other changes_" >> RELEASE_NOTES.md
+        fi
+        echo "" >> RELEASE_NOTES.md
+
+        # Installation
+        echo "## 📦 Installation" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo '```bash' >> RELEASE_NOTES.md
+        echo "${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
+        if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+          echo "yarn add ${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
+        else
+          echo "npm install ${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
+        fi
+        echo '```' >> RELEASE_NOTES.md
+
+        # Output the release notes content for use in other steps
+        RELEASE_NOTES=$(cat RELEASE_NOTES.md)
+        echo "release-notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT

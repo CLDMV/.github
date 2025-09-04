@@ -1,0 +1,62 @@
+name: "Create GitHub Release"
+description: "Complete reusable workflow for creating GitHub releases"
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version number for the release"
+        required: true
+        type: string
+      package-name:
+        description: "Name of the package being released"
+        required: true
+        type: string
+      is-prerelease:
+        description: "Whether this is a prerelease"
+        required: false
+        type: boolean
+        default: false
+      package-manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+    outputs:
+      release-id:
+        description: "ID of the created GitHub release"
+        value: ${{ jobs.create-github-release.outputs.release-id }}
+
+jobs:
+  create-github-release:
+    name: "📋 Create GitHub Release"
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create-release.outputs.release-id }}
+
+    steps:
+      - name: Checkout code
+        uses: ../../common/steps/checkout-code.yml
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: release-notes
+        uses: ../../git/steps/generate-release-notes.yml
+        with:
+          version: ${{ inputs.version }}
+          package-name: ${{ inputs.package-name }}
+          package-manager: ${{ inputs.package-manager }}
+
+      - name: Create GitHub release
+        id: create-release
+        uses: ../api/releases.yml
+        with:
+          version: ${{ inputs.version }}
+          package-name: ${{ inputs.package-name }}
+          release-notes: ${{ steps.release-notes.outputs.release-notes }}
+          is-prerelease: ${{ inputs.is-prerelease }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

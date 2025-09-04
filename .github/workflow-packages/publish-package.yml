@@ -1,0 +1,82 @@
+# CLDMV/.github/.github/workflow-packages/publish-package/action.yml
+name: 'Publish Package'
+description: 'Publishes an NPM package to a specified registry with fallback logic'
+
+inputs:
+  registry-name:
+    description: 'Registry display name (e.g., "NPM", "GitHub Packages")'
+    required: true
+  registry-url:
+    description: 'Registry URL to publish to'
+    required: true
+  package-name:
+    description: 'Package name'
+    required: true
+  version:
+    description: 'Package version'
+    required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: true
+  package-manager:
+    description: 'Package manager (npm or yarn)'
+    required: true
+    default: 'npm'
+  publish-command:
+    description: 'Primary publish command to execute'
+    required: true
+  auth-token:
+    description: 'Authentication token for the registry'
+    required: true
+
+outputs:
+  published:
+    description: 'Whether the package was successfully published'
+    value: ${{ steps.publish.outputs.published }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      shell: bash
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+      shell: bash
+
+    - name: Setup Node.js for ${{ inputs.registry-name }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+      shell: bash
+
+    - name: Publish to ${{ inputs.registry-name }}
+      id: publish
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.auth-token }}
+      run: |
+        echo "🚀 Publishing ${{ inputs.package-name }} v${{ inputs.version }} to ${{ inputs.registry-name }}"
+
+        # Try to publish with the provided command
+        if ${{ inputs.publish-command }}; then
+          echo "✅ Successfully published using primary command"
+        else
+          echo "⚠️ ${{ inputs.registry-name }} publish failed, trying with public access as fallback..."
+          
+          # Fallback to public access
+          if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+            yarn publish --access public
+          else
+            npm publish --access public
+          fi
+          
+          echo "✅ Successfully published using fallback command"
+        fi
+
+        echo "published=true" >> $GITHUB_OUTPUT
+        echo "✅ Successfully published to ${{ inputs.registry-name }}"

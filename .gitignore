@@ -1,2 +1,27 @@
 # VS Code settings
 .vscode/
+
+# AI Agent Files
+.cursorrules
+.windsurfrules
+.clinerules
+.cursor/
+.windsurf/
+.cline/
+.aider*
+.aide*
+.claude*
+.copilot*
+.github-copilot*
+ai-instructions.*
+AGENT.md
+AGENTS.md
+CLAUDE.md
+AI.md
+*.ai.md
+*-agent.*
+agent-*
+.ai/
+ai/
+agents/
+.github/copilot-instructions.md

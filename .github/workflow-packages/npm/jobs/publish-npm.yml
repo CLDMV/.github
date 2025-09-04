@@ -1,0 +1,56 @@
+name: "Publish to NPM"
+description: "Complete reusable workflow for publishing to NPM registry"
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        description: "Name of the package to publish"
+        required: true
+        type: string
+      version:
+        description: "Version to publish"
+        required: true
+        type: string
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "lts/*"
+      package-manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+      publish-command:
+        description: "Command to publish the package"
+        required: true
+        type: string
+    secrets:
+      NPM_TOKEN:
+        required: true
+    outputs:
+      published:
+        description: "Whether the package was successfully published"
+        value: ${{ jobs.publish-to-npm.outputs.published }}
+
+jobs:
+  publish-to-npm:
+    name: "📦 Publish to NPM"
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish-package.outputs.published }}
+
+    steps:
+      - name: Publish package to NPM
+        id: publish-package
+        uses: ../../publish-package.yml
+        with:
+          registry-name: "NPM"
+          registry-url: "https://registry.npmjs.org"
+          package-name: ${{ inputs.package-name }}
+          version: ${{ inputs.version }}
+          node-version: ${{ inputs.node-version }}
+          package-manager: ${{ inputs.package-manager }}
+          publish-command: ${{ inputs.publish-command }}
+          auth-token: ${{ secrets.NPM_TOKEN }}

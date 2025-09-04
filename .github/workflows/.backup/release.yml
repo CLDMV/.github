@@ -1,0 +1,499 @@
+# CLDMV/.github/.github/workflows/release-workflow.yml
+name: Release Workflow (Org-Level)
+
+on:
+  workflow_call:
+    inputs:
+      package_name:
+        required: true
+        type: string
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+      node_version:
+        required: false
+        type: string
+        default: "lts/*"
+        description: "Node.js version to use"
+      test_command:
+        required: false
+        type: string
+        default: "npm test"
+        description: "Command to run pre-build tests"
+      build_command:
+        required: false
+        type: string
+        default: "npm run build:ci"
+        description: "Command to build package (should include post-build tests)"
+      package_manager:
+        required: false
+        type: string
+        default: "npm"
+        description: "Package manager (npm or yarn)"
+    outputs:
+      release-pr-created:
+        description: "Whether a release PR was created"
+        value: ${{ jobs.create-release-pr.outputs.pr-created }}
+      release-pr-number:
+        description: "The release PR number if created"
+        value: ${{ jobs.create-release-pr.outputs.pr-number }}
+
+jobs:
+  check-release-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      should-create-pr: ${{ steps.check.outputs.should-create-pr }}
+      version-bump: ${{ steps.check.outputs.version-bump }}
+      commit-message: ${{ steps.check.outputs.commit-message }}
+      has-breaking: ${{ steps.check.outputs.has-breaking }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for release commit
+        id: check
+        run: |
+          # Get the latest commit message and body
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+
+          echo "Latest commit: $COMMIT_MSG"
+          echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
+          # Only trigger on explicit release commits
+          if [[ $COMMIT_MSG =~ ^release!: ]]; then
+            echo "should-create-pr=true" >> $GITHUB_OUTPUT
+            echo "version-bump=major" >> $GITHUB_OUTPUT
+            echo "has-breaking=true" >> $GITHUB_OUTPUT
+            echo "🚀 Breaking release commit detected - will create major version PR"
+          elif [[ $COMMIT_MSG =~ ^release: ]]; then
+            echo "should-create-pr=true" >> $GITHUB_OUTPUT
+            echo "has-breaking=false" >> $GITHUB_OUTPUT
+            
+            # Analyze commits since last release to determine version bump
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -z "$LAST_TAG" ]; then
+              echo "No previous tags found, defaulting to minor release"
+              echo "version-bump=minor" >> $GITHUB_OUTPUT
+            else
+              echo "Last tag: $LAST_TAG"
+              COMMIT_RANGE="$LAST_TAG..HEAD"
+              
+              # Check for breaking changes in the range
+              BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline)
+              BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline)
+              
+              if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
+                echo "version-bump=major" >> $GITHUB_OUTPUT
+                echo "has-breaking=true" >> $GITHUB_OUTPUT
+                echo "🚀 Major release - breaking changes detected in commit history"
+              else
+                # Check for features
+                FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline)
+                if [[ -n "$FEATURE_COMMITS" ]]; then
+                  echo "version-bump=minor" >> $GITHUB_OUTPUT
+                  echo "🎉 Minor release - new features detected"
+                else
+                  echo "version-bump=patch" >> $GITHUB_OUTPUT
+                  echo "🐛 Patch release - only fixes and other changes"
+                fi
+              fi
+            fi
+            echo "📦 Release commit detected - will create release PR"
+          else
+            echo "should-create-pr=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"
+          fi
+
+  run-tests:
+    needs: check-release-commit
+    if: needs.check-release-commit.outputs.should-create-pr == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Run pre-build tests
+        run: ${{ inputs.test_command }}
+        env:
+          NODE_ENV: development
+          NODE_OPTIONS: --conditions=development
+
+  create-release-pr:
+    needs: [check-release-commit, run-tests]
+    if: needs.check-release-commit.outputs.should-create-pr == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      pr-created: ${{ steps.outputs.outputs.pr-created }}
+      pr-number: ${{ steps.outputs.outputs.pr-number }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Get current version and calculate new version
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          # Split version into parts
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+
+          # Calculate new version based on bump type
+          BUMP_TYPE="${{ needs.check-release-commit.outputs.version-bump }}"
+          if [ "$BUMP_TYPE" = "major" ]; then
+            NEW_VERSION="$((MAJOR + 1)).0.0"
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+          else
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "🏷️ Version bump: $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)"
+
+      - name: Build package and run post-build tests
+        run: ${{ inputs.build_command }}
+        env:
+          NODE_ENV: production
+
+      - name: Prepare files for PR
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new-version }}"
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            yarn version --new-version $NEW_VERSION --no-git-tag-version
+          else
+            npm version $NEW_VERSION --no-git-tag-version
+          fi
+          echo "📝 Updated package.json to version $NEW_VERSION"
+
+      - name: Generate comprehensive changelog
+        id: changelog
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new-version }}"
+          BRANCH_NAME="${{ github.ref_name }}"
+
+          # Try to find the last release tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found, using initial commit"
+            COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
+          else
+            echo "Last tag: $LAST_TAG"
+            COMMIT_RANGE="$LAST_TAG..HEAD"
+          fi
+
+          # Create comprehensive changelog
+          cat > CHANGELOG_ENTRY.md << 'EOF'
+          ## 🚀 What's Changed
+
+          ### 💥 Breaking Changes
+          EOF
+
+          BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
+          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
+            echo "$BREAKING" >> CHANGELOG_ENTRY.md
+            echo "$BREAKING_BODY" >> CHANGELOG_ENTRY.md
+          else
+            echo "_No breaking changes_" >> CHANGELOG_ENTRY.md
+          fi
+
+          cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+          ### ✨ Features
+          EOF
+
+          FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$FEATURES" ]]; then
+            echo "$FEATURES" >> CHANGELOG_ENTRY.md
+          else
+            echo "_No new features_" >> CHANGELOG_ENTRY.md
+          fi
+
+          cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+          ### 🐛 Bug Fixes
+          EOF
+
+          FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$FIXES" ]]; then
+            echo "$FIXES" >> CHANGELOG_ENTRY.md
+          else
+            echo "_No bug fixes_" >> CHANGELOG_ENTRY.md
+          fi
+
+          cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+          ### 🔧 Other Changes
+          EOF
+
+          OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)" | head -5)
+          if [[ -n "$OTHER" ]]; then
+            echo "$OTHER" >> CHANGELOG_ENTRY.md
+          else
+            echo "_No other changes_" >> CHANGELOG_ENTRY.md
+          fi
+
+          cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+          ### 👥 Contributors
+          EOF
+
+          # Get contributors using GitHub API for accurate user mapping
+          # First, get the date range for commits
+          if [ -z "$LAST_TAG" ]; then
+            # If no previous tag, get all contributors
+            CONTRIBUTORS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/contributors" | \
+              jq -r '.[].login' 2>/dev/null)
+          else
+            # Get commits in range and extract unique authors via GitHub API
+            COMMIT_SHAS=$(git log $COMMIT_RANGE --pretty=format:"%H" | head -20)
+            CONTRIBUTORS_LIST=""
+            
+            for sha in $COMMIT_SHAS; do
+              AUTHOR=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${{ github.repository }}/commits/$sha" | \
+                jq -r '.author.login // empty' 2>/dev/null)
+              
+              if [[ -n "$AUTHOR" && "$AUTHOR" != "null" && "$AUTHOR" != "empty" ]]; then
+                CONTRIBUTORS_LIST="$CONTRIBUTORS_LIST $AUTHOR"
+              fi
+            done
+            
+            # Remove duplicates
+            CONTRIBUTORS=$(echo $CONTRIBUTORS_LIST | tr ' ' '\n' | sort -u | grep -v '^$')
+          fi
+
+          if [[ -n "$CONTRIBUTORS" ]]; then
+            echo "$CONTRIBUTORS" | while read -r contributor; do
+              if [[ -n "$contributor" ]]; then
+                echo "- @$contributor" >> CHANGELOG_ENTRY.md
+              fi
+            done
+          else
+            # Fallback to git author names if GitHub API fails
+            AUTHOR_NAMES=$(git log $COMMIT_RANGE --pretty=format:"- %an" | sort -u)
+            if [[ -n "$AUTHOR_NAMES" ]]; then
+              echo "$AUTHOR_NAMES" >> CHANGELOG_ENTRY.md
+            else
+              echo "_No contributors found_" >> CHANGELOG_ENTRY.md
+            fi
+          fi
+
+          echo "📄 Generated comprehensive changelog"
+
+          # Output the changelog content for use in PR body
+          echo "changelog-content<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG_ENTRY.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Detect default branch
+        id: default-branch
+        run: |
+          # Try to detect the default branch
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5 2>/dev/null || echo "")
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            # Fallback: check if master or main exists (prefer master)
+            if git show-ref --verify --quiet refs/remotes/origin/master; then
+              DEFAULT_BRANCH="master"
+            elif git show-ref --verify --quiet refs/remotes/origin/main; then
+              DEFAULT_BRANCH="main"
+            else
+              DEFAULT_BRANCH="master"  # Final fallback to master
+            fi
+          fi
+          echo "default-branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+          echo "🎯 Default branch detected: $DEFAULT_BRANCH"
+
+      - name: Commit version bump and build artifacts using GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if there are changes to commit
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Get current branch and commit info
+          CURRENT_BRANCH="${{ github.ref_name }}"
+          BASE_SHA=$(git rev-parse HEAD)
+
+          # Create tree with all changes using GitHub API
+          echo "📦 Creating tree with version bump and build artifacts..."
+
+          # First, ensure all objects are pushed to GitHub
+          git update-index --refresh || true
+
+          # Create tree SHA locally and verify it exists
+          TREE_SHA=$(git write-tree)
+          echo "Local tree SHA: $TREE_SHA"
+
+          # Verify the tree exists locally
+          if ! git cat-file -e "$TREE_SHA"; then
+            echo "❌ Tree SHA $TREE_SHA does not exist locally"
+            exit 1
+          fi
+
+          # Create the tree via GitHub API to ensure it exists remotely
+          echo "🔄 Creating tree via GitHub API..."
+
+          # Get all files in the staging area
+          FILES_JSON=$(git diff --cached --name-only | while read file; do
+            if [ -f "$file" ]; then
+              BLOB_SHA=$(git hash-object "$file")
+              echo "{\"path\":\"$file\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"$BLOB_SHA\"}"
+            fi
+          done | jq -s .)
+
+          # Create tree via API
+          TREE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/trees" \
+            -d "{
+              \"base_tree\": \"$(git rev-parse HEAD^{tree})\",
+              \"tree\": $FILES_JSON
+            }")
+
+          API_TREE_SHA=$(echo "$TREE_RESPONSE" | jq -r '.sha')
+
+          if [ "$API_TREE_SHA" = "null" ] || [ -z "$API_TREE_SHA" ]; then
+            echo "⚠️ Failed to create tree via API, using local tree SHA"
+            echo "Tree response: $TREE_RESPONSE"
+            FINAL_TREE_SHA="$TREE_SHA"
+          else
+            echo "✅ Created tree via API: $API_TREE_SHA"
+            FINAL_TREE_SHA="$API_TREE_SHA"
+          fi
+
+          # Create commit using GitHub API (automatically signed)
+          echo "✍️ Creating signed commit via GitHub API..."
+          COMMIT_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/commits" \
+            -d "{
+              \"message\": \"chore: bump version to ${{ steps.version.outputs.new-version }}\",
+              \"tree\": \"$FINAL_TREE_SHA\",
+              \"parents\": [\"$BASE_SHA\"]
+            }")
+
+          # Extract new commit SHA and verification status
+          NEW_COMMIT_SHA=$(echo "$COMMIT_RESPONSE" | jq -r '.sha')
+          VERIFIED=$(echo "$COMMIT_RESPONSE" | jq -r '.verification.verified')
+          VERIFICATION_REASON=$(echo "$COMMIT_RESPONSE" | jq -r '.verification.reason')
+
+          if [ "$NEW_COMMIT_SHA" = "null" ] || [ -z "$NEW_COMMIT_SHA" ]; then
+            echo "❌ Failed to create commit via API"
+            echo "Response: $COMMIT_RESPONSE"
+            exit 1
+          fi
+
+          echo "✅ Created commit: $NEW_COMMIT_SHA"
+          echo "🔐 Verified: $VERIFIED (reason: $VERIFICATION_REASON)"
+
+          # Update branch reference to new signed commit
+          echo "📌 Updating branch reference..."
+          UPDATE_RESPONSE=$(curl -s -X PATCH \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$CURRENT_BRANCH" \
+            -d "{
+              \"sha\": \"$NEW_COMMIT_SHA\"
+            }")
+
+          echo "✅ Updated branch $CURRENT_BRANCH to signed commit"
+          echo "Update response: $UPDATE_RESPONSE"
+
+      - name: Create Pull Request
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head ${{ github.ref_name }} --base ${{ steps.default-branch.outputs.default-branch }} --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR already exists: #$EXISTING_PR"
+            echo "pull-request-number=$EXISTING_PR" >> $GITHUB_OUTPUT
+          else
+            # Create new PR
+            PR_URL=$(gh pr create \
+              --title "release: v${{ steps.version.outputs.new-version }}" \
+              --base ${{ steps.default-branch.outputs.default-branch }} \
+              --head ${{ github.ref_name }} \
+              --body-file PR_BODY.md \
+              --label "release,${{ needs.check-release-commit.outputs.version-bump }}")
+            
+            # Extract PR number from URL
+            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]\+$')
+            
+            echo "Created PR: #$PR_NUMBER"
+            echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set outputs
+        id: outputs
+        run: |
+          if [ "${{ steps.create-pr.outputs.pull-request-number }}" != "" ]; then
+            echo "pr-created=true" >> $GITHUB_OUTPUT
+            echo "pr-number=${{ steps.create-pr.outputs.pull-request-number }}" >> $GITHUB_OUTPUT
+          else
+            echo "pr-created=false" >> $GITHUB_OUTPUT
+            echo "pr-number=" >> $GITHUB_OUTPUT
+          fi
+
+  notify-completion:
+    needs: [check-release-commit, create-release-pr]
+    if: always() && needs.check-release-commit.outputs.should-create-pr == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Summary
+        run: |
+          if [[ "${{ needs.create-release-pr.outputs.pr-created }}" == "true" ]]; then
+            echo "✅ Release PR created successfully!"
+            echo "📋 PR Number: ${{ needs.create-release-pr.outputs.pr-number }}"
+          else
+            echo "❌ Failed to create release PR"
+            exit 1
+          fi

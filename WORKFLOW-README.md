@@ -38,32 +38,28 @@ This repository contains reusable GitHub Actions workflows and modular component
 - **Purpose**: Comprehensive testing and building for NPM packages
 - **Triggers**: Push to any branch, PR to master/main
 - **Features**: Multi-version Node.js testing, linting, performance tests, artifact uploads
-- **Usage**: `CLDMV/.github/.github/workflows/ci.yml@v1`
-- **Note**: The `@v1` tag automatically points to the latest v1.x.x version
+- **Usage**: `CLDMV/.github/workflows/ci.yml@v1`
 
 ### Release Workflow (`release.yml`)
 
 - **Purpose**: Creates release PRs from release commits with changelog generation
 - **Triggers**: Push to non-master/main branches (when you push `release:` or `release!:` commits)
 - **Features**: Version detection, changelog generation, signed commits, automated PRs
-- **Usage**: `CLDMV/.github/.github/workflows/release.yml@v1`
-- **Note**: The `@v1` tag automatically points to the latest v1.x.x version
+- **Usage**: `CLDMV/.github/workflows/release.yml@v1`
 
 ### Publish Workflow (`publish.yml`)
 
 - **Purpose**: Publishes packages to NPM and creates GitHub releases
 - **Triggers**: PR closed on master branch (when release PRs are merged)
 - **Features**: Automated versioning, NPM publishing, GitHub releases, artifact management
-- **Usage**: `CLDMV/.github/.github/workflows/publish.yml@v1`
-- **Note**: The `@v1` tag automatically points to the latest v1.x.x version
+- **Usage**: `CLDMV/.github/workflows/publish.yml@v1`
 
-### Version Tags Workflow (`update-major-version-tags.yml`)
+### Update Major Version Tags Workflow (`update-major-version-tags.yml`)
 
-- **Purpose**: Automatically maintains major version tags (@v1, @v2, etc.) for workflow references
-- **Triggers**: Release published, semantic version tags pushed
-- **Features**: Updates major/minor version tags, creates VERSION_TAGS.md documentation
-- **Usage**: `CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1`
-- **Note**: Enables using `@v1` references in workflow calls, which auto-update to latest v1.x.x
+- **Purpose**: Automatically maintains major version tags (e.g., `v1`, `v2`) for semantic versioning
+- **Triggers**: New release published or semantic version tag pushed
+- **Features**: Auto-updates `v1` → `v1.x.x`, creates documentation, maintains version compatibility
+- **Usage**: `CLDMV/.github/workflows/update-major-version-tags.yml@v1`
 
 ## 🏗️ Modular Architecture
 

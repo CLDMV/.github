@@ -1,0 +1,64 @@
+name: "Update Major Version Tags"
+description: "Update major and minor version tags to point to the latest patch version"
+
+inputs:
+  tag-name:
+    description: "The semantic version tag to process (e.g., v1.2.3)"
+    required: true
+
+outputs:
+  major-version:
+    description: "The major version tag that was updated (e.g., v1)"
+    value: ${{ steps.update.outputs.major-version }}
+  minor-version:
+    description: "The minor version tag that was updated (e.g., v1.2)"
+    value: ${{ steps.update.outputs.minor-version }}
+  updated:
+    description: "Whether tags were successfully updated"
+    value: ${{ steps.update.outputs.updated }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Update version tags
+      id: update
+      shell: bash
+      run: |
+        TAG_NAME="${{ inputs.tag-name }}"
+        echo "Processing tag: $TAG_NAME"
+
+        # Validate that this is a semantic version tag
+        if [[ ! $TAG_NAME =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          echo "Tag $TAG_NAME is not a semantic version tag, skipping"
+          echo "updated=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Extract major and minor versions
+        MAJOR_VERSION="v${BASH_REMATCH[1]}"
+        MINOR_VERSION="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+
+        echo "Major version: $MAJOR_VERSION"
+        echo "Minor version: $MINOR_VERSION"
+
+        # Get the commit SHA for the tag
+        TAG_SHA=$(git rev-list -n 1 "$TAG_NAME")
+        echo "Tag SHA: $TAG_SHA"
+
+        # Update major version tag (e.g., v1)
+        echo "🏷️ Updating major version tag $MAJOR_VERSION to point to $TAG_NAME"
+        git tag -f "$MAJOR_VERSION" "$TAG_SHA"
+        git push origin "$MAJOR_VERSION" --force
+
+        # Update minor version tag (e.g., v1.1)
+        echo "🏷️ Updating minor version tag $MINOR_VERSION to point to $TAG_NAME"
+        git tag -f "$MINOR_VERSION" "$TAG_SHA"
+        git push origin "$MINOR_VERSION" --force
+
+        echo "✅ Successfully updated version tags"
+        echo "- $MAJOR_VERSION → $TAG_NAME"
+        echo "- $MINOR_VERSION → $TAG_NAME"
+
+        echo "major-version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
+        echo "minor-version=$MINOR_VERSION" >> $GITHUB_OUTPUT
+        echo "updated=true" >> $GITHUB_OUTPUT

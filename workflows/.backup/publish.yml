@@ -1,0 +1,585 @@
+# CLDMV/.github/.github/workflows/publish-workflow.yml
+name: Publish Workflow (Org-Level)
+
+on:
+  workflow_call:
+    inputs:
+      package_name:
+        required: true
+        type: string
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+      node_version:
+        required: false
+        type: string
+        default: "lts/*"
+        description: "Node.js version to use"
+      test_command:
+        required: false
+        type: string
+        default: "npm test"
+        description: "Command to run pre-build tests"
+      build_command:
+        required: false
+        type: string
+        default: "npm run build:ci"
+        description: "Command to build package (should include post-build tests)"
+      publish_command:
+        required: false
+        type: string
+        default: ""
+        description: "Command to publish package to NPM (auto-detects access level if empty)"
+      github_packages_publish_command:
+        required: false
+        type: string
+        default: ""
+        description: "Command to publish package to GitHub Packages (auto-detects access level if empty)"
+      publish_to_npm:
+        required: false
+        type: boolean
+        default: true
+        description: "Publish to NPM registry"
+      skip_publish:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip ALL publishing (for testing)"
+      publish_to_github_packages:
+        required: false
+        type: boolean
+        default: true
+        description: "Publish to GitHub Packages registry"
+      package_manager:
+        required: false
+        type: string
+        default: "npm"
+        description: "Package manager (npm or yarn)"
+    secrets:
+      NPM_TOKEN:
+        required: true
+    outputs:
+      published:
+        description: "Whether the package was successfully published"
+        value: ${{ jobs.detect-release.outputs.should-release }}
+
+      npm-published:
+        description: "Whether the package was published to NPM"
+        value: ${{ jobs.publish-to-npm.outputs.published || 'false' }}
+
+      github-packages-published:
+        description: "Whether the package was published to GitHub Packages"
+        value: ${{ jobs.publish-to-github-packages.outputs.published || 'false' }}
+
+      version:
+        description: "Version of the package that was published"
+        value: ${{ jobs.detect-release.outputs.version }}
+
+      release-id:
+        description: "GitHub release ID"
+        value: ${{ jobs.create-github-release.outputs.release-id }}
+
+      repo-is-private:
+        description: "Whether repository is private"
+        value: ${{ jobs.detect-repo-config.outputs.repo-is-private }}
+
+      npm-command:
+        description: "Auto-detected NPM publish command"
+        value: ${{ jobs.detect-repo-config.outputs.npm-command }}
+
+      github-packages-command:
+        description: "Auto-detected GitHub Packages publish command"
+        value: ${{ jobs.detect-repo-config.outputs.github-packages-command }}
+
+jobs:
+  detect-release:
+    name: "🔍 Detect Release"
+    if: |
+      github.event.pull_request.merged == true &&
+      (startsWith(github.event.pull_request.title, 'release:') ||
+       contains(github.event.pull_request.labels.*.name, 'release'))
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      version: ${{ steps.check.outputs.version }}
+      is-prerelease: ${{ steps.check.outputs.is-prerelease }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Extract version from PR
+        id: check
+        run: |
+          # Extract version from PR title or check for release label
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          HAS_RELEASE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'release') }}"
+
+          echo "PR Title: $PR_TITLE"
+          echo "Has release label: $HAS_RELEASE_LABEL"
+
+          # Check if title starts with "release:" and extract version
+          if [[ $PR_TITLE =~ ^release:\ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            echo "should-release=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            echo "🚀 Release PR merged for version $VERSION (from title)"
+          # Check if has release label (fallback for manual releases)
+          elif [[ "$HAS_RELEASE_LABEL" == "true" ]]; then
+            # Try to extract version from title even if it doesn't start with "release:"
+            if [[ $PR_TITLE =~ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+              VERSION="${BASH_REMATCH[1]}"
+              echo "should-release=true" >> $GITHUB_OUTPUT
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "is-prerelease=false" >> $GITHUB_OUTPUT
+              echo "🚀 Release PR merged for version $VERSION (from label + title)"
+            else
+              echo "should-release=false" >> $GITHUB_OUTPUT
+              echo "❌ Release label found but could not extract version from title: $PR_TITLE"
+            fi
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Not a release PR (title doesn't start with 'release:' and no release label)"
+          fi
+
+  build-and-test:
+    name: "🏗️ Build & Test"
+    needs: detect-release
+    if: needs.detect-release.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Run pre-build tests
+        run: ${{ inputs.test_command }}
+        env:
+          NODE_ENV: development
+          NODE_OPTIONS: --conditions=development
+
+      - name: Build package (includes post-build tests)
+        run: ${{ inputs.build_command }}
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            lib/
+            build/
+            *.tgz
+            package.json
+            package-lock.json
+            yarn.lock
+          retention-days: 1
+
+  create-github-release:
+    name: "📋 Create GitHub Release"
+    needs: [detect-release, build-and-test]
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create-release.outputs.id }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.detect-release.outputs.version }}"
+
+          # Try to find the last release tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found, using initial commit"
+            COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
+          else
+            echo "Last tag: $LAST_TAG"
+            COMMIT_RANGE="$LAST_TAG..HEAD"
+          fi
+
+          echo "## 🚀 What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+
+          # Breaking Changes
+          echo "### 💥 Breaking Changes" >> RELEASE_NOTES.md
+          BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
+          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
+            echo "$BREAKING" >> RELEASE_NOTES.md
+            echo "$BREAKING_BODY" >> RELEASE_NOTES.md
+          else
+            echo "_No breaking changes_" >> RELEASE_NOTES.md
+          fi
+          echo "" >> RELEASE_NOTES.md
+
+          # Features
+          echo "### ✨ Features" >> RELEASE_NOTES.md
+          FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$FEATURES" ]]; then
+            echo "$FEATURES" >> RELEASE_NOTES.md
+          else
+            echo "_No new features_" >> RELEASE_NOTES.md
+          fi
+          echo "" >> RELEASE_NOTES.md
+
+          # Bug Fixes
+          echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
+          FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+          if [[ -n "$FIXES" ]]; then
+            echo "$FIXES" >> RELEASE_NOTES.md
+          else
+            echo "_No bug fixes_" >> RELEASE_NOTES.md
+          fi
+          echo "" >> RELEASE_NOTES.md
+
+          # Other Changes
+          echo "### 🔧 Other Changes" >> RELEASE_NOTES.md
+          OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)" | head -5)
+          if [[ -n "$OTHER" ]]; then
+            echo "$OTHER" >> RELEASE_NOTES.md
+          else
+            echo "_No other changes_" >> RELEASE_NOTES.md
+          fi
+          echo "" >> RELEASE_NOTES.md
+
+          # Installation
+          echo "## 📦 Installation" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo '```bash' >> RELEASE_NOTES.md
+          echo "${{ inputs.package_name }}@$VERSION" >> RELEASE_NOTES.md
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            echo "yarn add ${{ inputs.package_name }}@$VERSION" >> RELEASE_NOTES.md
+          else
+            echo "npm install ${{ inputs.package_name }}@$VERSION" >> RELEASE_NOTES.md
+          fi
+          echo '```' >> RELEASE_NOTES.md
+
+      - name: Create signed tag and GitHub Release via API
+        id: create-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.detect-release.outputs.version }}"
+          TAG_NAME="v$VERSION"
+          RELEASE_NAME="${{ inputs.package_name }} v$VERSION"
+
+          # Get current commit SHA
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "Creating signed tag for commit: $COMMIT_SHA"
+
+          # Create signed annotated tag via GitHub API
+          echo "🏷️ Creating signed annotated tag via GitHub API..."
+          TAG_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/tags" \
+            -d "{
+              \"tag\": \"$TAG_NAME\",
+              \"message\": \"Release $TAG_NAME\",
+              \"object\": \"$COMMIT_SHA\",
+              \"type\": \"commit\"
+            }")
+
+          TAG_SHA=$(echo "$TAG_RESPONSE" | jq -r '.sha')
+
+          if [ "$TAG_SHA" = "null" ] || [ -z "$TAG_SHA" ]; then
+            echo "❌ Failed to create tag via API"
+            echo "Response: $TAG_RESPONSE"
+            exit 1
+          fi
+
+          echo "✅ Created signed tag: $TAG_SHA"
+
+          # Create tag reference
+          echo "📌 Creating tag reference..."
+          REF_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs" \
+            -d "{
+              \"ref\": \"refs/tags/$TAG_NAME\",
+              \"sha\": \"$TAG_SHA\"
+            }")
+
+          echo "✅ Created tag reference"
+
+          # Create GitHub Release
+          echo "🚀 Creating GitHub Release..."
+          RELEASE_BODY=$(cat RELEASE_NOTES.md)
+          RELEASE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" \
+            -d "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"$RELEASE_NAME\",
+              \"body\": $(echo "$RELEASE_BODY" | jq -Rs .),
+              \"draft\": false,
+              \"prerelease\": ${{ needs.detect-release.outputs.is-prerelease }}
+            }")
+
+          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id')
+
+          if [ "$RELEASE_ID" = "null" ] || [ -z "$RELEASE_ID" ]; then
+            echo "❌ Failed to create release"
+            echo "Response: $RELEASE_RESPONSE"
+            exit 1
+          fi
+
+          echo "✅ Created GitHub Release: $RELEASE_ID"
+          echo "id=$RELEASE_ID" >> $GITHUB_OUTPUT
+
+          # Verify tag signature
+          echo "🔐 Verifying tag signature..."
+          TAG_VERIFY_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/git/tags/$TAG_SHA")
+
+          VERIFIED=$(echo "$TAG_VERIFY_RESPONSE" | jq -r '.verification.verified // false')
+          VERIFICATION_REASON=$(echo "$TAG_VERIFY_RESPONSE" | jq -r '.verification.reason // "unknown"')
+
+          echo "🔐 Tag verified: $VERIFIED (reason: $VERIFICATION_REASON)"
+
+  detect-repo-config:
+    name: "🔧 Detect Repository Config"
+    needs: [detect-release, build-and-test, create-github-release]
+    if: |
+      inputs.skip_publish != true && 
+      (inputs.publish_to_npm == true || inputs.publish_to_github_packages == true)
+    runs-on: ubuntu-latest
+    outputs:
+      npm-command: ${{ steps.auto-detect.outputs.npm-command }}
+      github-packages-command: ${{ steps.auto-detect.outputs.github-packages-command }}
+      repo-is-private: ${{ steps.auto-detect.outputs.repo-is-private }}
+
+    steps:
+      - name: Detect repository visibility and auto-configure publish commands
+        id: auto-detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get repository information
+          REPO_INFO=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}")
+
+          IS_PRIVATE=$(echo "$REPO_INFO" | jq -r '.private')
+          echo "Repository is private: $IS_PRIVATE"
+
+          # Determine access level based on repo visibility
+          if [ "$IS_PRIVATE" = "true" ]; then
+            ACCESS_LEVEL="restricted"
+            echo "🔒 Private repository detected - using restricted access for auto-detection"
+          else
+            ACCESS_LEVEL="public"
+            echo "🌍 Public repository detected - using public access for auto-detection"
+          fi
+
+          # Set NPM publish command - use custom if provided, otherwise auto-detect
+          NPM_COMMAND="${{ inputs.publish_command }}"
+          if [ -z "$NPM_COMMAND" ]; then
+            if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+              NPM_COMMAND="yarn publish --access $ACCESS_LEVEL"
+            else
+              NPM_COMMAND="npm publish --access $ACCESS_LEVEL"
+            fi
+            echo "📦 Auto-detected NPM command: $NPM_COMMAND"
+          else
+            echo "📦 Using custom NPM command: $NPM_COMMAND"
+          fi
+
+          # Set GitHub Packages publish command - use custom if provided, otherwise auto-detect
+          GH_COMMAND="${{ inputs.github_packages_publish_command }}"
+          if [ -z "$GH_COMMAND" ]; then
+            if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+              GH_COMMAND="yarn publish --access $ACCESS_LEVEL"
+            else
+              GH_COMMAND="npm publish --access $ACCESS_LEVEL"
+            fi
+            echo "📦 Auto-detected GitHub Packages command: $GH_COMMAND"
+          else
+            echo "📦 Using custom GitHub Packages command: $GH_COMMAND"
+          fi
+
+          # Output the commands for use in later steps
+          echo "npm-command=$NPM_COMMAND" >> $GITHUB_OUTPUT
+          echo "github-packages-command=$GH_COMMAND" >> $GITHUB_OUTPUT
+          echo "repo-is-private=$IS_PRIVATE" >> $GITHUB_OUTPUT
+
+  publish-to-npm:
+    name: "📦 Publish to NPM"
+    needs: [detect-release, detect-repo-config]
+    if: inputs.skip_publish != true && inputs.publish_to_npm == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish-package.outputs.published }}
+
+    steps:
+      - name: Publish package to NPM
+        id: publish-package
+        uses: CLDMV/.github/workflow-packages/publish-package
+        with:
+          registry-name: "NPM"
+          registry-url: "https://registry.npmjs.org"
+          package-name: ${{ inputs.package_name }}
+          version: ${{ needs.detect-release.outputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ needs.detect-repo-config.outputs.npm-command }}
+          auth-token: ${{ secrets.NPM_TOKEN }}
+
+  publish-to-github-packages:
+    name: "📦 Publish to GitHub Packages"
+    needs: [detect-release, detect-repo-config]
+    if: inputs.skip_publish != true && inputs.publish_to_github_packages == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish-package.outputs.published }}
+
+    steps:
+      - name: Publish package to GitHub Packages
+        id: publish-package
+        uses: CLDMV/.github/workflow-packages/publish-package
+        with:
+          registry-name: "GitHub Packages"
+          registry-url: "https://npm.pkg.github.com"
+          package-name: ${{ inputs.package_name }}
+          version: ${{ needs.detect-release.outputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ needs.detect-repo-config.outputs.github-packages-command }}
+          auth-token: ${{ secrets.GITHUB_TOKEN }}
+
+  add-success-comment:
+    name: "💬 Add Success Comment"
+    needs: [detect-release, publish-to-npm, publish-to-github-packages]
+    if: |
+      always() && 
+      inputs.skip_publish != true && 
+      (needs.publish-to-npm.result == 'success' || needs.publish-to-github-packages.result == 'success') &&
+      (inputs.publish_to_npm == true || inputs.publish_to_github_packages == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add success comment to commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.detect-release.outputs.version }}';
+            const packageName = '${{ inputs.package_name }}';
+            const publishToNPM = '${{ inputs.publish_to_npm }}' === 'true';
+            const publishToGitHub = '${{ inputs.publish_to_github_packages }}' === 'true';
+            const npmPublished = '${{ needs.publish-to-npm.result }}' === 'success';
+            const githubPublished = '${{ needs.publish-to-github-packages.result }}' === 'success';
+
+            let comment = `🎉 **Package published successfully!**
+
+            🏷️ **Version:** ${version}`;
+
+            if (publishToNPM && npmPublished) {
+              comment += `
+
+            📦 **NPM:** [${packageName}@${version}](https://www.npmjs.com/package/${packageName}/v/${version})
+            📥 **Install:** \`npm install ${packageName}@${version}\``;
+            }
+
+            if (publishToGitHub && githubPublished) {
+              comment += `
+
+            📦 **GitHub Packages:** [${packageName}@${version}](https://github.com/${{ github.repository }}/packages/)
+            📥 **Install from GitHub:** \`npm install --registry=https://npm.pkg.github.com ${packageName}@${version}\``;
+            }
+
+            comment += `
+
+            The package is now available for installation! 🚀`;
+
+            try {
+              // Get the latest commit SHA from the default branch
+              const { data: ref } = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/' + context.ref.replace('refs/heads/', '')
+              });
+              
+              const commitSha = ref.object.sha;
+              
+              await github.rest.repos.createCommitComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: commitSha,
+                body: comment
+              });
+              
+              console.log(`✅ Successfully added comment to commit ${commitSha}`);
+            } catch (error) {
+              console.log(`⚠️ Failed to add commit comment: ${error.message}`);
+              // Don't fail the workflow if comment creation fails
+            }
+
+  notify-completion:
+    name: "✅ Release Summary"
+    needs: [detect-release, create-github-release, publish-to-npm, publish-to-github-packages]
+    if: always() && needs.detect-release.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Release completion summary
+        run: |
+          VERSION="${{ needs.detect-release.outputs.version }}"
+          PACKAGE="${{ inputs.package_name }}"
+
+          echo "🎊 Release $PACKAGE v$VERSION completed!"
+          echo "✅ GitHub Release: Created"
+
+          # Check NPM publish status
+          if [[ "${{ inputs.publish_to_npm }}" == "true" ]]; then
+            if [[ "${{ needs.publish-to-npm.result }}" == "success" ]]; then
+              echo "✅ NPM Publish: Success"
+            else
+              echo "❌ NPM Publish: Failed"
+            fi
+          else
+            echo "⏭️ NPM Publish: Disabled"
+          fi
+
+          # Check GitHub Packages publish status
+          if [[ "${{ inputs.publish_to_github_packages }}" == "true" ]]; then
+            if [[ "${{ needs.publish-to-github-packages.result }}" == "success" ]]; then
+              echo "✅ GitHub Packages Publish: Success"
+            else
+              echo "❌ GitHub Packages Publish: Failed"
+            fi
+          else
+            echo "⏭️ GitHub Packages Publish: Disabled"
+          fi
+
+          if [[ "${{ inputs.skip_publish }}" == "true" ]]; then
+            echo "⏭️ All Publishing: Skipped (configured)"
+          fi
+
+          echo ""
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+
+          if [[ "${{ inputs.publish_to_npm }}" == "true" && "${{ needs.publish-to-npm.result }}" == "success" ]]; then
+            echo "📦 NPM URL: https://www.npmjs.com/package/$PACKAGE/v/$VERSION"
+          fi

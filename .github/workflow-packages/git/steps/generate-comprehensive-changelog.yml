@@ -1,0 +1,136 @@
+name: "Generate Comprehensive Changelog"
+description: "Generate detailed changelog with breaking changes, features, fixes, and contributors"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+
+outputs:
+  changelog-content:
+    description: "Generated changelog content in markdown format"
+    value: ${{ steps.changelog.outputs.changelog-content }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate comprehensive changelog
+      id: changelog
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Try to find the last release tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$LAST_TAG" ]; then
+          echo "No previous tags found, using initial commit"
+          COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
+        else
+          echo "Last tag: $LAST_TAG"
+          COMMIT_RANGE="$LAST_TAG..HEAD"
+        fi
+
+        # Create comprehensive changelog
+        cat > CHANGELOG_ENTRY.md << 'EOF'
+        ## 🚀 What's Changed
+
+        ### 💥 Breaking Changes
+        EOF
+
+        BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
+        BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
+          echo "$BREAKING" >> CHANGELOG_ENTRY.md
+          echo "$BREAKING_BODY" >> CHANGELOG_ENTRY.md
+        else
+          echo "_No breaking changes_" >> CHANGELOG_ENTRY.md
+        fi
+
+        cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+        ### ✨ Features
+        EOF
+
+        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$FEATURES" ]]; then
+          echo "$FEATURES" >> CHANGELOG_ENTRY.md
+        else
+          echo "_No new features_" >> CHANGELOG_ENTRY.md
+        fi
+
+        cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+        ### 🐛 Bug Fixes
+        EOF
+
+        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+        if [[ -n "$FIXES" ]]; then
+          echo "$FIXES" >> CHANGELOG_ENTRY.md
+        else
+          echo "_No bug fixes_" >> CHANGELOG_ENTRY.md
+        fi
+
+        cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+        ### 🔧 Other Changes
+        EOF
+
+        OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)" | head -5)
+        if [[ -n "$OTHER" ]]; then
+          echo "$OTHER" >> CHANGELOG_ENTRY.md
+        else
+          echo "_No other changes_" >> CHANGELOG_ENTRY.md
+        fi
+
+        cat >> CHANGELOG_ENTRY.md << 'EOF'
+
+        ### 👥 Contributors
+        EOF
+
+        # Get contributors using GitHub API for accurate user mapping
+        if [ -z "$LAST_TAG" ]; then
+          # If no previous tag, get all contributors
+          CONTRIBUTORS=$(curl -s -H "Authorization: token ${{ inputs.github-token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/contributors" | \
+            jq -r '.[].login' 2>/dev/null)
+        else
+          # Get commits in range and extract unique authors via GitHub API
+          COMMIT_SHAS=$(git log $COMMIT_RANGE --pretty=format:"%H" | head -20)
+          CONTRIBUTORS_LIST=""
+          
+          for sha in $COMMIT_SHAS; do
+            AUTHOR=$(curl -s -H "Authorization: token ${{ inputs.github-token }}" \
+              "https://api.github.com/repos/${{ github.repository }}/commits/$sha" | \
+              jq -r '.author.login // empty' 2>/dev/null)
+            
+            if [[ -n "$AUTHOR" && "$AUTHOR" != "null" && "$AUTHOR" != "empty" ]]; then
+              CONTRIBUTORS_LIST="$CONTRIBUTORS_LIST $AUTHOR"
+            fi
+          done
+          
+          # Remove duplicates
+          CONTRIBUTORS=$(echo $CONTRIBUTORS_LIST | tr ' ' '\n' | sort -u | grep -v '^$')
+        fi
+
+        if [[ -n "$CONTRIBUTORS" ]]; then
+          echo "$CONTRIBUTORS" | while read -r contributor; do
+            if [[ -n "$contributor" ]]; then
+              echo "- @$contributor" >> CHANGELOG_ENTRY.md
+            fi
+          done
+        else
+          # Fallback to git author names if GitHub API fails
+          AUTHOR_NAMES=$(git log $COMMIT_RANGE --pretty=format:"- %an" | sort -u)
+          if [[ -n "$AUTHOR_NAMES" ]]; then
+            echo "$AUTHOR_NAMES" >> CHANGELOG_ENTRY.md
+          else
+            echo "_No contributors found_" >> CHANGELOG_ENTRY.md
+          fi
+        fi
+
+        echo "📄 Generated comprehensive changelog"
+
+        # Output the changelog content for use in PR body
+        echo "changelog-content<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG_ENTRY.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT

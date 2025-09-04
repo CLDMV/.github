@@ -1,0 +1,25 @@
+name: "Update Package Version"
+description: "Update package.json version using the appropriate package manager"
+
+inputs:
+  new-version:
+    description: "New version to set"
+    required: true
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Update package version
+      shell: bash
+      run: |
+        NEW_VERSION="${{ inputs.new-version }}"
+        if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+          yarn version --new-version $NEW_VERSION --no-git-tag-version
+        else
+          npm version $NEW_VERSION --no-git-tag-version
+        fi
+        echo "📝 Updated package.json to version $NEW_VERSION"

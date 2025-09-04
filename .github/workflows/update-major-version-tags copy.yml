@@ -1,0 +1,75 @@
+# CLDMV/.github/workflows/update-major-version-tags.yml
+name: 🏷️ Update Major Version Tags
+
+on:
+  workflow_call:
+    inputs:
+      create-documentation:
+        description: "Whether to create/update VERSION_TAGS.md documentation"
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      major-version:
+        description: "The major version tag that was updated"
+        value: ${{ jobs.update-tags.outputs.major-version }}
+      minor-version:
+        description: "The minor version tag that was updated"
+        value: ${{ jobs.update-tags.outputs.minor-version }}
+      updated:
+        description: "Whether tags were successfully updated"
+        value: ${{ jobs.update-tags.outputs.updated }}
+
+jobs:
+  update-tags:
+    name: "📌 Update Major Version Tags"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      major-version: ${{ steps.update-tags.outputs.major-version }}
+      minor-version: ${{ steps.update-tags.outputs.minor-version }}
+      updated: ${{ steps.update-tags.outputs.updated }}
+
+    steps:
+      - name: Checkout code
+        uses: CLDMV/.github/workflow-packages/common/steps/checkout-code.yml
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: get-tag
+        shell: bash
+        run: |
+          # Get the tag that triggered this workflow
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_NAME="${{ github.event.release.tag_name }}"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+          echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update major version tags
+        id: update-tags
+        uses: CLDMV/.github/workflow-packages/git/steps/update-major-version-tags.yml
+        with:
+          tag-name: ${{ steps.get-tag.outputs.tag-name }}
+
+      - name: Generate version documentation
+        if: inputs.create-documentation == true && steps.update-tags.outputs.updated == 'true'
+        uses: CLDMV/.github/workflow-packages/git/steps/generate-version-documentation.yml
+        with:
+          create-documentation: ${{ inputs.create-documentation }}
+
+      - name: Create summary
+        if: steps.update-tags.outputs.updated == 'true'
+        shell: bash
+        run: |
+          echo "## 🏷️ Version Tags Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following major/minor version tags have been updated:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.update-tags.outputs.major-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.update-tags.outputs.minor-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Workflows can now reference \`@${{ steps.update-tags.outputs.major-version }}\` for automatic updates." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,20 @@
+# Individual repo: .github/workflows/release.yml
+name: 🚀 Release PR Creation
+
+on:
+  push:
+    branches-ignore: [master, main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+
+jobs:
+  create-release-pr:
+    uses: CLDMV/.github/workflows/release.yml@v1
+    with:
+      package_name: "@cldmv/slothlet" # Required
+      node_version: "lts/*"
+      test_command: "npm test"
+      build_command: "npm run build:ci"
+      package_manager: "npm"
+    secrets: inherit

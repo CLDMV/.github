@@ -1,0 +1,24 @@
+# Individual repo: .github/workflows/publish.yml
+name: 📦 Release and Publish
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  publish-package:
+    uses: CLDMV/.github/workflows/publish.yml@v1
+    with:
+      package_name: "@cldmv/slothlet" # Required
+      node_version: "lts/*"
+      test_command: "npm test"
+      build_command: "npm run build:ci"
+      package_manager: "npm"
+      # Optional publishing configuration
+      # publish_to_npm: true
+      # publish_to_github_packages: true
+      # skip_publish: false
+      # publish_command: ""  # Auto-detects
+      # github_packages_publish_command: ""  # Auto-detects
+    secrets: inherit

@@ -1,0 +1,21 @@
+name: "Run Tests"
+description: "Run tests with configurable command and environment"
+
+inputs:
+  test-command:
+    description: "Command to run tests"
+    required: true
+  environment:
+    description: "Environment to run tests in (development, production, test)"
+    required: false
+    default: "development"
+  
+runs:
+  using: "composite"
+  steps:
+    - name: Run tests
+      shell: bash
+      run: ${{ inputs.test-command }}
+      env:
+        NODE_ENV: ${{ inputs.environment }}
+        NODE_OPTIONS: --conditions=${{ inputs.environment }}
