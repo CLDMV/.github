@@ -30,14 +30,27 @@ runs:
         # Get all version tags and sort them
         ALL_TAGS=$(git tag -l "v*.*.*" | sort -V)
 
+        # Determine current version from latest tag (to skip in orphan detection)
+        CURRENT_TAG=$(echo "$ALL_TAGS" | tail -1)
+        CURRENT_MAJOR="v$(echo "$CURRENT_TAG" | sed 's/v\([0-9]*\)\..*/\1/')"
+        CURRENT_MINOR="v$(echo "$CURRENT_TAG" | sed 's/v\([0-9]*\.[0-9]*\)\..*/\1/')"
+
+        echo "🏷️ Current tag: $CURRENT_TAG (major: $CURRENT_MAJOR, minor: $CURRENT_MINOR)"
+
         # Get all existing major version tags (v1, v2, etc.)
         EXISTING_MAJOR_TAGS=$(git tag -l | grep -E "^v[0-9]+$" | sort -V)
 
         # Get all existing minor version tags (v1.0, v1.1, etc.) 
         EXISTING_MINOR_TAGS=$(git tag -l | grep -E "^v[0-9]+\.[0-9]+$" | sort -V)
 
-        # Check existing major version tags for orphans
+        # Check existing major version tags for orphans (skip current major version)
         for MAJOR_TAG in $EXISTING_MAJOR_TAGS; do
+          # Skip the current major version - let regular update handle it
+          if [ "$MAJOR_TAG" = "v$CURRENT_MAJOR" ]; then
+            echo "⏭️ Skipping $MAJOR_TAG (current major version - handled by regular update)"
+            continue
+          fi
+          
           echo "🔍 Checking existing major tag: $MAJOR_TAG"
           
           # Get the latest patch version for this major version
@@ -55,7 +68,11 @@ runs:
             if [ "$MAJOR_COMMIT" != "$LATEST_COMMIT" ] && [ -n "$MAJOR_COMMIT" ]; then
               echo "🚨 Orphaned major tag detected: $MAJOR_TAG should point to $LATEST_PATCH"
               echo "$MAJOR_TAG|$LATEST_COMMIT|$LATEST_PATCH" >> "$ORPHANED_TAGS_FILE"
-              FIXED_TAGS="${FIXED_TAGS}${MAJOR_TAG}→${LATEST_PATCH} "
+              if [ -z "$FIXED_TAGS" ]; then
+                FIXED_TAGS="${MAJOR_TAG} → ${LATEST_PATCH}"
+              else
+                FIXED_TAGS="${FIXED_TAGS}\n${MAJOR_TAG} → ${LATEST_PATCH}"
+              fi
               ORPHANS_FOUND="true"
             else
               echo "✅ $MAJOR_TAG correctly points to $LATEST_PATCH"
@@ -63,8 +80,14 @@ runs:
           fi
         done
 
-        # Check existing minor version tags for orphans  
+        # Check existing minor version tags for orphans (skip current minor version)
         for MINOR_TAG in $EXISTING_MINOR_TAGS; do
+          # Skip the current minor version - let regular update handle it
+          if [ "$MINOR_TAG" = "v$CURRENT_MINOR" ]; then
+            echo "⏭️ Skipping $MINOR_TAG (current minor version - handled by regular update)"
+            continue
+          fi
+          
           echo "🔍 Checking existing minor tag: $MINOR_TAG"
           
           # Get the latest patch version for this minor version
@@ -82,7 +105,11 @@ runs:
             if [ "$MINOR_COMMIT" != "$LATEST_COMMIT" ] && [ -n "$MINOR_COMMIT" ]; then
               echo "🚨 Orphaned minor tag detected: $MINOR_TAG should point to $LATEST_PATCH"
               echo "$MINOR_TAG|$LATEST_COMMIT|$LATEST_PATCH" >> "$ORPHANED_TAGS_FILE"
-              FIXED_TAGS="${FIXED_TAGS}${MINOR_TAG}→${LATEST_PATCH} "
+              if [ -z "$FIXED_TAGS" ]; then
+                FIXED_TAGS="${MINOR_TAG} → ${LATEST_PATCH}"
+              else
+                FIXED_TAGS="${FIXED_TAGS}\n${MINOR_TAG} → ${LATEST_PATCH}"
+              fi
               ORPHANS_FOUND="true"
             else
               echo "✅ $MINOR_TAG correctly points to $LATEST_PATCH"
@@ -117,7 +144,7 @@ runs:
           echo "✅ No orphaned major/minor version tags found"
         fi
 
-    - name: Fix orphaned tags using GitHub API
+    - name: Fix orphaned tags using modular GitHub API action
       if: steps.fix-orphans.outputs.orphans-found == 'true'
       uses: CLDMV/.github/.github/actions/github/api/update-tag@v1
       with:

@@ -42,15 +42,28 @@ runs:
           echo "$TAG_DATA" | jq -r '.[] | "\(.tag):\(.sha)"' | while IFS=':' read -r tag_name target_sha; do
             echo "🏷️ Updating tag $tag_name to point to $target_sha"
             
+            # Use the correct GitHub API endpoint for updating tag references
             if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name \
                  --method PATCH \
                  --field sha="$target_sha" \
-                 --field force=true; then
+                 --field force=true 2>&1; then
               echo "✅ Successfully updated tag $tag_name"
               ((UPDATED_COUNT++))
             else
-              echo "❌ Failed to update tag $tag_name"
-              SUCCESS=false
+              echo "❌ Failed to update tag $tag_name via PATCH, trying DELETE and CREATE approach"
+              
+              # Alternative approach: delete and recreate the tag
+              if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name --method DELETE 2>/dev/null && \
+                 gh api repos/${{ github.repository }}/git/refs \
+                   --method POST \
+                   --field ref="refs/tags/$tag_name" \
+                   --field sha="$target_sha" 2>&1; then
+                echo "✅ Successfully recreated tag $tag_name"
+                ((UPDATED_COUNT++))
+              else
+                echo "❌ Failed to update/recreate tag $tag_name"
+                SUCCESS=false
+              fi
             fi
           done
           
@@ -62,17 +75,31 @@ runs:
           
           echo "🏷️ Updating tag $tag_name to point to $target_sha"
           
+          # Use the correct GitHub API endpoint for updating tag references
           if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name \
                --method PATCH \
                --field sha="$target_sha" \
-               --field force=true; then
+               --field force=true 2>&1; then
             echo "✅ Successfully updated tag $tag_name"
             UPDATED_COUNT=1
             MESSAGES="Tag $tag_name updated successfully"
           else
-            echo "❌ Failed to update tag $tag_name"
-            SUCCESS=false
-            MESSAGES="Failed to update tag $tag_name"
+            echo "❌ Failed to update tag $tag_name via PATCH, trying DELETE and CREATE approach"
+            
+            # Alternative approach: delete and recreate the tag
+            if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name --method DELETE 2>/dev/null && \
+               gh api repos/${{ github.repository }}/git/refs \
+                 --method POST \
+                 --field ref="refs/tags/$tag_name" \
+                 --field sha="$target_sha" 2>&1; then
+              echo "✅ Successfully recreated tag $tag_name"
+              UPDATED_COUNT=1
+              MESSAGES="Tag $tag_name recreated successfully"
+            else
+              echo "❌ Failed to update/recreate tag $tag_name"
+              SUCCESS=false
+              MESSAGES="Failed to update tag $tag_name"
+            fi
           fi
         fi
 
