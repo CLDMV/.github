@@ -170,7 +170,7 @@ jobs:
             # Use single node version
             SINGLE_VERSION="${{ inputs.node_version }}"
             echo "📍 Matrix testing skipped, using single version: $SINGLE_VERSION"
-            echo "matrix=["$SINGLE_VERSION"]" >> $GITHUB_OUTPUT
+            echo "matrix=[\"$SINGLE_VERSION\"]" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -183,20 +183,26 @@ jobs:
           else
             MAX=$DEFAULT_MAX
           fi
+
+          # Parse major and minor from min version
           MAJOR=$(echo $MIN | cut -d. -f1)
           MINOR=$(echo $MIN | cut -d. -f2)
+
+          # Build versions array
           VERSIONS=()
           if [[ "$MIN" == *"."* ]]; then
-            VERSIONS+=("${MAJOR}.${MINOR}.x")
+            VERSIONS+=("\"${MAJOR}.${MINOR}\"")
             ((MAJOR++))
           fi
           while [ $MAJOR -le $MAX ]; do
-            VERSIONS+=("${MAJOR}.x")
+            VERSIONS+=("\"${MAJOR}\"")
             ((MAJOR++))
           done
-          VERSIONS+=("lts/*")
-          printf -v joined '%s","' "${VERSIONS[@]}"
-          joined="["${joined%","}"]"
+          VERSIONS+=("\"lts/*\"")
+
+          # Join with commas and create JSON array
+          printf -v joined '%s,' "${VERSIONS[@]}"
+          joined="[${joined%,}]"
           echo "📊 Matrix testing enabled with versions: $joined"
           echo "matrix=$joined" >> $GITHUB_OUTPUT
 
