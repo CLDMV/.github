@@ -18,8 +18,9 @@ inputs:
     required: false
     default: "npm run build:ci"
   version-bump:
-    description: "Type of version bump (major, minor, patch)"
-    required: true
+    description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
+    required: false
+    default: ""
   github-token:
     description: "GitHub token for API operations"
     required: true
@@ -53,11 +54,16 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    - name: Check release commit for auto-detection
+      id: commit-check
+      if: inputs.version-bump == ''
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+
     - name: Calculate new version
       id: version
       uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
       with:
-        version-bump: ${{ inputs.version-bump }}
+        version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
 
     - name: Build package
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
@@ -96,6 +102,6 @@ runs:
         base-branch: ${{ steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
-        labels: "release,${{ inputs.version-bump }}"
+        labels: "release,${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}"
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}

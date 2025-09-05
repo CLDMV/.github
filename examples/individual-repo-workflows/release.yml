@@ -29,7 +29,7 @@ jobs:
       # build_command: "npm run build:ci" # Command to build package (default: npm run build:ci)
 
       # Release Configuration
-      # version_bump: "patch" # Type of version bump: patch, minor, major (default: patch)
+      # version_bump: "" # Type of version bump: patch, minor, major. Leave empty for auto-detection from commit message (default: "")
       # version: "" # Specific version - auto-calculated if not provided (default: "")
       # is_prerelease: false # Whether this is a prerelease (default: false)
       # release_source_only: false # Create source-only release, no package assets (default: false)

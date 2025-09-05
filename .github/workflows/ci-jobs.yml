@@ -111,10 +111,10 @@ on:
 
       # Release parameters
       version_bump:
-        description: "Type of version bump (major, minor, patch)"
+        description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
         required: false
         type: string
-        default: "patch"
+        default: ""
       version:
         description: "Specific version for release"
         required: false

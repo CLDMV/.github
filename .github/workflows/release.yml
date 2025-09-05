@@ -41,8 +41,8 @@ on:
       version_bump:
         required: false
         type: string
-        default: "patch"
-        description: "Type of version bump (major, minor, patch)"
+        default: ""
+        description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
       # Optional release parameters
       version:
         required: false

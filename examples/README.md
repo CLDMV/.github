@@ -19,6 +19,7 @@ The `individual-repo-workflows/` folder contains example workflow files that sho
   - Place in: `.github/workflows/release.yml` in your project repo
   - Triggers: Push to non-master/main branches (when you push `release:` or `release!:` commits)
   - Uses: `CLDMV/.github/.github/workflows/release.yml@v1`
+  - **Auto-detects version bump**: Uses `release!:` for major, `release:` + commit analysis for minor/patch
 
 - **`publish.yml`** - Package publishing and release creation workflow
   - Place in: `.github/workflows/publish.yml` in your project repo
@@ -42,5 +43,17 @@ Each workflow accepts various inputs to customize behavior:
 - **Commands**: Customize test, lint, build, and other commands
 - **Skip options**: Skip certain steps (linting, performance tests, etc.)
 - **Publishing options**: Control NPM/GitHub Packages publishing
+
+### Version Bump Auto-Detection:
+
+The release workflow automatically detects the type of version bump from your commit messages:
+
+- **`release!: message`** → **Major version bump** (breaking changes)
+- **`release: message`** → Analyzes commit history since last tag:
+  - Contains `!` in commits or `BREAKING CHANGE` → **Major**
+  - Contains `feat:` commits → **Minor**
+  - Only fixes and other changes → **Patch**
+
+You can override this by explicitly setting `version_bump: "major"`, `"minor"`, or `"patch"` in your workflow.
 
 See the org-level workflow files for complete input documentation.
