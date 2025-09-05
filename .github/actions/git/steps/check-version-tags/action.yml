@@ -1,0 +1,47 @@
+# Check if version tags exist pointing to current commit
+name: "🔍 Check for Version Tags"
+description: "Checks if any version tags (v*.*.* pattern) point to the current commit SHA"
+
+inputs:
+  fetch_depth:
+    description: "Git fetch depth for tag detection"
+    required: false
+    default: "0"
+
+outputs:
+  has_version_tags:
+    description: "Whether version tags pointing to current commit were found"
+    value: ${{ steps.check-tags.outputs.has_version_tags }}
+  version_tags:
+    description: "List of version tags found (newline separated)"
+    value: ${{ steps.check-tags.outputs.version_tags }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ inputs.fetch_depth }}
+
+    - name: Check for version tags pointing to this commit
+      id: check-tags
+      shell: bash
+      run: |
+        echo "🔍 Checking for version tags pointing to commit ${{ github.sha }}"
+
+        # Get all version tags pointing to current commit
+        VERSION_TAGS=$(git tag --points-at ${{ github.sha }} | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)
+
+        if [ -n "$VERSION_TAGS" ]; then
+          echo "✅ Found version tags:"
+          echo "$VERSION_TAGS"
+          echo "has_version_tags=true" >> $GITHUB_OUTPUT
+          echo "version_tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$VERSION_TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "❌ No version tags found pointing to current commit"
+          echo "has_version_tags=false" >> $GITHUB_OUTPUT
+          echo "version_tags=" >> $GITHUB_OUTPUT
+        fi

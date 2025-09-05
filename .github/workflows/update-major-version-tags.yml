@@ -19,10 +19,25 @@ on:
       updated:
         description: "Whether tags were successfully updated"
         value: ${{ jobs.update-tags.outputs.updated }}
+  push:
 
 jobs:
+  check-version-tags:
+    name: "🔍 Check for Version Tags"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    outputs:
+      has_version_tags: ${{ steps.check.outputs.has_version_tags }}
+      version_tags: ${{ steps.check.outputs.version_tags }}
+    steps:
+      - name: Check for version tags
+        id: check
+        uses: ./.github/actions/git/steps/check-version-tags
+
   update-tags:
     name: "🚀 Execute Tag Updates"
+    needs: [check-version-tags]
+    if: always() && (github.event_name == 'workflow_call' || needs.check-version-tags.outputs.has_version_tags == 'true')
     uses: ./.github/workflows/ci-jobs.yml
     with:
       package_name: "version-tags" # Dummy value since this is just for tagging
