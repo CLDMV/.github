@@ -97,4 +97,5 @@ runs:
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
         labels: "release,${{ inputs.version-bump }}"
-        github-token: ${{ inputs.github-token }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
