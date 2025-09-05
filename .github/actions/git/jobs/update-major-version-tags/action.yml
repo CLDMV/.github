@@ -17,6 +17,12 @@ outputs:
   updated:
     description: "Whether tags were successfully updated"
     value: ${{ steps.update-tags.outputs.updated }}
+  has-version-tags:
+    description: "Whether version tags were found"
+    value: ${{ steps.check-tags.outputs.has_version_tags }}
+  should-run:
+    description: "Whether the tag update should run"
+    value: ${{ steps.should-run.outputs.result }}
 
 runs:
   using: composite
@@ -26,8 +32,26 @@ runs:
       with:
         fetch-depth: 0
 
+    - name: Check for version tags
+      id: check-tags
+      uses: CLDMV/.github/.github/actions/git/steps/check-version-tags@v1
+
+    - name: Determine if should run
+      id: should-run
+      shell: bash
+      run: |
+        # Run if this is a workflow_call OR if version tags were found on push
+        if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ]; then
+          echo "result=true" >> $GITHUB_OUTPUT
+          echo "✅ Should run tag updates"
+        else
+          echo "result=false" >> $GITHUB_OUTPUT
+          echo "❌ Skipping tag updates - no version tags found"
+        fi
+
     - name: Get tag name
       id: get-tag
+      if: steps.should-run.outputs.result == 'true'
       shell: bash
       run: |
         # Get the tag that triggered this workflow
@@ -41,6 +65,7 @@ runs:
 
     - name: Update major version tags
       id: update-tags
+      if: steps.should-run.outputs.result == 'true'
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
       with:
         tag-name: ${{ steps.get-tag.outputs.tag-name }}
