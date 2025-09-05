@@ -1,0 +1,89 @@
+name: "🏷️ Update Tag(s) via GitHub API"
+description: "Updates Git tag(s) to point to different commits using GitHub API (creates signed tags)"
+
+inputs:
+  tag_data:
+    description: 'Either single tag ''tagname:sha'' or JSON array ''[{"tag":"v1","sha":"abc123"},{"tag":"v1.0","sha":"def456"}]'''
+    required: true
+  github_token:
+    description: "GitHub token for API access"
+    required: true
+
+outputs:
+  success:
+    description: "Whether all tags were successfully updated"
+    value: ${{ steps.update.outputs.success }}
+  updated_count:
+    description: "Number of tags that were updated"
+    value: ${{ steps.update.outputs.updated_count }}
+  message:
+    description: "Status message about the updates"
+    value: ${{ steps.update.outputs.message }}
+
+runs:
+  using: composite
+  steps:
+    - name: Update tag(s) via GitHub API
+      id: update
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        TAG_DATA="${{ inputs.tag_data }}"
+        SUCCESS=true
+        UPDATED_COUNT=0
+        MESSAGES=""
+
+        # Check if input is JSON array or single tag
+        if [[ "$TAG_DATA" =~ ^\[ ]]; then
+          echo "🔄 Processing multiple tags from JSON array"
+          
+          # Parse JSON array and process each tag
+          echo "$TAG_DATA" | jq -r '.[] | "\(.tag):\(.sha)"' | while IFS=':' read -r tag_name target_sha; do
+            echo "🏷️ Updating tag $tag_name to point to $target_sha"
+            
+            if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name \
+                 --method PATCH \
+                 --field sha="$target_sha" \
+                 --field force=true; then
+              echo "✅ Successfully updated tag $tag_name"
+              ((UPDATED_COUNT++))
+            else
+              echo "❌ Failed to update tag $tag_name"
+              SUCCESS=false
+            fi
+          done
+          
+        else
+          echo "🔄 Processing single tag"
+          
+          # Parse single tag format: tagname:sha
+          IFS=':' read -r tag_name target_sha <<< "$TAG_DATA"
+          
+          echo "🏷️ Updating tag $tag_name to point to $target_sha"
+          
+          if gh api repos/${{ github.repository }}/git/refs/tags/$tag_name \
+               --method PATCH \
+               --field sha="$target_sha" \
+               --field force=true; then
+            echo "✅ Successfully updated tag $tag_name"
+            UPDATED_COUNT=1
+            MESSAGES="Tag $tag_name updated successfully"
+          else
+            echo "❌ Failed to update tag $tag_name"
+            SUCCESS=false
+            MESSAGES="Failed to update tag $tag_name"
+          fi
+        fi
+
+        # Set outputs
+        echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+        echo "updated_count=$UPDATED_COUNT" >> $GITHUB_OUTPUT
+        echo "message=$MESSAGES" >> $GITHUB_OUTPUT
+
+        if [ "$SUCCESS" = true ]; then
+          echo "🎉 Successfully updated $UPDATED_COUNT tag(s)"
+        else
+          echo "💥 Some tag updates failed"
+          exit 1
+        fi
