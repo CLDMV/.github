@@ -121,25 +121,23 @@ runs:
         echo "fixed-tags=${FIXED_TAGS}" >> $GITHUB_OUTPUT
         echo "orphans-found=${ORPHANS_FOUND}" >> $GITHUB_OUTPUT
 
-        # Build JSON array for orphaned tags
         if [ "$ORPHANS_FOUND" = "true" ]; then
-          echo "🔧 Building JSON array for orphaned tags..."
+          echo "🔧 Found orphaned tags, building JSON array..."
           
-          JSON_ARRAY="["
-          FIRST=true
-          
+          # Use jq to properly build JSON array to avoid escaping issues
+          JSON_ARRAY="[]"
           while IFS='|' read -r tag_name target_sha latest_patch; do
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              JSON_ARRAY="${JSON_ARRAY},"
-            fi
-            JSON_ARRAY="${JSON_ARRAY}{\"tag\":\"${tag_name}\",\"sha\":\"${target_sha}\"}"
+            # Use jq to safely add each tag to the JSON array
+            JSON_ARRAY=$(echo "$JSON_ARRAY" | jq ". += [{\"tag\": \"$tag_name\", \"sha\": \"$target_sha\"}]")
           done < "$ORPHANED_TAGS_FILE"
           
-          JSON_ARRAY="${JSON_ARRAY}]"
-          echo "orphaned-tags-json=${JSON_ARRAY}" >> $GITHUB_OUTPUT
-          echo "🔧 Orphaned tags JSON: $JSON_ARRAY"
+          # Properly escape the JSON for GitHub Actions output
+          JSON_ESCAPED=$(echo "$JSON_ARRAY" | jq -c .)
+          echo "orphaned-tags-json<<EOF" >> $GITHUB_OUTPUT
+          echo "$JSON_ESCAPED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "🔧 Orphaned tags JSON: $JSON_ESCAPED"
         else
           echo "✅ No orphaned major/minor version tags found"
         fi
