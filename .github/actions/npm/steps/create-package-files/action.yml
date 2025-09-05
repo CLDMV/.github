@@ -1,28 +1,28 @@
 name: "Create Package Files for Release"
-description: "Creates .zip version of npm package contents from .tgz file for release assets"
+description: "Creates .tar.gz and .zip files from package contents for release assets"
 
 inputs:
   package-path:
-    description: "Path to the .tgz package file"
+    description: "Path to the .tgz package file from npm pack"
     required: false
     default: "*.tgz"
 
 outputs:
-  tgz-path:
-    description: "Path to the .tgz package file"
-    value: ${{ steps.prepare.outputs.tgz-path }}
+  tar-gz-path:
+    description: "Path to the created .tar.gz package file"
+    value: ${{ steps.create.outputs.tar-gz-path }}
   zip-path:
     description: "Path to the created .zip package file"
-    value: ${{ steps.prepare.outputs.zip-path }}
+    value: ${{ steps.create.outputs.zip-path }}
 
 runs:
   using: "composite"
   steps:
-    - name: Prepare package files
-      id: prepare
+    - name: Create package files from npm pack
+      id: create
       shell: bash
       run: |
-        # Find the .tgz file
+        # Find the .tgz file from npm pack
         TGZ_FILE=$(find . -name "${{ inputs.package-path }}" -type f | head -1)
 
         if [ -z "$TGZ_FILE" ]; then
@@ -30,34 +30,45 @@ runs:
           exit 1
         fi
 
-        echo "📦 Found package: $TGZ_FILE"
+        echo "📦 Found npm pack file: $TGZ_FILE"
 
-        # Get absolute path
-        TGZ_PATH=$(realpath "$TGZ_FILE")
-
+        # Get package name from the tgz filename
+        PACKAGE_NAME=$(basename "$TGZ_FILE" .tgz)
+        
         # Create temp directory for extraction
         TEMP_DIR=$(mktemp -d)
 
-        # Extract .tgz contents
-        echo "📂 Extracting package contents..."
-        tar -xzf "$TGZ_PATH" -C "$TEMP_DIR"
+        # Extract npm pack contents
+        echo "📂 Extracting npm pack contents..."
+        tar -xzf "$TGZ_FILE" -C "$TEMP_DIR"
+
+        # Create output files with proper naming
+        TAR_GZ_PATH="${PACKAGE_NAME}.tar.gz"
+        ZIP_PATH="${PACKAGE_NAME}.zip"
+
+        # Create .tar.gz from extracted contents
+        echo "🗜️ Creating .tar.gz file..."
+        cd "$TEMP_DIR"
+        tar -czf "../$TAR_GZ_PATH" .
+        cd - > /dev/null
 
         # Create .zip from extracted contents
-        PACKAGE_NAME=$(basename "$TGZ_FILE" .tgz)
-        ZIP_PATH="${TGZ_PATH%.*}.zip"
-
-        echo "🗜️ Creating .zip version..."
+        echo "� Creating .zip file..."
         cd "$TEMP_DIR"
-        zip -r "$ZIP_PATH" .
+        zip -r "../$ZIP_PATH" .
         cd - > /dev/null
 
         # Cleanup temp directory
         rm -rf "$TEMP_DIR"
 
+        # Get absolute paths
+        TAR_GZ_ABS=$(realpath "$TAR_GZ_PATH")
+        ZIP_ABS=$(realpath "$ZIP_PATH")
+
         echo "✅ Created package files:"
-        echo "  - TGZ: $TGZ_PATH"
-        echo "  - ZIP: $ZIP_PATH"
+        echo "  - TAR.GZ: $TAR_GZ_ABS"
+        echo "  - ZIP: $ZIP_ABS"
 
         # Output paths
-        echo "tgz-path=$TGZ_PATH" >> $GITHUB_OUTPUT
-        echo "zip-path=$ZIP_PATH" >> $GITHUB_OUTPUT
+        echo "tar-gz-path=$TAR_GZ_ABS" >> $GITHUB_OUTPUT
+        echo "zip-path=$ZIP_ABS" >> $GITHUB_OUTPUT

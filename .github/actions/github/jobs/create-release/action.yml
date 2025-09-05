@@ -164,7 +164,7 @@ runs:
         is_prerelease: ${{ inputs.is-prerelease }}
         is_draft: false
         github_token: ${{ inputs.github-token }}
-        assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tgz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
+        assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
 
     - name: Verify tag signature
       id: verify-tag
