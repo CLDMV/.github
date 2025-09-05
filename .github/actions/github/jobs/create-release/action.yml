@@ -181,7 +181,7 @@ runs:
     - name: Update Summary - Release Created
       shell: bash
       run: |
-        echo "- ✅ GitHub Release v${{ steps.detect-version.outputs.version }} created successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ GitHub Release [v${{ steps.detect-version.outputs.version }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }}) created successfully" >> $GITHUB_STEP_SUMMARY
         if [ "${{ inputs.release-source-only }}" != "true" ]; then
           echo "- ✅ Package assets (.tgz and .zip) attached to release" >> $GITHUB_STEP_SUMMARY
         fi
@@ -197,4 +197,4 @@ runs:
       shell: bash
       run: |
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 **GitHub Release Complete** - Release v${{ steps.detect-version.outputs.version }} is now available" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **GitHub Release Complete** - [Release v${{ steps.detect-version.outputs.version }} is now available →](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }})" >> $GITHUB_STEP_SUMMARY

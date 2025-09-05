@@ -9,7 +9,7 @@ inputs:
     description: "Environment to build for (production, development)"
     required: false
     default: "production"
-  
+
 runs:
   using: "composite"
   steps:
@@ -20,7 +20,7 @@ runs:
         echo "- Environment: \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- Started: $(date)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Run the build command
         if ${{ inputs.build-command }}; then
           echo "✅ **Build completed successfully**" >> $GITHUB_STEP_SUMMARY
@@ -36,7 +36,3 @@ runs:
         fi
       env:
         NODE_ENV: ${{ inputs.environment }}
-
-
-
-

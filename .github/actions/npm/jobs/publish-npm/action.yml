@@ -55,7 +55,9 @@ runs:
       if: steps.publish-package.outputs.published == 'true'
       shell: bash
       run: |
-        echo "- ✅ NPM Registry: Published ${{ inputs.package-name }}@${{ inputs.version }} successfully" >> $GITHUB_STEP_SUMMARY
+        # Extract package name for URL (remove @scope/ if present)
+        PACKAGE_URL_NAME=$(echo "${{ inputs.package-name }}" | sed 's|^@[^/]*/||')
+        echo "- ✅ NPM Registry: Published [${{ inputs.package-name }}@${{ inputs.version }}](https://www.npmjs.com/package/${{ inputs.package-name }}/v/${{ inputs.version }}) successfully" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - NPM Failure
       if: steps.publish-package.outputs.published != 'true'

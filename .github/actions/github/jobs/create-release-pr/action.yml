@@ -122,9 +122,9 @@ runs:
       if: steps.create-pr.outputs.pr-created == 'true'
       shell: bash
       run: |
-        echo "- ✅ Release PR created: #${{ steps.create-pr.outputs.pr-number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Release PR created: [#${{ steps.create-pr.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 **Release PR Complete** - Ready for review and merge" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **Release PR Complete** - [Ready for review and merge →](${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - No PR Created
       if: steps.create-pr.outputs.pr-created != 'true'
