@@ -1,0 +1,90 @@
+name: "Create GitHub Tag"
+description: "Creates a signed tag via the GitHub API if it does not exist, with optional force."
+
+inputs:
+  tag:
+    description: "The tag name to create (e.g., v1.2.3)"
+    required: true
+  message:
+    description: "Tag message/annotation"
+    required: true
+  commit-sha:
+    description: "Commit SHA to tag"
+    required: true
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+  force:
+    description: "Force update tag if it exists (delete and recreate)"
+    required: false
+    default: "false"
+
+outputs:
+  tag-sha:
+    description: "SHA of the created tag"
+    value: ${{ steps.create-tag.outputs.tag-sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check if tag exists
+      id: check
+      uses: CLDMV/.github/.github/actions/github/api/tags/check-exists@v1
+      with:
+        tag: ${{ inputs.tag }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Delete tag if force is true and tag exists
+      if: steps.check.outputs.exists == 'true' && inputs.force == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        OWNER_REPO=$(echo "$GITHUB_REPOSITORY")
+        echo "Deleting tag $TAG via API..."
+        curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$OWNER_REPO/git/refs/tags/$TAG"
+
+    - name: Create signed tag via GitHub API
+      id: create-tag
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ inputs.tag }}
+        MESSAGE: ${{ inputs.message }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+      run: |
+        OWNER_REPO=$(echo "$GITHUB_REPOSITORY")
+        API_URL="https://api.github.com/repos/$OWNER_REPO/git/tags"
+        TAG_NAME="$TAG"
+        echo "Creating signed tag $TAG_NAME for commit $COMMIT_SHA"
+        TAG_RESPONSE=$(curl -s -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "$API_URL" \
+          -d "{\n  \"tag\": \"$TAG_NAME\",\n  \"message\": \"$MESSAGE\",\n  \"object\": \"$COMMIT_SHA\",\n  \"type\": \"commit\"\n}")
+        TAG_SHA=$(echo "$TAG_RESPONSE" | jq -r '.sha // empty')
+        if [[ -n "$TAG_SHA" && "$TAG_SHA" != "null" ]]; then
+          echo "✅ Created signed tag: $TAG_SHA"
+          echo "tag-sha=$TAG_SHA" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Failed to create tag"
+          echo "Response: $TAG_RESPONSE"
+          exit 1
+        fi
+
+    - name: Create tag reference
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        OWNER_REPO=$(echo "$GITHUB_REPOSITORY")
+        TAG_NAME="$TAG"
+        TAG_SHA="${{ steps.create-tag.outputs.tag-sha }}"
+        echo "Creating tag reference for $TAG_NAME -> $TAG_SHA"
+        curl -s -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/$OWNER_REPO/git/refs" \
+          -d "{\n  \"ref\": \"refs/tags/$TAG_NAME\",\n  \"sha\": \"$TAG_SHA\"\n}"

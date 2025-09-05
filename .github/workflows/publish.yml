@@ -72,6 +72,7 @@ jobs:
       package_name: ${{ inputs.package_name }}
       run_build_and_test: true
       run_detect_repo_config: true
+      run_download_artifacts: true
       run_publish_npm: ${{ inputs.publish_to_npm && !inputs.skip_publish }}
       run_publish_github_packages: ${{ inputs.publish_to_github_packages && !inputs.skip_publish }}
       run_create_release: true

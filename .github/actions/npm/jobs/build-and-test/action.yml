@@ -35,6 +35,12 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    - name: Get Node.js Version
+      id: get_node_version
+      uses: CLDMV/.github/.github/actions/node/steps/get-node-version@v1
+      with:
+        label: ${{ (inputs.node-version == 'lts/*' || inputs.node-version == 'lts') && 'lts' || '' }}
+
     - name: Run pre-build tests
       uses: CLDMV/.github/.github/actions/common/steps/run-tests@v1
       with:
@@ -50,7 +56,7 @@ runs:
     - name: Upload build artifacts
       uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v1
       with:
-        artifact-name: build-artifacts
+        artifact-name: build-artifacts-${{ steps.get_node_version.outputs.node-label }}
         artifact-path: |
           dist/
           lib/

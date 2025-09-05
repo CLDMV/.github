@@ -3,6 +3,21 @@ name: "CI Jobs Orchestrator"
 on:
   workflow_call:
     inputs:
+      run_download_artifacts:
+        description: "Run download artifacts job"
+        required: false
+        type: boolean
+        default: false
+      download_artifact_name:
+        description: "Name of the artifact to download (e.g., build-artifacts-lts). Defaults to build-artifacts-lts or build-artifacts-{node_version}."
+        required: false
+        type: string
+        default: ${{ inputs.node_version && format('build-artifacts-{0}', inputs.node_version == 'lts/*' && 'lts' || inputs.node_version) || 'build-artifacts-lts' }}
+      download_artifact_path:
+        description: "Destination path for the downloaded artifact(s)"
+        required: false
+        type: string
+        default: "."
       # Package information
       package_name:
         description: "NPM package name (e.g., @cldmv/slothlet)"
@@ -157,6 +172,7 @@ jobs:
           printf -v joined '%s","' "${VERSIONS[@]}"
           joined="[\"${joined%","}\"]"
           echo "matrix=$joined" >> $GITHUB_OUTPUT
+
   build-and-test:
     name: "🏗️ Build & Test"
     if: inputs.run_build_and_test == true
@@ -207,6 +223,17 @@ jobs:
           version-bump: ${{ inputs.version_bump }}
           github-token: ${{ github.token }}
 
+  download-artifacts:
+    name: "⬇️ Download Artifacts"
+    if: inputs.run_download_artifacts == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: CLDMV/.github/.github/actions/common/steps/download-artifacts@v1
+        with:
+          artifact-name: ${{ inputs.download_artifact_name }}
+          path: ${{ inputs.download_artifact_path }}
+
   create-release:
     name: "📋 Create GitHub Release"
     if: inputs.run_create_release == true
@@ -246,6 +273,7 @@ jobs:
     name: "📦 Publish to NPM"
     if: inputs.run_publish_npm == true
     runs-on: ubuntu-latest
+    needs: build-and-test
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
@@ -264,6 +292,7 @@ jobs:
     name: "📦 Publish to GitHub Packages"
     if: inputs.run_publish_github_packages == true
     runs-on: ubuntu-latest
+    needs: build-and-test
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
