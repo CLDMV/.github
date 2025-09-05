@@ -12,7 +12,7 @@ on:
         required: false
         type: string
         default: "lts/*"
-        description: "Primary Node.js version to use"
+        description: "Node.js version to use"
       package_manager:
         required: false
         type: string
@@ -23,131 +23,27 @@ on:
         type: string
         default: "npm test"
         description: "Command to run tests"
-      lint_command:
-        required: false
-        type: string
-        default: "npm run lint"
-        description: "Command to run linting"
       build_command:
         required: false
         type: string
         default: "npm run build:ci"
         description: "Command to build package"
-      entry_test_command:
+
+    secrets:
+      NPM_TOKEN:
+        description: "NPM token for publishing packages"
         required: false
-        type: string
-        default: "npm run test:entry"
-        description: "Command to run entry point tests"
-      performance_test_command:
-        required: false
-        type: string
-        default: "npm run test:performance"
-        description: "Command to run performance tests"
-      test_matrix_versions:
-        required: false
-        type: string
-        default: '["18", "20", "21"]'
-        description: "JSON array of Node.js versions to test (as string)"
-      skip_lint:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip linting step"
-      skip_entry_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip entry point tests"
-      skip_performance_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip performance tests"
-      skip_matrix_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip multi-version Node.js tests"
 
 jobs:
-  # Primary CI job with full test suite
-  test-and-build:
-    name: "🧪 Test & Build"
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: CLDMV/.github/workflow-packages/common/steps/checkout-code.yml
-
-      - name: Setup Node.js
-        uses: CLDMV/.github/workflow-packages/common/steps/setup-node.yml
-        with:
-          node-version: ${{ inputs.node_version }}
-
-      - name: Install dependencies
-        uses: CLDMV/.github/workflow-packages/npm/steps/install-dependencies.yml
-        with:
-          package-manager: ${{ inputs.package_manager }}
-
-      - name: Run linting
-        if: inputs.skip_lint != true
-        shell: bash
-        run: ${{ inputs.lint_command }}
-
-      - name: Run tests
-        uses: CLDMV/.github/workflow-packages/common/steps/run-tests.yml
-        with:
-          test-command: ${{ inputs.test_command }}
-          environment: development
-
-      - name: Build package
-        uses: CLDMV/.github/workflow-packages/common/steps/build-project.yml
-        with:
-          build-command: ${{ inputs.build_command }}
-          environment: production
-
-      - name: Run entry point tests
-        if: inputs.skip_entry_tests != true
-        shell: bash
-        run: ${{ inputs.entry_test_command }}
-
-      - name: Run performance benchmarks
-        if: inputs.skip_performance_tests != true
-        shell: bash
-        run: ${{ inputs.performance_test_command }}
-
-  # Multi-version Node.js testing
-  test-matrix:
-    name: "🔄 Test Node.js ${{ matrix.node-version }}"
-    if: inputs.skip_matrix_tests != true
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: ${{ fromJSON(inputs.test_matrix_versions) }}
-
-    steps:
-      - name: Checkout code
-        uses: CLDMV/.github/workflow-packages/common/steps/checkout-code.yml
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: CLDMV/.github/workflow-packages/common/steps/setup-node.yml
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Install dependencies
-        uses: CLDMV/.github/workflow-packages/npm/steps/install-dependencies.yml
-        with:
-          package-manager: ${{ inputs.package_manager }}
-
-      - name: Run tests
-        uses: CLDMV/.github/workflow-packages/common/steps/run-tests.yml
-        with:
-          test-command: ${{ inputs.test_command }}
-          environment: development
-
-      - name: Build package
-        uses: CLDMV/.github/workflow-packages/common/steps/build-project.yml
-        with:
-          build-command: ${{ inputs.build_command }}
-          environment: production
+  ci:
+    name: "🏗️ Continuous Integration"
+    uses: ./.github/workflows/ci-jobs.yml
+    with:
+      package_name: ${{ inputs.package_name }}
+      run_build_and_test: true
+      node_version: ${{ inputs.node_version }}
+      package_manager: ${{ inputs.package_manager }}
+      test_command: ${{ inputs.test_command }}
+      build_command: ${{ inputs.build_command }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

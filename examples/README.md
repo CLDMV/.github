@@ -1,6 +1,6 @@
 # Examples 📋
 
-This folder contains example configurations for using the CLDMV org-level workflows.
+This folder contains example configurations for using the CLDMV org-level workflows with the streamlined orchestrator architecture.
 
 ## Individual Repository Workflows
 

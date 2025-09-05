@@ -1,146 +1,30 @@
-# This repository's workflow to update version tags
-name: 🏷️ Update Version Tags
+# CLDMV/.github/.githujobs:
+name: 📌 Update Major Version Tags
 
 on:
-  release:
-    types: [published]
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_call:
+    inputs:
+      create_documentation:
+        description: "Whether to create/update VERSION_TAGS.md documentation"
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      major-version:
+        description: "The major version tag that was updated"
+        value: ${{ jobs.update-tags.outputs.major-version }}
+      minor-version:
+        description: "The minor version tag that was updated"
+        value: ${{ jobs.update-tags.outputs.minor-version }}
+      updated:
+        description: "Whether tags were successfully updated"
+        value: ${{ jobs.update-tags.outputs.updated }}
 
 jobs:
   update-tags:
-    name: "📌 Update Major Version Tags"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get tag name
-        id: get-tag
-        shell: bash
-        run: |
-          # Get the tag that triggered this workflow
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG_NAME="${{ github.event.release.tag_name }}"
-          else
-            TAG_NAME="${{ github.ref_name }}"
-          fi
-          echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Update major version tags
-        id: update-tags
-        shell: bash
-        run: |
-          TAG_NAME="${{ steps.get-tag.outputs.tag-name }}"
-          echo "Processing tag: $TAG_NAME"
-
-          # Validate that this is a semantic version tag
-          if [[ ! $TAG_NAME =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "Tag $TAG_NAME is not a semantic version tag, skipping"
-            echo "updated=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Extract major and minor versions
-          MAJOR_VERSION="v${BASH_REMATCH[1]}"
-          MINOR_VERSION="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
-
-          echo "Major version: $MAJOR_VERSION"
-          echo "Minor version: $MINOR_VERSION"
-
-          # Get the commit SHA for the tag
-          TAG_SHA=$(git rev-list -n 1 "$TAG_NAME")
-          echo "Tag SHA: $TAG_SHA"
-
-          # Update major version tag (e.g., v1)
-          echo "🏷️ Updating major version tag $MAJOR_VERSION to point to $TAG_NAME"
-          git tag -f "$MAJOR_VERSION" "$TAG_SHA"
-          git push origin "$MAJOR_VERSION" --force
-
-          # Update minor version tag (e.g., v1.1)
-          echo "🏷️ Updating minor version tag $MINOR_VERSION to point to $TAG_NAME"
-          git tag -f "$MINOR_VERSION" "$TAG_SHA"
-          git push origin "$MINOR_VERSION" --force
-
-          echo "✅ Successfully updated version tags"
-          echo "- $MAJOR_VERSION → $TAG_NAME"
-          echo "- $MINOR_VERSION → $TAG_NAME"
-
-          echo "major-version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
-          echo "minor-version=$MINOR_VERSION" >> $GITHUB_OUTPUT
-          echo "updated=true" >> $GITHUB_OUTPUT
-
-      - name: Generate version documentation
-        if: steps.update-tags.outputs.updated == 'true'
-        shell: bash
-        run: |
-          # Create or update a VERSION_TAGS.md file documenting current major versions
-          cat > VERSION_TAGS.md << 'EOF'
-          # Version Tags
-
-          This repository uses semantic versioning with automated major version tag updates.
-
-          ## Current Major Versions
-
-          EOF
-
-          # List all major version tags
-          git tag -l 'v[0-9]*' | grep -E '^v[0-9]+$' | sort -V | while read major_tag; do
-            latest_patch=$(git tag -l "${major_tag}.*" | sort -V | tail -1)
-            if [ -n "$latest_patch" ]; then
-              echo "- \`$major_tag\` → \`$latest_patch\`" >> VERSION_TAGS.md
-            else
-              echo "- \`$major_tag\` → \`$major_tag\`" >> VERSION_TAGS.md
-            fi
-          done
-
-          cat >> VERSION_TAGS.md << 'EOF'
-
-          ## Usage
-
-          Reference workflows using major version tags for automatic updates:
-
-          ```yaml
-          jobs:
-            ci:
-              uses: CLDMV/.github/.github/workflows/ci.yml@v1
-          ```
-
-          Or use specific versions for stability:
-
-          ```yaml
-          jobs:
-            ci:
-              uses: CLDMV/.github/.github/workflows/ci.yml@v1.0.1
-          ```
-
-          Major version tags are automatically updated when new patch/minor releases are published.
-          EOF
-
-          # Commit the documentation if it changed
-          if ! git diff --quiet VERSION_TAGS.md 2>/dev/null; then
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add VERSION_TAGS.md
-            git commit -m "docs: update version tags documentation"
-            git push origin HEAD:${{ github.event.repository.default_branch }}
-          fi
-
-      - name: Create summary
-        if: steps.update-tags.outputs.updated == 'true'
-        shell: bash
-        run: |
-          echo "## 🏷️ Version Tags Updated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The following major/minor version tags have been updated:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.update-tags.outputs.major-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.update-tags.outputs.minor-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Workflows can now reference \`@${{ steps.update-tags.outputs.major-version }}\` for automatic updates." >> $GITHUB_STEP_SUMMARY
+    name: "🚀 Execute Tag Updates"
+    uses: ./.github/workflows/ci-jobs.yml
+    with:
+      package_name: "version-tags" # Dummy value since this is just for tagging
+      run_update_major_version_tags: true
+      create_documentation: ${{ inputs.create_documentation }}

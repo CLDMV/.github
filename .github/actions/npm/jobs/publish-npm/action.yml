@@ -1,0 +1,45 @@
+name: "Publish to NPM"
+description: "Composite action for publishing to NPM registry"
+
+inputs:
+  package-name:
+    description: "Name of the package to publish"
+    required: true
+  version:
+    description: "Version to publish"
+    required: true
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "lts/*"
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  publish-command:
+    description: "Command to publish the package"
+    required: true
+  npm-token:
+    description: "NPM token for authentication"
+    required: true
+
+outputs:
+  published:
+    description: "Whether the package was successfully published"
+    value: ${{ steps.publish-package.outputs.published }}
+
+runs:
+  using: composite
+  steps:
+    - name: Publish package to NPM
+      id: publish-package
+      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
+      with:
+        registry-name: "NPM"
+        registry-url: "https://registry.npmjs.org"
+        package-name: ${{ inputs.package-name }}
+        version: ${{ inputs.version }}
+        node-version: ${{ inputs.node-version }}
+        package-manager: ${{ inputs.package-manager }}
+        publish-command: ${{ inputs.publish-command }}
+        auth-token: ${{ inputs.npm-token }}

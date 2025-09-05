@@ -1,0 +1,52 @@
+name: "Create GitHub Release"
+description: "Composite action for creating GitHub releases"
+
+inputs:
+  version:
+    description: "Version number for the release"
+    required: true
+  package-name:
+    description: "Name of the package being released"
+    required: true
+  is-prerelease:
+    description: "Whether this is a prerelease"
+    required: false
+    default: "false"
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  github-token:
+    description: "GitHub token for API operations"
+    required: true
+
+outputs:
+  release-id:
+    description: "ID of the created GitHub release"
+    value: ${{ steps.create-release.outputs.release-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      with:
+        fetch-depth: 0
+
+    - name: Generate release notes
+      id: release-notes
+      uses: CLDMV/.github/.github/actions/git/steps/generate-release-notes@v1
+      with:
+        version: ${{ inputs.version }}
+        package-name: ${{ inputs.package-name }}
+        package-manager: ${{ inputs.package-manager }}
+
+    - name: Create GitHub release
+      id: create-release
+      uses: CLDMV/.github/.github/actions/github/api/relea@v1
+      with:
+        version: ${{ inputs.version }}
+        package-name: ${{ inputs.package-name }}
+        release-notes: ${{ steps.release-notes.outputs.release-notes }}
+        is-prerelease: ${{ inputs.is-prerelease }}
+        github-token: ${{ inputs.github-token }}

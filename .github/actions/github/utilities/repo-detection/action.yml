@@ -1,0 +1,90 @@
+name: "Detect Repository Configuration"
+description: "Detect repository visibility and configure publish commands"
+
+inputs:
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  custom-npm-command:
+    description: "Custom NPM publish command (overrides auto-detection)"
+    required: false
+    default: ""
+  custom-github-packages-command:
+    description: "Custom GitHub Packages publish command (overrides auto-detection)"
+    required: false
+    default: ""
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+
+outputs:
+  npm-command:
+    description: "NPM publish command (auto-detected or custom)"
+    value: ${{ steps.detect.outputs.npm-command }}
+  github-packages-command:
+    description: "GitHub Packages publish command (auto-detected or custom)"
+    value: ${{ steps.detect.outputs.github-packages-command }}
+  repo-is-private:
+    description: "Whether repository is private"
+    value: ${{ steps.detect.outputs.repo-is-private }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Detect repository visibility and configure commands
+      id: detect
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Get repository information
+        REPO_INFO=$(curl -s -H "Authorization: token ${{ inputs.github-token }}" \
+          "https://api.github.com/repos/${{ github.repository }}")
+
+        IS_PRIVATE=$(echo "$REPO_INFO" | jq -r '.private')
+        echo "Repository is private: $IS_PRIVATE"
+
+        # Determine access level based on repo visibility
+        if [ "$IS_PRIVATE" = "true" ]; then
+          ACCESS_LEVEL="restricted"
+          echo "🔒 Private repository detected - using restricted access for auto-detection"
+        else
+          ACCESS_LEVEL="public"
+          echo "🌍 Public repository detected - using public access for auto-detection"
+        fi
+
+        # Set NPM publish command - use custom if provided, otherwise auto-detect
+        NPM_COMMAND="${{ inputs.custom-npm-command }}"
+        if [ -z "$NPM_COMMAND" ]; then
+          if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+            NPM_COMMAND="yarn publish --access $ACCESS_LEVEL"
+          else
+            NPM_COMMAND="npm publish --access $ACCESS_LEVEL"
+          fi
+          echo "📦 Auto-detected NPM command: $NPM_COMMAND"
+        else
+          echo "📦 Using custom NPM command: $NPM_COMMAND"
+        fi
+
+        # Set GitHub Packages publish command - use custom if provided, otherwise auto-detect
+        GH_COMMAND="${{ inputs.custom-github-packages-command }}"
+        if [ -z "$GH_COMMAND" ]; then
+          if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+            GH_COMMAND="yarn publish --access $ACCESS_LEVEL"
+          else
+            GH_COMMAND="npm publish --access $ACCESS_LEVEL"
+          fi
+          echo "📦 Auto-detected GitHub Packages command: $GH_COMMAND"
+        else
+          echo "📦 Using custom GitHub Packages command: $GH_COMMAND"
+        fi
+
+        # Output the commands for use in later steps
+        echo "npm-command=$NPM_COMMAND" >> $GITHUB_OUTPUT
+        echo "github-packages-command=$GH_COMMAND" >> $GITHUB_OUTPUT
+        echo "repo-is-private=$IS_PRIVATE" >> $GITHUB_OUTPUT
+
+
+
+

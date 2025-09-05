@@ -1,0 +1,71 @@
+name: "Generate Version Documentation"
+description: "Create or update VERSION_TAGS.md with current major version mappings"
+
+inputs:
+  create-documentation:
+    description: "Whether to create version documentation"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate version tags documentation
+      if: inputs.create-documentation == 'true'
+      shell: bash
+      run: |
+        # Create or update a VERSION_TAGS.md file documenting current major versions
+        cat > VERSION_TAGS.md << 'EOF'
+        # Version Tags
+
+        This repository uses semantic versioning with automated major version tag updates.
+
+        ## Current Major Versions
+
+        EOF
+
+        # List all major version tags
+        git tag -l 'v[0-9]*' | grep -E '^v[0-9]+$' | sort -V | while read major_tag; do
+          latest_patch=$(git tag -l "${major_tag}.*" | sort -V | tail -1)
+          if [ -n "$latest_patch" ]; then
+            echo "- \`$major_tag\` → \`$latest_patch\`" >> VERSION_TAGS.md
+          else
+            echo "- \`$major_tag\` → \`$major_tag\`" >> VERSION_TAGS.md
+          fi
+        done
+
+        cat >> VERSION_TAGS.md << 'EOF'
+
+        ## Usage
+
+        Reference workflows using major version tags for automatic updates:
+
+        ```yaml
+        jobs:
+          ci:
+            uses: CLDMV/.github/workflows/ci.yml@v1
+        ```
+
+        Or use specific versions for stability:
+
+        ```yaml
+        jobs:
+          ci:
+            uses: CLDMV/.github/workflows/ci.yml@v1.0.1
+        ```
+
+        Major version tags are automatically updated when new patch/minor releases are published.
+        EOF
+
+        # Commit the documentation if it changed
+        if ! git diff --quiet VERSION_TAGS.md 2>/dev/null; then
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add VERSION_TAGS.md
+          git commit -m "docs: update version tags documentation"
+          git push origin HEAD:${{ github.event.repository.default_branch }}
+        fi
+
+
+
+

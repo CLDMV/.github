@@ -1,4 +1,4 @@
-# Individual repo: .github/workflows/update-version-tags.yml
+# This repository's workflow to update version tags
 name: 🏷️ Update Version Tags
 
 on:
@@ -10,8 +10,7 @@ on:
 
 jobs:
   update-tags:
-    uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
+    name: "📌 Update Major Version Tags"
+    uses: ./.github/workflows/update-major-version-tags.yml
     with:
       create_documentation: true
-    permissions:
-      contents: write

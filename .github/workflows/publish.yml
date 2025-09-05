@@ -1,5 +1,5 @@
-# CLDMV/.github/.github/workflows/publish-modular.yml
-name: Publish Workflow (Modular)
+# CLDMV/.github/.github/workflows/publish.yml
+name: Publish Workflow (Org-Level)
 
 on:
   workflow_call:
@@ -13,212 +13,73 @@ on:
         type: string
         default: "lts/*"
         description: "Node.js version to use"
-      test_command:
-        required: false
-        type: string
-        default: "npm test"
-        description: "Command to run pre-build tests"
-      build_command:
-        required: false
-        type: string
-        default: "npm run build:ci"
-        description: "Command to build package (should include post-build tests)"
-      publish_command:
-        required: false
-        type: string
-        default: ""
-        description: "Command to publish package to NPM (auto-detects access level if empty)"
-      github_packages_publish_command:
-        required: false
-        type: string
-        default: ""
-        description: "Command to publish package to GitHub Packages (auto-detects access level if empty)"
-      publish_to_npm:
-        required: false
-        type: boolean
-        default: true
-        description: "Publish to NPM registry"
-      skip_publish:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip ALL publishing (for testing)"
-      publish_to_github_packages:
-        required: false
-        type: boolean
-        default: true
-        description: "Publish to GitHub Packages registry"
       package_manager:
         required: false
         type: string
         default: "npm"
         description: "Package manager (npm or yarn)"
+      version:
+        required: true
+        type: string
+        description: "Version to publish"
+      publish_to_npm:
+        required: false
+        type: boolean
+        default: true
+        description: "Publish to NPM registry"
+      publish_to_github_packages:
+        required: false
+        type: boolean
+        default: true
+        description: "Publish to GitHub Packages registry"
+      publish_command:
+        required: false
+        type: string
+        default: ""
+        description: "Custom NPM publish command"
+      github_packages_publish_command:
+        required: false
+        type: string
+        default: ""
+        description: "Custom GitHub Packages publish command"
+      skip_publish:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip ALL publishing (for testing)"
+
     secrets:
       NPM_TOKEN:
+        description: "NPM token for publishing packages"
         required: true
+
     outputs:
       published:
         description: "Whether the package was successfully published"
-        value: ${{ jobs.detect-release.outputs.should-release }}
+        value: ${{ jobs.publish.outputs.published }}
       npm-published:
         description: "Whether the package was published to NPM"
-        value: ${{ jobs.publish-to-npm.outputs.published || 'false' }}
+        value: ${{ jobs.publish.outputs.npm-published }}
       github-packages-published:
         description: "Whether the package was published to GitHub Packages"
-        value: ${{ jobs.publish-to-github-packages.outputs.published || 'false' }}
-      version:
-        description: "Version of the package that was published"
-        value: ${{ jobs.detect-release.outputs.version }}
-      release-id:
-        description: "GitHub release ID"
-        value: ${{ jobs.create-github-release.outputs.release-id }}
-      repo-is-private:
-        description: "Whether repository is private"
-        value: ${{ jobs.detect-repo-config.outputs.repo-is-private }}
-      npm-command:
-        description: "Auto-detected NPM publish command"
-        value: ${{ jobs.detect-repo-config.outputs.npm-command }}
-      github-packages-command:
-        description: "Auto-detected GitHub Packages publish command"
-        value: ${{ jobs.detect-repo-config.outputs.github-packages-command }}
+        value: ${{ jobs.publish.outputs.github-packages-published }}
 
 jobs:
-  # Git-based release detection
-  detect-release:
-    uses: CLDMV/.github/workflow-packages/git/jobs/detect-release.yml
-
-  # NPM-specific build and test
-  build-and-test:
-    needs: detect-release
-    if: needs.detect-release.outputs.should-release == 'true'
-    uses: CLDMV/.github/workflow-packages/npm/jobs/build-and-test.yml
+  publish:
+    name: "📦 Publish Package"
+    uses: ./.github/workflows/ci-jobs.yml
     with:
-      node-version: ${{ inputs.node_version }}
-      package-manager: ${{ inputs.package_manager }}
-      test-command: ${{ inputs.test_command }}
-      build-command: ${{ inputs.build_command }}
-
-  # GitHub API-based release creation
-  create-github-release:
-    needs: [detect-release, build-and-test]
-    uses: CLDMV/.github/workflow-packages/github/jobs/create-release.yml
-    with:
-      version: ${{ needs.detect-release.outputs.version }}
-      package-name: ${{ inputs.package_name }}
-      is-prerelease: ${{ needs.detect-release.outputs.is-prerelease == 'true' }}
-      package-manager: ${{ inputs.package_manager }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # GitHub utility for repository configuration detection
-  detect-repo-config:
-    needs: [detect-release, build-and-test, create-github-release]
-    if: |
-      inputs.skip_publish != true && 
-      (inputs.publish_to_npm == true || inputs.publish_to_github_packages == true)
-    uses: CLDMV/.github/workflow-packages/github/jobs/detect-repo-config.yml
-    with:
-      package-manager: ${{ inputs.package_manager }}
-      custom-npm-command: ${{ inputs.publish_command }}
-      custom-github-packages-command: ${{ inputs.github_packages_publish_command }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # NPM publishing
-  publish-to-npm:
-    needs: [detect-release, detect-repo-config]
-    if: inputs.skip_publish != true && inputs.publish_to_npm == true
-    uses: CLDMV/.github/workflow-packages/npm/jobs/publish-npm.yml
-    with:
-      package-name: ${{ inputs.package_name }}
-      version: ${{ needs.detect-release.outputs.version }}
-      node-version: ${{ inputs.node_version }}
-      package-manager: ${{ inputs.package_manager }}
-      publish-command: ${{ needs.detect-repo-config.outputs.npm-command }}
+      package_name: ${{ inputs.package_name }}
+      run_build_and_test: true
+      run_detect_repo_config: true
+      run_publish_npm: ${{ inputs.publish_to_npm && !inputs.skip_publish }}
+      run_publish_github_packages: ${{ inputs.publish_to_github_packages && !inputs.skip_publish }}
+      run_create_release: true
+      run_update_major_version_tags: true
+      node_version: ${{ inputs.node_version }}
+      package_manager: ${{ inputs.package_manager }}
+      version: ${{ inputs.version }}
+      publish_command_npm: ${{ inputs.publish_command }}
+      publish_command_github_packages: ${{ inputs.github_packages_publish_command }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # GitHub Packages publishing
-  publish-to-github-packages:
-    needs: [detect-release, detect-repo-config]
-    if: inputs.skip_publish != true && inputs.publish_to_github_packages == true
-    uses: CLDMV/.github/workflow-packages/npm/jobs/publish-github-packages.yml
-    with:
-      package-name: ${{ inputs.package_name }}
-      version: ${{ needs.detect-release.outputs.version }}
-      node-version: ${{ inputs.node_version }}
-      package-manager: ${{ inputs.package_manager }}
-      publish-command: ${{ needs.detect-repo-config.outputs.github-packages-command }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # GitHub success notification
-  add-success-comment:
-    name: "💬 Add Success Comment"
-    needs: [detect-release, publish-to-npm, publish-to-github-packages]
-    if: |
-      always() && 
-      inputs.skip_publish != true && 
-      (needs.publish-to-npm.result == 'success' || needs.publish-to-github-packages.result == 'success') &&
-      (inputs.publish_to_npm == true || inputs.publish_to_github_packages == true)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Add success comment
-        uses: CLDMV/.github/workflow-packages/github/steps/add-success-comment.yml
-        with:
-          version: ${{ needs.detect-release.outputs.version }}
-          package-name: ${{ inputs.package_name }}
-          npm-published: ${{ needs.publish-to-npm.result == 'success' }}
-          github-packages-published: ${{ needs.publish-to-github-packages.result == 'success' }}
-          publish-to-npm: ${{ inputs.publish_to_npm }}
-          publish-to-github-packages: ${{ inputs.publish_to_github_packages }}
-
-  # Summary notification
-  notify-completion:
-    name: "✅ Release Summary"
-    needs: [detect-release, create-github-release, publish-to-npm, publish-to-github-packages]
-    if: always() && needs.detect-release.outputs.should-release == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Release completion summary
-        shell: bash
-        run: |
-          VERSION="${{ needs.detect-release.outputs.version }}"
-          PACKAGE="${{ inputs.package_name }}"
-
-          echo "🎊 Release $PACKAGE v$VERSION completed!"
-          echo "✅ GitHub Release: Created"
-
-          # Check NPM publish status
-          if [[ "${{ inputs.publish_to_npm }}" == "true" ]]; then
-            if [[ "${{ needs.publish-to-npm.result }}" == "success" ]]; then
-              echo "✅ NPM Publish: Success"
-            else
-              echo "❌ NPM Publish: Failed"
-            fi
-          else
-            echo "⏭️ NPM Publish: Disabled"
-          fi
-
-          # Check GitHub Packages publish status
-          if [[ "${{ inputs.publish_to_github_packages }}" == "true" ]]; then
-            if [[ "${{ needs.publish-to-github-packages.result }}" == "success" ]]; then
-              echo "✅ GitHub Packages Publish: Success"
-            else
-              echo "❌ GitHub Packages Publish: Failed"
-            fi
-          else
-            echo "⏭️ GitHub Packages Publish: Disabled"
-          fi
-
-          if [[ "${{ inputs.skip_publish }}" == "true" ]]; then
-            echo "⏭️ All Publishing: Skipped (configured)"
-          fi
-
-          echo ""
-          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
-
-          if [[ "${{ inputs.publish_to_npm }}" == "true" && "${{ needs.publish-to-npm.result }}" == "success" ]]; then
-            echo "📦 NPM URL: https://www.npmjs.com/package/$PACKAGE/v/$VERSION"
-          fi

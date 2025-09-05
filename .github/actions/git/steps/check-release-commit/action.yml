@@ -1,0 +1,79 @@
+name: "Check Release Commit"
+description: "Check if the latest commit is a release commit and determine version bump type"
+
+outputs:
+  should-create-pr:
+    description: "Whether a release PR should be created"
+    value: ${{ steps.check.outputs.should-create-pr }}
+  version-bump:
+    description: "Type of version bump (major, minor, patch)"
+    value: ${{ steps.check.outputs.version-bump }}
+  commit-message:
+    description: "The commit message that triggered the release"
+    value: ${{ steps.check.outputs.commit-message }}
+  has-breaking:
+    description: "Whether this release has breaking changes"
+    value: ${{ steps.check.outputs.has-breaking }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check for release commit
+      id: check
+      shell: bash
+      run: |
+        # Get the latest commit message and body
+        COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+        COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+
+        echo "Latest commit: $COMMIT_MSG"
+        echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
+        # Only trigger on explicit release commits
+        if [[ $COMMIT_MSG =~ ^release!: ]]; then
+          echo "should-create-pr=true" >> $GITHUB_OUTPUT
+          echo "version-bump=major" >> $GITHUB_OUTPUT
+          echo "has-breaking=true" >> $GITHUB_OUTPUT
+          echo "🚀 Breaking release commit detected - will create major version PR"
+        elif [[ $COMMIT_MSG =~ ^release: ]]; then
+          echo "should-create-pr=true" >> $GITHUB_OUTPUT
+          echo "has-breaking=false" >> $GITHUB_OUTPUT
+          
+          # Analyze commits since last release to determine version bump
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found, defaulting to minor release"
+            echo "version-bump=minor" >> $GITHUB_OUTPUT
+          else
+            echo "Last tag: $LAST_TAG"
+            COMMIT_RANGE="$LAST_TAG..HEAD"
+            
+            # Check for breaking changes in the range
+            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline)
+            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline)
+            
+            if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
+              echo "version-bump=major" >> $GITHUB_OUTPUT
+              echo "has-breaking=true" >> $GITHUB_OUTPUT
+              echo "🚀 Major release - breaking changes detected in commit history"
+            else
+              # Check for features
+              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline)
+              if [[ -n "$FEATURE_COMMITS" ]]; then
+                echo "version-bump=minor" >> $GITHUB_OUTPUT
+                echo "🎉 Minor release - new features detected"
+              else
+                echo "version-bump=patch" >> $GITHUB_OUTPUT
+                echo "🐛 Patch release - only fixes and other changes"
+              fi
+            fi
+          fi
+          echo "📦 Release commit detected - will create release PR"
+        else
+          echo "should-create-pr=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"
+        fi
+
+
+
+

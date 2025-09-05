@@ -1,0 +1,45 @@
+name: "Publish to GitHub Packages"
+description: "Composite action for publishing to GitHub Packages registry"
+
+inputs:
+  package-name:
+    description: "Name of the package to publish"
+    required: true
+  version:
+    description: "Version to publish"
+    required: true
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "lts/*"
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  publish-command:
+    description: "Command to publish the package"
+    required: true
+  github-token:
+    description: "GitHub token for authentication"
+    required: true
+
+outputs:
+  published:
+    description: "Whether the package was successfully published"
+    value: ${{ steps.publish-package.outputs.published }}
+
+runs:
+  using: composite
+  steps:
+    - name: Publish package to GitHub Packages
+      id: publish-package
+      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
+      with:
+        registry-name: "GitHub Packages"
+        registry-url: "https://npm.pkg.github.com"
+        package-name: ${{ inputs.package-name }}
+        version: ${{ inputs.version }}
+        node-version: ${{ inputs.node-version }}
+        package-manager: ${{ inputs.package-manager }}
+        publish-command: ${{ inputs.publish-command }}
+        auth-token: ${{ inputs.github-token }}

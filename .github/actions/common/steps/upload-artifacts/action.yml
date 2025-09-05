@@ -1,0 +1,28 @@
+name: "Upload Artifacts"
+description: "Upload build artifacts with configurable paths and retention"
+
+inputs:
+  artifact-name:
+    description: "Name for the artifact"
+    required: true
+  artifact-path:
+    description: "Paths to include in artifact (multiline supported)"
+    required: true
+  retention-days:
+    description: "Number of days to retain artifact"
+    required: false
+    default: "1"
+  
+runs:
+  using: "composite"
+  steps:
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.artifact-path }}
+        retention-days: ${{ inputs.retention-days }}
+
+
+
+

@@ -1,0 +1,65 @@
+name: "🔄 Git Tag Operations"
+description: "Composite action for updating major version tags"
+
+inputs:
+  create-documentation:
+    description: "Whether to create/update VERSION_TAGS.md documentation"
+    required: false
+    default: "true"
+
+outputs:
+  major-version:
+    description: "The major version tag that was updated"
+    value: ${{ steps.update-tags.outputs.major-version }}
+  minor-version:
+    description: "The minor version tag that was updated"
+    value: ${{ steps.update-tags.outputs.minor-version }}
+  updated:
+    description: "Whether tags were successfully updated"
+    value: ${{ steps.update-tags.outputs.updated }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      with:
+        fetch-depth: 0
+
+    - name: Get tag name
+      id: get-tag
+      shell: bash
+      run: |
+        # Get the tag that triggered this workflow
+        if [ "${{ github.event_name }}" = "release" ]; then
+          TAG_NAME="${{ github.event.release.tag_name }}"
+        else
+          TAG_NAME="${{ github.ref_name }}"
+        fi
+        echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "Processing tag: $TAG_NAME"
+
+    - name: Update major version tags
+      id: update-tags
+      uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
+      with:
+        tag-name: ${{ steps.get-tag.outputs.tag-name }}
+
+    - name: Generate version documentation
+      if: inputs.create-documentation == 'true' && steps.update-tags.outputs.updated == 'true'
+      uses: CLDMV/.github/.github/actions/git/steps/generate-version-documentation@v1
+      with:
+        create-documentation: ${{ inputs.create-documentation }}
+
+    - name: Create summary
+      if: steps.update-tags.outputs.updated == 'true'
+      shell: bash
+      run: |
+        echo "## 🏷️ Version Tags Updated" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "The following major/minor version tags have been updated:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.update-tags.outputs.major-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.update-tags.outputs.minor-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Workflows can now reference \`@${{ steps.update-tags.outputs.major-version }}\` for automatic updates." >> $GITHUB_STEP_SUMMARY

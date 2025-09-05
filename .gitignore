@@ -1,5 +1,6 @@
 # VS Code settings
 .vscode/
+.backup/
 
 # AI Agent Files
 .cursorrules
@@ -13,6 +14,7 @@
 .claude*
 .copilot*
 .github-copilot*
+copilot-instructions.md
 ai-instructions.*
 AGENT.md
 AGENTS.md
@@ -24,4 +26,3 @@ agent-*
 .ai/
 ai/
 agents/
-.github/copilot-instructions.md

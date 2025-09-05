@@ -1,0 +1,100 @@
+name: "Create Release PR"
+description: "Composite action for creating release pull requests"
+
+inputs:
+  package-name:
+    description: "NPM package name"
+    required: true
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "lts/*"
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  build-command:
+    description: "Command to build package"
+    required: false
+    default: "npm run build:ci"
+  version-bump:
+    description: "Type of version bump (major, minor, patch)"
+    required: true
+  github-token:
+    description: "GitHub token for API operations"
+    required: true
+
+outputs:
+  pr-created:
+    description: "Whether a release PR was created"
+    value: ${{ steps.create-pr.outputs.pr-created }}
+  pr-number:
+    description: "The release PR number if created"
+    value: ${{ steps.create-pr.outputs.pr-number }}
+  new-version:
+    description: "The new version that was set"
+    value: ${{ steps.version.outputs.new-version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install dependencies
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+      with:
+        package-manager: ${{ inputs.package-manager }}
+
+    - name: Calculate new version
+      id: version
+      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
+      with:
+        version-bump: ${{ inputs.version-bump }}
+
+    - name: Build package
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+      with:
+        build-command: ${{ inputs.build-command }}
+        environment: production
+
+    - name: Update package version
+      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v1
+      with:
+        new-version: ${{ steps.version.outputs.new-version }}
+        package-manager: ${{ inputs.package-manager }}
+
+    - name: Generate comprehensive changelog
+      id: changelog
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
+      with:
+        github-token: ${{ inputs.github-token }}
+
+    - name: Detect default branch
+      id: default-branch
+      uses: CLDMV/.github/.github/actions/git/utilitie@v1
+
+    - name: Create signed commit
+      id: commit
+      uses: CLDMV/.github/.github/actions/github/api/commit@v1
+      with:
+        commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
+        github-token: ${{ inputs.github-token }}
+
+    - name: Create pull request
+      id: create-pr
+      uses: CLDMV/.github/.github/actions/github/api/pull-reque@v1
+      with:
+        title: "release: v${{ steps.version.outputs.new-version }}"
+        base-branch: ${{ steps.default-branch.outputs.default-branch }}
+        head-branch: ${{ github.ref_name }}
+        body-content: ${{ steps.changelog.outputs.changelog-content }}
+        labels: "release,${{ inputs.version-bump }}"
+        github-token: ${{ inputs.github-token }}

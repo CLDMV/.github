@@ -1,0 +1,27 @@
+name: "Detect Release"
+description: "Composite action for detecting if this is a release PR"
+
+inputs: {}
+
+outputs:
+  should-release:
+    description: "Whether this is a release PR"
+    value: ${{ steps.extract.outputs.should-release }}
+  version:
+    description: "Extracted version number"
+    value: ${{ steps.extract.outputs.version }}
+  is-prerelease:
+    description: "Whether this is a prerelease"
+    value: ${{ steps.extract.outputs.is-prerelease }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      with:
+        fetch-depth: 2
+
+    - name: Extract version from PR
+      id: extract
+      uses: CLDMV/.github/.github/actions/git/steps/extract-version@v1

@@ -10,11 +10,15 @@ on:
 
 jobs:
   create-release-pr:
-    uses: CLDMV/.github/workflows/release.yml@v1
+    uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
-      package_name: "@cldmv/slothlet" # Required
-      node_version: "lts/*"
-      test_command: "npm test"
-      build_command: "npm run build:ci"
+      package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      # Optional parameters:
+      # node_version: "lts/*" # Use if you want a single version
+      min_node_version: "16.4" # Minimum Node.js version for matrix
+      # max_node_major: "22" # (Optional) Maximum Node.js major version
       package_manager: "npm"
-    secrets: inherit
+      build_command: "npm run build:ci"
+      version_bump: "patch" # or "minor", "major"
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

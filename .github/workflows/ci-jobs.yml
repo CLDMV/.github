@@ -1,0 +1,296 @@
+name: "CI Jobs Orchestrator"
+
+on:
+  workflow_call:
+    inputs:
+      # Package information
+      package_name:
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+        required: true
+        type: string
+
+      # Job control flags - all default to false
+      run_build_and_test:
+        description: "Run build and test job"
+        required: false
+        type: boolean
+        default: false
+      run_create_release_pr:
+        description: "Run create release PR job"
+        required: false
+        type: boolean
+        default: false
+      run_create_release:
+        description: "Run create GitHub release job"
+        required: false
+        type: boolean
+        default: false
+      run_detect_release:
+        description: "Run detect release job"
+        required: false
+        type: boolean
+        default: false
+      run_update_major_version_tags:
+        description: "Run update major version tags job"
+        required: false
+        type: boolean
+        default: false
+      run_publish_npm:
+        description: "Run publish to NPM job"
+        required: false
+        type: boolean
+        default: false
+      run_publish_github_packages:
+        description: "Run publish to GitHub Packages job"
+        required: false
+        type: boolean
+        default: false
+      run_detect_repo_config:
+        description: "Run detect repository config job"
+        required: false
+        type: boolean
+        default: false
+
+      # Build and test parameters
+      node_version:
+        description: "Node.js version to use (ignored if min_node_version is set)"
+        required: false
+        type: string
+        default: "lts/*"
+      min_node_version:
+        description: "Minimum Node.js version to test (e.g., 16.4)"
+        required: false
+        type: string
+        default: "16.4"
+      max_node_major:
+        description: "Override max Node.js major version (default: 22)"
+        required: false
+        type: string
+        default: "22"
+      package_manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+      test_command:
+        description: "Command to run tests"
+        required: false
+        type: string
+        default: "npm test"
+      build_command:
+        description: "Command to build package"
+        required: false
+        type: string
+        default: "npm run build:ci"
+
+      # Release parameters
+      version_bump:
+        description: "Type of version bump (major, minor, patch)"
+        required: false
+        type: string
+        default: "patch"
+      version:
+        description: "Specific version for release"
+        required: false
+        type: string
+        default: ""
+      is_prerelease:
+        description: "Whether this is a prerelease"
+        required: false
+        type: boolean
+        default: false
+
+      # Publishing parameters
+      publish_command_npm:
+        description: "Command to publish to NPM"
+        required: false
+        type: string
+        default: ""
+      publish_command_github_packages:
+        description: "Command to publish to GitHub Packages"
+        required: false
+        type: string
+        default: ""
+
+      # Documentation parameters
+      create_documentation:
+        description: "Whether to create/update VERSION_TAGS.md"
+        required: false
+        type: boolean
+        default: true
+
+    secrets:
+      NPM_TOKEN:
+        description: "NPM token for publishing packages"
+        required: false
+
+jobs:
+  set-matrix:
+    name: "Set Node.js Matrix"
+    runs-on: ubuntu-latest
+    if: inputs.run_build_and_test == true
+    outputs:
+      node-matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          MIN="${{ inputs.min_node_version }}"
+          MAX_INPUT="${{ inputs.max_node_major }}"
+          DEFAULT_MAX=22
+          if [[ -n "$MAX_INPUT" ]]; then
+            MAX=$MAX_INPUT
+          else
+            MAX=$DEFAULT_MAX
+          fi
+          MAJOR=$(echo $MIN | cut -d. -f1)
+          MINOR=$(echo $MIN | cut -d. -f2)
+          VERSIONS=()
+          if [[ "$MIN" == *"."* ]]; then
+            VERSIONS+=("${MAJOR}.${MINOR}.x")
+            ((MAJOR++))
+          fi
+          while [ $MAJOR -le $MAX ]; do
+            VERSIONS+=("${MAJOR}.x")
+            ((MAJOR++))
+          done
+          VERSIONS+=("lts/*")
+          printf -v joined '%s","' "${VERSIONS[@]}"
+          joined="[\"${joined%","}\"]"
+          echo "matrix=$joined" >> $GITHUB_OUTPUT
+  build-and-test:
+    name: "🏗️ Build & Test"
+    if: inputs.run_build_and_test == true
+    runs-on: ubuntu-latest
+    needs: set-matrix
+    strategy:
+      matrix:
+        node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
+    steps:
+      - name: Build and Test
+        uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager: ${{ inputs.package_manager }}
+          test-command: ${{ inputs.test_command }}
+          build-command: ${{ inputs.build_command }}
+
+  detect-release:
+    name: "🔍 Detect Release"
+    if: inputs.run_detect_release == true
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.detect.outputs.should-release }}
+      version: ${{ steps.detect.outputs.version }}
+      is-prerelease: ${{ steps.detect.outputs.is-prerelease }}
+    steps:
+      - name: Detect Release
+        id: detect
+        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+
+  create-release-pr:
+    name: "📋 Create Release PR"
+    if: inputs.run_create_release_pr == true
+    runs-on: ubuntu-latest
+    outputs:
+      pr-created: ${{ steps.create.outputs.pr-created }}
+      pr-number: ${{ steps.create.outputs.pr-number }}
+      new-version: ${{ steps.create.outputs.new-version }}
+    steps:
+      - name: Create Release PR
+        id: create
+        uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          build-command: ${{ inputs.build_command }}
+          version-bump: ${{ inputs.version_bump }}
+          github-token: ${{ github.token }}
+
+  create-release:
+    name: "📋 Create GitHub Release"
+    if: inputs.run_create_release == true
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create.outputs.release-id }}
+    steps:
+      - name: Create GitHub Release
+        id: create
+        uses: CLDMV/.github/.github/actions/github/jobs/create-release@v1
+        with:
+          version: ${{ inputs.version }}
+          package-name: ${{ inputs.package_name }}
+          is-prerelease: ${{ inputs.is_prerelease }}
+          package-manager: ${{ inputs.package_manager }}
+          github-token: ${{ github.token }}
+
+  detect-repo-config:
+    name: "🔧 Detect Repository Config"
+    if: inputs.run_detect_repo_config == true
+    runs-on: ubuntu-latest
+    outputs:
+      npm-command: ${{ steps.detect.outputs.npm-command }}
+      github-packages-command: ${{ steps.detect.outputs.github-packages-command }}
+      repo-is-private: ${{ steps.detect.outputs.repo-is-private }}
+    steps:
+      - name: Detect Repository Config
+        id: detect
+        uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v1
+        with:
+          package-manager: ${{ inputs.package_manager }}
+          custom-npm-command: ${{ inputs.publish_command_npm }}
+          custom-github-packages-command: ${{ inputs.publish_command_github_packages }}
+          github-token: ${{ github.token }}
+
+  publish-npm:
+    name: "📦 Publish to NPM"
+    if: inputs.run_publish_npm == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Publish to NPM
+        id: publish
+        uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          version: ${{ inputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ inputs.publish_command_npm }}
+          npm-token: ${{ secrets.NPM_TOKEN }}
+
+  publish-github-packages:
+    name: "📦 Publish to GitHub Packages"
+    if: inputs.run_publish_github_packages == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Publish to GitHub Packages
+        id: publish
+        uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          version: ${{ inputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ inputs.publish_command_github_packages }}
+          github-token: ${{ github.token }}
+
+  update-major-version-tags:
+    name: "🏷️ Process Version Tags"
+    if: inputs.run_update_major_version_tags == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      major-version: ${{ steps.update.outputs.major-version }}
+      minor-version: ${{ steps.update.outputs.minor-version }}
+      updated: ${{ steps.update.outputs.updated }}
+    steps:
+      - name: Update Major Version Tags
+        id: update
+        uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+        with:
+          create-documentation: ${{ inputs.create_documentation }}

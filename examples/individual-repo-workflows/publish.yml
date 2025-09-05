@@ -8,17 +8,19 @@ on:
 
 jobs:
   publish-package:
-    uses: CLDMV/.github/workflows/publish.yml@v1
+    uses: CLDMV/.github/.github/workflows/publish.yml@v1
     with:
-      package_name: "@cldmv/slothlet" # Required
-      node_version: "lts/*"
-      test_command: "npm test"
-      build_command: "npm run build:ci"
+      package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      version: "1.0.0" # Required: Version to publish (usually from release PR)
+      # Optional parameters:
+      # node_version: "lts/*" # Use if you want a single version
+      min_node_version: "16.4" # Minimum Node.js version for matrix
+      # max_node_major: "22" # (Optional) Maximum Node.js major version
       package_manager: "npm"
-      # Optional publishing configuration
-      # publish_to_npm: true
-      # publish_to_github_packages: true
-      # skip_publish: false
-      # publish_command: ""  # Auto-detects
-      # github_packages_publish_command: ""  # Auto-detects
-    secrets: inherit
+      publish_to_npm: true
+      publish_to_github_packages: true
+      # skip_publish: false # For testing
+      # publish_command: "" # Auto-detects NPM access level
+      # github_packages_publish_command: "" # Auto-detects
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
