@@ -23,8 +23,8 @@ on:
 jobs:
   update-tags:
     name: "🚀 Execute Tag Updates"
-    # Only run on tag pushes or releases, not branch pushes
-    # if: startsWith(github.ref, 'refs/tags/') || github.ref_type == 'tag' || github.event_name == 'release'
+    # Run on: tag pushes or releases only (workflow_call bypasses this condition)
+    if: github.ref_type == 'tag' || github.event_name == 'release'
     runs-on: ubuntu-latest
     outputs:
       major-version: ${{ steps.tags.outputs.major-version }}
@@ -33,23 +33,6 @@ jobs:
       has-version-tags: ${{ steps.tags.outputs.has-version-tags }}
       should-run: ${{ steps.tags.outputs.should-run }}
     steps:
-      - name: Debug GitHub Context
-        shell: bash
-        run: |
-          echo "## 🐛 GitHub Context Debug" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Event Name**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ref**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ref Name**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ref Type**: ${{ github.ref_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SHA**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Full GitHub Context:" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          echo '${{ toJSON(github) }}' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
       - name: Check for version tags and update
         id: tags
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
