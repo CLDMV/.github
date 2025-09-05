@@ -10,6 +10,8 @@ on:
 
 jobs:
   create-release-pr:
+    # Only run if the commit message starts with "release:" or "release!:"
+    if: startsWith(github.event.head_commit.message, 'release:') || startsWith(github.event.head_commit.message, 'release!:')
     uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
