@@ -79,7 +79,7 @@ runs:
 
     - name: Detect default branch
       id: default-branch
-      uses: CLDMV/.github/.github/actions/git/utilitie@v1
+      uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v1
 
     - name: Create signed commit
       id: commit
@@ -90,7 +90,7 @@ runs:
 
     - name: Create pull request
       id: create-pr
-      uses: CLDMV/.github/.github/actions/github/api/pull-reque@v1
+      uses: CLDMV/.github/.github/actions/github/api/pull-requests@v1
       with:
         title: "release: v${{ steps.version.outputs.new-version }}"
         base-branch: ${{ steps.default-branch.outputs.default-branch }}

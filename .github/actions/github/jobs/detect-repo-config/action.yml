@@ -34,7 +34,7 @@ runs:
   steps:
     - name: Detect repository configuration
       id: detect
-      uses: CLDMV/.github/.github/actions/github/utilitie@v1
+      uses: CLDMV/.github/.github/actions/github/utilities/repo-detection@v1
       with:
         package-manager: ${{ inputs.package-manager }}
         custom-npm-command: ${{ inputs.custom-npm-command }}
