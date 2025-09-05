@@ -40,7 +40,7 @@ runs:
         # Create tree with all changes using GitHub API
         echo "📦 Creating tree with version bump and build artifacts..."
 
-        # First, ensure all objects are pushed to GitHub
+        # Refresh the local git index
         git update-index --refresh || true
 
         # Create tree SHA locally and verify it exists
@@ -53,20 +53,61 @@ runs:
           exit 1
         fi
 
-        # First, push all staged objects to remote
-        echo "📤 Pushing staged objects to remote..."
-        git update-index --refresh || true
-
-        # Create a temporary commit to push objects
-        TEMP_COMMIT=$(git commit-tree "$TREE_SHA" -p HEAD -m "temp commit for object transfer")
-        git push origin "$TEMP_COMMIT:refs/temp/objects" || true
-
-        # Clean up the temp ref
-        git push origin --delete refs/temp/objects || true
-
-        # Now use the tree SHA directly since objects should exist remotely
-        echo "🌳 Using tree SHA: $TREE_SHA"
-        FINAL_TREE_SHA="$TREE_SHA"
+        # Create all blob objects via GitHub API first
+        echo "📄 Creating blob objects via GitHub API..."
+        
+        # Get all staged files and create blobs
+        git diff --cached --name-only | while read file; do
+          if [ -f "$file" ]; then
+            echo "Creating blob for: $file"
+            
+            # Read file content as base64
+            CONTENT=$(base64 -w 0 "$file")
+            
+            # Create blob via API using printf to avoid argument length issues
+            printf '{"content":"%s","encoding":"base64"}' "$CONTENT" | \
+            curl -s -X POST \
+              -H "Authorization: token ${{ inputs.github-token }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              --data-binary @- \
+              "https://api.github.com/repos/${{ github.repository }}/git/blobs" > /dev/null
+          fi
+        done
+        
+        echo "✅ All blob objects created"
+        
+        # Now create the tree via API
+        echo "🌳 Creating tree via GitHub API..."
+        
+        # Build tree JSON
+        TREE_ITEMS=$(git diff --cached --name-only | while read file; do
+          if [ -f "$file" ]; then
+            BLOB_SHA=$(git hash-object "$file")
+            printf '{"path":"%s","mode":"100644","type":"blob","sha":"%s"}' "$file" "$BLOB_SHA"
+          fi
+        done | paste -sd, -)
+        
+        TREE_JSON="{\"base_tree\":\"$(git rev-parse HEAD^{tree})\",\"tree\":[$TREE_ITEMS]}"
+        
+        echo "$TREE_JSON" | \
+        curl -s -X POST \
+          -H "Authorization: token ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          --data-binary @- \
+          "https://api.github.com/repos/${{ github.repository }}/git/trees" > /tmp/tree_response.json
+        
+        API_TREE_SHA=$(cat /tmp/tree_response.json | jq -r '.sha')
+        
+        if [ "$API_TREE_SHA" != "null" ] && [ -n "$API_TREE_SHA" ]; then
+          echo "✅ Created tree via API: $API_TREE_SHA"
+          FINAL_TREE_SHA="$API_TREE_SHA"
+        else
+          echo "⚠️ Failed to create tree via API, using local tree"
+          echo "Response: $(cat /tmp/tree_response.json)"
+          FINAL_TREE_SHA="$TREE_SHA"
+        fi
 
         # Create commit using GitHub API (automatically signed)
         echo "✍️ Creating signed commit via GitHub API..."
@@ -88,13 +129,13 @@ runs:
         if [ "$NEW_COMMIT_SHA" = "null" ] || [ -z "$NEW_COMMIT_SHA" ]; then
           echo "❌ Failed to create commit via API"
           echo "Response: $COMMIT_RESPONSE"
+          echo "This likely means some git objects don't exist remotely."
+          echo "Tree SHA: $FINAL_TREE_SHA"
           exit 1
         fi
 
-        echo "✅ Created commit: $NEW_COMMIT_SHA"
+        echo "✅ Created signed commit: $NEW_COMMIT_SHA"
         echo "🔐 Verified: $VERIFIED (reason: $VERIFICATION_REASON)"
-        echo "commit-sha=$NEW_COMMIT_SHA" >> $GITHUB_OUTPUT
-        echo "verified=$VERIFIED" >> $GITHUB_OUTPUT
 
         # Update branch reference to new signed commit
         echo "📌 Updating branch reference..."
@@ -108,3 +149,7 @@ runs:
 
         echo "✅ Updated branch $CURRENT_BRANCH to signed commit"
         echo "Update response: $UPDATE_RESPONSE"
+
+        # Set outputs
+        echo "commit-sha=$NEW_COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "verified=$VERIFIED" >> $GITHUB_OUTPUT

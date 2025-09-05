@@ -34,7 +34,7 @@ runs:
 
         # Get package name from the tgz filename
         PACKAGE_NAME=$(basename "$TGZ_FILE" .tgz)
-        
+
         # Create temp directory for extraction
         TEMP_DIR=$(mktemp -d)
 

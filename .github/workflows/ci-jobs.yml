@@ -178,10 +178,10 @@ jobs:
           MIN="${{ inputs.min_node_version }}"
           MAX_INPUT="${{ inputs.max_node_major }}"
           DEFAULT_MAX=22
-          
+
           echo "🔍 DEBUG (ci-jobs.yml): min_node_version = '$MIN'"
           echo "🔍 DEBUG (ci-jobs.yml): max_node_major = '$MAX_INPUT'"
-          
+
           if [[ -n "$MAX_INPUT" ]]; then
             MAX=$MAX_INPUT
           else
