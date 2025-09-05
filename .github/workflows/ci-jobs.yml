@@ -178,6 +178,8 @@ jobs:
           MIN="${{ inputs.min_node_version }}"
           MAX_INPUT="${{ inputs.max_node_major }}"
           DEFAULT_MAX=22
+          
+          echo "🔍 DEBUG: Received min_node_version = '$MIN'"
           if [[ -n "$MAX_INPUT" ]]; then
             MAX=$MAX_INPUT
           else
