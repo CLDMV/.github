@@ -124,20 +124,19 @@ runs:
         if [ "$ORPHANS_FOUND" = "true" ]; then
           echo "🔧 Found orphaned tags, building JSON array..."
           
-          # Use jq to properly build JSON array to avoid escaping issues
+          # Use jq to properly build JSON array
           JSON_ARRAY="[]"
           while IFS='|' read -r tag_name target_sha latest_patch; do
-            # Use jq to safely add each tag to the JSON array
             JSON_ARRAY=$(echo "$JSON_ARRAY" | jq ". += [{\"tag\": \"$tag_name\", \"sha\": \"$target_sha\"}]")
           done < "$ORPHANED_TAGS_FILE"
           
-          # Properly escape the JSON for GitHub Actions output
-          JSON_ESCAPED=$(echo "$JSON_ARRAY" | jq -c .)
-          echo "orphaned-tags-json<<EOF" >> $GITHUB_OUTPUT
-          echo "$JSON_ESCAPED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Base64 encode the JSON to avoid any quote escaping issues
+          JSON_COMPACT=$(echo "$JSON_ARRAY" | jq -c .)
+          JSON_BASE64=$(echo "$JSON_COMPACT" | base64 -w 0)
           
-          echo "🔧 Orphaned tags JSON: $JSON_ESCAPED"
+          echo "orphaned-tags-json-base64=$JSON_BASE64" >> $GITHUB_OUTPUT
+          echo "🔧 Orphaned tags JSON: $JSON_COMPACT"
+          echo "� Base64 encoded: $JSON_BASE64"
         else
           echo "✅ No orphaned major/minor version tags found"
         fi
@@ -146,5 +145,5 @@ runs:
       if: steps.fix-orphans.outputs.orphans-found == 'true'
       uses: CLDMV/.github/.github/actions/github/api/update-tag@v1
       with:
-        tag_data: ${{ steps.fix-orphans.outputs.orphaned-tags-json }}
+        tag_data: ${{ steps.fix-orphans.outputs.orphaned-tags-json-base64 }}
         github_token: ${{ github.token }}

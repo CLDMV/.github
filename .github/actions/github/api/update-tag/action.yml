@@ -34,7 +34,13 @@ runs:
         UPDATED_COUNT=0
         MESSAGES=""
 
-        # Check if input is JSON array or single tag
+        # Check if input is base64 encoded JSON, regular JSON array, or single tag
+        if [[ "$TAG_DATA" =~ ^[A-Za-z0-9+/]+=*$ ]] && [ ${#TAG_DATA} -gt 20 ]; then
+          echo "🔓 Decoding base64 JSON data"
+          TAG_DATA=$(echo "$TAG_DATA" | base64 -d)
+          echo "📄 Decoded JSON: $TAG_DATA"
+        fi
+
         if [[ "$TAG_DATA" =~ ^\[ ]]; then
           echo "🔄 Processing multiple tags from JSON array"
           
