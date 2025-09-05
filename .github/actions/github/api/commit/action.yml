@@ -53,55 +53,20 @@ runs:
           exit 1
         fi
 
-        # Create the tree via GitHub API to ensure it exists remotely
-        echo "🔄 Creating tree via GitHub API..."
+        # First, push all staged objects to remote
+        echo "� Pushing staged objects to remote..."
+        git update-index --refresh || true
+        
+        # Create a temporary commit to push objects
+        TEMP_COMMIT=$(git commit-tree "$TREE_SHA" -p HEAD -m "temp commit for object transfer")
+        git push origin "$TEMP_COMMIT:refs/temp/objects" || true
+        
+        # Clean up the temp ref
+        git push origin --delete refs/temp/objects || true
 
-        # Get all files in the staging area and create blobs
-        FILES_JSON=$(git diff --cached --name-only | while read file; do
-          if [ -f "$file" ]; then
-            echo "📄 Creating blob for: $file"
-            # Create blob via API first
-            FILE_CONTENT=$(base64 -w 0 "$file")
-            BLOB_RESPONSE=$(curl -s -X POST \
-              -H "Authorization: token ${{ inputs.github-token }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/git/blobs" \
-              -d "{
-                \"content\": \"$FILE_CONTENT\",
-                \"encoding\": \"base64\"
-              }")
-            
-            BLOB_SHA=$(echo "$BLOB_RESPONSE" | jq -r '.sha')
-            if [ "$BLOB_SHA" != "null" ] && [ -n "$BLOB_SHA" ]; then
-              echo "✅ Created blob: $BLOB_SHA for $file"
-              echo "{\"path\":\"$file\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"$BLOB_SHA\"}"
-            else
-              echo "❌ Failed to create blob for $file: $BLOB_RESPONSE"
-              exit 1
-            fi
-          fi
-        done | jq -s .)
-
-        # Create tree via API
-        TREE_RESPONSE=$(curl -s -X POST \
-          -H "Authorization: token ${{ inputs.github-token }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}/git/trees" \
-          -d "{
-            \"base_tree\": \"$(git rev-parse HEAD^{tree})\",
-            \"tree\": $FILES_JSON
-          }")
-
-        API_TREE_SHA=$(echo "$TREE_RESPONSE" | jq -r '.sha')
-
-        if [ "$API_TREE_SHA" = "null" ] || [ -z "$API_TREE_SHA" ]; then
-          echo "⚠️ Failed to create tree via API, using local tree SHA"
-          echo "Tree response: $TREE_RESPONSE"
-          FINAL_TREE_SHA="$TREE_SHA"
-        else
-          echo "✅ Created tree via API: $API_TREE_SHA"
-          FINAL_TREE_SHA="$API_TREE_SHA"
-        fi
+        # Now use the tree SHA directly since objects should exist remotely
+        echo "🌳 Using tree SHA: $TREE_SHA"
+        FINAL_TREE_SHA="$TREE_SHA"
 
         # Create commit using GitHub API (automatically signed)
         echo "✍️ Creating signed commit via GitHub API..."
