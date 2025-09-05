@@ -54,13 +54,13 @@ runs:
         fi
 
         # First, push all staged objects to remote
-        echo "� Pushing staged objects to remote..."
+        echo "📤 Pushing staged objects to remote..."
         git update-index --refresh || true
-        
+
         # Create a temporary commit to push objects
         TEMP_COMMIT=$(git commit-tree "$TREE_SHA" -p HEAD -m "temp commit for object transfer")
         git push origin "$TEMP_COMMIT:refs/temp/objects" || true
-        
+
         # Clean up the temp ref
         git push origin --delete refs/temp/objects || true
 
@@ -108,7 +108,3 @@ runs:
 
         echo "✅ Updated branch $CURRENT_BRANCH to signed commit"
         echo "Update response: $UPDATE_RESPONSE"
-
-
-
-
