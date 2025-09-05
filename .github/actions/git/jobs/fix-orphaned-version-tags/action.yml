@@ -29,9 +29,13 @@ runs:
         # Get all version tags and sort them
         ALL_TAGS=$(git tag -l "v*.*.*" | sort -V)
 
-        # Find all major versions
+        # Find all major versions (v1, v2, etc.)
         MAJOR_VERSIONS=$(echo "$ALL_TAGS" | sed 's/v\([0-9]*\)\..*/v\1/' | sort -u)
+        
+        # Find all minor versions (v1.0, v1.1, v2.0, etc.)
+        MINOR_VERSIONS=$(echo "$ALL_TAGS" | sed 's/v\([0-9]*\.[0-9]*\)\..*/v\1/' | sort -u)
 
+        # Check major version tags for orphans
         for MAJOR_TAG in $MAJOR_VERSIONS; do
           echo "🔍 Checking major tag: $MAJOR_TAG"
           
@@ -45,7 +49,7 @@ runs:
             LATEST_COMMIT=$(git rev-list -n 1 "$LATEST_PATCH")
             
             if [ "$MAJOR_COMMIT" != "$LATEST_COMMIT" ]; then
-              echo "🚨 Orphaned tag detected: $MAJOR_TAG points to $MAJOR_COMMIT, should point to $LATEST_COMMIT ($LATEST_PATCH)"
+              echo "🚨 Orphaned major tag detected: $MAJOR_TAG points to $MAJOR_COMMIT, should point to $LATEST_COMMIT ($LATEST_PATCH)"
               
               # Fix the orphaned tag
               git tag -f "$MAJOR_TAG" "$LATEST_COMMIT"
@@ -55,6 +59,34 @@ runs:
               ORPHANS_FOUND="true"
             else
               echo "✅ $MAJOR_TAG correctly points to $LATEST_PATCH"
+            fi
+          fi
+        done
+
+        # Check minor version tags for orphans  
+        for MINOR_TAG in $MINOR_VERSIONS; do
+          echo "🔍 Checking minor tag: $MINOR_TAG"
+          
+          # Get the latest patch version for this minor version
+          MINOR_PATTERN=$(echo "$MINOR_TAG" | sed 's/v//')
+          LATEST_PATCH=$(echo "$ALL_TAGS" | grep "^v${MINOR_PATTERN}\." | sort -V | tail -1)
+          
+          if [ -n "$LATEST_PATCH" ]; then
+            # Get current commit that minor tag points to
+            MINOR_COMMIT=$(git rev-list -n 1 "$MINOR_TAG" 2>/dev/null || echo "")
+            LATEST_COMMIT=$(git rev-list -n 1 "$LATEST_PATCH")
+            
+            if [ "$MINOR_COMMIT" != "$LATEST_COMMIT" ]; then
+              echo "🚨 Orphaned minor tag detected: $MINOR_TAG points to $MINOR_COMMIT, should point to $LATEST_COMMIT ($LATEST_PATCH)"
+              
+              # Fix the orphaned tag
+              git tag -f "$MINOR_TAG" "$LATEST_COMMIT"
+              echo "✅ Fixed: $MINOR_TAG now points to $LATEST_PATCH ($LATEST_COMMIT)"
+              
+              FIXED_TAGS="${FIXED_TAGS}${MINOR_TAG}→${LATEST_PATCH} "
+              ORPHANS_FOUND="true"
+            else
+              echo "✅ $MINOR_TAG correctly points to $LATEST_PATCH"
             fi
           fi
         done
