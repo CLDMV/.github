@@ -12,6 +12,7 @@ jobs:
   update-tags:
     uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
     with:
-      create_documentation: true
+      # Documentation Configuration
+      create_documentation: true # Create/update VERSION_TAGS.md documentation
     permissions:
       contents: write

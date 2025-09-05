@@ -18,6 +18,10 @@ inputs:
     description: "Command to build package"
     required: false
     default: "npm run build:ci"
+  skip-performance-tests:
+    description: "Skip performance tests during CI"
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -52,6 +56,12 @@ runs:
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
+
+    - name: Create npm package
+      id: create-package
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v1
+      with:
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Upload build artifacts
       uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v1

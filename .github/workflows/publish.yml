@@ -12,7 +12,7 @@ on:
         required: false
         type: string
         default: "lts/*"
-        description: "Node.js version to use"
+        description: "Node.js version to use (default: lts/*)"
       package_manager:
         required: false
         type: string
@@ -47,6 +47,54 @@ on:
         type: boolean
         default: false
         description: "Skip ALL publishing (for testing)"
+      # Build parameters
+      min_node_version:
+        required: false
+        type: string
+        default: "20"
+        description: "Minimum Node.js version for matrix testing (enables matrix when set)"
+      max_node_major:
+        required: false
+        type: string
+        default: "22"
+        description: "Override max Node.js major version (default: 22)"
+      test_command:
+        required: false
+        type: string
+        default: "npm test"
+        description: "Command to run tests"
+      build_command:
+        required: false
+        type: string
+        default: "npm run build:ci"
+        description: "Command to build package"
+      # Release parameters
+      is_prerelease:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether this is a prerelease"
+      release_source_only:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether to create source-only release (no package assets)"
+      create_documentation:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to create/update VERSION_TAGS.md"
+      # Test control options
+      skip_performance_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip performance tests during CI"
+      skip_matrix_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip matrix testing (use single node version only)"
 
     secrets:
       NPM_TOKEN:
@@ -78,9 +126,18 @@ jobs:
       run_create_release: true
       run_update_major_version_tags: true
       node_version: ${{ inputs.node_version }}
+      min_node_version: ${{ inputs.min_node_version }}
+      max_node_major: ${{ inputs.max_node_major }}
       package_manager: ${{ inputs.package_manager }}
+      test_command: ${{ inputs.test_command }}
+      build_command: ${{ inputs.build_command }}
       version: ${{ inputs.version }}
+      is_prerelease: ${{ inputs.is_prerelease }}
+      release_source_only: ${{ inputs.release_source_only }}
+      create_documentation: ${{ inputs.create_documentation }}
       publish_command_npm: ${{ inputs.publish_command }}
       publish_command_github_packages: ${{ inputs.github_packages_publish_command }}
+      skip_performance_tests: ${{ inputs.skip_performance_tests }}
+      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

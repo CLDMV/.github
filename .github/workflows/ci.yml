@@ -12,7 +12,17 @@ on:
         required: false
         type: string
         default: "lts/*"
-        description: "Node.js version to use"
+        description: "Node.js version to use (default: lts/*)"
+      min_node_version:
+        required: false
+        type: string
+        default: "20"
+        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+      max_node_major:
+        required: false
+        type: string
+        default: "22"
+        description: "Override max Node.js major version (default: 22)"
       package_manager:
         required: false
         type: string
@@ -28,6 +38,17 @@ on:
         type: string
         default: "npm run build:ci"
         description: "Command to build package"
+      # Test control options
+      skip_performance_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip performance tests during CI"
+      skip_matrix_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip matrix testing (use single node version only)"
 
     secrets:
       NPM_TOKEN:
@@ -42,8 +63,12 @@ jobs:
       package_name: ${{ inputs.package_name }}
       run_build_and_test: true
       node_version: ${{ inputs.node_version }}
+      min_node_version: ${{ inputs.min_node_version }}
+      max_node_major: ${{ inputs.max_node_major }}
       package_manager: ${{ inputs.package_manager }}
       test_command: ${{ inputs.test_command }}
       build_command: ${{ inputs.build_command }}
+      skip_performance_tests: ${{ inputs.skip_performance_tests }}
+      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

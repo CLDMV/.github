@@ -12,15 +12,31 @@ jobs:
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       version: "1.0.0" # Required: Version to publish (usually from release PR)
-      # Optional parameters:
-      # node_version: "lts/*" # Use if you want a single version
-      min_node_version: "16.4" # Minimum Node.js version for matrix
-      # max_node_major: "22" # (Optional) Maximum Node.js major version
-      package_manager: "npm"
-      publish_to_npm: true
-      publish_to_github_packages: true
-      # skip_publish: false # For testing
-      # publish_command: "" # Auto-detects NPM access level
-      # github_packages_publish_command: "" # Auto-detects
+
+      # Node.js Version Configuration
+      # node_version: "lts/*" # Single Node.js version for build/test (default: lts/*)
+      # min_node_version: "20" # Minimum Node.js version for matrix testing (default: 20)
+      # max_node_major: "22" # Maximum Node.js major version (default: 22)
+
+      # Package & Build Configuration
+      # package_manager: "npm" # Package manager - npm or yarn (default: npm)
+      # test_command: "npm test" # Command to run tests (default: npm test)
+      # build_command: "npm run build:ci" # Command to build package (default: npm run build:ci)
+
+      # Publishing Configuration
+      # publish_to_npm: true # Publish to NPM registry (default: true)
+      # publish_to_github_packages: true # Publish to GitHub Packages registry (default: true)
+      # skip_publish: false # Skip ALL publishing, for testing (default: false)
+      # publish_command: "" # Custom NPM publish command - auto-detects access level (default: "")
+      # github_packages_publish_command: "" # Custom GitHub Packages publish command (default: "")
+
+      # Release Configuration
+      # is_prerelease: false # Whether this is a prerelease (default: false)
+      # release_source_only: false # Create source-only release, no package assets (default: false)
+      # create_documentation: true # Create/update VERSION_TAGS.md (default: true)
+
+      # Test Control Options
+      # skip_performance_tests: false # Skip performance tests during CI (default: false)
+      # skip_matrix_tests: false # Skip matrix testing, use single version (default: false)
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

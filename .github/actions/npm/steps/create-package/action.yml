@@ -1,0 +1,67 @@
+name: "Create NPM Package"
+description: "Creates .tgz package file using npm pack command"
+
+inputs:
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  package-name:
+    description: "Expected package name for validation"
+    required: false
+    default: ""
+
+outputs:
+  package-path:
+    description: "Path to the created .tgz package file"
+    value: ${{ steps.pack.outputs.package-path }}
+  package-filename:
+    description: "Filename of the created .tgz package"
+    value: ${{ steps.pack.outputs.package-filename }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create npm package
+      id: pack
+      shell: bash
+      run: |
+        echo "📦 Creating npm package..."
+
+        # Create the package
+        if [[ "${{ inputs.package-manager }}" == "yarn" ]]; then
+          # Yarn pack creates a .tgz file
+          yarn pack
+          PACKAGE_FILE=$(ls *.tgz | head -1)
+        else
+          # npm pack creates a .tgz file
+          npm pack
+          PACKAGE_FILE=$(ls *.tgz | head -1)
+        fi
+
+        if [ -z "$PACKAGE_FILE" ]; then
+          echo "❌ No .tgz package file was created"
+          exit 1
+        fi
+
+        echo "✅ Created package: $PACKAGE_FILE"
+
+        # Validate package name if provided
+        if [[ -n "${{ inputs.package-name }}" ]]; then
+          EXPECTED_PATTERN=$(echo "${{ inputs.package-name }}" | sed 's/@//g' | sed 's/\//-/g')
+          if [[ "$PACKAGE_FILE" != *"$EXPECTED_PATTERN"* ]]; then
+            echo "⚠️ Warning: Package filename doesn't match expected pattern"
+            echo "Expected pattern: *${EXPECTED_PATTERN}*"
+            echo "Actual filename: $PACKAGE_FILE"
+          fi
+        fi
+
+        # Get absolute path
+        PACKAGE_PATH=$(realpath "$PACKAGE_FILE")
+
+        echo "package-path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+        echo "package-filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
+
+        # Show package contents for debugging
+        echo "📋 Package contents:"
+        tar -tzf "$PACKAGE_FILE" | head -10

@@ -1,0 +1,50 @@
+name: "Calculate Artifact and Release Names"
+description: "Calculate dynamic artifact names and release names based on node version and package info"
+
+inputs:
+  node-version:
+    description: "Node.js version used for build (affects artifact name)"
+    required: false
+    default: "lts/*"
+  package-name:
+    description: "Name of the package being released"
+    required: true
+  version:
+    description: "Version number for the release"
+    required: true
+
+outputs:
+  artifact-name:
+    description: "Calculated artifact name based on node version"
+    value: ${{ steps.calculate.outputs.artifact-name }}
+  release-name:
+    description: "Calculated release name with optional node version suffix"
+    value: ${{ steps.calculate.outputs.release-name }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Calculate names
+      id: calculate
+      shell: bash
+      run: |
+        NODE_VERSION="${{ inputs.node-version }}"
+
+        # Calculate artifact name based on node version
+        if [[ "$NODE_VERSION" == "lts/*" ]]; then
+          ARTIFACT_NAME="build-artifacts-lts"
+          VERSION_SUFFIX=""
+        else
+          # Convert version like "18.x" to "18" or "16.4.x" to "16.4"
+          VERSION_CLEAN=$(echo "$NODE_VERSION" | sed 's/\.x$//' | sed 's/\*$//')
+          ARTIFACT_NAME="build-artifacts-${VERSION_CLEAN}"
+          VERSION_SUFFIX=" (Node.js $VERSION_CLEAN)"
+        fi
+
+        # Calculate release name
+        RELEASE_NAME="${{ inputs.package-name }} v${{ inputs.version }}${VERSION_SUFFIX}"
+
+        echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+        echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+        echo "📦 Artifact name: $ARTIFACT_NAME"
+        echo "🏷️ Release name: $RELEASE_NAME"

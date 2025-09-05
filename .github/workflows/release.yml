@@ -12,12 +12,27 @@ on:
         required: false
         type: string
         default: "lts/*"
-        description: "Node.js version to use"
+        description: "Node.js version to use (default: lts/*)"
+      min_node_version:
+        required: false
+        type: string
+        default: "20"
+        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+      max_node_major:
+        required: false
+        type: string
+        default: "22"
+        description: "Override max Node.js major version (default: 22)"
       package_manager:
         required: false
         type: string
         default: "npm"
         description: "Package manager (npm or yarn)"
+      test_command:
+        required: false
+        type: string
+        default: "npm test"
+        description: "Command to run tests"
       build_command:
         required: false
         type: string
@@ -28,6 +43,38 @@ on:
         type: string
         default: "patch"
         description: "Type of version bump (major, minor, patch)"
+      # Optional release parameters
+      version:
+        required: false
+        type: string
+        default: ""
+        description: "Specific version for release (auto-calculated if not provided)"
+      is_prerelease:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether this is a prerelease"
+      release_source_only:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether to create source-only release (no package assets)"
+      create_documentation:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to create/update VERSION_TAGS.md"
+      # Test control options
+      skip_performance_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip performance tests during CI"
+      skip_matrix_tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip matrix testing (use single node version only)"
     outputs:
       release-pr-created:
         description: "Whether a release PR was created"
@@ -50,11 +97,21 @@ jobs:
     uses: ./.github/workflows/ci-jobs.yml
     with:
       package_name: ${{ inputs.package_name }}
+      run_build_and_test: true
       run_detect_release: true
       run_create_release_pr: true
       node_version: ${{ inputs.node_version }}
+      min_node_version: ${{ inputs.min_node_version }}
+      max_node_major: ${{ inputs.max_node_major }}
       package_manager: ${{ inputs.package_manager }}
+      test_command: ${{ inputs.test_command }}
       build_command: ${{ inputs.build_command }}
       version_bump: ${{ inputs.version_bump }}
+      version: ${{ inputs.version }}
+      is_prerelease: ${{ inputs.is_prerelease }}
+      release_source_only: ${{ inputs.release_source_only }}
+      create_documentation: ${{ inputs.create_documentation }}
+      skip_performance_tests: ${{ inputs.skip_performance_tests }}
+      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

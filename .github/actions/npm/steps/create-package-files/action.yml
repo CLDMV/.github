@@ -1,0 +1,63 @@
+name: "Create Package Files for Release"
+description: "Creates .zip version of npm package contents from .tgz file for release assets"
+
+inputs:
+  package-path:
+    description: "Path to the .tgz package file"
+    required: false
+    default: "*.tgz"
+
+outputs:
+  tgz-path:
+    description: "Path to the .tgz package file"
+    value: ${{ steps.prepare.outputs.tgz-path }}
+  zip-path:
+    description: "Path to the created .zip package file"
+    value: ${{ steps.prepare.outputs.zip-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Prepare package files
+      id: prepare
+      shell: bash
+      run: |
+        # Find the .tgz file
+        TGZ_FILE=$(find . -name "${{ inputs.package-path }}" -type f | head -1)
+
+        if [ -z "$TGZ_FILE" ]; then
+          echo "❌ No .tgz file found matching pattern: ${{ inputs.package-path }}"
+          exit 1
+        fi
+
+        echo "📦 Found package: $TGZ_FILE"
+
+        # Get absolute path
+        TGZ_PATH=$(realpath "$TGZ_FILE")
+
+        # Create temp directory for extraction
+        TEMP_DIR=$(mktemp -d)
+
+        # Extract .tgz contents
+        echo "📂 Extracting package contents..."
+        tar -xzf "$TGZ_PATH" -C "$TEMP_DIR"
+
+        # Create .zip from extracted contents
+        PACKAGE_NAME=$(basename "$TGZ_FILE" .tgz)
+        ZIP_PATH="${TGZ_PATH%.*}.zip"
+
+        echo "🗜️ Creating .zip version..."
+        cd "$TEMP_DIR"
+        zip -r "$ZIP_PATH" .
+        cd - > /dev/null
+
+        # Cleanup temp directory
+        rm -rf "$TEMP_DIR"
+
+        echo "✅ Created package files:"
+        echo "  - TGZ: $TGZ_PATH"
+        echo "  - ZIP: $ZIP_PATH"
+
+        # Output paths
+        echo "tgz-path=$TGZ_PATH" >> $GITHUB_OUTPUT
+        echo "zip-path=$ZIP_PATH" >> $GITHUB_OUTPUT

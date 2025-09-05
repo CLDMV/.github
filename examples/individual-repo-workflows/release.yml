@@ -1,5 +1,5 @@
 # Individual repo: .github/workflows/release.yml
-name: 🚀 Release PR Creation
+name: 🚀 Create Release PR
 
 on:
   push:
@@ -13,12 +13,30 @@ jobs:
     uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      # Optional parameters:
-      # node_version: "lts/*" # Use if you want a single version
-      min_node_version: "16.4" # Minimum Node.js version for matrix
-      # max_node_major: "22" # (Optional) Maximum Node.js major version
-      package_manager: "npm"
-      build_command: "npm run build:ci"
-      version_bump: "patch" # or "minor", "major"
+
+      # Node.js Version Configuration (choose one approach)
+      # Option 1: Single Node.js version (simple)
+      # node_version: "lts/*" # Single Node.js version to test (default: lts/*)
+      # skip_matrix_tests: true # Use this with node_version (default: false)
+
+      # Option 2: Matrix testing (comprehensive) - DEFAULT BEHAVIOR
+      # min_node_version: "20" # Minimum Node.js version for matrix testing (default: 20)
+      # max_node_major: "22" # Maximum Node.js major version (default: 22)
+
+      # Package & Build Configuration
+      # package_manager: "npm" # Package manager - npm or yarn (default: npm)
+      # test_command: "npm test" # Command to run tests (default: npm test)
+      # build_command: "npm run build:ci" # Command to build package (default: npm run build:ci)
+
+      # Release Configuration
+      # version_bump: "patch" # Type of version bump: patch, minor, major (default: patch)
+      # version: "" # Specific version - auto-calculated if not provided (default: "")
+      # is_prerelease: false # Whether this is a prerelease (default: false)
+      # release_source_only: false # Create source-only release, no package assets (default: false)
+      # create_documentation: true # Create/update VERSION_TAGS.md (default: true)
+
+      # Test Control Options
+      # skip_performance_tests: false # Skip performance tests during CI (default: false)
+      # skip_matrix_tests: false # Skip matrix testing, use single version (default: false)
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
