@@ -43,7 +43,7 @@ runs:
 
     - name: Create GitHub release
       id: create-release
-      uses: CLDMV/.github/.github/actions/github/api/releases@v1
+      uses: CLDMV/.github/.github/actions/github/api/release/releases@v1
       with:
         version: ${{ inputs.version }}
         package-name: ${{ inputs.package-name }}

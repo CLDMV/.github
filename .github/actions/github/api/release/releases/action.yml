@@ -1,0 +1,74 @@
+name: "Create GitHub Release"
+description: "Create a GitHub release with signed tag via GitHub API"
+
+inputs:
+  version:
+    description: "Version number for the release"
+    required: true
+  package-name:
+    description: "Name of the package being released"
+    required: true
+  release-notes:
+    description: "Release notes content in markdown"
+    required: true
+  is-prerelease:
+    description: "Whether this is a prerelease"
+    required: false
+    default: "false"
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+
+outputs:
+  tag-verified:
+    description: "Whether the tag is GPG verified"
+    value: ${{ steps.verify-tag.outputs.verified }}
+  tag-verification-reason:
+    description: "Reason for tag verification result"
+    value: ${{ steps.verify-tag.outputs.reason }}
+  commit-sha:
+    description: "Commit SHA used for the release tag"
+    value: ${{ steps.get-sha.outputs.commit-sha }}
+  release-id:
+    description: "ID of the created GitHub release"
+    value: ${{ steps.create-release.outputs.release_id }}
+  tag-sha:
+    description: "SHA of the created tag"
+    value: ${{ steps.create-tag.outputs.tag-sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get current commit SHA
+      id: get-sha
+      shell: bash
+      run: |
+        echo "commit-sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Create tag if needed
+      id: create-tag
+      uses: CLDMV/.github/.github/actions/github/api/tags/create@v1
+      with:
+        tag: v${{ inputs.version }}
+        message: Release v${{ inputs.version }}
+        commit-sha: ${{ steps.get-sha.outputs.commit-sha }}
+        github-token: ${{ inputs.github-token }}
+        force: false
+
+    - name: Create GitHub Release
+      id: create-release
+      uses: CLDMV/.github/.github/actions/github/api/release/create@v1
+      with:
+        tag_name: v${{ inputs.version }}
+        name: ${{ inputs.package-name }} v${{ inputs.version }}
+        body: ${{ inputs.release-notes }}
+        is_prerelease: ${{ inputs.is-prerelease }}
+        is_draft: false
+        github_token: ${{ inputs.github-token }}
+
+    - name: Verify tag signature
+      id: verify-tag
+      uses: CLDMV/.github/.github/actions/github/api/tags/verify@v1
+      with:
+        tag-sha: ${{ steps.create-tag.outputs.tag-sha }}
+        github-token: ${{ inputs.github-token }}

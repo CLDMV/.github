@@ -1,0 +1,93 @@
+name: "Create GitHub Release via API"
+description: "Reusable action to create a GitHub release, supporting prerelease, draft, and asset uploads."
+
+inputs:
+  tag_name:
+    description: "Tag name for the release (e.g. v1.2.3)"
+    required: true
+  name:
+    description: "Release name (title)"
+    required: true
+  body:
+    description: "Release notes content in markdown"
+    required: false
+    default: ""
+  is_prerelease:
+    description: "Whether this is a prerelease"
+    required: false
+    default: "false"
+  is_draft:
+    description: "Whether this is a draft release"
+    required: false
+    default: "false"
+  github_token:
+    description: "GitHub token for API access"
+    required: true
+  assets:
+    description: "Comma-separated list of file paths to upload as release assets."
+    required: false
+    default: ""
+
+outputs:
+  release_id:
+    description: "ID of the created GitHub release"
+    value: ${{ steps.create-release.outputs.release_id }}
+  html_url:
+    description: "URL of the created release"
+    value: ${{ steps.create-release.outputs.html_url }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create GitHub Release
+      id: create-release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
+        RESPONSE=$(curl -sSL -X POST "$API_URL" \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -d "{
+            \"tag_name\": \"${{ inputs.tag_name }}\",
+            \"name\": \"${{ inputs.name }}\",
+            \"body\": $(echo \"${{ inputs.body }}\" | jq -Rs .),
+            \"draft\": ${{ inputs.is_draft }},
+            \"prerelease\": ${{ inputs.is_prerelease }}
+          }")
+
+        RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id')
+        HTML_URL=$(echo "$RESPONSE" | jq -r '.html_url')
+        if [ "$RELEASE_ID" = "null" ] || [ -z "$RELEASE_ID" ]; then
+          echo "❌ Failed to create release"
+          echo "Response: $RESPONSE"
+          exit 1
+        fi
+        echo "✅ Created GitHub Release: $RELEASE_ID ($HTML_URL)"
+        echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+        echo "html_url=$HTML_URL" >> $GITHUB_OUTPUT
+
+    - name: Upload assets to release
+      if: ${{ inputs.assets != '' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        IFS=',' read -ra FILES <<< "${{ inputs.assets }}"
+        for FILE in "${FILES[@]}"; do
+          FILE_PATH=$(echo "$FILE" | xargs)
+          if [ -f "$FILE_PATH" ]; then
+            echo "Uploading $FILE_PATH..."
+            MIME_TYPE=$(file --mime-type -b "$FILE_PATH")
+            ASSET_NAME=$(basename "$FILE_PATH")
+            UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.create-release.outputs.release_id }}/assets?name=$ASSET_NAME"
+            curl -sSL -X POST "$UPLOAD_URL" \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: $MIME_TYPE" \
+              --data-binary "@$FILE_PATH"
+            echo "✅ Uploaded $ASSET_NAME"
+          else
+            echo "⚠️ File not found: $FILE_PATH"
+          fi
+        done
