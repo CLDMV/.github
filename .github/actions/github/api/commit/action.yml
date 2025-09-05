@@ -55,7 +55,7 @@ runs:
 
         # Create all blob objects via GitHub API first
         echo "📄 Creating blob objects via GitHub API..."
-        
+
         # Get all staged files and create blobs
         git diff --cached --name-only | while read file; do
           if [ -f "$file" ]; then
@@ -74,22 +74,34 @@ runs:
               "https://api.github.com/repos/${{ github.repository }}/git/blobs" > /dev/null
           fi
         done
-        
+
         echo "✅ All blob objects created"
-        
+
         # Now create the tree via API
         echo "🌳 Creating tree via GitHub API..."
-        
-        # Build tree JSON
-        TREE_ITEMS=$(git diff --cached --name-only | while read file; do
+
+        # Build tree JSON array properly
+        TREE_ITEMS_JSON=$(git diff --cached --name-only | while read file; do
           if [ -f "$file" ]; then
             BLOB_SHA=$(git hash-object "$file")
-            printf '{"path":"%s","mode":"100644","type":"blob","sha":"%s"}' "$file" "$BLOB_SHA"
+            jq -n --arg path "$file" --arg sha "$BLOB_SHA" '{
+              path: $path,
+              mode: "100644",
+              type: "blob",
+              sha: $sha
+            }'
           fi
-        done | paste -sd, -)
-        
-        TREE_JSON="{\"base_tree\":\"$(git rev-parse HEAD^{tree})\",\"tree\":[$TREE_ITEMS]}"
-        
+        done | jq -s .)
+
+        # Create the full tree JSON
+        BASE_TREE=$(git rev-parse HEAD^{tree})
+        TREE_JSON=$(jq -n --arg base_tree "$BASE_TREE" --argjson tree "$TREE_ITEMS_JSON" '{
+          base_tree: $base_tree,
+          tree: $tree
+        }')
+
+        echo "Tree JSON: $TREE_JSON"
+
         echo "$TREE_JSON" | \
         curl -s -X POST \
           -H "Authorization: token ${{ inputs.github-token }}" \
@@ -97,9 +109,9 @@ runs:
           -H "Content-Type: application/json" \
           --data-binary @- \
           "https://api.github.com/repos/${{ github.repository }}/git/trees" > /tmp/tree_response.json
-        
+
         API_TREE_SHA=$(cat /tmp/tree_response.json | jq -r '.sha')
-        
+
         if [ "$API_TREE_SHA" != "null" ] && [ -n "$API_TREE_SHA" ]; then
           echo "✅ Created tree via API: $API_TREE_SHA"
           FINAL_TREE_SHA="$API_TREE_SHA"
