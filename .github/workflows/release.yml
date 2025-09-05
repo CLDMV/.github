@@ -115,3 +115,37 @@ jobs:
       skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  summary:
+    name: "📋 Release Summary"
+    needs: release
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Release Summary
+        run: |
+          echo "## 🚀 Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.release.result }}" = "success" ]; then
+            if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
+              echo "✅ **Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "**PR Number**: [#${{ needs.release.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.release.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🔄 **Next Steps**: Review and merge the release PR to publish the package." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "ℹ️ **Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ **Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow logs for details on the failure. Common issues:" >> $GITHUB_STEP_SUMMARY
+            echo "- Build or test failures" >> $GITHUB_STEP_SUMMARY
+            echo "- Invalid commit message format (use \`release:\` or \`release!:\` prefix)" >> $GITHUB_STEP_SUMMARY
+            echo "- Authentication or permissions issues" >> $GITHUB_STEP_SUMMARY
+          fi

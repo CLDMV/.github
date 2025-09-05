@@ -155,6 +155,47 @@ on:
         description: "NPM token for publishing packages"
         required: false
 
+    outputs:
+      # Release management outputs
+      pr-created:
+        description: "Whether a release PR was created"
+        value: ${{ jobs.create-release-pr.outputs.pr-created }}
+      pr-number:
+        description: "The number of the created release PR"
+        value: ${{ jobs.create-release-pr.outputs.pr-number }}
+      new-version:
+        description: "The new version that will be released"
+        value: ${{ jobs.create-release-pr.outputs.new-version }}
+
+      # Release detection outputs
+      should-release:
+        description: "Whether this commit should trigger a release"
+        value: ${{ jobs.detect-release.outputs.should-release }}
+
+      # GitHub release outputs
+      release-id:
+        description: "The ID of the created GitHub release"
+        value: ${{ jobs.create-release.outputs.release-id }}
+
+      # Publishing outputs
+      npm-published:
+        description: "Whether the package was published to NPM"
+        value: ${{ jobs.publish-npm.outputs.published }}
+      github-packages-published:
+        description: "Whether the package was published to GitHub Packages"
+        value: ${{ jobs.publish-github-packages.outputs.published }}
+
+      # Version tag outputs
+      major-version:
+        description: "The major version tag that was updated"
+        value: ${{ jobs.update-major-version-tags.outputs.major-version }}
+      minor-version:
+        description: "The minor version tag that was updated"
+        value: ${{ jobs.update-major-version-tags.outputs.minor-version }}
+      tags-updated:
+        description: "Whether version tags were updated"
+        value: ${{ jobs.update-major-version-tags.outputs.updated }}
+
 jobs:
   set-matrix:
     name: "Set Node.js Matrix"

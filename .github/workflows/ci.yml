@@ -72,3 +72,35 @@ jobs:
       skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  summary:
+    name: "📊 CI Summary"
+    needs: ci
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate CI Summary
+        run: |
+          echo "## 🏗️ Continuous Integration Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Node Version**: \`${{ inputs.node_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Package Manager**: \`${{ inputs.package_manager }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.ci.result }}" = "success" ]; then
+            echo "✅ **Status**: All checks passed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- Build completed" >> $GITHUB_STEP_SUMMARY
+            echo "- Tests passed" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ inputs.skip_matrix_tests }}" != "true" ]; then
+              echo "- Matrix testing completed" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "${{ inputs.skip_performance_tests }}" != "true" ]; then
+              echo "- Performance tests passed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ **Status**: CI failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow logs for details on the failure." >> $GITHUB_STEP_SUMMARY
+          fi
