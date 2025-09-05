@@ -34,10 +34,22 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
+    - name: Update Summary - Node.js Setup
+      shell: bash
+      run: |
+        echo "## 🏗️ Build & Test Progress" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Node.js ${{ inputs.node-version }} setup complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Install dependencies
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
       with:
         package-manager: ${{ inputs.package-manager }}
+
+    - name: Update Summary - Dependencies
+      shell: bash
+      run: |
+        echo "- ✅ Dependencies installed with ${{ inputs.package-manager }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Get Node.js Version
       id: get_node_version
@@ -46,22 +58,47 @@ runs:
         label: ${{ (inputs.node-version == 'lts/*' || inputs.node-version == 'lts') && 'lts' || '' }}
 
     - name: Run pre-build tests
+      id: pre-tests
       uses: CLDMV/.github/.github/actions/common/steps/run-tests@v1
       with:
         test-command: ${{ inputs.test-command }}
         environment: development
 
+    - name: Update Summary - Tests
+      shell: bash
+      run: |
+        if [ "${{ steps.pre-tests.outcome }}" = "success" ]; then
+          echo "- ✅ Pre-build tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Pre-build tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Build package
+      id: build
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
+
+    - name: Update Summary - Build
+      shell: bash
+      run: |
+        if [ "${{ steps.build.outcome }}" = "success" ]; then
+          echo "- ✅ Package build completed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Package build failed" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Create npm package
       id: create-package
       uses: CLDMV/.github/.github/actions/npm/steps/create-package@v1
       with:
         package-manager: ${{ inputs.package-manager }}
+
+    - name: Update Summary - Package Created
+      shell: bash
+      run: |
+        echo "- ✅ NPM package created successfully" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload build artifacts
       uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v1
@@ -76,3 +113,17 @@ runs:
           package-lock.json
           yarn.lock
         retention-days: 1
+
+    - name: Update Summary - Final
+      if: always()
+      shell: bash
+      run: |
+        echo "- ✅ Build artifacts uploaded" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check overall success
+        if [ "${{ steps.pre-tests.outcome }}" = "success" ] && [ "${{ steps.build.outcome }}" = "success" ]; then
+          echo "🎉 **Build & Test Complete** - All steps passed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Build & Test Failed** - Check the individual step results above" >> $GITHUB_STEP_SUMMARY
+        fi

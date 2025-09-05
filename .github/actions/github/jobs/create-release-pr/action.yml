@@ -39,6 +39,13 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Update Summary - Release PR Start
+      shell: bash
+      run: |
+        echo "## 📋 Release PR Progress" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔄 Starting release PR creation for ${{ inputs.package-name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Checkout code
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
       with:
@@ -64,6 +71,11 @@ runs:
       uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
       with:
         version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
+
+    - name: Update Summary - Version Calculated
+      shell: bash
+      run: |
+        echo "- ✅ New version calculated: v${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Build package
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
@@ -105,3 +117,19 @@ runs:
         labels: "release,${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}"
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+
+    - name: Update Summary - PR Created
+      if: steps.create-pr.outputs.pr-created == 'true'
+      shell: bash
+      run: |
+        echo "- ✅ Release PR created: #${{ steps.create-pr.outputs.pr-number }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **Release PR Complete** - Ready for review and merge" >> $GITHUB_STEP_SUMMARY
+
+    - name: Update Summary - No PR Created
+      if: steps.create-pr.outputs.pr-created != 'true'
+      shell: bash
+      run: |
+        echo "- ℹ️ No release PR created (not a release commit)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Tip**: Use \`release:\` or \`release!:\` prefix to trigger releases" >> $GITHUB_STEP_SUMMARY

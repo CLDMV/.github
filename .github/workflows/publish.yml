@@ -168,49 +168,18 @@ jobs:
     steps:
       - name: Generate Publish Summary
         run: |
-          echo "## 📦 Publish Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Publish Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Version**: \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.publish.result }}" = "success" ]; then
-            echo "✅ **Status**: Package publishing completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Overall Status**: Publishing workflow completed successfully" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "🔄 **Publishing Results**:" >> $GITHUB_STEP_SUMMARY
-            
-            if [ "${{ inputs.publish_to_npm }}" = "true" ] && [ "${{ inputs.skip_publish }}" != "true" ]; then
-              if [ "${{ needs.publish.outputs.npm-published }}" = "true" ]; then
-                echo "- ✅ NPM Registry: Published successfully" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "- ❌ NPM Registry: Publishing failed or skipped" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "- ⏭️ NPM Registry: Skipped (disabled or skip_publish=true)" >> $GITHUB_STEP_SUMMARY
-            fi
-            
-            if [ "${{ inputs.publish_to_github_packages }}" = "true" ] && [ "${{ inputs.skip_publish }}" != "true" ]; then
-              if [ "${{ needs.publish.outputs.github-packages-published }}" = "true" ]; then
-                echo "- ✅ GitHub Packages: Published successfully" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "- ❌ GitHub Packages: Publishing failed or skipped" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "- ⏭️ GitHub Packages: Skipped (disabled or skip_publish=true)" >> $GITHUB_STEP_SUMMARY
-            fi
-            
-            if [ "${{ needs.publish.outputs.release-id }}" != "" ]; then
-              echo "- ✅ GitHub Release: Created (ID: ${{ needs.publish.outputs.release-id }})" >> $GITHUB_STEP_SUMMARY
-            fi
-            
-            if [ "${{ needs.publish.outputs.tags-updated }}" = "true" ]; then
-              echo "- ✅ Version Tags: Updated to v${{ needs.publish.outputs.major-version }}" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "Check the detailed progress above for specific publishing results to each registry." >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Status**: Package publishing failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Overall Status**: Publishing workflow failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the workflow logs for details. Common issues:" >> $GITHUB_STEP_SUMMARY
-            echo "- Build or test failures" >> $GITHUB_STEP_SUMMARY
-            echo "- Authentication failures (check NPM_TOKEN)" >> $GITHUB_STEP_SUMMARY
-            echo "- Version conflicts (version may already exist)" >> $GITHUB_STEP_SUMMARY
-            echo "- Registry permissions or network issues" >> $GITHUB_STEP_SUMMARY
+            echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
           fi

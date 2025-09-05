@@ -81,7 +81,7 @@ jobs:
     steps:
       - name: Generate CI Summary
         run: |
-          echo "## 🏗️ Continuous Integration Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏗️ Continuous Integration Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Node Version**: \`${{ inputs.node_version }}\`" >> $GITHUB_STEP_SUMMARY
@@ -89,18 +89,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.ci.result }}" = "success" ]; then
-            echo "✅ **Status**: All checks passed successfully" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "- Build completed" >> $GITHUB_STEP_SUMMARY
-            echo "- Tests passed" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ inputs.skip_matrix_tests }}" != "true" ]; then
-              echo "- Matrix testing completed" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ "${{ inputs.skip_performance_tests }}" != "true" ]; then
-              echo "- Performance tests passed" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "✅ **Overall Status**: All CI checks passed successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Status**: CI failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Overall Status**: CI workflow failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the workflow logs for details on the failure." >> $GITHUB_STEP_SUMMARY
+            echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
           fi

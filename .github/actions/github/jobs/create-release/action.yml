@@ -61,6 +61,13 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Update Summary - Release Start
+      shell: bash
+      run: |
+        echo "## 🚀 GitHub Release Progress" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔄 Starting release creation for ${{ inputs.package-name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Checkout code
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
       with:
@@ -110,6 +117,11 @@ runs:
         commit-sha: ${{ steps.get-sha.outputs.commit-sha }}
         github-token: ${{ inputs.github-token }}
         force: false
+
+    - name: Update Summary - Tag Created
+      shell: bash
+      run: |
+        echo "- ✅ Git tag v${{ steps.detect-version.outputs.version }} created" >> $GITHUB_STEP_SUMMARY
 
     - name: Download build artifacts (for package assets)
       if: inputs.release-source-only == 'false'
@@ -166,9 +178,23 @@ runs:
         github_token: ${{ inputs.github-token }}
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
 
+    - name: Update Summary - Release Created
+      shell: bash
+      run: |
+        echo "- ✅ GitHub Release v${{ steps.detect-version.outputs.version }} created successfully" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.release-source-only }}" != "true" ]; then
+          echo "- ✅ Package assets (.tgz and .zip) attached to release" >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Verify tag signature
       id: verify-tag
       uses: CLDMV/.github/.github/actions/github/api/tags/verify@v1
       with:
         tag-sha: ${{ steps.create-tag.outputs.tag-sha }}
         github-token: ${{ inputs.github-token }}
+
+    - name: Update Summary - Final
+      shell: bash
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **GitHub Release Complete** - Release v${{ steps.detect-version.outputs.version }} is now available" >> $GITHUB_STEP_SUMMARY

@@ -31,6 +31,13 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Update Summary - NPM Publishing Start
+      shell: bash
+      run: |
+        echo "## 📦 NPM Publishing Progress" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔄 Starting NPM publication for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Publish package to NPM
       id: publish-package
       uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
@@ -43,3 +50,15 @@ runs:
         package-manager: ${{ inputs.package-manager }}
         publish-command: ${{ inputs.publish-command }}
         auth-token: ${{ inputs.npm-token }}
+
+    - name: Update Summary - NPM Success
+      if: steps.publish-package.outputs.published == 'true'
+      shell: bash
+      run: |
+        echo "- ✅ NPM Registry: Published ${{ inputs.package-name }}@${{ inputs.version }} successfully" >> $GITHUB_STEP_SUMMARY
+
+    - name: Update Summary - NPM Failure
+      if: steps.publish-package.outputs.published != 'true'
+      shell: bash
+      run: |
+        echo "- ❌ NPM Registry: Publication failed for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
