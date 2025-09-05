@@ -1,0 +1,70 @@
+name: "🔧 Fix Orphaned Major Version Tags"
+description: "Detects and fixes major version tags that don't point to the latest patch version"
+
+outputs:
+  fixed-tags:
+    description: "List of major version tags that were fixed"
+    value: ${{ steps.fix-orphans.outputs.fixed-tags }}
+  orphans-found:
+    description: "Whether any orphaned tags were found and fixed"
+    value: ${{ steps.fix-orphans.outputs.orphans-found }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect and fix orphaned major version tags
+      id: fix-orphans
+      shell: bash
+      run: |
+        echo "🔍 Checking for orphaned major version tags..."
+
+        FIXED_TAGS=""
+        ORPHANS_FOUND="false"
+
+        # Get all version tags and sort them
+        ALL_TAGS=$(git tag -l "v*.*.*" | sort -V)
+
+        # Find all major versions
+        MAJOR_VERSIONS=$(echo "$ALL_TAGS" | sed 's/v\([0-9]*\)\..*/v\1/' | sort -u)
+
+        for MAJOR_TAG in $MAJOR_VERSIONS; do
+          echo "🔍 Checking major tag: $MAJOR_TAG"
+          
+          # Get the latest patch version for this major version
+          MAJOR_NUM=$(echo "$MAJOR_TAG" | sed 's/v//')
+          LATEST_PATCH=$(echo "$ALL_TAGS" | grep "^v${MAJOR_NUM}\." | sort -V | tail -1)
+          
+          if [ -n "$LATEST_PATCH" ]; then
+            # Get current commit that major tag points to
+            MAJOR_COMMIT=$(git rev-list -n 1 "$MAJOR_TAG" 2>/dev/null || echo "")
+            LATEST_COMMIT=$(git rev-list -n 1 "$LATEST_PATCH")
+            
+            if [ "$MAJOR_COMMIT" != "$LATEST_COMMIT" ]; then
+              echo "🚨 Orphaned tag detected: $MAJOR_TAG points to $MAJOR_COMMIT, should point to $LATEST_COMMIT ($LATEST_PATCH)"
+              
+              # Fix the orphaned tag
+              git tag -f "$MAJOR_TAG" "$LATEST_COMMIT"
+              echo "✅ Fixed: $MAJOR_TAG now points to $LATEST_PATCH ($LATEST_COMMIT)"
+              
+              FIXED_TAGS="${FIXED_TAGS}${MAJOR_TAG}→${LATEST_PATCH} "
+              ORPHANS_FOUND="true"
+            else
+              echo "✅ $MAJOR_TAG correctly points to $LATEST_PATCH"
+            fi
+          fi
+        done
+
+        # Set outputs
+        echo "fixed-tags=${FIXED_TAGS}" >> $GITHUB_OUTPUT
+        echo "orphans-found=${ORPHANS_FOUND}" >> $GITHUB_OUTPUT
+
+        if [ "$ORPHANS_FOUND" = "true" ]; then
+          echo "🔧 Fixed orphaned tags: $FIXED_TAGS"
+        else
+          echo "✅ No orphaned major version tags found"
+        fi
