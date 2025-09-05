@@ -19,9 +19,10 @@ on:
         default: "npm"
         description: "Package manager (npm or yarn)"
       version:
-        required: true
+        required: false
         type: string
-        description: "Version to publish"
+        default: ""
+        description: "Version to publish (auto-detected from package.json if not provided)"
       publish_to_npm:
         required: false
         type: boolean

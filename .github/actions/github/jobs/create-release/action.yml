@@ -3,8 +3,9 @@ description: "Composite action for creating GitHub releases"
 
 inputs:
   version:
-    description: "Version number for the release"
-    required: true
+    description: "Version number for the release (auto-detected from package.json if not provided)"
+    required: false
+    default: ""
   package-name:
     description: "Name of the package being released"
     required: true
@@ -65,11 +66,24 @@ runs:
       with:
         fetch-depth: 0
 
+    - name: Auto-detect version if not provided
+      id: detect-version
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.version }}" ]; then
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🔍 Auto-detected version from package.json: $VERSION"
+        else
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "📋 Using provided version: ${{ inputs.version }}"
+        fi
+
     - name: Generate release notes
       id: release-notes
       uses: CLDMV/.github/.github/actions/git/steps/generate-release-notes@v1
       with:
-        version: ${{ inputs.version }}
+        version: ${{ steps.detect-version.outputs.version }}
         package-name: ${{ inputs.package-name }}
         package-manager: ${{ inputs.package-manager }}
 
@@ -85,14 +99,14 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         package-name: ${{ inputs.package-name }}
-        version: ${{ inputs.version }}
+        version: ${{ steps.detect-version.outputs.version }}
 
     - name: Create tag if needed
       id: create-tag
       uses: CLDMV/.github/.github/actions/github/api/tags/create@v1
       with:
-        tag: v${{ inputs.version }}
-        message: Release v${{ inputs.version }}
+        tag: v${{ steps.detect-version.outputs.version }}
+        message: Release v${{ steps.detect-version.outputs.version }}
         commit-sha: ${{ steps.get-sha.outputs.commit-sha }}
         github-token: ${{ inputs.github-token }}
         force: false
@@ -144,7 +158,7 @@ runs:
       id: create-release
       uses: CLDMV/.github/.github/actions/github/api/release/create@v1
       with:
-        tag_name: v${{ inputs.version }}
+        tag_name: v${{ steps.detect-version.outputs.version }}
         name: ${{ steps.names.outputs.release-name }}
         body: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
         is_prerelease: ${{ inputs.is-prerelease }}
