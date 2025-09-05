@@ -114,8 +114,19 @@ on:
         value: ${{ jobs.publish.outputs.github-packages-published }}
 
 jobs:
+  debug-inputs:
+    name: "🔍 Debug Input Parameters"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Debug min_node_version parameter"
+        run: |
+          echo "🔍 DEBUG (publish.yml): min_node_version input = '${{ inputs.min_node_version }}'"
+          echo "🔍 DEBUG (publish.yml): max_node_major input = '${{ inputs.max_node_major }}'"
+          echo "🔍 DEBUG (publish.yml): node_version input = '${{ inputs.node_version }}'"
+
   publish:
     name: "📦 Publish Package"
+    needs: debug-inputs
     uses: ./.github/workflows/ci-jobs.yml
     with:
       package_name: ${{ inputs.package_name }}

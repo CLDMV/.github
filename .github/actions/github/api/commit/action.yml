@@ -56,11 +56,29 @@ runs:
         # Create the tree via GitHub API to ensure it exists remotely
         echo "🔄 Creating tree via GitHub API..."
 
-        # Get all files in the staging area
+        # Get all files in the staging area and create blobs
         FILES_JSON=$(git diff --cached --name-only | while read file; do
           if [ -f "$file" ]; then
-            BLOB_SHA=$(git hash-object "$file")
-            echo "{\"path\":\"$file\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"$BLOB_SHA\"}"
+            echo "📄 Creating blob for: $file"
+            # Create blob via API first
+            FILE_CONTENT=$(base64 -w 0 "$file")
+            BLOB_RESPONSE=$(curl -s -X POST \
+              -H "Authorization: token ${{ inputs.github-token }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/git/blobs" \
+              -d "{
+                \"content\": \"$FILE_CONTENT\",
+                \"encoding\": \"base64\"
+              }")
+            
+            BLOB_SHA=$(echo "$BLOB_RESPONSE" | jq -r '.sha')
+            if [ "$BLOB_SHA" != "null" ] && [ -n "$BLOB_SHA" ]; then
+              echo "✅ Created blob: $BLOB_SHA for $file"
+              echo "{\"path\":\"$file\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"$BLOB_SHA\"}"
+            else
+              echo "❌ Failed to create blob for $file: $BLOB_RESPONSE"
+              exit 1
+            fi
           fi
         done | jq -s .)
 
