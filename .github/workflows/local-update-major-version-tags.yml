@@ -15,5 +15,6 @@ jobs:
     uses: ./.github/workflows/update-major-version-tags.yml
     permissions:
       contents: write # (optional) also set at the job
+    secrets: inherit # <-- valid here (caller side)
     with:
       create_documentation: true
