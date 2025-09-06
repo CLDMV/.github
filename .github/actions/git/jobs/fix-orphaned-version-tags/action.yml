@@ -17,128 +17,152 @@ runs:
       with:
         fetch-depth: 0
 
-    - name: Detect and fix orphaned major version tags
+    - name: Detect and fix orphaned major/minor tags (gather)
       id: fix-orphans
       shell: bash
       run: |
-        echo "🔍 Checking for orphaned major and minor version tags..."
+        node <<'EOF'
+        const { execSync } = require('child_process');
+        const fs = require('fs');
 
-        FIXED_TAGS=""
-        ORPHANS_FOUND="false"
-        ORPHANED_TAGS_FILE=$(mktemp)
+        const out = process.env.GITHUB_OUTPUT;
+        const log = (...a) => console.log(...a);
+        const sh = (cmd) => execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
 
-        # Get all version tags and sort them
-        ALL_TAGS=$(git tag -l "v*.*.*" | sort -V)
+        // Ensure tags are up-to-date (checkout used fetch-depth: 0 already)
+        try { sh('git fetch --prune --tags --force'); } catch {}
 
-        # Determine current version from latest tag (to skip in orphan detection)
-        CURRENT_TAG=$(echo "$ALL_TAGS" | tail -1)
-        CURRENT_MAJOR="v$(echo "$CURRENT_TAG" | sed 's/v\([0-9]*\)\..*/\1/')"
-        CURRENT_MINOR="v$(echo "$CURRENT_TAG" | sed 's/v\([0-9]*\.[0-9]*\)\..*/\1/')"
+        log('🔍 Checking for orphaned major and minor version tags...');
 
-        echo "🏷️ Current tag: $CURRENT_TAG (major: $CURRENT_MAJOR, minor: $CURRENT_MINOR)"
+        // Helpers
+        const verKey = (t) => t.replace(/^v/, '').split('.').map(n => parseInt(n, 10));
+        const cmp = (a, b) => {
+          const [A,B,C] = verKey(a);
+          const [D,E,F] = verKey(b);
+          return (A-D) || (B-E) || (C-F);
+        };
 
-        # Get all existing major version tags (v1, v2, etc.)
-        EXISTING_MAJOR_TAGS=$(git tag -l | grep -E "^v[0-9]+$" | sort -V)
+        // All patch tags vX.Y.Z (sorted ascending)
+        const allTags = sh('git tag -l "v*.*.*"')
+          .split('\n').filter(Boolean).sort(cmp);
 
-        # Get all existing minor version tags (v1.0, v1.1, etc.) 
-        EXISTING_MINOR_TAGS=$(git tag -l | grep -E "^v[0-9]+\.[0-9]+$" | sort -V)
+        if (allTags.length === 0) {
+          fs.appendFileSync(out, `orphans-found=false\n`);
+          fs.appendFileSync(out, `fixed-tags=\n`);
+          fs.appendFileSync(out, `orphaned-tags-json=[]\n`);
+          log('✅ No versioned tags found (v*.*.*).');
+          process.exit(0);
+        }
 
-        # Check existing major version tags for orphans (skip current major version)
-        for MAJOR_TAG in $EXISTING_MAJOR_TAGS; do
-          # Skip the current major version - let regular update handle it
-          if [ "$MAJOR_TAG" = "v$CURRENT_MAJOR" ]; then
-            echo "⏭️ Skipping $MAJOR_TAG (current major version - handled by regular update)"
-            continue
-          fi
-          
-          echo "🔍 Checking existing major tag: $MAJOR_TAG"
-          
-          # Get the latest patch version for this major version
-          MAJOR_NUM=$(echo "$MAJOR_TAG" | sed 's/v//')
-          LATEST_PATCH=$(echo "$ALL_TAGS" | grep "^v${MAJOR_NUM}\." | sort -V | tail -1)
-          
-          if [ -n "$LATEST_PATCH" ]; then
-            # Get current commit that major tag points to
-            MAJOR_COMMIT=$(git rev-list -n 1 "$MAJOR_TAG" 2>/dev/null || echo "")
-            LATEST_COMMIT=$(git rev-list -n 1 "$LATEST_PATCH")
-            
-            echo "  📍 $MAJOR_TAG points to: $MAJOR_COMMIT"
-            echo "  📍 $LATEST_PATCH points to: $LATEST_COMMIT"
-            
-            if [ "$MAJOR_COMMIT" != "$LATEST_COMMIT" ] && [ -n "$MAJOR_COMMIT" ]; then
-              echo "🚨 Orphaned major tag detected: $MAJOR_TAG should point to $LATEST_PATCH"
-              echo "$MAJOR_TAG|$LATEST_COMMIT|$LATEST_PATCH" >> "$ORPHANED_TAGS_FILE"
-              if [ -z "$FIXED_TAGS" ]; then
-                FIXED_TAGS="${MAJOR_TAG} → ${LATEST_PATCH}"
-              else
-                FIXED_TAGS="${FIXED_TAGS}\n${MAJOR_TAG} → ${LATEST_PATCH}"
-              fi
-              ORPHANS_FOUND="true"
-            else
-              echo "✅ $MAJOR_TAG correctly points to $LATEST_PATCH"
-            fi
-          fi
-        done
+        const currentTag = allTags[allTags.length - 1];
+        const [curMaj, curMin] = (() => {
+          const [M, m] = verKey(currentTag);
+          return [`v${M}`, `v${M}.${m}`];
+        })();
 
-        # Check existing minor version tags for orphans (skip current minor version)
-        for MINOR_TAG in $EXISTING_MINOR_TAGS; do
-          # Skip the current minor version - let regular update handle it
-          if [ "$MINOR_TAG" = "v$CURRENT_MINOR" ]; then
-            echo "⏭️ Skipping $MINOR_TAG (current minor version - handled by regular update)"
-            continue
-          fi
-          
-          echo "🔍 Checking existing minor tag: $MINOR_TAG"
-          
-          # Get the latest patch version for this minor version
-          MINOR_PATTERN=$(echo "$MINOR_TAG" | sed 's/v//')
-          LATEST_PATCH=$(echo "$ALL_TAGS" | grep "^v${MINOR_PATTERN}\." | sort -V | tail -1)
-          
-          if [ -n "$LATEST_PATCH" ]; then
-            # Get current commit that minor tag points to
-            MINOR_COMMIT=$(git rev-list -n 1 "$MINOR_TAG" 2>/dev/null || echo "")
-            LATEST_COMMIT=$(git rev-list -n 1 "$LATEST_PATCH")
-            
-            echo "  📍 $MINOR_TAG points to: $MINOR_COMMIT"
-            echo "  📍 $LATEST_PATCH points to: $LATEST_COMMIT"
-            
-            if [ "$MINOR_COMMIT" != "$LATEST_COMMIT" ] && [ -n "$MINOR_COMMIT" ]; then
-              echo "🚨 Orphaned minor tag detected: $MINOR_TAG should point to $LATEST_PATCH"
-              echo "$MINOR_TAG|$LATEST_COMMIT|$LATEST_PATCH" >> "$ORPHANED_TAGS_FILE"
-              if [ -z "$FIXED_TAGS" ]; then
-                FIXED_TAGS="${MINOR_TAG} → ${LATEST_PATCH}"
-              else
-                FIXED_TAGS="${FIXED_TAGS}\n${MINOR_TAG} → ${LATEST_PATCH}"
-              fi
-              ORPHANS_FOUND="true"
-            else
-              echo "✅ $MINOR_TAG correctly points to $LATEST_PATCH"
-            fi
-          fi
-        done
+        log(`🏷️ Current tag: ${currentTag} (major: ${curMaj}, minor: ${curMin})`);
 
-        # Set outputs
-        echo "fixed-tags=${FIXED_TAGS}" >> $GITHUB_OUTPUT
-        echo "orphans-found=${ORPHANS_FOUND}" >> $GITHUB_OUTPUT
+        // All existing ref tags
+        const allRefTags = sh('git tag -l').split('\n').filter(Boolean);
+        const existingMajors = allRefTags.filter(t => /^v\d+$/.test(t)).sort((a,b) => verKey(a)[0]-verKey(b)[0]);
+        const existingMinors = allRefTags.filter(t => /^v\d+\.\d+$/.test(t)).sort((a,b) => {
+          const [A,B] = verKey(a); const [D,E] = verKey(b);
+          return (A-D) || (B-E);
+        });
 
-        if [ "$ORPHANS_FOUND" = "true" ]; then
-          echo "🔧 Found orphaned tags, building JSON array..."
-          
-          # Build JSON array using printf method (same as ci-jobs.yml)
-          TAGS_ARRAY=()
-          while IFS='|' read -r tag_name target_sha latest_patch; do
-            TAGS_ARRAY+=("{\"tag\":\"${tag_name}\",\"sha\":\"${target_sha}\"}")
-          done < "$ORPHANED_TAGS_FILE"
-          
-          # Join with commas and create JSON array
-          printf -v joined '%s,' "${TAGS_ARRAY[@]}"
-          JSON_ARRAY="[${joined%,}]"
-          
-          echo "orphaned-tags-json=$JSON_ARRAY" >> $GITHUB_OUTPUT
-          echo "🔧 Orphaned tags JSON: $JSON_ARRAY"
-        else
-          echo "✅ No orphaned major/minor version tags found"
-        fi
+        const orphanRows = []; // { tagName, targetSha, latestPatch }
+        let fixedTagsLines = [];
+        let orphansFound = false;
+
+        // Utility: get commit sha of a tag/ref (or '' if missing)
+        const rev = (ref) => {
+          try { return sh(`git rev-list -n 1 "${ref}"`); } catch { return ''; }
+        };
+
+        // Latest patch for a given major number
+        const latestPatchForMajor = (M) => {
+          const prefix = `v${M}.`;
+          const picks = allTags.filter(t => t.startsWith(prefix));
+          return picks.length ? picks[picks.length - 1] : '';
+        };
+
+        // Latest patch for a given minor string "X.Y"
+        const latestPatchForMinor = (minor) => {
+          const prefix = `v${minor}.`;
+          const picks = allTags.filter(t => t.startsWith(prefix));
+          return picks.length ? picks[picks.length - 1] : '';
+        };
+
+        // ---- Check major tags (skip current major) ----
+        for (const majorTag of existingMajors) {
+          if (majorTag === curMaj) {
+            log(`⏭️ Skipping ${majorTag} (current major version - handled by regular update)`);
+            continue;
+          }
+          log(`🔍 Checking existing major tag: ${majorTag}`);
+          const M = verKey(majorTag)[0];
+          const latest = latestPatchForMajor(M);
+          if (!latest) continue;
+
+          const majorCommit = rev(majorTag);
+          const latestCommit = rev(latest);
+          log(`  📍 ${majorTag} points to: ${majorCommit}`);
+          log(`  📍 ${latest} points to: ${latestCommit}`);
+
+          if (majorCommit && majorCommit !== latestCommit) {
+            log(`🚨 Orphaned major tag detected: ${majorTag} should point to ${latest}`);
+            orphanRows.push({ tagName: majorTag, targetSha: latestCommit, latestPatch: latest });
+            fixedTagsLines.push(`${majorTag} → ${latest}`);
+            orphansFound = true;
+          } else {
+            log(`✅ ${majorTag} correctly points to ${latest}`);
+          }
+        }
+
+        // ---- Check minor tags (skip current minor) ----
+        for (const minorTag of existingMinors) {
+          if (minorTag === curMin) {
+            log(`⏭️ Skipping ${minorTag} (current minor version - handled by regular update)`);
+            continue;
+          }
+          log(`🔍 Checking existing minor tag: ${minorTag}`);
+          const [M, m] = verKey(minorTag);
+          const latest = latestPatchForMinor(`${M}.${m}`);
+          if (!latest) continue;
+
+          const minorCommit = rev(minorTag);
+          const latestCommit = rev(latest);
+          log(`  📍 ${minorTag} points to: ${minorCommit}`);
+          log(`  📍 ${latest} points to: ${latestCommit}`);
+
+          if (minorCommit && minorCommit !== latestCommit) {
+            log(`🚨 Orphaned minor tag detected: ${minorTag} should point to ${latest}`);
+            orphanRows.push({ tagName: minorTag, targetSha: latestCommit, latestPatch: latest });
+            fixedTagsLines.push(`${minorTag} → ${latest}`);
+            orphansFound = true;
+          } else {
+            log(`✅ ${minorTag} correctly points to ${latest}`);
+          }
+        }
+
+        // ----- Outputs -----
+        const fixedTagsText = fixedTagsLines.join('\n');
+
+        // fixed-tags can be multi-line -> use multiline output syntax
+        fs.appendFileSync(out, `fixed-tags<<EOF\n${fixedTagsText}\nEOF\n`);
+        fs.appendFileSync(out, `orphans-found=${orphansFound}\n`);
+
+        if (orphansFound) {
+          // Build compact JSON array [{tag, sha}]
+          const tagData = orphanRows.map(r => ({ tag: r.tagName, sha: r.targetSha }));
+          const compact = JSON.stringify(tagData);
+          fs.appendFileSync(out, `orphaned-tags-json=${compact}\n`);
+          log('🔧 Orphaned tags JSON:', compact);
+        } else {
+          fs.appendFileSync(out, `orphaned-tags-json=[]\n`);
+          log('✅ No orphaned major/minor version tags found');
+        }
+        EOF
 
     - name: Fix orphaned tags using modular GitHub API action
       if: steps.fix-orphans.outputs.orphans-found == 'true'
