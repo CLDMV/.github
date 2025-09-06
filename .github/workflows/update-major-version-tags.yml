@@ -28,6 +28,8 @@ jobs:
     name: "🚀 Execute Tag Updates"
     # Run on: tag pushes or releases only (workflow_call bypasses this condition)
     if: github.ref_type == 'tag' || github.event_name == 'release'
+    permissions:
+      contents: write # ensure the caller grants write
     runs-on: ubuntu-latest
     outputs:
       major-version: ${{ steps.tags.outputs.major-version }}

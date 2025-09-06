@@ -7,6 +7,7 @@ export function parseRepo(repoStr) {
 
 export async function api(method, path, body, { token, owner, repo }) {
 	const url = `https://api.github.com/repos/${owner}/${repo}${path}`;
+	console.log("api url: ", method, url);
 	const res = await fetch(url, {
 		method,
 		headers: {

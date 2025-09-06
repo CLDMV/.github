@@ -6,6 +6,9 @@ on:
     types: [published]
   push:
 
+permissions:
+  contents: write
+
 jobs:
   update-tags:
     name: "📌 Update Major Version Tags"

@@ -9,9 +9,6 @@ inputs:
     description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
     required: false
     default: "fix"
-  github_token:
-    description: "GitHub token for API access"
-    required: true
 
 outputs:
   fixed-tags:
