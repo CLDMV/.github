@@ -1,11 +1,14 @@
 name: "🔄 Git Tag Operations"
-description: "Composite action for updating major version tags"
+description: "Composite action for updating major/minor version tags and fixing orphans"
 
 inputs:
   create-documentation:
     description: "Whether to create/update VERSION_TAGS.md documentation"
     required: false
     default: "true"
+  repo:
+    description: "owner/repo (defaults to the caller repository). Passed through to orphan fixer."
+    required: false
 
 outputs:
   major-version:
@@ -24,16 +27,16 @@ outputs:
     description: "Whether the tag update should run"
     value: ${{ steps.should-run.outputs.result }}
   fixed-orphans:
-    description: "List of orphaned tags that were fixed"
+    description: "Multiline list of orphaned tags that were fixed"
     value: ${{ steps.fix-orphans.outputs.fixed-tags }}
   orphans-found:
-    description: "Whether any orphaned tags were found and fixed"
+    description: "Whether any orphaned tags were found (and fixed if run_mode=fix)"
     value: ${{ steps.fix-orphans.outputs.orphans-found }}
 
 runs:
   using: composite
   steps:
-    - name: Checkout code
+    - name: Checkout code (full history for tags)
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
       with:
         fetch-depth: 0
@@ -42,20 +45,21 @@ runs:
       id: check-tags
       uses: CLDMV/.github/.github/actions/git/steps/check-version-tags@v1
 
-    - name: Fix orphaned major version tags
+    - name: Fix orphaned major/minor version tags (detect+fix via reusable job)
       id: fix-orphans
-      uses: CLDMV/.github/.github/actions/git/jobs/fix-orphaned-version-tags@v1
+      uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v1
+      with:
+        repo: ${{ inputs.repo }}
 
     - name: Determine if should run
       id: should-run
       shell: bash
       run: |
-        # Run if this is a workflow_call OR if version tags were found on push
         if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ]; then
-          echo "result=true" >> $GITHUB_OUTPUT
+          echo "result=true" >> "$GITHUB_OUTPUT"
           echo "✅ Should run tag updates"
         else
-          echo "result=false" >> $GITHUB_OUTPUT
+          echo "result=false" >> "$GITHUB_OUTPUT"
           echo "❌ Skipping tag updates - no version tags found"
         fi
 
@@ -64,16 +68,15 @@ runs:
       if: steps.should-run.outputs.result == 'true'
       shell: bash
       run: |
-        # Get the tag that triggered this workflow
         if [ "${{ github.event_name }}" = "release" ]; then
           TAG_NAME="${{ github.event.release.tag_name }}"
         else
           TAG_NAME="${{ github.ref_name }}"
         fi
-        echo "tag-name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "tag-name=$TAG_NAME" >> "$GITHUB_OUTPUT"
         echo "Processing tag: $TAG_NAME"
 
-    - name: Update major version tags
+    - name: Update major/minor version tags to this release
       id: update-tags
       if: steps.should-run.outputs.result == 'true'
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
@@ -89,32 +92,33 @@ runs:
     - name: Create summary
       shell: bash
       run: |
-        echo "## 🏷️ Version Tag Operations" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## 🏷️ Version Tag Operations"
+          echo
+          if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "true" ]; then
+            echo "### 🔧 Fixed Orphaned Tags"
+            echo "The following version tags were corrected:"
+            echo
+            # fixed-orphans is multiline; print as-is
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "- $line"
+            done <<< "${{ steps.fix-orphans.outputs.fixed-tags }}"
+            echo
+          fi
 
-        # Show orphan fixes if any
-        if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "true" ]; then
-          echo "### 🔧 Fixed Orphaned Tags" >> $GITHUB_STEP_SUMMARY
-          echo "The following major version tags were corrected:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- ${{ steps.fix-orphans.outputs.fixed-tags }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-        fi
+          if [ "${{ steps.update-tags.outputs.updated }}" = "true" ]; then
+            echo "### 📌 Version Tags Updated"
+            echo "The following major/minor version tags have been updated:"
+            echo
+            echo "- \`${{ steps.update-tags.outputs.major-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`"
+            echo "- \`${{ steps.update-tags.outputs.minor-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`"
+            echo
+          fi
 
-        # Show regular tag updates if any
-        if [ "${{ steps.update-tags.outputs.updated }}" = "true" ]; then
-          echo "### 📌 Version Tags Updated" >> $GITHUB_STEP_SUMMARY
-          echo "The following major/minor version tags have been updated:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.update-tags.outputs.major-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.update-tags.outputs.minor-version }}\` → \`${{ steps.get-tag.outputs.tag-name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-        fi
+          if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "false" ] && [ "${{ steps.update-tags.outputs.updated }}" != "true" ]; then
+            echo "✅ All version tags are up to date - no changes needed"
+          fi
 
-        # Show status if no operations
-        if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "false" ] && [ "${{ steps.update-tags.outputs.updated }}" != "true" ]; then
-          echo "✅ All version tags are up to date - no changes needed" >> $GITHUB_STEP_SUMMARY
-        fi
-
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Workflows can reference major version tags (e.g., \`@v1\`) for automatic updates." >> $GITHUB_STEP_SUMMARY
+          echo
+          echo "Workflows can reference major version tags (e.g., \`@v1\`) for automatic updates."
+        } >> "$GITHUB_STEP_SUMMARY"

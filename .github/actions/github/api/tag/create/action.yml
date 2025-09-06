@@ -1,0 +1,26 @@
+name: tag-create
+description: "Create a VERIFIED annotated tag for a commit (or move existing tag ref to the new tag object)"
+
+inputs:
+  tag:
+    description: "Tag name to create (e.g., v2.0.0)"
+    required: true
+  sha:
+    description: "Target commit SHA the tag should reference"
+    required: true
+  message:
+    description: "Annotated tag message (defaults to tag name)"
+    required: false
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+
+outputs:
+  tag_obj_sha:
+    description: "SHA of the created annotated tag object"
+  ref_sha:
+    description: "Final SHA of refs/tags/<tag> (points at the tag object)"
+
+runs:
+  using: node20
+  main: action.mjs

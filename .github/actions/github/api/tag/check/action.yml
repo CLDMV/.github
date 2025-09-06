@@ -1,0 +1,22 @@
+name: tag-check
+description: "Check if a tag exists and return its ref sha/type"
+
+inputs:
+  tag:
+    description: "Tag name (e.g., v2.0.0)"
+    required: true
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+
+outputs:
+  exists:
+    description: "String 'true' if the tag exists, otherwise 'false'"
+  ref_sha:
+    description: "SHA that the tag ref points to (tag object or commit)"
+  object_type:
+    description: "Type of referenced object: 'tag' or 'commit'"
+
+runs:
+  using: node20
+  main: action.mjs

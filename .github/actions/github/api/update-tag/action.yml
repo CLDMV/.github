@@ -33,108 +33,83 @@ runs:
       run: |
         node <<'EOF'
         const fs = require('fs');
+        const { execSync } = require('child_process');
         const out = process.env.GITHUB_OUTPUT;
-        const repo = process.env.REPO;
-        const token = process.env.GITHUB_TOKEN;
         let raw = process.env.TAG_DATA || '';
 
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28'
-        };
-        const base = `https://api.github.com/repos/${repo}`;
+        let updated = 0;
+        let success = true;
+        let messages = [];
 
-        async function api(method, path, body) {
-          const res = await fetch(base + path, {
-            method,
-            headers,
-            body: body ? JSON.stringify(body) : undefined
-          });
-          if (res.ok) {
-            if (res.status === 204) return null;
-            return res.json();
-          }
-          const text = await res.text();
-          throw new Error(`${method} ${path} -> ${res.status} ${text}`);
-        }
-
-        function parseTagData(raw) {
-          raw = raw.trim();
-          // base64 encoded JSON?
-          if (/^[A-Za-z0-9+/]+=*$/.test(raw) && raw.length > 20 && !raw.startsWith('[')) {
-            console.log('🔓 Decoding base64 JSON data');
-            const buf = Buffer.from(raw, 'base64');
-            raw = buf.toString('utf8');
-            console.log('📄 Decoded JSON:', raw);
-          }
-
+        try {
+          // Parse the tag data
+          let tags;
           if (raw.startsWith('[')) {
-            console.log('🔄 Processing multiple tags from JSON array');
-            return JSON.parse(raw).map(o => `${o.tag}:${o.sha}`);
+            tags = JSON.parse(raw);
           } else if (raw.includes(',')) {
-            console.log('🔄 Processing multiple tags from comma-separated format');
-            return raw.split(',').map(x => x.trim()).filter(Boolean);
+            // comma-separated format: tag1:sha1,tag2:sha2
+            tags = raw.split(',').map(pair => {
+              const [tag, sha] = pair.split(':');
+              return { tag, sha };
+            });
           } else {
-            console.log('🔄 Processing single tag');
-            return [raw];
+            // single tag format: tag:sha
+            const [tag, sha] = raw.split(':');
+            tags = [{ tag, sha }];
           }
-        }
-
-        async function updateTag(tag, sha) {
-          const refPath = `/git/refs/tags/${encodeURIComponent(tag)}`;
-          try {
-            await api('PATCH', refPath, { sha, force: true });
-            console.log(`✅ Successfully updated tag ${tag}`);
-            return true;
-          } catch (err) {
-            console.log(`❌ Failed to PATCH tag ${tag}: ${err.message}`);
-            console.log('↻ Trying delete and recreate approach...');
-            try {
-              await api('DELETE', refPath);
-            } catch {}
-            try {
-              await api('POST', `/git/refs`, { ref: `refs/tags/${tag}`, sha });
-              console.log(`✅ Successfully recreated tag ${tag}`);
-              return true;
-            } catch (err2) {
-              console.log(`❌ Failed to recreate tag ${tag}: ${err2.message}`);
-              return false;
-            }
-          }
-        }
-
-        (async () => {
-          let success = true;
-          let updatedCount = 0;
-          let messages = [];
-
-          const pairs = parseTagData(raw);
-          for (const pair of pairs) {
-            const [tag, sha] = pair.split(':');
+          
+          console.log(`🔄 Processing ${tags.length} tag(s)`);
+          
+          for (const { tag, sha } of tags) {
             console.log(`🏷️ Updating tag ${tag} to point to ${sha}`);
-            const ok = await updateTag(tag, sha);
-            if (ok) {
-              updatedCount++;
-              messages.push(`Tag ${tag} updated`);
-            } else {
+            
+            try {
+              // Check if tag exists locally
+              let tagExists = false;
+              try {
+                execSync(`git tag -l ${tag}`, { stdio: 'pipe' });
+                const output = execSync(`git tag -l ${tag}`, { encoding: 'utf8' }).trim();
+                tagExists = output === tag;
+              } catch {}
+
+              if (tagExists) {
+                console.log(`📝 Tag ${tag} exists, force updating...`);
+                // Force update existing tag (same as working system)
+                execSync(`git tag -f ${tag} ${sha}`, { stdio: 'inherit' });
+                execSync(`git push origin ${tag} --force`, { stdio: 'inherit' });
+              } else {
+                console.log(`🆕 Tag ${tag} doesn't exist, creating signed tag...`);
+                // Create new signed tag
+                execSync(`git tag -s ${tag} ${sha} -m "Create ${tag} pointing to latest patch"`, { stdio: 'inherit' });
+                execSync(`git push origin ${tag}`, { stdio: 'inherit' });
+              }
+              
+              console.log(`✅ Successfully updated tag ${tag}`);
+              updated++;
+              messages.push(`Tag ${tag} updated successfully`);
+              
+            } catch (error) {
+              console.log(`❌ Failed to update tag ${tag}: ${error.message}`);
               success = false;
-              messages.push(`Tag ${tag} failed`);
+              messages.push(`Failed to update tag ${tag}: ${error.message}`);
             }
           }
+          
+        } catch (error) {
+          console.log(`💥 Error processing tags: ${error.message}`);
+          success = false;
+          messages.push(`Error processing tags: ${error.message}`);
+        }
 
-          fs.appendFileSync(out, `success=${success}\n`);
-          fs.appendFileSync(out, `updated_count=${updatedCount}\n`);
-          fs.appendFileSync(out, `message=${messages.join('; ')}\n`);
+        // Write outputs
+        fs.appendFileSync(out, `success=${success}\n`);
+        fs.appendFileSync(out, `updated_count=${updated}\n`);
+        fs.appendFileSync(out, `message=${messages.join('; ')}\n`);
 
-          if (success) {
-            console.log(`🎉 Successfully updated ${updatedCount} tag(s)`);
-          } else {
-            console.log('💥 Some tag updates failed');
-            process.exit(1);
-          }
-        })().catch(err => {
-          console.error('::error::' + err.message);
+        if (success) {
+          console.log(`🎉 Successfully updated ${updated} tag(s)`);
+        } else {
+          console.log('💥 Some tag updates failed');
           process.exit(1);
-        });
+        }
         EOF

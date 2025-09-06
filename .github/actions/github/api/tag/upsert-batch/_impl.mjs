@@ -1,0 +1,37 @@
+export async function run({ token, repo, raw, runCheck, runCreate, runUpdate }) {
+	if (!raw) throw new Error("payload is required");
+
+	let items;
+	try {
+		items = JSON.parse(raw);
+	} catch {
+		throw new Error("payload must be valid JSON");
+	}
+	if (!Array.isArray(items)) throw new Error("payload must be an array");
+
+	const rows = [];
+	const results = [];
+
+	for (const it of items) {
+		const tag = String(it.tag || "");
+		const sha = String(it.sha || "");
+		const message = String(it.message || tag);
+		if (!tag) throw new Error(`Missing tag in item: ${JSON.stringify(it)}`);
+		if (!sha) throw new Error(`Missing sha in item: ${JSON.stringify(it)}`);
+
+		const chk = await runCheck({ token, repo, tag });
+		if (chk.exists === "true") {
+			const out = await runUpdate({ token, repo, tag, sha, message });
+			results.push({ tag, action: "update", tag_obj_sha: out.tag_obj_sha });
+		} else {
+			const out = await runCreate({ token, repo, tag, sha, message });
+			results.push({ tag, action: "create", tag_obj_sha: out.tag_obj_sha });
+		}
+
+		rows.push(`| \`${tag}\` | \`${sha}\` |`);
+	}
+
+	const summary = `## Tag upsert results\n\n| Tag | Target SHA |\n| --- | --- |\n${rows.join("\n")}\n\n`;
+
+	return { summary, report: results };
+}

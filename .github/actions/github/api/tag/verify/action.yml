@@ -1,0 +1,28 @@
+name: tag-verify
+description: "Verify whether a tag is signed/verified. Detects lightweight vs annotated."
+
+inputs:
+  tag:
+    description: "Tag name to verify (e.g., v2.0.0)"
+    required: true
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+
+outputs:
+  exists:
+    description: "String 'true' if the tag ref exists, otherwise 'false'"
+  tag_type:
+    description: "Either 'annotated' or 'lightweight' (empty if tag is missing)"
+  ref_sha:
+    description: "SHA that refs/tags/<tag> points to (tag object or commit SHA)"
+  tag_obj_sha:
+    description: "Annotated tag object SHA if applicable (empty for lightweight/missing)"
+  is_signed:
+    description: "String 'true' if the annotated tag has a verified signature, otherwise 'false'"
+  verification_reason:
+    description: "Reason from the API verification block (or 'not_found'/'lightweight')"
+
+runs:
+  using: node20
+  main: action.mjs

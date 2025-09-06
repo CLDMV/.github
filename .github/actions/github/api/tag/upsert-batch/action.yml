@@ -1,0 +1,18 @@
+name: tag-upsert-batch
+description: "Create or update many tags from JSON [{tag, sha, message?}]"
+
+inputs:
+  payload:
+    description: 'JSON array: [{"tag":"vX.Y.Z","sha":"<commit>","message":"optional"}, ...]'
+    required: true
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+
+outputs:
+  report:
+    description: 'Compact JSON array of results per tag (e.g., [{"tag":"v2.0.0","action":"create","tag_obj_sha":"..."}, ...])'
+
+runs:
+  using: node20
+  main: action.mjs

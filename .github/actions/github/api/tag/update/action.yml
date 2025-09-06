@@ -1,0 +1,26 @@
+name: tag-update
+description: "Move an existing tag to a new commit using a new VERIFIED annotated tag object"
+
+inputs:
+  tag:
+    description: "Existing tag name to update"
+    required: true
+  sha:
+    description: "New target commit SHA the tag should reference"
+    required: true
+  message:
+    description: "Annotated tag message (defaults to tag name)"
+    required: false
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+
+outputs:
+  tag_obj_sha:
+    description: "SHA of the new annotated tag object created during update"
+  ref_sha:
+    description: "Final SHA of refs/tags/<tag> after update (tag object)"
+
+runs:
+  using: node20
+  main: action.mjs

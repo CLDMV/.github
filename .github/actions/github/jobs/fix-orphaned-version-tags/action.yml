@@ -1,0 +1,44 @@
+name: "🔧 Fix Orphaned Major/Minor Version Tags"
+description: "Detects major/minor version tags that don't point to the latest patch and fixes them via tag/upsert-batch"
+
+inputs:
+  repo:
+    description: "owner/repo (defaults to current repository)"
+    required: false
+  run_mode:
+    description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
+    required: false
+    default: "fix"
+
+outputs:
+  fixed-tags:
+    description: "Multiline list of tags that were (or would be) retargeted in this run"
+    value: ${{ steps.gather.outputs.fixed-tags }}
+  orphans-found:
+    description: "'true' if any orphaned tags were detected (and possibly fixed), otherwise 'false'"
+    value: ${{ steps.gather.outputs.orphans-found }}
+  orphaned-tags-json:
+    description: "Compact JSON array of {tag, sha} to retarget (input for tag/upsert-batch)"
+    value: ${{ steps.gather.outputs.orphaned-tags-json }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code (full history for tags)
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect orphaned major/minor tags
+      id: gather
+      run: node $GITHUB_ACTION_PATH/action.mjs
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo || github.repository }}
+
+    - name: Fix orphaned tags (via tag/upsert-batch)
+      if: ${{ steps.gather.outputs.orphans-found == 'true' && inputs.run_mode == 'fix' }}
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
+      with:
+        repo: ${{ inputs.repo }}
+        payload: ${{ steps.gather.outputs.orphaned-tags-json }}
