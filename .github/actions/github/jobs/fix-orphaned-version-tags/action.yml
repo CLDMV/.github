@@ -42,5 +42,5 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
-        repo: ${{ inputs.repo }}
+        repo: ${{ inputs.repo || github.repository }}
         payload: ${{ steps.gather.outputs.orphaned-tags-json }}

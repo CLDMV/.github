@@ -41,6 +41,21 @@ runs:
       with:
         fetch-depth: 0
 
+    - name: Sanity - create/move a temp tag in this repo
+      env:
+        GH_TOKEN: ${{ github.token }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        REPO="${{ github.repository }}"
+        sha="$(git ls-remote https://github.com/$REPO HEAD | awk '{print $1}')"
+        curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/$REPO/git/refs" \
+          -d "{\"ref\":\"refs/tags/_actions_temp\",\"sha\":\"$sha\"}" || true
+        curl -fsS -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/$REPO/git/refs/tags/_actions_temp" \
+          -d "{\"sha\":\"$sha\",\"force\":true}"
+
     - name: Check for version tags
       id: check-tags
       uses: CLDMV/.github/.github/actions/git/steps/check-version-tags@v1
@@ -49,7 +64,7 @@ runs:
       id: fix-orphans
       uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v1
       with:
-        repo: ${{ inputs.repo }}
+        repo: ${{ inputs.repo || github.repository }}
 
     - name: Determine if should run
       id: should-run

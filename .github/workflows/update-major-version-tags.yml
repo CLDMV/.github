@@ -20,16 +20,14 @@ on:
         description: "Whether tags were successfully updated"
         value: ${{ jobs.update-tags.outputs.updated }}
 
-permissions:
-  contents: write
+permissions: write-all
 
 jobs:
   update-tags:
     name: "🚀 Execute Tag Updates"
     # Run on: tag pushes or releases only (workflow_call bypasses this condition)
     if: github.ref_type == 'tag' || github.event_name == 'release'
-    permissions:
-      contents: write # ensure the caller grants write
+    permissions: write-all # ensure the caller grants write
     runs-on: ubuntu-latest
     outputs:
       major-version: ${{ steps.tags.outputs.major-version }}

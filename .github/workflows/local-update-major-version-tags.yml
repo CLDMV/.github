@@ -13,5 +13,7 @@ jobs:
   update-tags:
     name: "📌 Update Major Version Tags"
     uses: ./.github/workflows/update-major-version-tags.yml
+    permissions:
+      contents: write # (optional) also set at the job
     with:
       create_documentation: true
