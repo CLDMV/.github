@@ -1,28 +1,26 @@
-name: GH App Tag Signing Test
+name: App Tag (API-only, annotated)
 
 on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag name to (create or) move (annotated only, no lightweight)"
+        description: "Tag name to (create or) move (annotated only; no lightweight)"
         default: "v-app-test"
         required: true
 
 permissions:
-  contents: write # allow writing refs in this repo if the run uses GITHUB_TOKEN (we'll use App token)
+  contents: write
 
 jobs:
-  app_tag_test:
-    name: Create/Move annotated tag via GitHub App
+  tag_with_app_api:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout (needed only to compute first & last commit)
+      - name: Checkout (only to compute SHAs)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get first and last commit SHAs
+      - name: Compute first and last commit SHAs
         id: shas
         shell: bash
         run: |
@@ -30,9 +28,9 @@ jobs:
           FIRST_SHA="$(git rev-list --max-parents=0 HEAD | tail -n1)"
           LAST_SHA="$(git rev-parse HEAD)"
           echo "first=${FIRST_SHA}" >> "$GITHUB_OUTPUT"
-          echo "last=${LAST_SHA}" >> "$GITHUB_OUTPUT"
-          echo "First commit: $FIRST_SHA"
-          echo "Last  commit: $LAST_SHA"
+          echo "last=${LAST_SHA}"   >> "$GITHUB_OUTPUT"
+          echo "First: $FIRST_SHA"
+          echo "Last : $LAST_SHA"
 
       - name: Create installation access token for the App
         id: app-token
@@ -40,109 +38,116 @@ jobs:
         with:
           app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
           private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-          # Either specify installation-id OR let the action auto-detect for this repo.
-          # installation-id: ${{ secrets.CLDMV_BOT_APP_INSTALLATION_ID }}
-          # Optionally, you can pin owner/repositories if needed:
-          # owner: ${{ github.repository_owner }}
-          # repositories: ${{ github.event.repository.name }}
+          # installation-id omitted (auto-detects the installation for this repo)
 
-      - name: Install jq (for JSON parsing)
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Ensure jq present
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
 
-      - name: Create/Move annotated tag with App token
+      - name: Create/Move annotated tag via Git Data API (App token)
         id: tag_ops
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag_name }}
-          FIRST_SHA: ${{ steps.shas.outputs.first }}
-          LAST_SHA: ${{ steps.shas.outputs.last }}
+          FIRST: ${{ steps.shas.outputs.first }}
+          LAST: ${{ steps.shas.outputs.last }}
         shell: bash
         run: |
           set -euo pipefail
 
+          GH="https://api.github.com/repos/${REPO}"
           api() {
             local method="$1" url="$2" data="${3:-}"
             if [[ -n "$data" ]]; then
               curl -sS -X "$method" \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "$url" \
-                -d "$data"
+                   -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" \
+                   "$url" -d "$data"
             else
               curl -sS -X "$method" \
-                -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "$url"
+                   -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" \
+                   "$url"
             fi
           }
 
-          GH="https://api.github.com/repos/${REPO}"
-
-          echo "🔎 Checking if tag ref exists: refs/tags/${TAG}"
+          echo "🔎 Does tag ref exist?"
           REF_STATUS=$(curl -sS -o /tmp/ref.json -w "%{http_code}" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "${GH}/git/ref/tags/${TAG}" || true)
 
           if [[ "$REF_STATUS" == "200" ]]; then
-            echo "ℹ️ Tag ref exists — will CREATE a NEW annotated tag object for LAST commit and MOVE ref."
-            TARGET_SHA="$LAST_SHA"
-            MODE="move"
+            TARGET="$LAST"; MODE="move"
+            echo "ℹ️ Ref exists → will create NEW annotated tag object at HEAD and PATCH ref."
           else
-            echo "ℹ️ Tag ref does not exist — will CREATE annotated tag object for FIRST commit and CREATE ref."
-            TARGET_SHA="$FIRST_SHA"
-            MODE="create"
+            TARGET="$FIRST"; MODE="create"
+            echo "ℹ️ Ref missing → will create annotated tag object at FIRST commit and CREATE ref."
           fi
+          echo "🎯 Target commit: $TARGET"
 
-          echo "🎯 Target commit for tag object: $TARGET_SHA"
-          echo "🧱 Creating annotated tag object (no lightweight; type=commit)"
+          echo "🧱 Creating annotated tag object (type=commit)"
           TAG_OBJ_JSON=$(api POST "${GH}/git/tags" \
-            "$(jq -cn --arg tag "$TAG" --arg msg "App test tag for $TAG -> $TARGET_SHA" --arg obj "$TARGET_SHA" \
-              '{tag:$tag, message:$msg, object:$obj, type:"commit"}')")
-
+            "$(jq -cn --arg tag "$TAG" \
+                         --arg msg "API tag $TAG -> $TARGET" \
+                         --arg obj "$TARGET" \
+               '{tag:$tag, message:$msg, object:$obj, type:"commit"}')")
           echo "$TAG_OBJ_JSON" | jq . > /tmp/tag_obj.json
+
           TAG_OBJ_SHA=$(jq -r '.sha' /tmp/tag_obj.json)
           VERIFIED=$(jq -r '.verification.verified // "false"' /tmp/tag_obj.json)
-          REASON=$(jq -r '.verification.reason // "unknown"' /tmp/tag_obj.json)
-
-          echo "📦 Tag object SHA: $TAG_OBJ_SHA"
-          echo "🔐 verification.verified: $VERIFIED"
-          echo "🔐 verification.reason:   $REASON"
+          REASON=$(jq -r '.verification.reason   // "unknown"' /tmp/tag_obj.json)
 
           if [[ -z "$TAG_OBJ_SHA" || "$TAG_OBJ_SHA" == "null" ]]; then
             echo "❌ Failed to create tag object"; cat /tmp/tag_obj.json; exit 1
           fi
 
+          echo "📦 Tag object sha: $TAG_OBJ_SHA"
+          echo "🔐 verification.verified: $VERIFIED"
+          echo "🔐 verification.reason:   $REASON"
+
           if [[ "$MODE" == "create" ]]; then
             echo "🧷 Creating tag REF → tag object"
             CREATE_REF_JSON=$(api POST "${GH}/git/refs" \
-              "$(jq -cn --arg ref "refs/tags/${TAG}" --arg sha "$TAG_OBJ_SHA" '{ref:$ref, sha:$sha}')")
+              "$(jq -cn --arg ref "refs/tags/${TAG}" --arg sha "$TAG_OBJ_SHA" \
+                 '{ref:$ref, sha:$sha}')")
             echo "$CREATE_REF_JSON" | jq . > /tmp/create_ref.json
-
-            # Fetch the tag object back to display final verification
-            echo "🔁 Fetch created tag object for verification"
-            GET_TAG_JSON=$(api GET "${GH}/git/tags/${TAG_OBJ_SHA}")
-            echo "$GET_TAG_JSON" | jq . > /tmp/get_tag.json
-            echo "::notice title=TagCreated::$(jq -r '.tag + " @" + .object.sha' /tmp/get_tag.json)"
-
           else
-            echo "✏️ Moving existing tag REF → NEW tag object (force)"
+            echo "✏️ Moving tag REF → NEW tag object (force)"
             PATCH_REF_JSON=$(api PATCH "${GH}/git/refs/tags/${TAG}" \
               "$(jq -cn --arg sha "$TAG_OBJ_SHA" '{sha:$sha, force:true}')")
             echo "$PATCH_REF_JSON" | jq . > /tmp/patch_ref.json
-
-            echo "🔁 Fetch moved tag object for verification"
-            GET_TAG_JSON=$(api GET "${GH}/git/tags/${TAG_OBJ_SHA}")
-            echo "$GET_TAG_JSON" | jq . > /tmp/get_tag.json
-            echo "::notice title=TagMoved::$(jq -r '.tag + " @" + .object.sha' /tmp/get_tag.json)"
           fi
 
-          # Surface verification info as outputs
+          # Outputs for the next step
           echo "tag_object_sha=$TAG_OBJ_SHA" >> "$GITHUB_OUTPUT"
-          echo "verification=$(jq -c '.verification' /tmp/get_tag.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Show verification result
+      - name: Show verification (resolved from ref → tag object)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag_name }}
+        shell: bash
         run: |
-          echo "Tag object: ${{ steps.tag_ops.outputs.tag_object_sha }}"
-          echo "Verification JSON: ${{ steps.tag_ops.outputs.verification }}"
+          set -euo pipefail
+          GH="https://api.github.com/repos/${REPO}"
+
+          REF_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                           -H "Accept: application/vnd.github+json" \
+                           "${GH}/git/ref/tags/${TAG}")
+          echo "$REF_JSON" | jq . > /tmp/ref.json
+          OBJ_SHA=$(jq -r '.object.sha'  /tmp/ref.json)
+          OBJ_TY=$(jq -r '.object.type' /tmp/ref.json)
+          echo "Ref → $OBJ_TY $OBJ_SHA"
+
+          if [[ "$OBJ_TY" == "tag" ]]; then
+            TAG_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                              -H "Accept: application/vnd.github+json" \
+                              "${GH}/git/tags/${OBJ_SHA}")
+            echo "$TAG_JSON" | jq .
+            echo "::notice title=Verification::.verification=$(echo "$TAG_JSON" | jq -c '.verification')"
+          else
+            echo "Note: ref is not pointing to a tag object (unexpected for this flow)."
+          fi
