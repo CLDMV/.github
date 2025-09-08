@@ -70,3 +70,12 @@ export async function forceMoveRefToCommit({ token, repo, tag, commitSha }) {
 	const enc = encodeURIComponent(tag);
 	return api("PATCH", `/git/refs/tags/${enc}`, { sha: commitSha, force: true }, { token, owner, repo: r });
 }
+
+export function inferAnnotate({ annotate, sign, message }) {
+	if (annotate === "true") return true;
+	if (annotate === "false") return false;
+	// auto
+	if (sign === "true") return true;
+	if (message && message.length) return true;
+	return false;
+}

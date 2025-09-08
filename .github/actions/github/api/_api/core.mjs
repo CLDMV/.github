@@ -1,4 +1,6 @@
 // Generic ESM helpers for GitHub REST API
+import { execSync } from "node:child_process";
+
 export function parseRepo(repoStr) {
 	const [owner, repo] = (repoStr || "").split("/");
 	if (!owner || !repo) throw new Error(`Invalid repo "${repoStr}" (expected owner/repo)`);
@@ -23,3 +25,8 @@ export async function api(method, path, body, { token, owner, repo }) {
 	}
 	return res.status === 204 ? null : res.json();
 }
+
+export const sh = (cmd) =>
+	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], env: process.env })
+		.toString()
+		.trim();

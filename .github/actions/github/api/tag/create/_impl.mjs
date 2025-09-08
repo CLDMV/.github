@@ -1,52 +1,6 @@
-import { execSync } from "node:child_process";
-import fs from "node:fs";
-import { getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
-
-const sh = (cmd, env = {}) =>
-	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, ...env } })
-		.toString()
-		.trim();
-
-function inferAnnotate({ annotate, sign, message }) {
-	if (annotate === "true") return true;
-	if (annotate === "false") return false;
-	// auto
-	if (sign === "true") return true;
-	if (message && message.length) return true;
-	return false;
-}
-
-function shouldSign({ sign, gpg_private_key }) {
-	if (sign === "true") return true;
-	if (sign === "false") return false;
-	return Boolean(gpg_private_key && gpg_private_key.length);
-}
-
-function ensureGitAuthRemote(repo, token) {
-	// set origin to include token for push
-	const url = `https://x-access-token:${token}@github.com/${repo}.git`;
-	sh(`git remote set-url origin "${url}"`);
-	sh(`git fetch --tags --prune --force`);
-}
-
-function importGpgIfNeeded({ gpg_private_key, gpg_passphrase }) {
-	if (!gpg_private_key) return "";
-	fs.writeFileSync("/tmp/private.key", gpg_private_key, { encoding: "utf8" });
-	sh(`gpg --batch --yes --pinentry-mode loopback --passphrase "${gpg_passphrase || ""}" --import /tmp/private.key`);
-	const keyid = sh(`gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1`);
-	if (!keyid) throw new Error("No secret key imported");
-	return keyid;
-}
-
-function configureGitIdentity({ tagger_name, tagger_email, keyid, enableSign }) {
-	if (tagger_name) sh(`git config user.name "${tagger_name}"`);
-	if (tagger_email) sh(`git config user.email "${tagger_email}"`);
-	if (enableSign) {
-		if (keyid) sh(`git config user.signingkey ${keyid}`);
-		sh(`git config commit.gpgsign true`);
-		sh(`git config tag.gpgsign true`);
-	}
-}
+import { sh } from "../../_api/core.mjs";
+import { shouldSign, ensureGitAuthRemote, configureGitIdentity } from "../../_api/gpg.mjs";
+import { inferAnnotate, getRefTag, createRefToCommit, forceMoveRefToCommit, importGpgIfNeeded } from "../../_api/tag.mjs";
 
 function runGitSmartTag({
 	repo,

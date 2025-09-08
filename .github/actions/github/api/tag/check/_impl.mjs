@@ -1,4 +1,4 @@
-import { getRefTag } from "../../_api/tag.mjs"; // per your import style
+import { getRefTag } from "../../_api/tag.mjs";
 
 export async function run({ token, repo, tag }) {
 	const out = await getRefTag({ token, repo, tag });
