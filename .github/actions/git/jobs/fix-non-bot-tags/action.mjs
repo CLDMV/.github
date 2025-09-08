@@ -20,7 +20,7 @@ function getTagInfo(tagName) {
 		// Parse tagger info from annotated tag
 		const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
 		debugLog(`taggerMatch result:`, taggerMatch);
-		console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
+		console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`, tagInfo);
 		if (taggerMatch) {
 			const [, nameEmail, timestamp, timezone] = taggerMatch;
 			const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
