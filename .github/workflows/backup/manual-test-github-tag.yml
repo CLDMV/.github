@@ -4,6 +4,11 @@ name: |
 on:
   workflow_dispatch:
     inputs:
+      debug:
+        description: "Enable debug logging"
+        type: boolean
+        required: false
+        default: false
       tag_name:
         description: "Tag to create/update"
         required: true
@@ -58,7 +63,9 @@ jobs:
         uses: CLDMV/.github/.github/actions/github/api/tag/create@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
+          debug: ${{ inputs.debug }}
           repo: ${{ github.repository }}
           tag: ${{ inputs.tag_name }}
           sha: ${{ steps.sha.outputs.sha }}

@@ -2,6 +2,10 @@ name: "🔧 Fix Orphaned Major/Minor Version Tags"
 description: "Detects major/minor version tags that don't point to the latest patch and fixes them via tag/upsert-batch"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   repo:
     description: "owner/repo (defaults to current repository)"
     required: false
@@ -57,6 +61,7 @@ runs:
       run: node $GITHUB_ACTION_PATH/action.mjs
       shell: bash
       env:
+        CI_DEBUG: ${{ inputs.debug }}
         REPO: ${{ inputs.repo || github.repository }}
 
     - name: Fix orphaned tags (via tag/upsert-batch)
@@ -65,6 +70,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:
+        debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
         payload: ${{ steps.gather.outputs.orphaned-tags-json }}
         sign: ${{ inputs.sign }}

@@ -2,6 +2,7 @@
 
 import { execSync } from "child_process";
 import fs from "fs";
+import { debugLog } from "../../../common/common/core.mjs";
 
 /**
  * Get tag information including tagger details and message
@@ -12,9 +13,13 @@ function getTagInfo(tagName) {
 	try {
 		// Get the tag object info (if it's an annotated tag)
 		const tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
+		debugLog(`Raw tag info for ${tagName}:`);
+		debugLog(tagInfo);
+		debugLog("End of tag info");
 
 		// Parse tagger info from annotated tag
 		const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
+		debugLog(`taggerMatch result:`, taggerMatch);
 		if (taggerMatch) {
 			const [, nameEmail, timestamp, timezone] = taggerMatch;
 			const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);

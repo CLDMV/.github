@@ -2,6 +2,10 @@ name: tag-upsert-batch
 description: "Create or update many tags from JSON [{tag, sha, message?}]"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   sign:
     description: "Sign the tag? 'auto' (default) signs if a GPG key is provided; 'true' forces signing; 'false' disables it."
     required: false

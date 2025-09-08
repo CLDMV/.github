@@ -2,6 +2,10 @@ name: "🤖 Fix Non-Bot-Signed Version Tags"
 description: "Detects version tags that weren't created by the bot and recreates them with proper bot signing"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   sign:
     description: "Smart signing mode for retagging (auto/true/false)"
     required: false
@@ -55,6 +59,7 @@ runs:
       run: node $GITHUB_ACTION_PATH/action.mjs
       shell: bash
       env:
+        CI_DEBUG: ${{ inputs.debug }}
         BOT_PATTERNS: ${{ inputs.bot_patterns }}
         EXCLUDE_TAGS: ${{ inputs.exclude_tags }}
 
@@ -64,6 +69,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
+        debug: ${{ inputs.debug }}
         payload: ${{ steps.gather.outputs.non-bot-tags-json }}
         sign: ${{ inputs.sign }}
         annotate: ${{ inputs.annotate }}

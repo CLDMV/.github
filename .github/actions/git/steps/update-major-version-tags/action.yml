@@ -2,6 +2,10 @@ name: "Update Major Version Tags"
 description: "Update major and minor version tags to point to the latest patch version"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   tag-name:
     description: "The semantic version tag to process (e.g., v1.2.3)"
     required: true
@@ -61,6 +65,7 @@ runs:
       if: ${{ steps.update.outputs.updated == 'true' }}
       uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
       with:
+        debug: ${{ inputs.debug }}
         payload: ${{ steps.update.outputs.tags-payload }}
         sign: "auto"
         annotate: "auto"

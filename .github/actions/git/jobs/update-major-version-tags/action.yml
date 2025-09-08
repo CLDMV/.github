@@ -2,6 +2,10 @@ name: "🔄 Git Tag Operations"
 description: "Composite action for updating major/minor version tags and fixing orphans"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   create-documentation:
     description: "Whether to create/update VERSION_TAGS.md documentation"
     required: false
@@ -90,6 +94,7 @@ runs:
       id: fix-orphans
       uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v1
       with:
+        debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
         github_token: ${{ env.GITHUB_TOKEN }}
         sign: ${{ inputs.sign }}
@@ -101,10 +106,11 @@ runs:
 
     - name: Fix non-bot-signed version tags
       id: fix-bot-signatures
-      uses: ./.github/actions/git/jobs/fix-non-bot-tags
+      uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v1
       env:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
+        debug: ${{ inputs.debug }}
         sign: ${{ inputs.sign }}
         annotate: ${{ inputs.annotate }}
         tagger_name: ${{ inputs.tagger_name }}
@@ -143,6 +149,7 @@ runs:
       if: steps.should-run.outputs.result == 'true'
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
       with:
+        debug: ${{ inputs.debug }}
         tag-name: ${{ steps.get-tag.outputs.tag-name }}
 
     - name: Generate version documentation

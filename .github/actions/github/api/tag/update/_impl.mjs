@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { sh } from "../../_api/core.mjs";
 import { shouldSign, ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
 import { inferAnnotate, getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
+import { debugLog } from "../../../../common/common/core.mjs";
 
 function runGitSmartTag({
 	repo,
@@ -17,11 +18,11 @@ function runGitSmartTag({
 	gpg_passphrase,
 	push
 }) {
-	console.log(`🔍 DEBUG runGitSmartTag: repo=${repo}, tag=${tag}, sha=${sha}`);
-	console.log(`🔍 DEBUG runGitSmartTag: token starts with ${token?.substring(0, 10)}...`);
-	console.log(`🔍 DEBUG runGitSmartTag: sign=${sign}, annotate=${annotate}, push=${push}`);
-	console.log(`🔍 DEBUG runGitSmartTag: tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
-	console.log(`🔍 DEBUG runGitSmartTag: gpg_private_key present=${!!gpg_private_key}`);
+	debugLog(`runGitSmartTag: repo=${repo}, tag=${tag}, sha=${sha}`);
+	debugLog(`runGitSmartTag: token starts with ${token?.substring(0, 10)}...`);
+	debugLog(`runGitSmartTag: sign=${sign}, annotate=${annotate}, push=${push}`);
+	debugLog(`runGitSmartTag: tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
+	debugLog(`runGitSmartTag: gpg_private_key present=${!!gpg_private_key}`);
 
 	ensureGitAuthRemote(repo, token);
 	const willSign = shouldSign({ sign, gpg_private_key });
@@ -33,28 +34,28 @@ function runGitSmartTag({
 	// Ensure we have a message for annotated tags
 	const tagMessage = message || `Update ${tag} tag`;
 
-	console.log(`🔍 DEBUG runGitSmartTag: willSign=${willSign}, willAnnotate=${willAnnotate}`);
+	debugLog(`runGitSmartTag: willSign=${willSign}, willAnnotate=${willAnnotate}`);
 
 	if (willSign) {
-		console.log(`🔍 DEBUG runGitSmartTag: Creating signed tag: git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
+		debugLog(`runGitSmartTag: Creating signed tag: git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
-		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || '/tmp'}/tag-message-${Date.now()}.txt`;
+		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
 		fs.writeFileSync(tmpFile, tagMessage, "utf8");
 		sh(`git tag -s -f -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else if (willAnnotate) {
-		console.log(`🔍 DEBUG runGitSmartTag: Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
+		debugLog(`runGitSmartTag: Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
-		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || '/tmp'}/tag-message-${Date.now()}.txt`;
+		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
 		fs.writeFileSync(tmpFile, tagMessage, "utf8");
 		sh(`git tag -a -f -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else {
-		console.log(`🔍 DEBUG runGitSmartTag: Creating lightweight tag: git tag -f ${tag} ${sha}`);
+		debugLog(`runGitSmartTag: Creating lightweight tag: git tag -f ${tag} ${sha}`);
 		sh(`git tag -f ${tag} ${sha}`);
 	}
 	if (push) {
-		console.log(`🔍 DEBUG runGitSmartTag: Pushing tag: git push origin +refs/tags/${tag}`);
+		debugLog(`runGitSmartTag: Pushing tag: git push origin +refs/tags/${tag}`);
 		sh(`git push origin +refs/tags/${tag}`);
 	}
 	return { tag_obj_sha: "", ref_sha: sha };
@@ -74,8 +75,10 @@ export async function run({
 	gpg_passphrase = "",
 	push = true
 }) {
+	debugLog(`update/_impl.run: Called with message="${message}"`);
 	// Fallback to API lightweight tag if push via git isn't possible
 	try {
+		debugLog(`update/_impl: About to call runGitSmartTag with message="${message}"`);
 		return runGitSmartTag({
 			repo,
 			token,
@@ -91,6 +94,7 @@ export async function run({
 			push
 		});
 	} catch (e) {
+		debugLog(`update/_impl: runGitSmartTag failed: ${e.message}`);
 		console.warn("Git-based tagging failed, falling back to API lightweight tag:", e.message);
 		const state = await getRefTag({ token, repo, tag });
 		if (state.exists) {

@@ -2,6 +2,10 @@ name: tag-create
 description: "Create a VERIFIED annotated tag for a commit (or move existing tag ref to the new tag object)"
 
 inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
   sign:
     description: "Sign the tag? 'auto' (default) signs if a GPG key is provided; 'true' forces signing; 'false' disables it."
     required: false

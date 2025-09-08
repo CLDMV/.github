@@ -8,6 +8,11 @@ on:
 
   workflow_dispatch:
     inputs:
+      debug:
+        description: "Enable debug logging for troubleshooting"
+        type: boolean
+        required: false
+        default: false
       use_gpg:
         description: "Use GPG signing via CLDMV_ secrets?"
         type: boolean
@@ -33,6 +38,7 @@ jobs:
     permissions:
       contents: write
     with:
+      debug: ${{ inputs.debug || false }}
       create_documentation: ${{ inputs.create_documentation || true }}
       sign: ${{ inputs.sign || 'auto' }}
       annotate: ${{ inputs.annotate || 'auto' }}
