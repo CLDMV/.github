@@ -45,6 +45,8 @@ jobs:
           owner: ${{ github.repository_owner }}
           # installation-id omitted: auto-detects installation for this repo
 
+      # 1) Import GPG key and configure Git identity/signing
+
       - name: Install gpg + jq
         run: |
           sudo apt-get update
@@ -57,32 +59,23 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-
-          # Configure GPG for non-interactive use in CI
-          echo "use-agent" >> ~/.gnupg/gpg.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+          # Non-interactive GPG
+          printf '%s\n' "use-agent" >> ~/.gnupg/gpg.conf
+          printf '%s\n' "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          printf '%s\n' "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent || true
 
-          # Import the armored private key from secrets
+          # Import secret key
           printf '%s' "$GPG_PRIVATE_KEY" > /tmp/private.key
           gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import /tmp/private.key
 
-          echo "Imported secret keys:"
-          gpg --list-secret-keys --keyid-format LONG
-
-          # Capture the first secret key ID
+          # Grab first key id
           KEYID="$(gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
-          if [ -z "$KEYID" ]; then
-            echo "No secret key imported"; exit 1
-          fi
+          if [ -z "$KEYID" ]; then echo "No secret key imported"; exit 1; fi
           echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git identity & signing
-        id: gitcfg
         env:
           TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
           TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
@@ -96,38 +89,44 @@ jobs:
           git config gpg.program gpg
           echo "Using signing key: $KEYID as $TAGGER_NAME <$TAGGER_EMAIL>"
 
-      - name: Create or move SIGNED annotated tag locally
+        # 2) Create/move a **signed annotated** tag locally, then push with the App token
+
+      - name: Create/Migrate signed annotated tag locally
         id: tagop
         env:
           TAG: ${{ inputs.tag_name }}
-          MSG: ${{ inputs.tag_message }}
+          MSG: ${{ format('Signed tag created/updated by CLDMV App workflow → {0}', steps.shas.outputs.last) }}
           FIRST: ${{ steps.shas.outputs.first }}
           LAST: ${{ steps.shas.outputs.last }}
           GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-
           # Decide target (create at FIRST if missing, else move to HEAD)
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            TARGET="$LAST"; MODE="move"
-            echo "Tag exists → moving to HEAD ($TARGET)"
+          TARGET="$LAST"; MODE="move"
+          echo "Tag exists → moving to HEAD ($TARGET)"
           else
-            TARGET="$FIRST"; MODE="create"
-            echo "Tag missing → creating at FIRST commit ($TARGET)"
+          TARGET="$FIRST"; MODE="create"
+          echo "Tag missing → creating at FIRST commit ($TARGET)"
           fi
 
-          # Ensure GPG agent has passphrase via loopback (no TTY prompts)
           export GPG_TTY=$(tty || true)
-          # Sign once to warm-up agent (ignore failure if not needed)
+          # Warm-up agent with passphrase (ignore if not needed)
           echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback \
-               --quick-sign-key "$(git config user.signingkey)" >/dev/null 2>&1 || true
+             --quick-sign-key "$(git config user.signingkey)" >/dev/null 2>&1 || true
 
-          # Create/move a SIGNED annotated tag (-s); -f for move case
+          # **Signed** annotated tag (-s); -f for move case
           git tag -s -f -m "$MSG" "$TAG" "$TARGET"
 
-          echo "pushed_tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "target_sha=${TARGET}" >> "$GITHUB_OUTPUT"
-          echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag using App installation token
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }} # from your existing create-github-app-token step
+        run: |
+          set -euo pipefail
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
+          git push origin "refs/tags/${{ inputs.tag_name }}" --force
 
       - name: Push tag using App installation token
         env:
