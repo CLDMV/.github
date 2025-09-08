@@ -52,6 +52,12 @@ outputs:
   orphans-found:
     description: "Whether any orphaned tags were found (and fixed if run_mode=fix)"
     value: ${{ steps.fix-orphans.outputs.orphans-found }}
+  fixed-bot-signatures:
+    description: "Multiline list of tags that were recreated with bot signatures"
+    value: ${{ steps.fix-bot-signatures.outputs.fixed-tags }}
+  non-bot-tags-found:
+    description: "Whether any non-bot-signed tags were found and fixed"
+    value: ${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}
 
 runs:
   using: composite
@@ -86,6 +92,19 @@ runs:
       with:
         repo: ${{ inputs.repo || github.repository }}
         github_token: ${{ env.GITHUB_TOKEN }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+
+    - name: Fix non-bot-signed version tags
+      id: fix-bot-signatures
+      uses: ./.github/actions/git/jobs/fix-non-bot-tags
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      with:
         sign: ${{ inputs.sign }}
         annotate: ${{ inputs.annotate }}
         tagger_name: ${{ inputs.tagger_name }}
@@ -137,6 +156,7 @@ runs:
         {
           echo "## 🏷️ Version Tag Operations"
           echo
+          
           if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "true" ]; then
             echo "### 🔧 Fixed Orphaned Tags"
             echo "The following version tags were corrected:"
@@ -145,6 +165,17 @@ runs:
             while IFS= read -r line; do
               [ -n "$line" ] && echo "- $line"
             done <<< "${{ steps.fix-orphans.outputs.fixed-tags }}"
+            echo
+          fi
+
+          if [ "${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}" = "true" ]; then
+            echo "### 🤖 Fixed Bot Signatures"
+            echo "The following version tags were recreated with proper bot signatures:"
+            echo
+            # fixed-bot-signatures is multiline; print as-is
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "- $line"
+            done <<< "${{ steps.fix-bot-signatures.outputs.fixed-tags }}"
             echo
           fi
 
@@ -157,7 +188,7 @@ runs:
             echo
           fi
 
-          if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "false" ] && [ "${{ steps.update-tags.outputs.updated }}" != "true" ]; then
+          if [ "${{ steps.fix-orphans.outputs.orphans-found }}" = "false" ] && [ "${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}" = "false" ] && [ "${{ steps.update-tags.outputs.updated }}" != "true" ]; then
             echo "✅ All version tags are up to date - no changes needed"
           fi
 

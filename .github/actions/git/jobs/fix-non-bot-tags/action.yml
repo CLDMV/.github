@@ -1,0 +1,69 @@
+name: "🤖 Fix Non-Bot-Signed Version Tags"
+description: "Detects version tags that weren't created by the bot and recreates them with proper bot signing"
+
+inputs:
+  sign:
+    description: "Smart signing mode for retagging (auto/true/false)"
+    required: false
+    default: "auto"
+  annotate:
+    description: "Smart annotate mode (auto/true/false)"
+    required: false
+    default: "auto"
+  tagger_name:
+    description: "Bot tagger name"
+    required: false
+  tagger_email:
+    description: "Bot tagger email"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+  bot_patterns:
+    description: "Patterns to identify bot signatures (JSON array)"
+    required: false
+    default: '["CLDMV Bot", "cldmv-bot"]'
+
+outputs:
+  fixed-tags:
+    description: "Multiline list of tags that were recreated with bot signatures"
+    value: ${{ steps.gather.outputs.fixed-tags }}
+  non-bot-tags-found:
+    description: "'true' if any non-bot-signed tags were detected and fixed, otherwise 'false'"
+    value: ${{ steps.gather.outputs.non-bot-tags-found }}
+  non-bot-tags-json:
+    description: "Compact JSON array of {tag, sha} to recreate with bot signatures"
+    value: ${{ steps.gather.outputs.non-bot-tags-json }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code (full history for tags)
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect non-bot-signed version tags
+      id: gather
+      run: node $GITHUB_ACTION_PATH/action.mjs
+      shell: bash
+      env:
+        BOT_PATTERNS: ${{ inputs.bot_patterns }}
+
+    - name: Recreate non-bot tags with bot signatures
+      if: ${{ steps.gather.outputs.non-bot-tags-found == 'true' }}
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      with:
+        payload: ${{ steps.gather.outputs.non-bot-tags-json }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+        force: true
