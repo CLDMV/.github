@@ -38,15 +38,15 @@ function runGitSmartTag({
 	if (willSign) {
 		console.log(`🔍 DEBUG runGitSmartTag: Creating signed tag: git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
-		const tmpFile = `/tmp/tag-message-${Date.now()}.txt`;
-		fs.writeFileSync(tmpFile, tagMessage, 'utf8');
+		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || '/tmp'}/tag-message-${Date.now()}.txt`;
+		fs.writeFileSync(tmpFile, tagMessage, "utf8");
 		sh(`git tag -s -f -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else if (willAnnotate) {
 		console.log(`🔍 DEBUG runGitSmartTag: Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
-		const tmpFile = `/tmp/tag-message-${Date.now()}.txt`;
-		fs.writeFileSync(tmpFile, tagMessage, 'utf8');
+		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || '/tmp'}/tag-message-${Date.now()}.txt`;
+		fs.writeFileSync(tmpFile, tagMessage, "utf8");
 		sh(`git tag -a -f -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else {
