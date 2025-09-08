@@ -11,9 +11,18 @@ import { debugLog } from "../../../common/common/core.mjs";
  */
 function getTagInfo(tagName) {
 	try {
-		// Get the tag object info (if it's an annotated tag)
-		const tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
-		debugLog(`Raw tag info for ${tagName}:`);
+		// First check if this is an annotated tag by trying to get the tag object
+		let tagInfo;
+		try {
+			// Try to get the tag object specifically (this will fail for lightweight tags)
+			const tagObjectSha = execSync(`git rev-parse "${tagName}^{tag}"`, { encoding: "utf8" }).trim();
+			tagInfo = execSync(`git cat-file -p ${tagObjectSha}`, { encoding: "utf8" });
+			debugLog(`Raw tag object info for ${tagName} (${tagObjectSha}):`);
+		} catch (tagObjectError) {
+			// If that fails, it's likely a lightweight tag, get the commit it points to
+			tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
+			debugLog(`Raw commit info for lightweight tag ${tagName}:`);
+		}
 		debugLog(tagInfo);
 		debugLog("End of tag info");
 
