@@ -19,10 +19,22 @@ jobs:
   tag_with_git_signed:
     runs-on: ubuntu-latest
     steps:
+      - name: Create installation access token for the App
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+          private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-workflows: write
+          # installation-id omitted: auto-detects installation for this repo
+
       - name: Checkout (full history for tags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Compute first and last commit SHAs
         id: shas
@@ -35,15 +47,6 @@ jobs:
           echo "last=${LAST_SHA}"   >> "$GITHUB_OUTPUT"
           echo "First: $FIRST_SHA"
           echo "Last : $LAST_SHA"
-
-      - name: Create installation access token for the App
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
-          private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          # installation-id omitted: auto-detects installation for this repo
 
       # 1) Import GPG key and configure Git identity/signing
 
