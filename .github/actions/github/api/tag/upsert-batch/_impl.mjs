@@ -1,4 +1,4 @@
-export async function run({ token, repo, raw, runCheck, runCreate, runUpdate }) {
+export async function run({ token, repo, raw, runCheck, runCreate, runUpdate, sign='auto', annotate='auto', tagger_name='', tagger_email='', gpg_private_key='', gpg_passphrase='', push=true }) {
 	if (!raw) throw new Error("payload is required");
 
 	let items;
@@ -21,10 +21,10 @@ export async function run({ token, repo, raw, runCheck, runCreate, runUpdate }) 
 
 		const chk = await runCheck({ token, repo, tag });
 		if (chk.exists === "true") {
-			const out = await runUpdate({ token, repo, tag, sha, message });
+			const out = await runUpdate({ token, repo, tag, sha, message, sign, annotate, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push });
 			results.push({ tag, action: "update", tag_obj_sha: out.tag_obj_sha });
 		} else {
-			const out = await runCreate({ token, repo, tag, sha, message });
+			const out = await runCreate({ token, repo, tag, sha, message, sign, annotate, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push });
 			results.push({ tag, action: "create", tag_obj_sha: out.tag_obj_sha });
 		}
 

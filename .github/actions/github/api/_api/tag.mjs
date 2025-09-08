@@ -57,3 +57,16 @@ export async function forceMoveRefToTagObject({ token, repo, tag, tagObjectSha }
 	const enc = encodeURIComponent(tag);
 	return api("PATCH", `/git/refs/tags/${enc}`, { sha: tagObjectSha, force: true }, { token, owner, repo: r });
 }
+
+/** Create refs/tags/<tag> pointing directly to a COMMIT SHA (lightweight tag). */
+export async function createRefToCommit({ token, repo, tag, commitSha }) {
+	const { owner, repo: r } = parseRepo(repo);
+	return api("POST", "/git/refs", { ref: `refs/tags/${tag}`, sha: commitSha }, { token, owner, repo: r });
+}
+
+/** Force-move refs/tags/<tag> to a COMMIT SHA (lightweight tag). */
+export async function forceMoveRefToCommit({ token, repo, tag, commitSha }) {
+	const { owner, repo: r } = parseRepo(repo);
+	const enc = encodeURIComponent(tag);
+	return api("PATCH", `/git/refs/tags/${enc}`, { sha: commitSha, force: true }, { token, owner, repo: r });
+}

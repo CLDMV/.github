@@ -1,0 +1,97 @@
+name: |
+  🧪 Manual: Test Smart Tagging
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag to create/update"
+        required: true
+        default: "v-smart-test"
+      message:
+        description: "Tag message (annotated if set or annotate=true)"
+        required: false
+        default: "Test smart tag workflow"
+      use_gpg:
+        description: "Use GPG signing via CLDMV_ secrets?"
+        type: boolean
+        required: true
+        default: false
+      sign:
+        description: "sign mode: auto | true | false"
+        required: false
+        default: "auto"
+      annotate:
+        description: "annotate mode: auto | true | false"
+        required: false
+        default: "auto"
+      target_sha:
+        description: "Target commit SHA (leave blank to use HEAD)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  smart-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target SHA
+        id: sha
+        shell: bash
+        run: |
+          set -euo pipefail
+          TSHA="${{ github.event.inputs.target_sha }}"
+          if [ -z "$TSHA" ]; then
+            TSHA="$(git rev-parse HEAD)"
+          fi
+          echo "sha=$TSHA" >> "$GITHUB_OUTPUT"
+          echo "Using sha=$TSHA"
+
+      - name: Smart tag (create or update)
+        uses: CLDMV/.github/.github/actions/github/api/tag/create@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          repo: ${{ github.repository }}
+          tag: ${{ inputs.tag_name }}
+          sha: ${{ steps.sha.outputs.sha }}
+          message: ${{ inputs.message }}
+
+          # Behavior controls
+          sign: ${{ inputs.sign }}
+          annotate: ${{ inputs.annotate }}
+
+          # Identity & GPG (only supplied if use_gpg==true)
+          tagger_name: ${{ inputs.use_gpg && secrets.CLDMV_BOT_NAME || '' }}
+          tagger_email: ${{ inputs.use_gpg && secrets.CLDMV_BOT_EMAIL || '' }}
+          gpg_private_key: ${{ inputs.use_gpg && secrets.CLDMV_BOT_GPG_PRIVATE_KEY || '' }}
+          gpg_passphrase: ${{ inputs.use_gpg && secrets.CLDMV_BOT_GPG_PASSPHRASE || '' }}
+
+      - name: Show ref & verification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          GH="https://api.github.com/repos/${{ github.repository }}"
+          TAG="${{ inputs.tag_name }}"
+          REF_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GH/git/ref/tags/${TAG}")
+          echo "$REF_JSON" | jq . > /tmp/ref.json
+          OBJ_SHA=$(jq -r '.object.sha'  /tmp/ref.json)
+          OBJ_TY=$(jq -r '.object.type' /tmp/ref.json)
+          echo "Ref → $OBJ_TY $OBJ_SHA"
+
+          if [[ "$OBJ_TY" == "tag" ]]; then
+            TAG_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GH/git/tags/${OBJ_SHA}")
+            echo "::notice title=Verification::.verification=$(echo "$TAG_JSON" | jq -c '.verification')"
+            echo "$TAG_JSON" | jq .
+          else
+            echo "Note: ref is pointing directly to a commit (lightweight tag)."
+          fi

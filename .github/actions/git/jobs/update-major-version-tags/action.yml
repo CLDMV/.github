@@ -9,6 +9,33 @@ inputs:
   repo:
     description: "owner/repo (defaults to the caller repository). Passed through to orphan fixer."
     required: false
+  sign:
+    description: "Smart signing mode for tag updates (auto/true/false)"
+    required: false
+    default: "auto"
+  annotate:
+    description: "Smart annotate mode (auto/true/false)"
+    required: false
+    default: "auto"
+  tagger_name:
+    description: "Tagger name"
+    required: false
+  tagger_email:
+    description: "Tagger email"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+
+    description: "Whether to create/update VERSION_TAGS.md documentation"
+    required: false
+    default: "true"
+  repo:
+    description: "owner/repo (defaults to the caller repository). Passed through to orphan fixer."
+    required: false
 
 outputs:
   major-version:
@@ -65,6 +92,13 @@ runs:
       uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v1
       with:
         repo: ${{ inputs.repo || github.repository }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+
 
     - name: Determine if should run
       id: should-run

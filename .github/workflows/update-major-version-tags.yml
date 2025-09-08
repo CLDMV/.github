@@ -9,6 +9,36 @@ on:
         required: false
         type: boolean
         default: true
+      sign:
+        description: "Smart signing mode (auto/true/false)"
+        required: false
+        type: string
+        default: "auto"
+      annotate:
+        description: "Smart annotate mode (auto/true/false)"
+        required: false
+        type: string
+        default: "auto"
+      tagger_name:
+        description: "Tagger name"
+        required: false
+        type: string
+      tagger_email:
+        description: "Tagger email"
+        required: false
+        type: string
+      gpg_private_key:
+        description: "ASCII-armored private key for signing"
+        required: false
+        type: string
+      gpg_passphrase:
+        description: "Passphrase for the private key (if protected)"
+        required: false
+        type: string
+        description: "Whether to create/update VERSION_TAGS.md documentation"
+        required: false
+        type: boolean
+        default: true
     outputs:
       major-version:
         description: "The major version tag that was updated"
@@ -43,3 +73,13 @@ jobs:
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
         with:
           create-documentation: ${{ inputs.create_documentation || 'true' }}
+          sign: ${{ inputs.sign }}
+          annotate: ${{ inputs.annotate }}
+          tagger_name: ${{ inputs.tagger_name || secrets.CLDMV_BOT_NAME }}
+          tagger_email: ${{ inputs.tagger_email || secrets.CLDMV_BOT_EMAIL }}
+          gpg_private_key: ${{ inputs.gpg_private_key }}
+          gpg_passphrase: ${{ inputs.gpg_passphrase }}
+          CLDMV_BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+          CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+          CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+

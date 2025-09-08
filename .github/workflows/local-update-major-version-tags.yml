@@ -18,3 +18,9 @@ jobs:
     secrets: inherit # <-- valid here (caller side)
     with:
       create_documentation: true
+      sign: auto
+      annotate: auto
+      tagger_name: ${{ secrets.CLDMV_BOT_NAME }}
+      tagger_email: ${{ secrets.CLDMV_BOT_EMAIL }}
+      gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+      gpg_passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}

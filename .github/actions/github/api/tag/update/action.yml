@@ -1,7 +1,31 @@
 name: tag-update
 description: "Move an existing tag to a new commit using a new VERIFIED annotated tag object"
 
-inputs:
+\1
+sign:
+  description: "Sign the tag? 'auto' (default) signs if a GPG key is provided; 'true' forces signing; 'false' disables it."
+  required: false
+  default: "auto"
+annotate:
+  description: "Create an annotated tag? 'auto' (default) annotates if signing or a message is provided; 'true' forces annotated; 'false' creates a lightweight tag."
+  required: false
+  default: "auto"
+tagger_name:
+  description: "Tagger name (defaults to bot/user name if unset)"
+  required: false
+tagger_email:
+  description: "Tagger email (defaults to bot/user email if unset)"
+  required: false
+gpg_private_key:
+  description: "ASCII-armored private key for signing (if provided and sign=auto/true)"
+  required: false
+gpg_passphrase:
+  description: "Passphrase for the private key (if applicable)"
+  required: false
+push:
+  description: "Push the tag to origin after creation/update (default true)"
+  required: false
+  default: "true"
   tag:
     description: "Existing tag name to update"
     required: true

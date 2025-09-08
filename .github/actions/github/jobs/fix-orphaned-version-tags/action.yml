@@ -9,6 +9,33 @@ inputs:
     description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
     required: false
     default: "fix"
+  sign:
+    description: "Smart signing mode for retagging (auto/true/false)"
+    required: false
+    default: "auto"
+  annotate:
+    description: "Smart annotate mode (auto/true/false)"
+    required: false
+    default: "auto"
+  tagger_name:
+    description: "Tagger name"
+    required: false
+  tagger_email:
+    description: "Tagger email"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+
+    description: "owner/repo (defaults to current repository)"
+    required: false
+  run_mode:
+    description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
+    required: false
+    default: "fix"
 
 outputs:
   fixed-tags:
@@ -44,3 +71,14 @@ runs:
       with:
         repo: ${{ inputs.repo || github.repository }}
         payload: ${{ steps.gather.outputs.orphaned-tags-json }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+
