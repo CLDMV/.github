@@ -33,6 +33,10 @@ on:
         required: false
       GPG_PASSPHRASE:
         required: false
+      BOT_APP_ID:
+        required: false
+      BOT_APP_PRIVATE_KEY:
+        required: false
 
 permissions:
   contents: write
@@ -48,9 +52,18 @@ jobs:
       has-version-tags: ${{ steps.tags.outputs.has-version-tags }}
       should-run: ${{ steps.tags.outputs.should-run }}
     steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Check for version tags and update
         id: tags
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           create-documentation: ${{ inputs.create_documentation }}
           sign: ${{ inputs.sign }}

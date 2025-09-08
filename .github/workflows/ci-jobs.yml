@@ -154,6 +154,12 @@ on:
       NPM_TOKEN:
         description: "NPM token for publishing packages"
         required: false
+      BOT_APP_ID:
+        description: "GitHub App ID for CLDMV bot"
+        required: false
+      BOT_APP_PRIVATE_KEY:
+        description: "GitHub App private key for CLDMV bot"
+        required: false
 
     outputs:
       # Release management outputs
@@ -291,6 +297,13 @@ jobs:
       pr-number: ${{ steps.create.outputs.pr-number }}
       new-version: ${{ steps.create.outputs.new-version }}
     steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Create Release PR
         id: create
         uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v1
@@ -300,7 +313,7 @@ jobs:
           package-manager: ${{ inputs.package_manager }}
           build-command: ${{ inputs.build_command }}
           version-bump: ${{ inputs.version_bump }}
-          github-token: ${{ github.token }}
+          github-token: ${{ steps.app-token.outputs.token }}
 
   download-artifacts:
     name: "⬇️ Download Artifacts"
@@ -321,6 +334,13 @@ jobs:
     outputs:
       release-id: ${{ steps.create.outputs.release-id }}
     steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Create GitHub Release
         id: create
         uses: CLDMV/.github/.github/actions/github/jobs/create-release@v1
@@ -332,7 +352,7 @@ jobs:
           release-source-only: ${{ inputs.release_source_only }}
           node-version: ${{ inputs.node_version }}
           build-command: ${{ inputs.build_command }}
-          github-token: ${{ github.token }}
+          github-token: ${{ steps.app-token.outputs.token }}
 
   detect-repo-config:
     name: "🔧 Detect Repository Config"
@@ -401,8 +421,17 @@ jobs:
       minor-version: ${{ steps.update.outputs.minor-version }}
       updated: ${{ steps.update.outputs.updated }}
     steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Update Major Version Tags
         id: update
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           create-documentation: ${{ inputs.create_documentation }}

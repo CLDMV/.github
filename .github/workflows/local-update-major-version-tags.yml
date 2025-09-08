@@ -38,9 +38,12 @@ jobs:
       annotate: ${{ inputs.annotate || 'auto' }}
       # let the reusable decide whether to use secrets based on this flag
       use_gpg: ${{ inputs.use_gpg || true }}
+      # Note: use_app_token is automatically determined in the reusable workflow based on BOT_APP_ID presence
     secrets:
       # map your repo/org secrets into generic names expected by the reusable
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
       GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+      BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

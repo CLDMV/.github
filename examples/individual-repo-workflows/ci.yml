@@ -36,5 +36,16 @@ jobs:
       # Test Control Options
       # skip_performance_tests: false # Skip performance tests during CI (default: false)
       # skip_matrix_tests: false # Skip matrix testing, use single version (default: false)
+
+    # Authentication & Bot Configuration
+    # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
+    # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
+    # - WITHOUT App secrets: Falls back to GitHub Actions bot with standard permissions
+    # Note: CI workflow currently only runs build/test jobs, but App secrets are included for consistency
+    # To set up App authentication, add these secrets to your repository settings:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Optional: CLDMV Bot credentials for enhanced permissions and proper attribution
+      # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
+      BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}

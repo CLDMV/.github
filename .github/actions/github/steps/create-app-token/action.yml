@@ -1,0 +1,49 @@
+name: "🔑 Create App Token (Auto-detect)"
+description: "Creates GitHub App installation token if secrets are available, otherwise falls back to default token"
+
+inputs:
+  app_id:
+    description: "GitHub App ID (leave empty to auto-detect from BOT_APP_ID)"
+    required: false
+  private_key:
+    description: "GitHub App private key (leave empty to auto-detect from BOT_APP_PRIVATE_KEY)"
+    required: false
+  owner:
+    description: "Repository owner (defaults to current repository owner)"
+    required: false
+    default: ${{ github.repository_owner }}
+
+outputs:
+  token:
+    description: "The App token if available, otherwise the default GITHUB_TOKEN"
+    value: ${{ steps.app-token.outputs.token || github.token }}
+  using_app_token:
+    description: "Whether an App token was created (true/false)"
+    value: ${{ steps.check-app.outputs.use_app_token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check if App token should be used
+      id: check-app
+      shell: bash
+      run: |
+        APP_ID="${{ inputs.app_id || env.BOT_APP_ID }}"
+        PRIVATE_KEY="${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}"
+
+        if [ -n "$APP_ID" ] && [ -n "$PRIVATE_KEY" ]; then
+          echo "use_app_token=true" >> "$GITHUB_OUTPUT"
+          echo "✅ App secrets available - will use App token"
+        else
+          echo "use_app_token=false" >> "$GITHUB_OUTPUT"
+          echo "⚠️  App secrets not available - will use default GITHUB_TOKEN"
+        fi
+
+    - name: Create installation access token for the App
+      id: app-token
+      if: ${{ steps.check-app.outputs.use_app_token == 'true' }}
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ inputs.app_id || env.BOT_APP_ID }}
+        private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
+        owner: ${{ inputs.owner }}

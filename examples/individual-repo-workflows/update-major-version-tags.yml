@@ -43,3 +43,5 @@ jobs:
       TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
       GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+      BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

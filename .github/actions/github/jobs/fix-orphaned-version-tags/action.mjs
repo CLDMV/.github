@@ -1,13 +1,7 @@
-import { execSync } from "node:child_process";
+import { sh } from "../../../api/_api/core.mjs";
 import fs from "node:fs";
 
 const out = process.env.GITHUB_OUTPUT;
-
-// run shell command and capture stdout
-const sh = (cmd) =>
-	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] })
-		.toString()
-		.trim();
 
 // parse version
 const verKey = (t) =>
@@ -15,6 +9,7 @@ const verKey = (t) =>
 		.replace(/^v/, "")
 		.split(".")
 		.map((n) => parseInt(n, 10));
+
 const cmp = (a, b) => {
 	const [A, B, C] = verKey(a);
 	const [D, E, F] = verKey(b);
