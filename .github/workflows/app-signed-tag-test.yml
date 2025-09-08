@@ -89,6 +89,22 @@ jobs:
           git config gpg.program gpg
           echo "Using signing key: $KEYID as $TAGGER_NAME <$TAGGER_EMAIL>"
 
+      - name: Create gpg wrapper (non-interactive signing)
+        id: gpgwrap
+        env:
+          GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/gpg-wrapper.sh <<'EOF'
+          #!/usr/bin/env bash
+          # Force non-interactive gpg with loopback pinentry and passphrase from env
+          exec /usr/bin/gpg --batch --no-tty --pinentry-mode loopback \
+               --passphrase "${GPG_PASSPHRASE:-}" "$@"
+          EOF
+          chmod +x /tmp/gpg-wrapper.sh
+          # Tell git to use the wrapper
+          git config gpg.program /tmp/gpg-wrapper.sh
+
         # 2) Create/move a **signed annotated** tag locally, then push with the App token
 
       - name: Create/Migrate signed annotated tag locally
@@ -101,32 +117,20 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          # Decide target (create at FIRST if missing, else move to HEAD)
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-          TARGET="$LAST"; MODE="move"
-          echo "Tag exists → moving to HEAD ($TARGET)"
+            TARGET="$LAST"; MODE="move"
+            echo "Tag exists → moving to HEAD ($TARGET)"
           else
-          TARGET="$FIRST"; MODE="create"
-          echo "Tag missing → creating at FIRST commit ($TARGET)"
+            TARGET="$FIRST"; MODE="create"
+            echo "Tag missing → creating at FIRST commit ($TARGET)"
           fi
 
           export GPG_TTY=$(tty || true)
-          # Warm-up agent with passphrase (ignore if not needed)
-          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback \
-             --quick-sign-key "$(git config user.signingkey)" >/dev/null 2>&1 || true
 
-          # **Signed** annotated tag (-s); -f for move case
+          # Signed annotated tag (-s); -f for move case
           git tag -s -f -m "$MSG" "$TAG" "$TARGET"
 
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-
-      - name: Push tag using App installation token
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }} # from your existing create-github-app-token step
-        run: |
-          set -euo pipefail
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
-          git push origin "refs/tags/${{ inputs.tag_name }}" --force
 
       - name: Push tag using App installation token
         env:
