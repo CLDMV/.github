@@ -1,6 +1,9 @@
 name: 🏷️ Update Version Tags (Caller)
 
 on:
+  release:
+    types: [published]
+  push:
   workflow_dispatch:
     inputs:
       use_gpg:
@@ -30,11 +33,11 @@ jobs:
     permissions:
       contents: write
     with:
-      create_documentation: ${{ inputs.create_documentation }}
-      sign: ${{ inputs.sign }}
-      annotate: ${{ inputs.annotate }}
+      create_documentation: ${{ inputs.create_documentation || 'true' }}
+      sign: ${{ inputs.sign || 'auto' }}
+      annotate: ${{ inputs.annotate || 'auto' }}
       # let the reusable decide whether to use secrets based on this flag
-      use_gpg: ${{ inputs.use_gpg }}
+      use_gpg: ${{ inputs.use_gpg != false }}
     secrets:
       # map your repo/org secrets into generic names expected by the reusable
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
