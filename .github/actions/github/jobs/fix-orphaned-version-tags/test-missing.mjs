@@ -60,9 +60,9 @@ for (const tag of allTags) {
 
 console.log("\n🔍 Checking for missing minor tags...");
 for (const majorMinor of allMajorMinors) {
-	const [M, m] = majorMinor.split('.').map(n => parseInt(n, 10));
+	const [M, m] = majorMinor.split(".").map((n) => parseInt(n, 10));
 	const expectedMinorTag = `v${M}.${m}`;
-	
+
 	if (minors.includes(expectedMinorTag)) {
 		console.log(`✅ Minor tag ${expectedMinorTag} exists`);
 	} else {
@@ -82,7 +82,7 @@ for (const tag of allTags) {
 
 for (const M of allMajors) {
 	const expectedMajorTag = `v${M}`;
-	
+
 	if (majors.includes(expectedMajorTag)) {
 		console.log(`✅ Major tag ${expectedMajorTag} exists`);
 	} else {

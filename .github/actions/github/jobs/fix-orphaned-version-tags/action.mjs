@@ -112,12 +112,12 @@ for (const tag of allTags) {
 
 // Check for missing minor tags (v1.3, v2.1, etc.)
 for (const majorMinor of allMajorMinors) {
-	const [M, m] = majorMinor.split('.').map(n => parseInt(n, 10));
+	const [M, m] = majorMinor.split(".").map((n) => parseInt(n, 10));
 	const expectedMinorTag = `v${M}.${m}`;
-	
+
 	// Skip if this minor tag already exists
 	if (minors.includes(expectedMinorTag)) continue;
-	
+
 	// Find the latest patch for this major.minor
 	const latest = latestPatchForMinor(majorMinor);
 	if (latest) {
@@ -142,10 +142,10 @@ for (const tag of allTags) {
 
 for (const M of allMajors) {
 	const expectedMajorTag = `v${M}`;
-	
+
 	// Skip if this major tag already exists
 	if (majors.includes(expectedMajorTag)) continue;
-	
+
 	// Find the latest patch for this major
 	const latest = latestPatchForMajor(M);
 	if (latest) {
