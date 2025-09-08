@@ -1,4 +1,4 @@
-name: "CI Jobs Orchestrator"
+name: "CI Jobs Orchestrator (Org-Level)"
 
 on:
   workflow_call:
