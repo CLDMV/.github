@@ -1,0 +1,215 @@
+name: Debug Tag v1 Information
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: 'Tag to debug (default: v1)'
+        required: false
+        default: 'v1'
+        type: string
+
+jobs:
+  debug-tag-info:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history and tags
+          
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - name: Git Version Info
+        run: |
+          echo "::group::Git Version and Config"
+          git --version
+          git config --list | grep -E "(user\.|core\.)" || true
+          echo "::endgroup::"
+          
+      - name: List All Tags
+        run: |
+          echo "::group::All Local Tags"
+          git tag -l
+          echo "::endgroup::"
+          
+      - name: Remote Tags Info
+        run: |
+          echo "::group::Remote Tags"
+          git ls-remote --tags origin
+          echo "::endgroup::"
+          
+      - name: Debug Target Tag - ${{ inputs.target_tag }}
+        run: |
+          TAG="${{ inputs.target_tag }}"
+          echo "::group::Debugging tag: $TAG"
+          
+          echo "=== Basic Tag Info ==="
+          echo "Tag exists check:"
+          git tag -l "$TAG" || echo "Tag not found locally"
+          
+          echo ""
+          echo "=== Object Type Detection ==="
+          echo "git cat-file -t $TAG:"
+          git cat-file -t "$TAG" 2>&1 || echo "Failed to get object type"
+          
+          echo ""
+          echo "=== Direct Tag Content ==="
+          echo "git cat-file -p $TAG:"
+          git cat-file -p "$TAG" 2>&1 || echo "Failed to get tag content"
+          
+          echo ""
+          echo "=== Rev-parse Methods ==="
+          echo "git rev-parse $TAG:"
+          git rev-parse "$TAG" 2>&1 || echo "Failed rev-parse"
+          
+          echo ""
+          echo "git rev-parse $TAG^{commit}:"
+          git rev-parse "$TAG^{commit}" 2>&1 || echo "Failed rev-parse commit"
+          
+          echo ""
+          echo "git rev-parse $TAG^{tag} (this might fail):"
+          git rev-parse "$TAG^{tag}" 2>&1 || echo "Failed rev-parse tag object"
+          
+          echo ""
+          echo "=== Show Tag Details ==="
+          echo "git show $TAG:"
+          git show "$TAG" 2>&1 || echo "Failed git show"
+          
+          echo ""
+          echo "=== Tag Object via Show ==="
+          echo "git show $TAG --format=fuller:"
+          git show "$TAG" --format=fuller 2>&1 || echo "Failed git show fuller"
+          
+          echo ""
+          echo "=== Rev-list Commit ==="
+          echo "git rev-list -n 1 $TAG:"
+          git rev-list -n 1 "$TAG" 2>&1 || echo "Failed rev-list"
+          
+          echo ""
+          echo "=== Log with Tag Info ==="
+          echo "git log -1 --format=fuller $TAG:"
+          git log -1 --format=fuller "$TAG" 2>&1 || echo "Failed git log"
+          
+          echo ""
+          echo "=== For-each-ref Tag Info ==="
+          echo "git for-each-ref refs/tags/$TAG --format='%(refname) %(objecttype) %(object) %(*objecttype) %(*object)':"
+          git for-each-ref "refs/tags/$TAG" --format='%(refname) %(objecttype) %(object) %(*objecttype) %(*object)' 2>&1 || echo "Failed for-each-ref"
+          
+          echo ""
+          echo "=== Verify Tag ==="
+          echo "git verify-tag $TAG:"
+          git verify-tag "$TAG" 2>&1 || echo "Failed verify-tag or tag not signed"
+          
+          echo ""
+          echo "=== Cat-file on Commit SHA ==="
+          COMMIT_SHA=$(git rev-list -n 1 "$TAG" 2>/dev/null || echo "")
+          if [ -n "$COMMIT_SHA" ]; then
+            echo "Commit SHA: $COMMIT_SHA"
+            echo "git cat-file -p $COMMIT_SHA:"
+            git cat-file -p "$COMMIT_SHA" 2>&1 || echo "Failed to get commit content"
+          else
+            echo "Could not get commit SHA"
+          fi
+          
+          echo "::endgroup::"
+          
+      - name: Test Our Updated Detection Logic
+        run: |
+          TAG="${{ inputs.target_tag }}"
+          echo "::group::Testing Our Detection Logic"
+          
+          echo "=== Step 1: Object Type Check ==="
+          OBJECT_TYPE=$(git cat-file -t "$TAG" 2>/dev/null || echo "unknown")
+          echo "Object type for $TAG: $OBJECT_TYPE"
+          
+          if [ "$OBJECT_TYPE" = "tag" ]; then
+            echo "Detected as ANNOTATED tag"
+            echo ""
+            echo "=== Annotated Tag Content ==="
+            git cat-file -p "$TAG"
+            
+            echo ""
+            echo "=== Parsing Tagger Info ==="
+            TAG_CONTENT=$(git cat-file -p "$TAG" 2>/dev/null || echo "")
+            if echo "$TAG_CONTENT" | grep -q "^tagger "; then
+              echo "Found tagger line:"
+              echo "$TAG_CONTENT" | grep "^tagger "
+              
+              echo ""
+              echo "=== Extracting Message ==="
+              # Extract message after tagger line
+              MESSAGE=$(echo "$TAG_CONTENT" | sed -n '/^tagger /,${//!p}' | sed '1d' | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' | sed '/^$/d')
+              echo "Extracted message: '$MESSAGE'"
+            else
+              echo "No tagger line found in tag content"
+            fi
+            
+          elif [ "$OBJECT_TYPE" = "commit" ]; then
+            echo "Detected as LIGHTWEIGHT tag"
+            echo ""
+            echo "=== Commit Content ==="
+            git cat-file -p "$TAG"
+            
+            echo ""
+            echo "=== Parsing Author Info ==="
+            COMMIT_CONTENT=$(git cat-file -p "$TAG" 2>/dev/null || echo "")
+            if echo "$COMMIT_CONTENT" | grep -q "^author "; then
+              echo "Found author line:"
+              echo "$COMMIT_CONTENT" | grep "^author "
+              
+              echo ""
+              echo "=== Extracting Commit Message ==="
+              MESSAGE=$(echo "$COMMIT_CONTENT" | sed -n '/^$/,${//!p}' | tail -n +2)
+              echo "Extracted commit message: '$MESSAGE'"
+            else
+              echo "No author line found in commit content"
+            fi
+            
+          else
+            echo "Unknown object type: $OBJECT_TYPE"
+          fi
+          
+          echo "::endgroup::"
+          
+      - name: Compare with Remote
+        run: |
+          TAG="${{ inputs.target_tag }}"
+          echo "::group::Remote vs Local Comparison"
+          
+          echo "=== Remote Tag Info ==="
+          git ls-remote --tags origin | grep "$TAG" || echo "Tag not found on remote"
+          
+          echo ""
+          echo "=== Fetch Tag Specifically ==="
+          git fetch origin "refs/tags/$TAG:refs/tags/remote-$TAG" 2>&1 || echo "Failed to fetch tag"
+          
+          if git tag -l "remote-$TAG" | grep -q "remote-$TAG"; then
+            echo ""
+            echo "=== Remote Tag Object Type ==="
+            REMOTE_TYPE=$(git cat-file -t "remote-$TAG" 2>/dev/null || echo "unknown")
+            echo "Remote tag object type: $REMOTE_TYPE"
+            
+            echo ""
+            echo "=== Remote Tag Content ==="
+            git cat-file -p "remote-$TAG" 2>&1 || echo "Failed to get remote tag content"
+            
+            echo ""
+            echo "=== Comparison ==="
+            LOCAL_SHA=$(git rev-parse "$TAG" 2>/dev/null || echo "")
+            REMOTE_SHA=$(git rev-parse "remote-$TAG" 2>/dev/null || echo "")
+            echo "Local SHA:  $LOCAL_SHA"
+            echo "Remote SHA: $REMOTE_SHA"
+            
+            if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
+              echo "✅ SHAs match"
+            else
+              echo "❌ SHAs differ"
+            fi
+          fi
+          
+          echo "::endgroup::"

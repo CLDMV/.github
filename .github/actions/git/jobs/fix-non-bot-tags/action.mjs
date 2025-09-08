@@ -11,67 +11,89 @@ import { debugLog } from "../../../common/common/core.mjs";
  */
 function getTagInfo(tagName) {
 	try {
-		// First check if this is an annotated tag by trying to get the tag object
+		// First check if this is an annotated tag by checking the object type
 		let tagInfo;
+		let isAnnotated = false;
+		
 		try {
-			// Try to get the tag object specifically (this will fail for lightweight tags)
-			const tagObjectSha = execSync(`git rev-parse "${tagName}^{tag}"`, { encoding: "utf8" }).trim();
-			tagInfo = execSync(`git cat-file -p ${tagObjectSha}`, { encoding: "utf8" });
-			debugLog(`Raw tag object info for ${tagName} (${tagObjectSha}):`);
+			// Check what type of object the tag points to
+			const tagObjectType = execSync(`git cat-file -t ${tagName}`, { encoding: "utf8" }).trim();
+			console.log(`🔍 DEBUG: Object type for ${tagName}: ${tagObjectType}`);
+			
+			if (tagObjectType === 'tag') {
+				// It's an annotated tag, get the tag object directly
+				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
+				isAnnotated = true;
+				console.log(`🔍 DEBUG: Successfully found annotated tag object for ${tagName}`);
+			} else {
+				// It's a lightweight tag pointing directly to a commit
+				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
+				isAnnotated = false;
+				console.log(`🔍 DEBUG: Found lightweight tag ${tagName} pointing to ${tagObjectType}`);
+			}
 		} catch (tagObjectError) {
-			// If that fails, it's likely a lightweight tag, get the commit it points to
+			// If that fails, fall back to getting the commit it points to
+			console.log(`🔍 DEBUG: Failed to get object type for ${tagName}: ${tagObjectError.message}`);
 			tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
-			debugLog(`Raw commit info for lightweight tag ${tagName}:`);
+			isAnnotated = false;
 		}
 		debugLog(tagInfo);
 		debugLog("End of tag info");
 
-		// Parse tagger info from annotated tag
-		const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
-		debugLog(`taggerMatch result:`, taggerMatch);
-		console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`, tagInfo);
-		if (taggerMatch) {
-			const [, nameEmail, timestamp, timezone] = taggerMatch;
-			const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
-			const name = emailMatch ? emailMatch[1] : nameEmail;
-			const email = emailMatch ? emailMatch[2] : "";
+		// Parse based on whether it's annotated or lightweight
+		if (isAnnotated) {
+			// Parse tagger info from annotated tag
+			const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
+			debugLog(`taggerMatch result:`, taggerMatch);
+			console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
+			
+			if (taggerMatch) {
+				const [, nameEmail, timestamp, timezone] = taggerMatch;
+				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
+				const name = emailMatch ? emailMatch[1] : nameEmail;
+				const email = emailMatch ? emailMatch[2] : "";
 
-			// Extract message from annotated tag (everything after the tagger line until PGP signature or end)
-			const messageMatch = tagInfo.match(/^tagger .+\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/m);
-			const message = messageMatch ? messageMatch[1].trim() : `Update ${tagName}`;
+				// Extract message from annotated tag (everything after the tagger line until PGP signature or end)
+				const messageMatch = tagInfo.match(/^tagger .+\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/m);
+				const message = messageMatch ? messageMatch[1].trim() : `Update ${tagName}`;
 
-			return {
-				type: "annotated",
-				tagger: { name, email },
-				timestamp: parseInt(timestamp),
-				timezone,
-				message
-			};
+				return {
+					type: "annotated",
+					tagger: { name, email },
+					timestamp: parseInt(timestamp),
+					timezone,
+					message
+				};
+			} else {
+				console.log(`🔍 DEBUG: No tagger info found in annotated tag ${tagName}, treating as lightweight`);
+				isAnnotated = false; // Fall through to lightweight logic
+			}
 		}
+		
+		if (!isAnnotated) {
+			// Parse author info from commit (lightweight tag)
+			const authorMatch = tagInfo.match(/^author (.+) (\d+) ([\+\-]\d{4})$/m);
+			debugLog(`authorMatch result:`, authorMatch);
+			console.log(`🔍 DEBUG: Checking author match for ${tagName} - Match: ${!!authorMatch}`);
+			
+			if (authorMatch) {
+				const [, nameEmail, timestamp, timezone] = authorMatch;
+				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
+				const name = emailMatch ? emailMatch[1] : nameEmail;
+				const email = emailMatch ? emailMatch[2] : "";
 
-		// If no tagger info, it might be a lightweight tag
-		// Get commit info instead
-		const commitSha = execSync(`git rev-list -n 1 ${tagName}`, { encoding: "utf8" }).trim();
-		const commitInfo = execSync(`git cat-file -p ${commitSha}`, { encoding: "utf8" });
-		const authorMatch = commitInfo.match(/^author (.+) (\d+) ([\+\-]\d{4})$/m);
+				// For lightweight tags, use the commit message as the tag message
+				const commitMessage = tagInfo.match(/\n\n([\s\S]*?)$/);
+				const message = commitMessage ? commitMessage[1].trim() : `Update ${tagName}`;
 
-		if (authorMatch) {
-			const [, nameEmail, timestamp, timezone] = authorMatch;
-			const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
-			const name = emailMatch ? emailMatch[1] : nameEmail;
-			const email = emailMatch ? emailMatch[2] : "";
-
-			// For lightweight tags, use the commit message as the tag message
-			const commitMessage = commitInfo.match(/\n\n([\s\S]*?)$/);
-			const message = commitMessage ? commitMessage[1].trim() : `Update ${tagName}`;
-
-			return {
-				type: "lightweight",
-				author: { name, email },
-				timestamp: parseInt(timestamp),
-				timezone,
-				message
-			};
+				return {
+					type: "lightweight",
+					author: { name, email },
+					timestamp: parseInt(timestamp),
+					timezone,
+					message
+				};
+			}
 		}
 
 		return null;
