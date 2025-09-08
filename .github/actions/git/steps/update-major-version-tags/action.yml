@@ -47,12 +47,12 @@ runs:
 
         # Update major version tag (e.g., v1)
         echo "🏷️ Updating major version tag $MAJOR_VERSION to point to $TAG_NAME"
-        git tag -f "$MAJOR_VERSION" "$TAG_SHA"
+        git tag -f -m "Update major version tag $MAJOR_VERSION to point to $TAG_NAME" "$MAJOR_VERSION" "$TAG_SHA"
         git push origin "$MAJOR_VERSION" --force
 
         # Update minor version tag (e.g., v1.1)
         echo "🏷️ Updating minor version tag $MINOR_VERSION to point to $TAG_NAME"
-        git tag -f "$MINOR_VERSION" "$TAG_SHA"
+        git tag -f -m "Update minor version tag $MINOR_VERSION to point to $TAG_NAME" "$MINOR_VERSION" "$TAG_SHA"
         git push origin "$MINOR_VERSION" --force
 
         echo "✅ Successfully updated version tags"

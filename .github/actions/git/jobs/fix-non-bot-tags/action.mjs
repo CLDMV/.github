@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 
 /**
- * Get tag information including tagger details
+ * Get tag information including tagger details and message
  * @param {string} tagName - The tag name to inspect
  * @returns {Object|null} Tag information or null if not found
  */
@@ -21,11 +21,16 @@ function getTagInfo(tagName) {
 			const name = emailMatch ? emailMatch[1] : nameEmail;
 			const email = emailMatch ? emailMatch[2] : "";
 
+			// Extract message from annotated tag (everything after the blank line)
+			const messageMatch = tagInfo.match(/\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/);
+			const message = messageMatch ? messageMatch[1].trim() : `Update ${tagName}`;
+
 			return {
 				type: "annotated",
 				tagger: { name, email },
 				timestamp: parseInt(timestamp),
-				timezone
+				timezone,
+				message
 			};
 		}
 
@@ -41,11 +46,16 @@ function getTagInfo(tagName) {
 			const name = emailMatch ? emailMatch[1] : nameEmail;
 			const email = emailMatch ? emailMatch[2] : "";
 
+			// For lightweight tags, use the commit message as the tag message
+			const commitMessage = commitInfo.match(/\n\n([\s\S]*?)$/);
+			const message = commitMessage ? commitMessage[1].trim() : `Update ${tagName}`;
+
 			return {
 				type: "lightweight",
 				author: { name, email },
 				timestamp: parseInt(timestamp),
-				timezone
+				timezone,
+				message
 			};
 		}
 
@@ -156,7 +166,8 @@ async function main() {
 					sha: commitSha,
 					currentSigner: signerName,
 					currentEmail: signerEmail,
-					type: tagInfo.type
+					type: tagInfo.type,
+					message: tagInfo.message || `Update ${tag}`
 				});
 			}
 		}
@@ -170,7 +181,8 @@ async function main() {
 
 			const jsonPayload = nonBotTags.map((tag) => ({
 				tag: tag.tag,
-				sha: tag.sha
+				sha: tag.sha,
+				message: tag.message
 			}));
 
 			// Set outputs using GitHub Actions format
