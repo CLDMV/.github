@@ -1,6 +1,6 @@
 import { sh } from "../../_api/core.mjs";
-import { shouldSign, ensureGitAuthRemote, configureGitIdentity } from "../../_api/gpg.mjs";
-import { inferAnnotate, getRefTag, createRefToCommit, forceMoveRefToCommit, importGpgIfNeeded } from "../../_api/tag.mjs";
+import { shouldSign, ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
+import { inferAnnotate, getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
 
 function runGitSmartTag({
 	repo,
