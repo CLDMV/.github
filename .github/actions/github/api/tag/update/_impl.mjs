@@ -29,14 +29,17 @@ function runGitSmartTag({
 	if (willSign) keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
 	configureGitIdentity({ tagger_name, tagger_email, keyid, enableSign: willSign });
 
+	// Ensure we have a message for annotated tags
+	const tagMessage = message || `Update ${tag} tag`;
+
 	console.log(`🔍 DEBUG runGitSmartTag: willSign=${willSign}, willAnnotate=${willAnnotate}`);
 
 	if (willSign) {
-		console.log(`🔍 DEBUG runGitSmartTag: Creating signed tag: git tag -s -f -m "${message}" ${tag} ${sha}`);
-		sh(`git tag -s -f -m "${message}" ${tag} ${sha}`);
+		console.log(`🔍 DEBUG runGitSmartTag: Creating signed tag: git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
+		sh(`git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
 	} else if (willAnnotate) {
-		console.log(`🔍 DEBUG runGitSmartTag: Creating annotated tag: git tag -a -f -m "${message}" ${tag} ${sha}`);
-		sh(`git tag -a -f -m "${message}" ${tag} ${sha}`);
+		console.log(`🔍 DEBUG runGitSmartTag: Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
+		sh(`git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
 	} else {
 		console.log(`🔍 DEBUG runGitSmartTag: Creating lightweight tag: git tag -f ${tag} ${sha}`);
 		sh(`git tag -f ${tag} ${sha}`);
