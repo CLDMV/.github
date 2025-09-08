@@ -1,5 +1,5 @@
 # CLDMV/.github/.github/workflows/ci.yml
-name: CI Workflow (Org-Level)
+name: 🧪 CI Workflow (Org-Level)
 
 on:
   workflow_call:

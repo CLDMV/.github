@@ -1,5 +1,5 @@
 # CLDMV/.github/.github/workflows/release.yml
-name: Release Workflow (Org-Level)
+name: 🚀 Release Workflow (Org-Level)
 
 on:
   workflow_call:

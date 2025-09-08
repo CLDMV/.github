@@ -1,0 +1,175 @@
+name: App Tag (signed, annotated, via App token)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name to (create or) move (signed annotated)"
+        default: "v-app-test"
+        required: true
+      tag_message:
+        description: "Tag message"
+        default: "Signed tag created/updated by CLDMV App workflow"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  tag_with_git_signed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create installation access token for the App
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+          private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-workflows: write
+          # installation-id omitted: auto-detects installation for this repo
+
+      - name: Checkout (full history for tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Compute first and last commit SHAs
+        id: shas
+        shell: bash
+        run: |
+          set -euo pipefail
+          FIRST_SHA="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+          LAST_SHA="$(git rev-parse HEAD)"
+          echo "first=${FIRST_SHA}" >> "$GITHUB_OUTPUT"
+          echo "last=${LAST_SHA}"   >> "$GITHUB_OUTPUT"
+          echo "First: $FIRST_SHA"
+          echo "Last : $LAST_SHA"
+
+      # 1) Import GPG key and configure Git identity/signing
+
+      - name: Install gpg + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg jq
+
+      - name: Import GPG private key
+        id: gpg
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+          # Non-interactive GPG
+          printf '%s\n' "use-agent" >> ~/.gnupg/gpg.conf
+          printf '%s\n' "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          printf '%s\n' "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent || true
+
+          # Import secret key
+          printf '%s' "$GPG_PRIVATE_KEY" > /tmp/private.key
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import /tmp/private.key
+
+          # Grab first key id
+          KEYID="$(gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
+          if [ -z "$KEYID" ]; then echo "No secret key imported"; exit 1; fi
+          echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git identity & signing
+        env:
+          TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+          TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+        run: |
+          set -euo pipefail
+          KEYID="${{ steps.gpg.outputs.keyid }}"
+          git config user.name  "$TAGGER_NAME"
+          git config user.email "$TAGGER_EMAIL"
+          git config user.signingkey "$KEYID"
+          git config commit.gpgsign true
+          git config gpg.program gpg
+          echo "Using signing key: $KEYID as $TAGGER_NAME <$TAGGER_EMAIL>"
+
+      - name: Create gpg wrapper (non-interactive signing)
+        id: gpgwrap
+        env:
+          GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/gpg-wrapper.sh <<'EOF'
+          #!/usr/bin/env bash
+          # Force non-interactive gpg with loopback pinentry and passphrase from env
+          exec /usr/bin/gpg --batch --no-tty --pinentry-mode loopback \
+               --passphrase "${GPG_PASSPHRASE:-}" "$@"
+          EOF
+          chmod +x /tmp/gpg-wrapper.sh
+          # Tell git to use the wrapper
+          git config gpg.program /tmp/gpg-wrapper.sh
+
+        # 2) Create/move a **signed annotated** tag locally, then push with the App token
+
+      - name: Create/Migrate signed annotated tag locally
+        id: tagop
+        env:
+          TAG: ${{ inputs.tag_name }}
+          MSG: ${{ format('Signed tag created/updated by CLDMV App workflow → {0}', steps.shas.outputs.last) }}
+          FIRST: ${{ steps.shas.outputs.first }}
+          LAST: ${{ steps.shas.outputs.last }}
+          GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TARGET="$LAST"; MODE="move"
+            echo "Tag exists → moving to HEAD ($TARGET)"
+          else
+            TARGET="$FIRST"; MODE="create"
+            echo "Tag missing → creating at FIRST commit ($TARGET)"
+          fi
+
+          export GPG_TTY=$(tty || true)
+
+          # Signed annotated tag (-s); -f for move case
+          git tag -s -f -m "$MSG" "$TAG" "$TARGET"
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag using App installation token
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Use the app token for pushing (attributed to the App)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
+          # Force push in case we moved the tag
+          git push origin "refs/tags/${{ inputs.tag_name }}" --force
+
+      - name: Show verification via Git API (tag object)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GH="https://api.github.com/repos/${REPO}"
+
+          REF_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                           -H "Accept: application/vnd.github+json" \
+                           "${GH}/git/ref/tags/${TAG}")
+          echo "$REF_JSON" | jq . > /tmp/ref.json
+
+          OBJ_SHA=$(jq -r '.object.sha'  /tmp/ref.json)
+          OBJ_TY=$(jq -r '.object.type' /tmp/ref.json)
+          echo "Ref → $OBJ_TY $OBJ_SHA"
+
+          if [[ "$OBJ_TY" == "tag" ]]; then
+            TAG_JSON=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                              -H "Accept: application/vnd.github+json" \
+                              "${GH}/git/tags/${OBJ_SHA}")
+            echo "$TAG_JSON" | jq .
+            echo "::notice title=Verification::.verification=$(echo "$TAG_JSON" | jq -c '.verification')"
+          else
+            echo "Note: ref is not pointing to a tag object (unexpected)."
+          fi

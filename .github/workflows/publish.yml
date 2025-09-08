@@ -1,5 +1,5 @@
 # CLDMV/.github/.github/workflows/publish.yml
-name: Publish Workflow (Org-Level)
+name: 📦 Publish Workflow (Org-Level)
 
 on:
   workflow_call:

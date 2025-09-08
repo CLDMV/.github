@@ -1,5 +1,5 @@
 # .github/workflows/update-major-version-tags.yml
-name: 📌 Update Major Version Tags
+name: 📌 Update Major Version Tags (Org-Level)
 
 on:
   workflow_call:
