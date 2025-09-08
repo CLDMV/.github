@@ -26,8 +26,8 @@ function getTagInfo(tagName) {
 			const name = emailMatch ? emailMatch[1] : nameEmail;
 			const email = emailMatch ? emailMatch[2] : "";
 
-			// Extract message from annotated tag (everything after the blank line)
-			const messageMatch = tagInfo.match(/\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/);
+			// Extract message from annotated tag (everything after the tagger line until PGP signature or end)
+			const messageMatch = tagInfo.match(/^tagger .+\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/m);
 			const message = messageMatch ? messageMatch[1].trim() : `Update ${tagName}`;
 
 			return {
