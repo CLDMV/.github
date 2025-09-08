@@ -156,7 +156,7 @@ async function main() {
 			if (outputFile) {
 				fs.appendFileSync(outputFile, `non-bot-tags-found=true\n`);
 				// Use multiline output format for fixed-tags
-				fs.appendFileSync(outputFile, `fixed-tags<<EOF\n${fixedTagsList.join('\n')}\nEOF\n`);
+				fs.appendFileSync(outputFile, `fixed-tags<<EOF\n${fixedTagsList.join("\n")}\nEOF\n`);
 				fs.appendFileSync(outputFile, `non-bot-tags-json=${JSON.stringify(jsonPayload)}\n`);
 			}
 
