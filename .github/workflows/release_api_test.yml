@@ -1,0 +1,176 @@
+name: Release via REST (no GPG)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag name (will be auto-created if missing)"
+        default: "v-api-release-test"
+        required: true
+      target_commitish:
+        description: "Commit/branch/sha to tag (default: HEAD)"
+        default: ""
+        required: false
+      release_name:
+        description: "Release title"
+        default: "API Release Test"
+        required: true
+      release_body:
+        description: "Release notes"
+        default: "Testing whether Release API creates a signed tag."
+        required: true
+      draft:
+        description: "Create as draft? (true/false)"
+        default: "false"
+        required: true
+      prerelease:
+        description: "Mark as prerelease? (true/false)"
+        default: "false"
+        required: true
+      force_recreate_tag:
+        description: "Delete existing tag first? (true/false)"
+        default: "true"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release_api_only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create installation access token for the App
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+          private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Checkout (read-only is fine)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Resolve target commitish (HEAD if empty)
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.target_commitish }}" ]; then
+            TGT="${{ inputs.target_commitish }}"
+          else
+            TGT="$(git rev-parse HEAD)"
+          fi
+          echo "target=${TGT}" >> "$GITHUB_OUTPUT"
+          echo "Target commitish: $TGT"
+
+      - name: (Optional) Remove existing tag so Release must create it
+        if: ${{ inputs.force_recreate_tag == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GH="https://api.github.com/repos/${REPO}"
+          echo "Checking if tag ref exists: refs/tags/${TAG}"
+          STATUS=$(curl -sS -o /tmp/ref.json -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "${GH}/git/ref/tags/${TAG}" || true)
+          if [ "$STATUS" = "200" ]; then
+            echo "Tag ref exists → deleting to force API-created tag"
+            curl -sS -X DELETE \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "${GH}/git/refs/tags/${TAG}"
+          else
+            echo "No existing tag ref."
+          fi
+
+      - name: Create release via REST (no local tag creation)
+        id: create_release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag_name }}
+          NAME: ${{ inputs.release_name }}
+          BODY: ${{ inputs.release_body }}
+          DRAFT: ${{ inputs.draft }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          TARGET: ${{ steps.target.outputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GH="https://api.github.com/repos/${REPO}"
+
+          echo "Creating release tag=${TAG} target=${TARGET}"
+          RESP=$(curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d "$(jq -cn --arg tag "$TAG" \
+                         --arg name "$NAME" \
+                         --arg body "$BODY" \
+                         --arg target "$TARGET" \
+                         --argjson draft $DRAFT \
+                         --argjson prerelease $PRERELEASE \
+                         '{tag_name:$tag, name:$name, body:$body, target_commitish:$target, draft:$draft, prerelease:$prerelease}')" \
+            "${GH}/releases")
+
+          echo "$RESP" | jq . > /tmp/release.json
+          HTML_URL=$(jq -r '.html_url // empty' /tmp/release.json)
+          UPLOAD_URL=$(jq -r '.upload_url // empty' /tmp/release.json)
+          if [ -z "$HTML_URL" ]; then
+            echo "Create release failed:"; cat /tmp/release.json; exit 1
+          fi
+          echo "release_url=$HTML_URL" >> "$GITHUB_OUTPUT"
+          echo "upload_url=$UPLOAD_URL" >> "$GITHUB_OUTPUT"
+          echo "Release URL: $HTML_URL"
+
+      - name: Inspect created tag/ref & verification
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GH="https://api.github.com/repos/${REPO}"
+
+          echo "🔎 Fetching tag ref"
+          REF_STATUS=$(curl -sS -o /tmp/ref.json -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "${GH}/git/ref/tags/${TAG}" || true)
+          echo "ref.status=$REF_STATUS"
+          cat /tmp/ref.json | jq .
+
+          if [ "$REF_STATUS" != "200" ]; then
+            echo "❌ Tag ref not found; release may have failed to create it."; exit 1
+          fi
+
+          OBJ_SHA=$(jq -r '.object.sha'  /tmp/ref.json)
+          OBJ_TYP=$(jq -r '.object.type' /tmp/ref.json)
+          echo "Ref points to: type=$OBJ_TYP sha=$OBJ_SHA"
+
+          if [ "$OBJ_TYP" = "tag" ]; then
+            echo "🔎 Fetching tag object"
+            TAG_JSON=$(curl -sS \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "${GH}/git/tags/${OBJ_SHA}")
+            echo "$TAG_JSON" | jq .
+            echo "::notice title=Verification (tag object)::$(echo "$TAG_JSON" | jq -c '.verification')"
+          else
+            echo "Note: ref points directly to a commit (likely a lightweight tag)."
+            COMM_JSON=$(curl -sS \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "${GH}/git/commits/${OBJ_SHA}")
+            echo "$COMM_JSON" | jq '{sha:.sha, verification:.verification}'
+            echo "::notice title=Verification (lightweight tag → commit)::$(echo "$COMM_JSON" | jq -c '.verification')"
+          fi
+
+      - name: Output release URL
+        run: |
+          echo "Release: ${{ steps.create_release.outputs.release_url }}"
