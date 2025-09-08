@@ -12,12 +12,20 @@ on:
       - "*.md"
       - "LICENSE"
       - ".gitignore"
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Enable debug logging for troubleshooting"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   ci:
     uses: CLDMV/.github/.github/workflows/ci.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }} # Enable debug logging
 
       # Node.js Version Configuration (choose one approach)
       # Option 1: Single Node.js version (simple)

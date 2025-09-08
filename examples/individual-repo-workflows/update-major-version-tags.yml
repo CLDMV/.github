@@ -38,11 +38,11 @@ jobs:
     permissions:
       contents: write
     with:
-      debug: ${{ inputs.debug || false }}
-      create_documentation: ${{ inputs.create_documentation || true }}
-      sign: ${{ inputs.sign || 'auto' }}
-      annotate: ${{ inputs.annotate || 'auto' }}
-      use_gpg: ${{ inputs.use_gpg || true }}
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
+      create_documentation: ${{ github.event_name == 'workflow_dispatch' && inputs.create_documentation || true }}
+      sign: ${{ github.event_name == 'workflow_dispatch' && inputs.sign || 'auto' }}
+      annotate: ${{ github.event_name == 'workflow_dispatch' && inputs.annotate || 'auto' }}
+      use_gpg: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gpg || true }}
     secrets:
       # Map your repo/org secrets to the expected names
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}

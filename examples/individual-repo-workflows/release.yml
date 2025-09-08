@@ -7,6 +7,13 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Enable debug logging for troubleshooting"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   create-release-pr:
@@ -15,6 +22,7 @@ jobs:
     uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }} # Enable debug logging
 
       # Node.js Version Configuration (choose one approach)
       # Option 1: Single Node.js version (simple)

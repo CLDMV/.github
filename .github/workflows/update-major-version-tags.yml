@@ -53,7 +53,7 @@ jobs:
     permissions:
       contents: write
     with:
-      package_name: "version-tags"  # Required input, but not used for this operation
+      package_name: "version-tags" # Required input, but not used for this operation
       debug: ${{ inputs.debug }}
       run_fix_bot_signatures: true
       run_update_version_tags: true
