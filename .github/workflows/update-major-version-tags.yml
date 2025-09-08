@@ -69,7 +69,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
-          sign: ${{ inputs.sign }}
+          sign: ${{ inputs.sign || 'auto' }}
           annotate: ${{ inputs.annotate }}
           # forward identity & GPG only if toggled on
           tagger_name: ${{ inputs.use_gpg && secrets.TAGGER_NAME   || '' }}

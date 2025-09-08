@@ -45,23 +45,24 @@ runs:
         TAG_SHA=$(git rev-list -n 1 "$TAG_NAME")
         echo "Tag SHA: $TAG_SHA"
 
-        # Update major version tag (e.g., v1)
-        echo "🏷️ Updating major version tag $MAJOR_VERSION to point to $TAG_NAME"
-        git tag -f -m "Update major version tag $MAJOR_VERSION to point to $TAG_NAME" "$MAJOR_VERSION" "$TAG_SHA"
-        git push origin "$MAJOR_VERSION" --force
+        # Create JSON payload for upsert-batch action
+        JSON_PAYLOAD='[{"tag":"'"$MAJOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"Update major version tag '"$MAJOR_VERSION"' to point to '"$TAG_NAME"'"},{"tag":"'"$MINOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"Update minor version tag '"$MINOR_VERSION"' to point to '"$TAG_NAME"'"}]'
 
-        # Update minor version tag (e.g., v1.1)
-        echo "🏷️ Updating minor version tag $MINOR_VERSION to point to $TAG_NAME"
-        git tag -f -m "Update minor version tag $MINOR_VERSION to point to $TAG_NAME" "$MINOR_VERSION" "$TAG_SHA"
-        git push origin "$MINOR_VERSION" --force
+        echo "🏷️ Updating version tags using upsert-batch:"
+        echo "$JSON_PAYLOAD"
 
-        echo "✅ Successfully updated version tags"
-        echo "- $MAJOR_VERSION → $TAG_NAME"
-        echo "- $MINOR_VERSION → $TAG_NAME"
-
+        # Set output for upsert-batch step
+        echo "tags-payload=$JSON_PAYLOAD" >> $GITHUB_OUTPUT
         echo "major-version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
         echo "minor-version=$MINOR_VERSION" >> $GITHUB_OUTPUT
         echo "updated=true" >> $GITHUB_OUTPUT
+
+    - name: Update tags with proper signing
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
+      with:
+        payload: ${{ steps.update.outputs.tags-payload }}
+        sign: "auto"
+        annotate: "auto"
 
 
 
