@@ -85,6 +85,7 @@ runs:
       uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v1
       with:
         repo: ${{ inputs.repo || github.repository }}
+        github_token: ${{ env.GITHUB_TOKEN }}
         sign: ${{ inputs.sign }}
         annotate: ${{ inputs.annotate }}
         tagger_name: ${{ inputs.tagger_name }}

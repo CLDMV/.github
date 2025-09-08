@@ -5,6 +5,9 @@ inputs:
   repo:
     description: "owner/repo (defaults to current repository)"
     required: false
+  github_token:
+    description: "GitHub token for API access (defaults to github.token)"
+    required: false
   run_mode:
     description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
     required: false
@@ -60,7 +63,7 @@ runs:
       if: ${{ steps.gather.outputs.orphans-found == 'true' && inputs.run_mode == 'fix' }}
       uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:
         repo: ${{ inputs.repo || github.repository }}
         payload: ${{ steps.gather.outputs.orphaned-tags-json }}
