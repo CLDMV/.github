@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { sh } from "../../_api/core.mjs";
+import { sh } from "./core.mjs";
 
 export function importGpgIfNeeded({ gpg_private_key, gpg_passphrase }) {
 	if (!gpg_private_key) return "";
