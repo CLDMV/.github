@@ -18,22 +18,22 @@ function getTagInfo(tagName) {
 		try {
 			// Check what type of object the tag points to
 			const tagObjectType = execSync(`git cat-file -t ${tagName}`, { encoding: "utf8" }).trim();
-			console.log(`🔍 DEBUG: Object type for ${tagName}: ${tagObjectType}`);
+			debugLog(`Object type for ${tagName}: ${tagObjectType}`);
 
 			if (tagObjectType === "tag") {
 				// It's an annotated tag, get the tag object directly
 				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
 				isAnnotated = true;
-				console.log(`🔍 DEBUG: Successfully found annotated tag object for ${tagName}`);
+				debugLog(`Successfully found annotated tag object for ${tagName}`);
 			} else {
 				// It's a lightweight tag pointing directly to a commit
 				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
 				isAnnotated = false;
-				console.log(`🔍 DEBUG: Found lightweight tag ${tagName} pointing to ${tagObjectType}`);
+				debugLog(`Found lightweight tag ${tagName} pointing to ${tagObjectType}`);
 			}
 		} catch (tagObjectError) {
 			// If that fails, fall back to getting the commit it points to
-			console.log(`🔍 DEBUG: Failed to get object type for ${tagName}: ${tagObjectError.message}`);
+			debugLog(`Failed to get object type for ${tagName}: ${tagObjectError.message}`);
 			tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
 			isAnnotated = false;
 		}
@@ -45,7 +45,7 @@ function getTagInfo(tagName) {
 			// Parse tagger info from annotated tag
 			const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
 			debugLog(`taggerMatch result:`, taggerMatch);
-			console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
+			debugLog(`Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
 
 			if (taggerMatch) {
 				const [, nameEmail, timestamp, timezone] = taggerMatch;
@@ -65,7 +65,7 @@ function getTagInfo(tagName) {
 					message
 				};
 			} else {
-				console.log(`🔍 DEBUG: No tagger info found in annotated tag ${tagName}, treating as lightweight`);
+				debugLog(`No tagger info found in annotated tag ${tagName}, treating as lightweight`);
 				isAnnotated = false; // Fall through to lightweight logic
 			}
 		}
@@ -74,7 +74,7 @@ function getTagInfo(tagName) {
 			// Parse author info from commit (lightweight tag)
 			const authorMatch = tagInfo.match(/^author (.+) (\d+) ([\+\-]\d{4})$/m);
 			debugLog(`authorMatch result:`, authorMatch);
-			console.log(`🔍 DEBUG: Checking author match for ${tagName} - Match: ${!!authorMatch}`);
+			debugLog(`Checking author match for ${tagName} - Match: ${!!authorMatch}`);
 
 			if (authorMatch) {
 				const [, nameEmail, timestamp, timezone] = authorMatch;
