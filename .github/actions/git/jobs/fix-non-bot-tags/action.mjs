@@ -14,13 +14,13 @@ function getTagInfo(tagName) {
 		// First check if this is an annotated tag by checking the object type
 		let tagInfo;
 		let isAnnotated = false;
-		
+
 		try {
 			// Check what type of object the tag points to
 			const tagObjectType = execSync(`git cat-file -t ${tagName}`, { encoding: "utf8" }).trim();
 			console.log(`🔍 DEBUG: Object type for ${tagName}: ${tagObjectType}`);
-			
-			if (tagObjectType === 'tag') {
+
+			if (tagObjectType === "tag") {
 				// It's an annotated tag, get the tag object directly
 				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
 				isAnnotated = true;
@@ -46,7 +46,7 @@ function getTagInfo(tagName) {
 			const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
 			debugLog(`taggerMatch result:`, taggerMatch);
 			console.log(`🔍 DEBUG: Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
-			
+
 			if (taggerMatch) {
 				const [, nameEmail, timestamp, timezone] = taggerMatch;
 				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
@@ -69,13 +69,13 @@ function getTagInfo(tagName) {
 				isAnnotated = false; // Fall through to lightweight logic
 			}
 		}
-		
+
 		if (!isAnnotated) {
 			// Parse author info from commit (lightweight tag)
 			const authorMatch = tagInfo.match(/^author (.+) (\d+) ([\+\-]\d{4})$/m);
 			debugLog(`authorMatch result:`, authorMatch);
 			console.log(`🔍 DEBUG: Checking author match for ${tagName} - Match: ${!!authorMatch}`);
-			
+
 			if (authorMatch) {
 				const [, nameEmail, timestamp, timezone] = authorMatch;
 				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
