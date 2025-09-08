@@ -6,11 +6,40 @@ on:
     types: [published]
   push:
 
+  workflow_dispatch:
+    inputs:
+      use_gpg:
+        description: "Use GPG signing via CLDMV_ secrets?"
+        type: boolean
+        required: false
+        default: true
+      sign:
+        description: "sign mode: auto | true | false"
+        required: false
+        default: "auto"
+      annotate:
+        description: "annotate mode: auto | true | false"
+        required: false
+        default: "auto"
+      create_documentation:
+        description: "Create/update VERSION_TAGS.md documentation"
+        type: boolean
+        required: false
+        default: true
+
 jobs:
   update-tags:
     uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
-    with:
-      # Documentation Configuration
-      create_documentation: true # Create/update VERSION_TAGS.md documentation
     permissions:
       contents: write
+    with:
+      create_documentation: ${{ inputs.create_documentation || true }}
+      sign: ${{ inputs.sign || 'auto' }}
+      annotate: ${{ inputs.annotate || 'auto' }}
+      use_gpg: ${{ inputs.use_gpg || true }}
+    secrets:
+      # Map your repo/org secrets to the expected names
+      TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+      TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+      GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
