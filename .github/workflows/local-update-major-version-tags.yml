@@ -33,11 +33,11 @@ jobs:
     permissions:
       contents: write
     with:
-      create_documentation: ${{ github.event.inputs.create_documentation || 'true' }}
-      sign: ${{ github.event.inputs.sign || 'auto' }}
-      annotate: ${{ github.event.inputs.annotate || 'auto' }}
+      create_documentation: "${{ github.event.inputs.create_documentation || 'true' }}"
+      sign: "${{ github.event.inputs.sign || 'auto' }}"
+      annotate: "${{ github.event.inputs.annotate || 'auto' }}"
       # let the reusable decide whether to use secrets based on this flag
-      use_gpg: ${{ github.event.inputs.use_gpg || 'true' }}
+      use_gpg: "${{ github.event_name == 'workflow_dispatch' && ((github.event.inputs.use_gpg == 'true' || github.event.inputs.use_gpg == true) && 'true' || 'false') || 'true' }}"
       # Note: use_app_token is automatically determined in the reusable workflow based on BOT_APP_ID presence
     secrets:
       # map your repo/org secrets into generic names expected by the reusable
