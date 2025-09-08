@@ -21,16 +21,16 @@ function runGitSmartTag({
 	console.log(`🔍 DEBUG runGitSmartTag: sign=${sign}, annotate=${annotate}, push=${push}`);
 	console.log(`🔍 DEBUG runGitSmartTag: tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
 	console.log(`🔍 DEBUG runGitSmartTag: gpg_private_key present=${!!gpg_private_key}`);
-	
+
 	ensureGitAuthRemote(repo, token);
 	const willSign = shouldSign({ sign, gpg_private_key });
 	const willAnnotate = inferAnnotate({ annotate, sign: willSign ? "true" : "false", message });
 	let keyid = "";
 	if (willSign) keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
 	configureGitIdentity({ tagger_name, tagger_email, keyid, enableSign: willSign });
-	
+
 	console.log(`🔍 DEBUG runGitSmartTag: willSign=${willSign}, willAnnotate=${willAnnotate}`);
-	
+
 	if (willSign) {
 		console.log(`🔍 DEBUG runGitSmartTag: Creating signed tag: git tag -s -f -m "${message}" ${tag} ${sha}`);
 		sh(`git tag -s -f -m "${message}" ${tag} ${sha}`);
