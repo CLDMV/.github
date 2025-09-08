@@ -26,6 +26,10 @@ inputs:
     description: "Patterns to identify bot signatures (JSON array)"
     required: false
     default: '["CLDMV Bot", "cldmv-bot"]'
+  exclude_tags:
+    description: "Multiline list of tags to exclude from processing (already fixed by other steps)"
+    required: false
+    default: ""
 
 outputs:
   fixed-tags:
@@ -52,6 +56,7 @@ runs:
       shell: bash
       env:
         BOT_PATTERNS: ${{ inputs.bot_patterns }}
+        EXCLUDE_TAGS: ${{ inputs.exclude_tags }}
 
     - name: Recreate non-bot tags with bot signatures
       if: ${{ steps.gather.outputs.non-bot-tags-found == 'true' }}

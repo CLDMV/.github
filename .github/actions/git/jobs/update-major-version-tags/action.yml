@@ -111,6 +111,7 @@ runs:
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}
         gpg_passphrase: ${{ inputs.gpg_passphrase }}
+        exclude_tags: ${{ steps.fix-orphans.outputs.fixed-tags }}
 
     - name: Determine if should run
       id: should-run

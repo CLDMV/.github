@@ -4,7 +4,35 @@ import { execSync } from "child_process";
 import fs from "fs";
 
 /**
- * Get tag information including tagger details
+ * Get		// Parse bot patterns from input
+		const botPatternsInput = process.env.BOT_PATTERNS || '["CLDMV Bot", "cldmv-bot"]';
+		let botPatterns;
+
+		try {
+			botPatterns = JSON.parse(botPatternsInput);
+		} catch (parseError) {
+			console.error("Error parsing BOT_PATTERNS, using defaults:", parseError.message);
+			botPatterns = ["CLDMV Bot", "cldmv-bot"];
+		}
+
+		// Parse excluded tags from input (format: "v1 → v1.3.22" lines)
+		const excludeTagsInput = process.env.EXCLUDE_TAGS || "";
+		const excludeTags = excludeTagsInput
+			.split('\n')
+			.map(line => line.trim())
+			.filter(line => line.length > 0)
+			.map(line => {
+				// Extract tag name from "tag → target" format
+				const match = line.match(/^([^\s→]+)/);
+				return match ? match[1] : line;
+			})
+			.filter(tag => tag.length > 0);
+
+		console.log("🔍 Checking version tags for bot signatures...");
+		console.log(`🤖 Bot patterns: ${JSON.stringify(botPatterns)}`);
+		if (excludeTags.length > 0) {
+			console.log(`🚫 Excluding tags: ${excludeTags.join(", ")}`);
+		}ion including tagger details
  * @param {string} tagName - The tag name to inspect
  * @returns {Object|null} Tag information or null if not found
  */
@@ -113,6 +141,12 @@ async function main() {
 		const nonBotTags = [];
 
 		for (const tag of versionTags) {
+			// Skip tags that are in the exclusion list
+			if (excludeTags.includes(tag)) {
+				console.log(`🚫 Skipping ${tag} (excluded by previous step)`);
+				continue;
+			}
+
 			const tagInfo = getTagInfo(tag);
 
 			if (!tagInfo) {

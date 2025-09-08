@@ -98,6 +98,67 @@ for (const nt of minors) {
 	}
 }
 
+// check for missing major/minor tags
+console.log("🔍 Checking for missing major/minor tags...");
+
+// Find all unique major.minor combinations from semantic version tags
+const allMajorMinors = new Set();
+for (const tag of allTags) {
+	const [M, m] = verKey(tag);
+	if (!isNaN(M) && !isNaN(m)) {
+		allMajorMinors.add(`${M}.${m}`);
+	}
+}
+
+// Check for missing minor tags (v1.3, v2.1, etc.)
+for (const majorMinor of allMajorMinors) {
+	const [M, m] = majorMinor.split('.').map(n => parseInt(n, 10));
+	const expectedMinorTag = `v${M}.${m}`;
+	
+	// Skip if this minor tag already exists
+	if (minors.includes(expectedMinorTag)) continue;
+	
+	// Find the latest patch for this major.minor
+	const latest = latestPatchForMinor(majorMinor);
+	if (latest) {
+		const wantSha = rev(latest);
+		if (wantSha) {
+			found = true;
+			orphanRows.push({ tag: expectedMinorTag, sha: wantSha });
+			fixedLines.push(`${expectedMinorTag} → ${latest} (missing)`);
+			console.log(`🚨 Missing minor tag: ${expectedMinorTag} → ${latest}`);
+		}
+	}
+}
+
+// Check for missing major tags (v1, v2, etc.)
+const allMajors = new Set();
+for (const tag of allTags) {
+	const [M] = verKey(tag);
+	if (!isNaN(M)) {
+		allMajors.add(M);
+	}
+}
+
+for (const M of allMajors) {
+	const expectedMajorTag = `v${M}`;
+	
+	// Skip if this major tag already exists
+	if (majors.includes(expectedMajorTag)) continue;
+	
+	// Find the latest patch for this major
+	const latest = latestPatchForMajor(M);
+	if (latest) {
+		const wantSha = rev(latest);
+		if (wantSha) {
+			found = true;
+			orphanRows.push({ tag: expectedMajorTag, sha: wantSha });
+			fixedLines.push(`${expectedMajorTag} → ${latest} (missing)`);
+			console.log(`🚨 Missing major tag: ${expectedMajorTag} → ${latest}`);
+		}
+	}
+}
+
 // outputs
 const fixedText = fixedLines.join("\n");
 fs.appendFileSync(out, `fixed-tags<<EOF\n${fixedText}\nEOF\n`);
