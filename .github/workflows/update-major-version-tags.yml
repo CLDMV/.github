@@ -1,4 +1,4 @@
-# CLDMV/.github/.githujobs:
+# .github/workflows/update-major-version-tags.yml
 name: 📌 Update Major Version Tags
 
 on:
@@ -19,43 +19,27 @@ on:
         required: false
         type: string
         default: "auto"
-      tagger_name:
-        description: "Tagger name"
+      use_gpg:
+        description: "If true, forward provided secrets to enable signing"
         required: false
-        type: string
-      tagger_email:
-        description: "Tagger email"
+        type: boolean
+        default: false
+    secrets:
+      TAGGER_NAME:
         required: false
-        type: string
-      gpg_private_key:
-        description: "ASCII-armored private key for signing"
+      TAGGER_EMAIL:
         required: false
-        type: string
-      gpg_passphrase:
-        description: "Passphrase for the private key (if protected)"
+      GPG_PRIVATE_KEY:
         required: false
-        type: string
-    outputs:
-      major-version:
-        description: "The major version tag that was updated"
-        value: ${{ jobs.update-tags.outputs.major-version }}
-      minor-version:
-        description: "The minor version tag that was updated"
-        value: ${{ jobs.update-tags.outputs.minor-version }}
-      updated:
-        description: "Whether tags were successfully updated"
-        value: ${{ jobs.update-tags.outputs.updated }}
+      GPG_PASSPHRASE:
+        required: false
 
 permissions:
   contents: write
 
 jobs:
-  update-tags:
-    name: "🚀 Execute Tag Updates"
-    # Run on: tag pushes or releases only (workflow_call bypasses this condition)
-    if: github.ref_type == 'tag' || github.event_name == 'release'
-    permissions:
-      contents: write
+  update:
+    name: Update major/minor version tags
     runs-on: ubuntu-latest
     outputs:
       major-version: ${{ steps.tags.outputs.major-version }}
@@ -68,10 +52,12 @@ jobs:
         id: tags
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
         with:
-          create-documentation: ${{ inputs.create_documentation || 'true' }}
+          create-documentation: ${{ inputs.create_documentation }}
           sign: ${{ inputs.sign }}
           annotate: ${{ inputs.annotate }}
-          tagger_name: ${{ inputs.tagger_name || secrets.CLDMV_BOT_NAME }}
-          tagger_email: ${{ inputs.tagger_email || secrets.CLDMV_BOT_EMAIL }}
-          gpg_private_key: ${{ inputs.gpg_private_key || secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ inputs.gpg_passphrase || secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+
+          # forward identity & GPG only if toggled on
+          tagger_name: ${{ inputs.use_gpg && secrets.TAGGER_NAME   || '' }}
+          tagger_email: ${{ inputs.use_gpg && secrets.TAGGER_EMAIL  || '' }}
+          gpg_private_key: ${{ inputs.use_gpg && secrets.GPG_PRIVATE_KEY || '' }}
+          gpg_passphrase: ${{ inputs.use_gpg && secrets.GPG_PASSPHRASE  || '' }}
