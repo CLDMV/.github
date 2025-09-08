@@ -7,7 +7,7 @@ on:
         description: "Use GPG signing via CLDMV_ secrets?"
         type: boolean
         required: true
-        default: false
+        default: true
       sign:
         description: "sign mode: auto | true | false"
         required: false
