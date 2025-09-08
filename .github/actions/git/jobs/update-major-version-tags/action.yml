@@ -30,13 +30,6 @@ inputs:
     description: "Passphrase for the private key (if protected)"
     required: false
 
-    description: "Whether to create/update VERSION_TAGS.md documentation"
-    required: false
-    default: "true"
-  repo:
-    description: "owner/repo (defaults to the caller repository). Passed through to orphan fixer."
-    required: false
-
 outputs:
   major-version:
     description: "The major version tag that was updated"
@@ -98,7 +91,6 @@ runs:
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}
         gpg_passphrase: ${{ inputs.gpg_passphrase }}
-
 
     - name: Determine if should run
       id: should-run

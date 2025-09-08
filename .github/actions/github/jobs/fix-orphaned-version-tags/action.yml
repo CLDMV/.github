@@ -30,13 +30,6 @@ inputs:
     description: "Passphrase for the private key (if protected)"
     required: false
 
-    description: "owner/repo (defaults to current repository)"
-    required: false
-  run_mode:
-    description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
-    required: false
-    default: "fix"
-
 outputs:
   fixed-tags:
     description: "Multiline list of tags that were (or would be) retargeted in this run"
@@ -77,8 +70,3 @@ runs:
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}
         gpg_passphrase: ${{ inputs.gpg_passphrase }}
-        sign: ${{ inputs.sign }}
-        annotate: ${{ inputs.annotate }}
-        tagger_name: ${{ inputs.tagger_name }}
-        tagger_email: ${{ inputs.tagger_email }}
-
