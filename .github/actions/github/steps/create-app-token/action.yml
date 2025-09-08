@@ -47,3 +47,6 @@ runs:
         app-id: ${{ inputs.app_id || env.BOT_APP_ID }}
         private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
         owner: ${{ inputs.owner }}
+        permissions: >-
+          contents:write,
+          workflows:write
