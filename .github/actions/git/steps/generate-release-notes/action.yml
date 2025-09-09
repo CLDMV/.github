@@ -23,7 +23,7 @@ runs:
   steps:
     - name: Get commit range for release notes
       id: commit-range
-      uses: ./.github/actions/git/steps/get-commit-range
+      uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v1
       with:
         debug: "false"
 
@@ -35,7 +35,7 @@ runs:
         COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
         LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
         HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
-        
+
         echo "📋 Generating release notes for version: $VERSION"
         echo "📋 Commit range: $COMMIT_RANGE"
         echo "📋 Base tag: $LAST_TAG"

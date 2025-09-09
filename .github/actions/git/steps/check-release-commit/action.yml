@@ -47,7 +47,7 @@ runs:
     - name: Get commit range for analysis
       id: commit-range
       if: steps.check.outputs.analyze-commits == 'true'
-      uses: ./.github/actions/git/steps/get-commit-range
+      uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v1
       with:
         debug: "true"
 
@@ -59,7 +59,7 @@ runs:
         COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
         LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
         HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
-        
+
         if [ "$HAS_COMMITS" = "false" ]; then
           echo "No commits to analyze, defaulting to minor release"
           echo "version-bump=minor" >> $GITHUB_OUTPUT

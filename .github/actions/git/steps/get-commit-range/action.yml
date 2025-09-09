@@ -38,7 +38,7 @@ runs:
         HEAD_REF="${{ inputs.head-ref }}"
         BASE_REF_OVERRIDE="${{ inputs.base-ref }}"
         DEBUG="${{ inputs.debug }}"
-        
+
         if [ "$DEBUG" = "true" ]; then
           echo "🔍 DEBUG: head-ref=$HEAD_REF"
           echo "🔍 DEBUG: base-ref override=$BASE_REF_OVERRIDE"
