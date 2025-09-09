@@ -50,6 +50,21 @@ runs:
           echo "🔑 Using default github.token for GitHub API"
         fi
 
+        # Debug: Check token and repository info
+        echo "🔍 Repository: ${{ github.repository }}"
+        echo "🔍 Repository Owner: ${{ github.repository_owner }}"
+        echo "🔍 Head Branch: ${{ inputs.head-branch }}"
+        echo "🔍 Base Branch: ${{ inputs.base-branch }}"
+        
+        # Test token permissions
+        echo "🔍 Testing token permissions..."
+        REPO_INFO=$(curl -s -H "Authorization: token $TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}")
+        
+        REPO_PERMISSIONS=$(echo "$REPO_INFO" | jq -r '.permissions // "null"')
+        echo "🔍 Repository permissions: $REPO_PERMISSIONS"
+
         # Check if PR already exists using GitHub API
         echo "🔍 Checking for existing PR..."
         EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
@@ -82,6 +97,8 @@ runs:
               body: $body
             }')
 
+          echo "🔍 PR JSON payload: $PR_JSON"
+
           # Create PR via API
           PR_RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $TOKEN" \
@@ -102,6 +119,7 @@ runs:
             if [ -n "${{ inputs.labels }}" ]; then
               echo "🏷️ Adding labels: ${{ inputs.labels }}"
               LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
+              echo "🔍 Labels JSON: $LABELS_JSON"
               curl -s -X POST \
                 -H "Authorization: token $TOKEN" \
                 -H "Accept: application/vnd.github.v3+json" \
@@ -115,6 +133,9 @@ runs:
           else
             echo "❌ Failed to create PR"
             echo "Response: $PR_RESPONSE"
+            echo ""
+            echo "🔍 This indicates the GitHub App needs 'Pull requests: Write' permission."
+            echo "🔍 Check the app permissions at: https://github.com/settings/apps"
             exit 1
           fi
         fi
