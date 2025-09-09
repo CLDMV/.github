@@ -41,7 +41,7 @@ runs:
       id: create-pr
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ env.GITHUB_TOKEN || github.token }}
       run: |
         # Check if PR already exists
         EXISTING_PR=$(gh pr list --head ${{ inputs.head-branch }} --base ${{ inputs.base-branch }} --json number --jq '.[0].number' 2>/dev/null || echo "")
