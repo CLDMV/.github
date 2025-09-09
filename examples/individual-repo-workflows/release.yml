@@ -1,8 +1,9 @@
 # Individual repo: .github/workflows/release.yml
-# 
+#
 # This workflow intelligently detects release commits in the commit history
-# and creates release PRs. It runs on all branch pushes (except main/master)
+# and creates release PRs. It runs on human commits to branches (except main/master)
 # and uses smart commit analysis to determine if a release should be created.
+# Bot commits are ignored to prevent infinite loops.
 #
 name: 🚀 Create Release PR
 
@@ -27,7 +28,11 @@ on:
 
 jobs:
   create-release-pr:
-    # Let the check-release-commit action handle release detection intelligently
+    # Prevent infinite loops: Don't run on bot commits or if PR already exists
+    if: |
+      github.actor != 'cldmv-bot[bot]' && 
+      github.actor != 'github-actions[bot]' &&
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
     uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name

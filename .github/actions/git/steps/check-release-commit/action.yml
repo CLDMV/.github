@@ -18,140 +18,18 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Get commit range for analysis
+    - name: Get commit range and categorized commits
       id: commit-range
       uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v1
       with:
         debug: "true"
 
-    - name: Check for release commit in range
+    - name: Check for release commit and analyze version bump
       id: check
       shell: bash
       run: |
-        COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
-        LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
-        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
+        export COMMITS='${{ steps.commit-range.outputs.commits }}'
+        export HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
 
-        echo "🔍 Commit range: $COMMIT_RANGE"
-        echo "🔍 Base tag: $LAST_TAG"
-        echo "🔍 Has commits: $HAS_COMMITS"
-
-        if [ "$HAS_COMMITS" = "false" ]; then
-          echo "should-create-pr=false" >> $GITHUB_OUTPUT
-          echo "ℹ️ No commits in range - not triggering release"
-          exit 0
-        fi
-
-        # Look for release commits in the commit range (using reusable logic output)
-        echo "🔍 Checking for release commits in range: $COMMIT_RANGE"
-        BREAKING_RELEASE_COMMIT=$(git log $COMMIT_RANGE --grep="^release!:" --pretty=format:"%s" | head -1 || true)
-        RELEASE_COMMIT=$(git log $COMMIT_RANGE --grep="^release:" --pretty=format:"%s" | head -1 || true)
-
-        if [[ -n "$BREAKING_RELEASE_COMMIT" ]]; then
-          COMMIT_MSG="$BREAKING_RELEASE_COMMIT"
-          echo "🔍 Found breaking release commit: $COMMIT_MSG"
-          echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "should-create-pr=true" >> $GITHUB_OUTPUT
-          echo "version-bump=major" >> $GITHUB_OUTPUT
-          echo "has-breaking=true" >> $GITHUB_OUTPUT
-          echo "🚀 Breaking release commit detected - will create major version PR"
-        elif [[ -n "$RELEASE_COMMIT" ]]; then
-          COMMIT_MSG="$RELEASE_COMMIT"
-          echo "🔍 Found release commit: $COMMIT_MSG"
-          echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "should-create-pr=true" >> $GITHUB_OUTPUT
-          echo "has-breaking=false" >> $GITHUB_OUTPUT
-          echo "analyze-commits=true" >> $GITHUB_OUTPUT
-          echo "🚀 Release commit detected - will create release PR"
-        else
-          echo "should-create-pr=false" >> $GITHUB_OUTPUT
-          echo "ℹ️ No release commit found in commit range - not triggering release"
-        fi
-
-    - name: Analyze commits for version bump
-      id: analyze
-      if: steps.check.outputs.analyze-commits == 'true'
-      shell: bash
-      run: |
-        COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
-        LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
-        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
-
-        if [ "$HAS_COMMITS" = "false" ]; then
-          echo "No commits to analyze, defaulting to minor release"
-          echo "version-bump=minor" >> $GITHUB_OUTPUT
-        else
-          echo "Last tag: $LAST_TAG"
-          echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
-          
-          # Check for breaking changes in the range (exclude release commits)
-          echo "🔍 Checking for breaking changes..."
-          BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release" || true)
-          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release" || true)
-          
-          echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
-          echo "$BREAKING_COMMITS"
-          echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
-          echo "$BREAKING_BODY"
-          
-          if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
-            echo "version-bump=major" >> $GITHUB_OUTPUT
-            echo "has-breaking=true" >> $GITHUB_OUTPUT
-            echo "🚀 Major release - breaking changes detected in commit history"
-          else
-            # Check for features (exclude release commits)
-            FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release" || true)
-            if [[ -n "$FEATURE_COMMITS" ]]; then
-              echo "version-bump=minor" >> $GITHUB_OUTPUT
-              echo "🎉 Minor release - new features detected"
-            else
-              echo "version-bump=patch" >> $GITHUB_OUTPUT
-              echo "🐛 Patch release - only fixes and other changes"
-            fi
-          fi
-        fi
-        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
-
-        if [ "$HAS_COMMITS" = "false" ]; then
-          echo "No commits to analyze, defaulting to minor release"
-          echo "version-bump=minor" >> $GITHUB_OUTPUT
-        else
-          echo "Last tag: $LAST_TAG"
-          echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
-          
-          # Check for breaking changes in the range (exclude release commits)
-          echo "🔍 Checking for breaking changes..."
-          BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release" || true)
-          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release" || true)
-          
-          echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
-          echo "$BREAKING_COMMITS"
-          echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
-          echo "$BREAKING_BODY"
-          
-          if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
-            echo "version-bump=major" >> $GITHUB_OUTPUT
-            echo "has-breaking=true" >> $GITHUB_OUTPUT
-            echo "🚀 Major release - breaking changes detected in commit history"
-          else
-            # Check for features (exclude release commits)
-            FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release" || true)
-            if [[ -n "$FEATURE_COMMITS" ]]; then
-              echo "version-bump=minor" >> $GITHUB_OUTPUT
-              echo "🎉 Minor release - new features detected"
-            else
-              echo "version-bump=patch" >> $GITHUB_OUTPUT
-              echo "🐛 Patch release - only fixes and other changes"
-            fi
-          fi
-        fi
-
-    - name: Final output
-      if: steps.check.outputs.should-create-pr == 'true'
-      shell: bash
-      run: |
-        if [[ "${{ steps.check.outputs.analyze-commits }}" == "true" ]]; then
-          echo "version-bump=${{ steps.analyze.outputs.version-bump }}" >> $GITHUB_OUTPUT
-          echo "has-breaking=${{ steps.analyze.outputs.has-breaking || 'false' }}" >> $GITHUB_OUTPUT
-        fi
-        echo "📦 Release commit detected - will create release PR"
+        # Run the Node.js script
+        node "${{ github.action_path }}/action.mjs"

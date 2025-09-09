@@ -1,0 +1,131 @@
+import { appendFileSync } from "fs";
+
+// Get inputs from environment
+const COMMITS_JSON = process.env.COMMITS;
+const HAS_COMMITS = process.env.HAS_COMMITS === "true";
+
+console.log("🔍 Checking for release commits...");
+
+/**
+ * Parse commits from JSON
+ * @returns {Array} Array of commit objects
+ */
+function getCommits() {
+	try {
+		const commits = JSON.parse(COMMITS_JSON || "[]");
+		return commits;
+	} catch (error) {
+		console.log(`🔍 DEBUG: Failed to parse commits JSON: ${error.message}`);
+		return [];
+	}
+}
+
+/**
+ * Find release commits in the commit list
+ * @param {Array} commits - Array of commit objects
+ * @returns {object} Release commit analysis
+ */
+function findReleaseCommits(commits) {
+	const releaseCommits = commits.filter((commit) => {
+		const subject = commit.subject.toLowerCase();
+		return subject.startsWith("release:") || subject.startsWith("release!");
+	});
+
+	// Find the most recent release commit
+	const breakingRelease = releaseCommits.find((commit) => commit.subject.toLowerCase().startsWith("release!:"));
+
+	const normalRelease = releaseCommits.find(
+		(commit) => commit.subject.toLowerCase().startsWith("release:") && !commit.subject.toLowerCase().startsWith("release!:")
+	);
+
+	return {
+		hasRelease: releaseCommits.length > 0,
+		breakingRelease,
+		normalRelease,
+		mostRecent: breakingRelease || normalRelease
+	};
+}
+
+/**
+ * Analyze commits for version bump type
+ * @param {Array} commits - Array of commit objects (excluding release commits)
+ * @returns {object} Version bump analysis
+ */
+function analyzeVersionBump(commits) {
+	// Filter out release commits for version analysis
+	const nonReleaseCommits = commits.filter((commit) => {
+		const subject = commit.subject.toLowerCase();
+		return !subject.startsWith("release:") && !subject.startsWith("release!");
+	});
+
+	// Check for breaking changes
+	const hasBreaking = nonReleaseCommits.some((commit) => commit.category === "breaking" || commit.isBreaking);
+
+	if (hasBreaking) {
+		return {
+			versionBump: "major",
+			hasBreaking: true,
+			reason: "Breaking changes detected in commit history"
+		};
+	}
+
+	// Check for features
+	const hasFeatures = nonReleaseCommits.some((commit) => commit.category === "feature");
+
+	if (hasFeatures) {
+		return {
+			versionBump: "minor",
+			hasBreaking: false,
+			reason: "New features detected"
+		};
+	}
+
+	// Default to patch
+	return {
+		versionBump: "patch",
+		hasBreaking: false,
+		reason: "Only fixes and other changes"
+	};
+}
+
+// Main logic
+if (!HAS_COMMITS) {
+	console.log("ℹ️ No commits in range - not triggering release");
+	appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+	process.exit(0);
+}
+
+const commits = getCommits();
+console.log(`🔍 Analyzing ${commits.length} commits`);
+
+const releaseAnalysis = findReleaseCommits(commits);
+
+if (releaseAnalysis.hasRelease) {
+	const releaseCommit = releaseAnalysis.mostRecent;
+	console.log(`🔍 Found release commit: ${releaseCommit.subject}`);
+
+	// Output release commit details
+	const outputs = [
+		"should-create-pr=true",
+		`commit-message=${releaseCommit.subject}`,
+		`has-breaking=${releaseAnalysis.breakingRelease ? "true" : "false"}`
+	];
+
+	if (releaseAnalysis.breakingRelease) {
+		outputs.push("version-bump=major");
+		console.log("🚀 Breaking release commit detected - will create major version PR");
+	} else {
+		// For non-breaking release commits, analyze the other commits
+		const versionAnalysis = analyzeVersionBump(commits);
+		outputs.push(`version-bump=${versionAnalysis.versionBump}`);
+		outputs.push(`has-breaking=${versionAnalysis.hasBreaking}`);
+		console.log(`🚀 Release commit detected - will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
+	}
+
+	outputs.forEach((output) => {
+		appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
+	});
+} else {
+	console.log("ℹ️ No release commit found - not triggering release");
+	appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+}

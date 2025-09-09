@@ -33,8 +33,7 @@ runs:
       run: |
         # Set environment variables for the Node.js script
         export VERSION="${{ inputs.version }}"
-        export COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
-        export LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
+        export COMMITS='${{ steps.commit-range.outputs.commits }}'
         export HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
         export PACKAGE_NAME="${{ inputs.package-name }}"
         export PACKAGE_MANAGER="${{ inputs.package-manager }}"

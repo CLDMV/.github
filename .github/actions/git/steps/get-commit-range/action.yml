@@ -27,70 +27,23 @@ outputs:
   base-ref:
     description: "The actual base ref used"
     value: ${{ steps.range.outputs.base-ref }}
+  commit-count:
+    description: "Number of commits in the range"
+    value: ${{ steps.range.outputs.commit-count }}
+  commits:
+    description: "JSON array of commits with categorization metadata (hash, subject, author, date, category, type, scope, isBreaking)"
+    value: ${{ steps.range.outputs.commits }}
 
 runs:
   using: "composite"
   steps:
-    - name: Calculate commit range
+    - name: Calculate commit range and categorize commits
       id: range
       shell: bash
       run: |
-        HEAD_REF="${{ inputs.head-ref }}"
-        BASE_REF_OVERRIDE="${{ inputs.base-ref }}"
-        DEBUG="${{ inputs.debug }}"
+        export HEAD_REF="${{ inputs.head-ref }}"
+        export BASE_REF_OVERRIDE="${{ inputs.base-ref }}"
+        export DEBUG="${{ inputs.debug }}"
 
-        if [ "$DEBUG" = "true" ]; then
-          echo "🔍 DEBUG: head-ref=$HEAD_REF"
-          echo "🔍 DEBUG: base-ref override=$BASE_REF_OVERRIDE"
-        fi
-
-        # Fetch all tags to ensure we have the complete tag history
-        echo "🔍 Fetching all tags from remote..."
-        git fetch --tags --force
-        git fetch origin master --tags 2>/dev/null || true
-        git fetch origin main --tags 2>/dev/null || true
-
-        if [ "$DEBUG" = "true" ]; then
-          echo "🔍 DEBUG: Available tags after fetch:"
-          git tag -l | sort -V | tail -10
-        fi
-
-        # Determine base ref
-        if [ -n "$BASE_REF_OVERRIDE" ]; then
-          BASE_REF="$BASE_REF_OVERRIDE"
-          echo "🔍 Using override base ref: $BASE_REF"
-        else
-          # Use the latest semantic version tag, not just reachable ones
-          BASE_REF=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          echo "🔍 Latest semantic version tag found: $BASE_REF"
-        fi
-
-        if [ -z "$BASE_REF" ]; then
-          echo "⚠️ No base ref found, using initial commit"
-          BASE_REF=$(git rev-list --max-parents=0 HEAD)
-          COMMIT_RANGE="$BASE_REF..$HEAD_REF"
-        else
-          COMMIT_RANGE="$BASE_REF..$HEAD_REF"
-        fi
-
-        echo "📋 Commit range: $COMMIT_RANGE"
-
-        # Check if there are commits in the range
-        COMMIT_COUNT=$(git rev-list --count $COMMIT_RANGE 2>/dev/null || echo "0")
-        if [ "$COMMIT_COUNT" -gt 0 ]; then
-          HAS_COMMITS="true"
-          echo "✅ Found $COMMIT_COUNT commits in range"
-          if [ "$DEBUG" = "true" ]; then
-            echo "🔍 DEBUG: Commits in range:"
-            git log $COMMIT_RANGE --oneline | head -10 || true
-          fi
-        else
-          HAS_COMMITS="false"
-          echo "ℹ️ No commits found in range"
-        fi
-
-        # Set outputs
-        echo "last-tag=$BASE_REF" >> $GITHUB_OUTPUT
-        echo "commit-range=$COMMIT_RANGE" >> $GITHUB_OUTPUT
-        echo "has-commits=$HAS_COMMITS" >> $GITHUB_OUTPUT
-        echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
+        # Run the Node.js script
+        node "${{ github.action_path }}/action.mjs"
