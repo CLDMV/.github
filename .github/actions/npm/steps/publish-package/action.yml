@@ -37,6 +37,18 @@ outputs:
   published:
     description: "Whether the package was successfully published"
     value: ${{ steps.publish.outputs.published }}
+  error-type:
+    description: "Type of error if publish failed (version-conflict, auth-error, network-error, unknown)"
+    value: ${{ steps.publish.outputs.error-type }}
+  error-message:
+    description: "Detailed error message"
+    value: ${{ steps.publish.outputs.error-message }}
+  suggested-fix:
+    description: "Suggested action to fix the error"
+    value: ${{ steps.publish.outputs.suggested-fix }}
+  is-registry-available:
+    description: "Whether the version is available in the registry"
+    value: ${{ steps.publish.outputs.is-registry-available }}
 
 runs:
   using: "composite"
@@ -93,6 +105,10 @@ runs:
         # Verify package.json exists
         if [ ! -f "package.json" ]; then
           echo "❌ No package.json found in package-contents"
+          echo "published=false" >> $GITHUB_OUTPUT
+          echo "error-type=missing-package-json" >> $GITHUB_OUTPUT
+          echo "error-message=package.json not found in package-contents directory" >> $GITHUB_OUTPUT
+          echo "suggested-fix=Ensure build step creates package-contents with package.json" >> $GITHUB_OUTPUT
           exit 1
         fi
 
@@ -102,37 +118,79 @@ runs:
         if [ -z "$PUBLISH_CMD" ]; then
           echo "❌ No publish command provided"
           echo "published=false" >> $GITHUB_OUTPUT
+          echo "error-type=missing-command" >> $GITHUB_OUTPUT
+          echo "error-message=No publish command was provided" >> $GITHUB_OUTPUT
+          echo "suggested-fix=Provide a valid publish command in workflow inputs" >> $GITHUB_OUTPUT
           exit 1
         fi
 
-        # Execute the provided command
+        # Execute the provided command and capture output
         echo "🔧 Running command: $PUBLISH_CMD"
-        if eval "$PUBLISH_CMD"; then
-          echo "✅ Successfully published using primary command"
+
+        if OUTPUT=$(eval "$PUBLISH_CMD" 2>&1); then
+          echo "✅ Successfully published to ${{ inputs.registry-name }}"
+          echo "$OUTPUT"
           echo "published=true" >> $GITHUB_OUTPUT
+          echo "error-type=" >> $GITHUB_OUTPUT
+          echo "error-message=" >> $GITHUB_OUTPUT
+          echo "suggested-fix=" >> $GITHUB_OUTPUT
+          echo "is-registry-available=true" >> $GITHUB_OUTPUT
         else
-          echo "⚠️ ${{ inputs.registry-name }} publish failed, trying with public access as fallback..."
+          EXIT_CODE=$?
+          echo "❌ Publish failed with exit code: $EXIT_CODE"
+          echo "Error output: $OUTPUT"
           
-          # Fallback to public access
-          if [ "${{ inputs.package-manager }}" = "yarn" ]; then
-            if yarn publish --access public; then
-              echo "✅ Successfully published using yarn fallback command"
+          # Analyze the error and provide specific guidance
+          if echo "$OUTPUT" | grep -q "Cannot publish over previously published version"; then
+            # This is the key case - version was previously published but may not be visible
+            echo ""
+            echo "📊 Version conflict detected: ${{ inputs.version }} was previously published"
+            
+            # Check if version is currently available in registry
+            if npm view "${{ inputs.package-name }}@${{ inputs.version }}" version 2>/dev/null; then
+              echo "✅ Version ${{ inputs.version }} is available in registry"
+              echo "ℹ️ This is a pseudo-success - version exists and is accessible"
               echo "published=true" >> $GITHUB_OUTPUT
+              echo "error-type=version-already-published" >> $GITHUB_OUTPUT
+              echo "error-message=Version ${{ inputs.version }} already exists in registry" >> $GITHUB_OUTPUT
+              echo "suggested-fix=This is normal - the version is already published and available" >> $GITHUB_OUTPUT
+              echo "is-registry-available=true" >> $GITHUB_OUTPUT
             else
-              echo "❌ Failed to publish with yarn fallback"
+              echo "❌ Version ${{ inputs.version }} is NOT available in registry"
+              echo "⚠️ This version was previously published but is now reserved/hidden"
               echo "published=false" >> $GITHUB_OUTPUT
+              echo "error-type=version-conflict" >> $GITHUB_OUTPUT
+              echo "error-message=Version ${{ inputs.version }} is reserved by NPM (previously published then unpublished)" >> $GITHUB_OUTPUT
+              echo "suggested-fix=Update package.json version, git tags, and GitHub releases to a new version number" >> $GITHUB_OUTPUT
+              echo "is-registry-available=false" >> $GITHUB_OUTPUT
               exit 1
             fi
+            
+          elif echo "$OUTPUT" | grep -q "403\|401\|authentication\|Unauthorized\|Forbidden"; then
+            echo "❌ Authentication/authorization error"
+            echo "published=false" >> $GITHUB_OUTPUT
+            echo "error-type=auth-error" >> $GITHUB_OUTPUT
+            echo "error-message=Authentication failed - check token permissions" >> $GITHUB_OUTPUT
+            echo "suggested-fix=Verify NPM_TOKEN or GITHUB_TOKEN has publish permissions" >> $GITHUB_OUTPUT
+            echo "is-registry-available=unknown" >> $GITHUB_OUTPUT
+            exit 1
+            
+          elif echo "$OUTPUT" | grep -q "network\|timeout\|ENOTFOUND\|ETIMEDOUT"; then
+            echo "❌ Network error"
+            echo "published=false" >> $GITHUB_OUTPUT
+            echo "error-type=network-error" >> $GITHUB_OUTPUT
+            echo "error-message=Network connectivity issue" >> $GITHUB_OUTPUT
+            echo "suggested-fix=Retry the workflow - this may be a temporary network issue" >> $GITHUB_OUTPUT
+            echo "is-registry-available=unknown" >> $GITHUB_OUTPUT
+            exit 1
+            
           else
-            if npm publish --access public; then
-              echo "✅ Successfully published using npm fallback command"
-              echo "published=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Failed to publish with npm fallback"
-              echo "published=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+            echo "❌ Unknown publish error"
+            echo "published=false" >> $GITHUB_OUTPUT
+            echo "error-type=unknown" >> $GITHUB_OUTPUT
+            echo "error-message=$OUTPUT" >> $GITHUB_OUTPUT
+            echo "suggested-fix=Check the error message above and resolve the specific issue" >> $GITHUB_OUTPUT
+            echo "is-registry-available=unknown" >> $GITHUB_OUTPUT
+            exit 1
           fi
         fi
-
-        echo "✅ Successfully published to ${{ inputs.registry-name }}"
