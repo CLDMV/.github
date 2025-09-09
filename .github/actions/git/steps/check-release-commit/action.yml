@@ -81,7 +81,7 @@ runs:
               echo "🚀 Major release - breaking changes detected in commit history"
             else
               # Check for features (exclude release commits)
-              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release")
+              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release" || true)
               if [[ -n "$FEATURE_COMMITS" ]]; then
                 echo "version-bump=minor" >> $GITHUB_OUTPUT
                 echo "🎉 Minor release - new features detected"
