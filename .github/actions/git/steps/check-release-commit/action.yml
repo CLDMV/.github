@@ -42,14 +42,10 @@ runs:
           # Fetch all tags to ensure we have the complete tag history
           echo "🔍 Fetching all tags from remote..."
           git fetch --tags --force
-          git fetch origin master --tags
+          git fetch origin master --tags 2>/dev/null || true
           git fetch origin main --tags 2>/dev/null || true
           
           # Debug: Show available tags
-          echo "Available tags after fetch:"
-          git tag -l | sort -V | tail -5
-          git fetch origin --tags --force 2>/dev/null || true
-          
           echo "📋 Available tags after fetch:"
           git tag -l | sort -V | tail -10
           
@@ -60,38 +56,14 @@ runs:
             echo "version-bump=minor" >> $GITHUB_OUTPUT
           else
             echo "Last tag: $LAST_TAG"
-            
-            # Debug: Show what commits we're analyzing
-            COMMIT_RANGE="$LAST_TAG..HEAD"
-            echo "🔍 Analyzing commit range: $COMMIT_RANGE"
-            echo "📋 Commits in range:"
-            git log $COMMIT_RANGE --oneline | head -10
-            
-            # Check for breaking changes in the range (exclude previous release commits)
-            echo "🔍 Checking for breaking changes..."
-            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --not --grep="^release" --oneline)
-            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --not --grep="^release" --oneline)
-            
-            if [[ -n "$BREAKING_COMMITS" ]]; then
-              echo "⚠️ Breaking commits found:"
-              echo "$BREAKING_COMMITS"
-            fi
-            if [[ -n "$BREAKING_BODY" ]]; then
-              echo "⚠️ Breaking change bodies found:"
-              echo "$BREAKING_BODY"
-            fi
-          if [ -z "$LAST_TAG" ]; then
-            echo "No previous tags found, defaulting to minor release"
-            echo "version-bump=minor" >> $GITHUB_OUTPUT
-          else
-            echo "Last tag: $LAST_TAG"
             COMMIT_RANGE="$LAST_TAG..HEAD"
             
             echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
-            echo "🔍 DEBUG: All commits in range:"
-            git log $COMMIT_RANGE --oneline || true
+            echo "� DEBUG: All commits in range:"
+            git log $COMMIT_RANGE --oneline | head -10 || true
             
             # Check for breaking changes in the range (exclude previous release commits)
+            echo "🔍 Checking for breaking changes..."
             BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --not --grep="^release" --oneline)
             BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --not --grep="^release" --oneline)
             
@@ -121,7 +93,3 @@ runs:
           echo "should-create-pr=false" >> $GITHUB_OUTPUT
           echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"
         fi
-
-
-
-
