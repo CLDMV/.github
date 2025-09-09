@@ -469,6 +469,14 @@ jobs:
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
+      - name: Calculate artifact names
+        id: names
+        uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+        with:
+          node-version: ${{ inputs.node_version }}
+          package-name: ${{ inputs.package_name }}
+          version: ${{ inputs.version }}
+
       - name: Publish to NPM
         id: publish
         uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v1
@@ -479,6 +487,7 @@ jobs:
           package-manager: ${{ inputs.package_manager }}
           publish-command: ${{ inputs.publish_command_npm }}
           npm-token: ${{ secrets.NPM_TOKEN }}
+          artifact-name: ${{ steps.names.outputs.artifact-name }}
 
   publish-github-packages:
     name: "📦 Publish to GitHub Packages"
@@ -488,6 +497,14 @@ jobs:
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
+      - name: Calculate artifact names
+        id: names
+        uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+        with:
+          node-version: ${{ inputs.node_version }}
+          package-name: ${{ inputs.package_name }}
+          version: ${{ inputs.version }}
+
       - name: Publish to GitHub Packages
         id: publish
         uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v1
@@ -498,6 +515,7 @@ jobs:
           package-manager: ${{ inputs.package_manager }}
           publish-command: ${{ inputs.publish_command_github_packages }}
           github-token: ${{ github.token }}
+          artifact-name: ${{ steps.names.outputs.artifact-name }}
 
   fix-bot-signatures:
     name: "🤖 Fix Non-Bot-Signed Version Tags"

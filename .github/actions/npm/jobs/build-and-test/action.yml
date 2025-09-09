@@ -95,6 +95,29 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    - name: Extract package contents for artifacts
+      shell: bash
+      run: |
+        echo "📦 Extracting npm package contents for easier access..."
+
+        # Find the .tgz file
+        TGZ_FILE=$(find . -name "*.tgz" -type f | head -1)
+
+        if [ -z "$TGZ_FILE" ]; then
+          echo "❌ No .tgz file found"
+          exit 1
+        fi
+
+        echo "📦 Found package file: $TGZ_FILE"
+
+        # Extract to package-contents directory
+        mkdir -p package-contents
+        tar -xzf "$TGZ_FILE" -C package-contents --strip-components=1
+
+        echo "📂 Package contents extracted to package-contents/"
+        echo "📋 Extracted files:"
+        ls -la package-contents/
+
     - name: Update Summary - Package Created
       shell: bash
       run: |
@@ -109,6 +132,7 @@ runs:
           lib/
           build/
           *.tgz
+          package-contents/
           package.json
           package-lock.json
           yarn.lock

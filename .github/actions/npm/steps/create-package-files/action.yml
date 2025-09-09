@@ -14,6 +14,9 @@ outputs:
   zip-path:
     description: "Path to the created .zip package file"
     value: ${{ steps.create.outputs.zip-path }}
+  clean-name:
+    description: "Clean name of the package (without @ and / characters)"
+    value: ${{ steps.create.outputs.clean-name }}
 
 runs:
   using: "composite"
@@ -22,44 +25,87 @@ runs:
       id: create
       shell: bash
       run: |
-        # Find the .tgz file from npm pack
-        TGZ_FILE=$(find . -name "${{ inputs.package-path }}" -type f | head -1)
+        echo "📦 Creating release package files..."
+        
+        # Check if we have package-contents directory (preferred)
+        if [ -d "package-contents" ]; then
+          echo "✅ Using package-contents from artifacts"
+          PACKAGE_DIR="package-contents"
+          
+          # Get package name from package.json
+          PACKAGE_NAME=$(node -p "require('./package-contents/package.json').name")
+        else
+          # Fallback: extract from .tgz file
+          echo "📦 Extracting from .tgz file as fallback..."
+          TGZ_FILE=$(find . -name "${{ inputs.package-path }}" -type f | head -1)
 
-        if [ -z "$TGZ_FILE" ]; then
-          echo "❌ No .tgz file found matching pattern: ${{ inputs.package-path }}"
-          exit 1
+          if [ -z "$TGZ_FILE" ]; then
+            echo "❌ No .tgz file found matching pattern: ${{ inputs.package-path }}"
+            exit 1
+          fi
+
+          echo "📦 Found npm pack file: $TGZ_FILE"
+
+          # Create temp directory for extraction
+          TEMP_DIR=$(mktemp -d)
+
+          # Extract npm pack contents
+          echo "📂 Extracting npm pack contents..."
+          tar -xzf "$TGZ_FILE" -C "$TEMP_DIR"
+          PACKAGE_DIR="$TEMP_DIR/package"
+          
+          # Get package name from extracted package.json
+          PACKAGE_NAME=$(node -p "require('$PACKAGE_DIR/package.json').name")
         fi
+        
+        echo "📦 Package name: $PACKAGE_NAME"
+        echo "📂 Package directory: $PACKAGE_DIR"
 
-        echo "📦 Found npm pack file: $TGZ_FILE"
-
-        # Get package name from the tgz filename
-        PACKAGE_NAME=$(basename "$TGZ_FILE" .tgz)
-
-        # Create temp directory for extraction
-        TEMP_DIR=$(mktemp -d)
-
-        # Extract npm pack contents
-        echo "📂 Extracting npm pack contents..."
-        tar -xzf "$TGZ_FILE" -C "$TEMP_DIR"
+        # Create clean filename (replace @ and / for file names)
+        CLEAN_NAME=$(echo "$PACKAGE_NAME" | sed 's/@//g' | sed 's/\//-/g')
 
         # Create output files with proper naming (production marked)
-        TAR_GZ_PATH="${PACKAGE_NAME}-production.tar.gz"
-        ZIP_PATH="${PACKAGE_NAME}-production.zip"
+        TAR_GZ_PATH="${CLEAN_NAME}-production.tar.gz"
+        ZIP_PATH="${CLEAN_NAME}-production.zip"
 
-        # Create .tar.gz from extracted contents
-        echo "🗜️ Creating .tar.gz file..."
-        cd "$TEMP_DIR"
-        tar -czf "../$TAR_GZ_PATH" .
-        cd - > /dev/null
+        # Create temporary directory for proper folder structure
+        BUILD_DIR=$(mktemp -d)
+        
+        # Create directory with package name (e.g., @cldmv/slothlet)
+        # Handle scoped packages by creating nested directories
+        if [[ "$PACKAGE_NAME" == *"/"* ]]; then
+          # Scoped package like @cldmv/slothlet
+          SCOPE_DIR=$(dirname "$PACKAGE_NAME")
+          PACKAGE_DIR_NAME=$(basename "$PACKAGE_NAME")
+          mkdir -p "$BUILD_DIR/$SCOPE_DIR"
+          FINAL_PACKAGE_DIR="$BUILD_DIR/$SCOPE_DIR/$PACKAGE_DIR_NAME"
+        else
+          # Unscoped package
+          FINAL_PACKAGE_DIR="$BUILD_DIR/$PACKAGE_NAME"
+        fi
+        
+        mkdir -p "$FINAL_PACKAGE_DIR"
+        
+        echo "📁 Creating package structure: $FINAL_PACKAGE_DIR"
 
-        # Create .zip from extracted contents
-        echo "📁 Creating .zip file..."
-        cd "$TEMP_DIR"
-        zip -r "../$ZIP_PATH" .
-        cd - > /dev/null
+        # Copy all package contents to the properly named directory
+        cp -r "$PACKAGE_DIR"/* "$FINAL_PACKAGE_DIR"/
 
-        # Cleanup temp directory
-        rm -rf "$TEMP_DIR"
+                # Create tar.gz file containing the properly named package directory
+        echo "Creating tar.gz file..."
+        tar -czf "$TAR_GZ_PATH" -C "$WORKING_DIR" "$PACKAGE_NAME"
+
+        # Create zip file containing the properly named package directory  
+        echo "Creating zip file..."
+        cd "$WORKING_DIR"
+        zip -r "$GITHUB_WORKSPACE/$ZIP_PATH" "$PACKAGE_NAME"
+        cd "$GITHUB_WORKSPACE"
+
+        # Cleanup temp directories
+        rm -rf "$BUILD_DIR"
+        if [ -n "$TEMP_DIR" ]; then
+          rm -rf "$TEMP_DIR"
+        fi
 
         # Get absolute paths
         TAR_GZ_ABS=$(realpath "$TAR_GZ_PATH")
@@ -72,3 +118,4 @@ runs:
         # Output paths
         echo "tar-gz-path=$TAR_GZ_ABS" >> $GITHUB_OUTPUT
         echo "zip-path=$ZIP_ABS" >> $GITHUB_OUTPUT
+        echo "clean-name=$CLEAN_NAME" >> $GITHUB_OUTPUT

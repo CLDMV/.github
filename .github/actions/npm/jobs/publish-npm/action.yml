@@ -22,6 +22,10 @@ inputs:
   npm-token:
     description: "NPM token for authentication"
     required: true
+  artifact-name:
+    description: "Name of the build artifact to download"
+    required: false
+    default: "build-artifacts"
 
 outputs:
   published:
@@ -50,6 +54,7 @@ runs:
         package-manager: ${{ inputs.package-manager }}
         publish-command: ${{ inputs.publish-command }}
         auth-token: ${{ inputs.npm-token }}
+        artifact-name: ${{ inputs.artifact-name }}
 
     - name: Update Summary - NPM Success
       if: steps.publish-package.outputs.published == 'true'

@@ -28,6 +28,10 @@ inputs:
   auth-token:
     description: "Authentication token for the registry"
     required: true
+  artifact-name:
+    description: "Name of the build artifact to download"
+    required: false
+    default: "build-artifacts"
 
 outputs:
   published:
@@ -43,7 +47,28 @@ runs:
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: build-artifacts
+        name: ${{ inputs.artifact-name }}
+
+    - name: Verify package contents
+      shell: bash
+      run: |
+        echo "📦 Verifying package contents from artifacts..."
+        
+        if [ -d "package-contents" ]; then
+          echo "✅ Package contents directory found in artifacts"
+          echo "📋 Files in package-contents:"
+          ls -la package-contents/
+          
+          if [ ! -f "package-contents/package.json" ]; then
+            echo "❌ No package.json found in package-contents"
+            exit 1
+          fi
+        else
+          echo "❌ Package contents directory not found in artifacts"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
 
     - name: Setup Node.js for ${{ inputs.registry-name }}
       uses: actions/setup-node@v4
@@ -54,26 +79,50 @@ runs:
     - name: Publish to ${{ inputs.registry-name }}
       id: publish
       shell: bash
+      working-directory: package-contents
       env:
         NODE_AUTH_TOKEN: ${{ inputs.auth-token }}
       run: |
         echo "🚀 Publishing ${{ inputs.package-name }} v${{ inputs.version }} to ${{ inputs.registry-name }}"
-
+        echo "📂 Publishing from package-contents directory"
+        
+        # Show what files are available for publishing
+        echo "📋 Files in package:"
+        ls -la
+        
+        # Verify package.json exists
+        if [ ! -f "package.json" ]; then
+          echo "❌ No package.json found in package-contents"
+          exit 1
+        fi
+        
         # Try to publish with the provided command
         if ${{ inputs.publish-command }}; then
           echo "✅ Successfully published using primary command"
+          echo "published=true" >> $GITHUB_OUTPUT
         else
           echo "⚠️ ${{ inputs.registry-name }} publish failed, trying with public access as fallback..."
           
           # Fallback to public access
           if [ "${{ inputs.package-manager }}" = "yarn" ]; then
-            yarn publish --access public
+            if yarn publish --access public; then
+              echo "✅ Successfully published using yarn fallback command"
+              echo "published=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Failed to publish with yarn fallback"
+              echo "published=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
           else
-            npm publish --access public
+            if npm publish --access public; then
+              echo "✅ Successfully published using npm fallback command"
+              echo "published=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Failed to publish with npm fallback"
+              echo "published=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
           fi
-          
-          echo "✅ Successfully published using fallback command"
         fi
-
-        echo "published=true" >> $GITHUB_OUTPUT
+        
         echo "✅ Successfully published to ${{ inputs.registry-name }}"
