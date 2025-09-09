@@ -41,8 +41,8 @@ runs:
           VERSION_SUFFIX=" (Node.js $VERSION_CLEAN)"
         fi
 
-        # Calculate release name
-        RELEASE_NAME="${{ inputs.package-name }} v${{ inputs.version }}${VERSION_SUFFIX}"
+        # Calculate release name (just version, package name is redundant in repo context)
+        RELEASE_NAME="v${{ inputs.version }}${VERSION_SUFFIX}"
 
         echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
         echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT

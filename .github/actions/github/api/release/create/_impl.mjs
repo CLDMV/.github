@@ -9,38 +9,92 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		console.log(`  assets: ${assets}`);
 	}
 
-	// Create the release via GitHub API
-	const releasePayload = {
-		tag_name,
-		name,
-		body,
-		draft: is_draft,
-		prerelease: is_prerelease
-	};
-
-	if (debug) {
-		console.log(`🔍 Release payload:`, JSON.stringify(releasePayload, null, 2));
-	}
-
-	const releaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases`, {
-		method: "POST",
+	// Check if release already exists
+	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag_name}`, {
+		method: "GET",
 		headers: {
 			"Authorization": `token ${token}`,
-			"Accept": "application/vnd.github.v3+json",
-			"Content-Type": "application/json"
-		},
-		body: JSON.stringify(releasePayload)
+			"Accept": "application/vnd.github.v3+json"
+		}
 	});
 
-	if (!releaseResponse.ok) {
-		const errorText = await releaseResponse.text();
-		throw new Error(`Failed to create release: ${releaseResponse.status} ${errorText}`);
-	}
+	let releaseData;
+	
+	if (existingReleaseResponse.ok) {
+		// Release already exists
+		releaseData = await existingReleaseResponse.json();
+		console.log(`ℹ️ Release ${tag_name} already exists (ID: ${releaseData.id}). Updating it...`);
+		
+		// Update the existing release
+		const updatePayload = {
+			name,
+			body,
+			draft: is_draft,
+			prerelease: is_prerelease
+		};
 
-	const releaseData = await releaseResponse.json();
+		if (debug) {
+			console.log(`🔍 Update payload:`, JSON.stringify(updatePayload, null, 2));
+		}
 
-	if (debug) {
-		console.log(`✅ Created release: ${releaseData.id}`);
+		const updateResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+			method: "PATCH",
+			headers: {
+				"Authorization": `token ${token}`,
+				"Accept": "application/vnd.github.v3+json",
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(updatePayload)
+		});
+
+		if (!updateResponse.ok) {
+			const errorText = await updateResponse.text();
+			throw new Error(`Failed to update release: ${updateResponse.status} ${errorText}`);
+		}
+
+		releaseData = await updateResponse.json();
+		
+		if (debug) {
+			console.log(`✅ Updated existing release: ${releaseData.id}`);
+		}
+	} else if (existingReleaseResponse.status === 404) {
+		// Release doesn't exist, create new one
+		const releasePayload = {
+			tag_name,
+			name,
+			body,
+			draft: is_draft,
+			prerelease: is_prerelease
+		};
+
+		if (debug) {
+			console.log(`🔍 Release payload:`, JSON.stringify(releasePayload, null, 2));
+		}
+
+		const releaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases`, {
+			method: "POST",
+			headers: {
+				"Authorization": `token ${token}`,
+				"Accept": "application/vnd.github.v3+json",
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(releasePayload)
+		});
+
+		if (!releaseResponse.ok) {
+			const errorText = await releaseResponse.text();
+			throw new Error(`Failed to create release: ${releaseResponse.status} ${errorText}`);
+		}
+
+		releaseData = await releaseResponse.json();
+
+		if (debug) {
+			console.log(`✅ Created new release: ${releaseData.id}`);
+		}
+	} else {
+		// Some other error checking for existing release
+		const errorText = await existingReleaseResponse.text();
+		throw new Error(`Failed to check for existing release: ${existingReleaseResponse.status} ${errorText}`);
 	}
 
 	const result = {
