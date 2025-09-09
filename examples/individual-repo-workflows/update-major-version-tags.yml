@@ -38,11 +38,11 @@ jobs:
     permissions:
       contents: write
     with:
-      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
-      create_documentation: ${{ github.event_name == 'workflow_dispatch' && inputs.create_documentation || true }}
-      sign: ${{ github.event_name == 'workflow_dispatch' && inputs.sign || 'auto' }}
-      annotate: ${{ github.event_name == 'workflow_dispatch' && inputs.annotate || 'auto' }}
-      use_gpg: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gpg || false }}
+      debug: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.debug == 'true' || github.event.inputs.debug == true)) || false }}
+      create_documentation: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.create_documentation == 'true' || github.event.inputs.create_documentation == true)) || (github.event_name != 'workflow_dispatch' && true) }}
+      sign: "${{ github.event.inputs.sign || 'auto' }}"
+      annotate: "${{ github.event.inputs.annotate || 'auto' }}"
+      use_gpg: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.use_gpg == 'true' || github.event.inputs.use_gpg == true)) || (github.event_name != 'workflow_dispatch' && true) }}
     secrets:
       # Map your repo/org secrets to the expected names
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}

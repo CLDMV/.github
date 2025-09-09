@@ -1,8 +1,7 @@
 name: "🔄 Git Tag Operations"
 description: "Composite action for updating major/minor version tags and fixing orphans"
-        exclude_tags: ${{ steps.fix-orphans.outputs.fixed-tags }}
 
-    - name: Determine if should run:
+inputs:
   debug:
     description: "Enable debug logging"
     required: false
