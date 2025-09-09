@@ -95,13 +95,13 @@ runs:
         # Copy all package contents to the properly named directory
         cp -r "$PACKAGE_DIR"/* "$FINAL_PACKAGE_DIR"/
 
-                # Create tar.gz file containing the properly named package directory
+        # Create tar.gz file containing the properly named package directory
         echo "Creating tar.gz file..."
-        tar -czf "$TAR_GZ_PATH" -C "$WORKING_DIR" "$PACKAGE_NAME"
+        tar -czf "$TAR_GZ_PATH" -C "$BUILD_DIR" "$PACKAGE_NAME"
 
         # Create zip file containing the properly named package directory  
         echo "Creating zip file..."
-        cd "$WORKING_DIR"
+        cd "$BUILD_DIR"
         zip -r "$GITHUB_WORKSPACE/$ZIP_PATH" "$PACKAGE_NAME"
         cd "$GITHUB_WORKSPACE"
 
