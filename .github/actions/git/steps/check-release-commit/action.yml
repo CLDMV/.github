@@ -67,10 +67,9 @@ runs:
             
             # Check for breaking changes in the range (exclude release commits)
             echo "🔍 Checking for breaking changes..."
-            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release")
-            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release")
+            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release" || true)
+            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release" || true)
             
-            echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
             echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
             echo "$BREAKING_COMMITS"
             echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
