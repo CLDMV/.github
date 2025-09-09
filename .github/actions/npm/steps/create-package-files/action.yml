@@ -28,12 +28,15 @@ runs:
         echo "📦 Creating release package files..."
         
         # Check if we have package-contents directory (preferred)
+        # Look both in current directory and artifacts directory
         if [ -d "package-contents" ]; then
-          echo "✅ Using package-contents from artifacts"
+          echo "✅ Using package-contents from current directory"
           PACKAGE_DIR="package-contents"
-          
-          # Get package name from package.json
-          PACKAGE_NAME=$(node -p "require('./package-contents/package.json').name")
+          PACKAGE_JSON_PATH="package-contents/package.json"
+        elif [ -d "artifacts/package-contents" ]; then
+          echo "✅ Using package-contents from artifacts directory"
+          PACKAGE_DIR="artifacts/package-contents"
+          PACKAGE_JSON_PATH="artifacts/package-contents/package.json"
         else
           # Fallback: extract from .tgz file
           echo "📦 Extracting from .tgz file as fallback..."
@@ -53,10 +56,11 @@ runs:
           echo "📂 Extracting npm pack contents..."
           tar -xzf "$TGZ_FILE" -C "$TEMP_DIR"
           PACKAGE_DIR="$TEMP_DIR/package"
-          
-          # Get package name from extracted package.json
-          PACKAGE_NAME=$(node -p "require('$PACKAGE_DIR/package.json').name")
+          PACKAGE_JSON_PATH="$PACKAGE_DIR/package.json"
         fi
+        
+        # Get package name from package.json
+        PACKAGE_NAME=$(node -p "require('$PACKAGE_JSON_PATH').name")
         
         echo "📦 Package name: $PACKAGE_NAME"
         echo "📂 Package directory: $PACKAGE_DIR"
