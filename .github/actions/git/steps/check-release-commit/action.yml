@@ -50,26 +50,30 @@ runs:
           git tag -l | sort -V | tail -10
           
           # Analyze commits since last release to determine version bump
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Use the latest semantic version tag, not just reachable ones
+          LAST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          echo "🔍 DEBUG: Latest semantic version tag found: $LAST_TAG"
+          
           if [ -z "$LAST_TAG" ]; then
-            echo "No previous tags found, defaulting to minor release"
+            echo "No previous semantic version tags found, defaulting to minor release"
             echo "version-bump=minor" >> $GITHUB_OUTPUT
           else
             echo "Last tag: $LAST_TAG"
             COMMIT_RANGE="$LAST_TAG..HEAD"
             
             echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
-            echo "� DEBUG: All commits in range:"
+            echo "🔍 DEBUG: All commits in range:"
             git log $COMMIT_RANGE --oneline | head -10 || true
             
-            # Check for breaking changes in the range (exclude previous release commits)
+            # Check for breaking changes in the range (exclude release commits)
             echo "🔍 Checking for breaking changes..."
-            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --not --grep="^release" --oneline)
-            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --not --grep="^release" --oneline)
+            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release")
+            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release")
             
-            echo "🔍 DEBUG: Breaking commits found:"
+            echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
+            echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
             echo "$BREAKING_COMMITS"
-            echo "🔍 DEBUG: Breaking change body found:"
+            echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
             echo "$BREAKING_BODY"
             
             if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
@@ -77,8 +81,8 @@ runs:
               echo "has-breaking=true" >> $GITHUB_OUTPUT
               echo "🚀 Major release - breaking changes detected in commit history"
             else
-              # Check for features (exclude previous release commits)
-              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --not --grep="^release" --oneline)
+              # Check for features (exclude release commits)
+              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release")
               if [[ -n "$FEATURE_COMMITS" ]]; then
                 echo "version-bump=minor" >> $GITHUB_OUTPUT
                 echo "🎉 Minor release - new features detected"

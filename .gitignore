@@ -8,6 +8,15 @@
 .clinerules
 .cursor/
 .windsurf/
+
+# Project Management
+TODO.md
+
+# Archive Files
+*.zip
+*.tar.gz
+*.rar
+*.7z
 .cline/
 .aider*
 .aide*
