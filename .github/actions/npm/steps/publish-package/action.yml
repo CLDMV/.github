@@ -96,8 +96,12 @@ runs:
           exit 1
         fi
         
+        # Set the publish command
+        PUBLISH_CMD="${{ inputs.publish-command }}"
+        
         # Try to publish with the provided command
-        if ${{ inputs.publish-command }}; then
+        echo "🔧 Running command: $PUBLISH_CMD"
+        if eval "$PUBLISH_CMD"; then
           echo "✅ Successfully published using primary command"
           echo "published=true" >> $GITHUB_OUTPUT
         else
