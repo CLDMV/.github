@@ -103,7 +103,3 @@ runs:
           echo "has-breaking=${{ steps.analyze.outputs.has-breaking || 'false' }}" >> $GITHUB_OUTPUT
         fi
         echo "📦 Release commit detected - will create release PR"
-        else
-          echo "should-create-pr=false" >> $GITHUB_OUTPUT
-          echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"
-        fi
