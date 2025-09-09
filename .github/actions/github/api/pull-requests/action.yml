@@ -43,36 +43,78 @@ runs:
       run: |
         # Set the token - prefer passed GITHUB_TOKEN, fallback to default github.token
         if [ -n "$GITHUB_TOKEN" ]; then
-          export GH_TOKEN="$GITHUB_TOKEN"
-          echo "🔑 Using passed GITHUB_TOKEN for GitHub CLI"
+          TOKEN="$GITHUB_TOKEN"
+          echo "🔑 Using passed GITHUB_TOKEN for GitHub API"
         else
-          export GH_TOKEN="${{ github.token }}"
-          echo "🔑 Using default github.token for GitHub CLI"
+          TOKEN="${{ github.token }}"
+          echo "🔑 Using default github.token for GitHub API"
         fi
-        # Check if PR already exists
-        EXISTING_PR=$(gh pr list --head ${{ inputs.head-branch }} --base ${{ inputs.base-branch }} --json number --jq '.[0].number' 2>/dev/null || echo "")
 
-        if [ -n "$EXISTING_PR" ]; then
-          echo "PR already exists: #$EXISTING_PR"
-          echo "pr-number=$EXISTING_PR" >> $GITHUB_OUTPUT
+        # Check if PR already exists using GitHub API
+        echo "🔍 Checking for existing PR..."
+        EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ inputs.head-branch }}&base=${{ inputs.base-branch }}&state=open")
+
+        EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
+
+        if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
+          echo "📋 PR already exists: #$EXISTING_PR_NUMBER"
+          echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr-created=false" >> $GITHUB_OUTPUT
         else
-          # Create new PR
-          PR_URL=$(gh pr create \
-            --title "${{ inputs.title }}" \
-            --base ${{ inputs.base-branch }} \
-            --head ${{ inputs.head-branch }} \
-            --body-file PR_BODY.md \
-            --label "${{ inputs.labels }}")
+          # Create new PR using GitHub API
+          echo "📋 Creating new PR..."
           
-          # Extract PR number from URL
-          PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]\+$')
+          # Read PR body content
+          PR_BODY=$(cat PR_BODY.md)
           
-          echo "Created PR: #$PR_NUMBER"
-          echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr-created=true" >> $GITHUB_OUTPUT
+          # Create PR JSON payload
+          PR_JSON=$(jq -n \
+            --arg title "${{ inputs.title }}" \
+            --arg head "${{ inputs.head-branch }}" \
+            --arg base "${{ inputs.base-branch }}" \
+            --arg body "$PR_BODY" \
+            '{
+              title: $title,
+              head: $head,
+              base: $base,
+              body: $body
+            }')
+
+          # Create PR via API
+          PR_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls" \
+            -d "$PR_JSON")
+
+          # Extract PR number
+          PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number')
+          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url')
+
+          if [ "$PR_NUMBER" != "null" ] && [ -n "$PR_NUMBER" ]; then
+            echo "✅ Created PR: #$PR_NUMBER"
+            echo "🔗 URL: $PR_URL"
+            
+            # Add labels if specified
+            if [ -n "${{ inputs.labels }}" ]; then
+              echo "🏷️ Adding labels: ${{ inputs.labels }}"
+              LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
+              curl -s -X POST \
+                -H "Authorization: token $TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -H "Content-Type: application/json" \
+                "https://api.github.com/repos/${{ github.repository }}/issues/$PR_NUMBER/labels" \
+                -d "{\"labels\": $LABELS_JSON}" > /dev/null
+            fi
+            
+            echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr-created=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to create PR"
+            echo "Response: $PR_RESPONSE"
+            exit 1
+          fi
         fi
-
-
-
-
