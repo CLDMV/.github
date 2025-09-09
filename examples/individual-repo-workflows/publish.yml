@@ -20,7 +20,7 @@ on:
 
 jobs:
   publish-package:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     uses: CLDMV/.github/.github/workflows/publish.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
