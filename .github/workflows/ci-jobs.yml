@@ -363,6 +363,9 @@ jobs:
       - name: Create App token (auto-detect)
         id: app-token
         uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
         env:
           BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -377,7 +380,18 @@ jobs:
           build-command: ${{ inputs.build_command }}
           version-bump: ${{ inputs.version_bump }}
           github-token: ${{ steps.app-token.outputs.token }}
-
+      - name: Dispatch CI for PR branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "ci.yml",             // or the numeric ID
+              ref: process.env.GITHUB_REF_NAME,  // PR branch name
+              inputs: { debug: "false" }
+            })
   download-artifacts:
     name: "⬇️ Download Artifacts"
     if: inputs.run_download_artifacts == true
@@ -400,6 +414,9 @@ jobs:
       - name: Create App token (auto-detect)
         id: app-token
         uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
         env:
           BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -486,6 +503,9 @@ jobs:
       - name: Create App token (auto-detect)
         id: app-token
         uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
         env:
           BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -528,6 +548,9 @@ jobs:
       - name: Create App token (auto-detect)
         id: app-token
         uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
         env:
           BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}

@@ -66,12 +66,12 @@ jobs:
     # To set up App authentication, add these secrets to your repository settings:
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # Optional: CLDMV Bot credentials for enhanced permissions and proper attribution
-      # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
+      # CLDMV Bot credentials for enhanced permissions and proper attribution
+      # Uncomment these lines to use your bot instead of github-actions[bot]
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}
       # Optional: GPG signing credentials (only needed if use_gpg: true)
-      # TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
-      # TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
-      # GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      # GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+      TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+      GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}

@@ -3,7 +3,14 @@ name: 🧪 CI Tests & Build
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [master, main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
   push:
     branches: ["**"]
     paths-ignore:
@@ -27,6 +34,7 @@ on:
 
 jobs:
   ci:
+    name: 🏗️ Continuous Integration
     uses: CLDMV/.github/.github/workflows/ci.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
@@ -63,3 +71,26 @@ jobs:
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}
+
+  # ✅ Stable check that runs on BOTH push and PR and mirrors ci result
+  required-check:
+    name: ✅ Required PR Check
+    needs: ci
+    # run on both push and PR so the context exists on the PR head SHA
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror reusable result
+        run: |
+          echo "ci.result=${{ needs.ci.result }}"
+          if [ "${{ needs.ci.result }}" = "success" ]; then
+            echo "Reusable CI passed."
+            exit 0
+          elif [ "${{ needs.ci.result }}" = "failure" ] || [ "${{ needs.ci.result }}" = "cancelled" ]; then
+            echo "Reusable CI did not pass."
+            exit 1
+          else
+            # covers 'skipped' or undefined; force red to avoid silent green
+            echo "Reusable CI produced no pass/fail; treating as failure."
+            exit 1
+          fi
