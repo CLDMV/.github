@@ -14,6 +14,11 @@ on:
         type: boolean
         required: false
         default: false
+      skip_matrix_tests:
+        description: "Skip matrix testing (use single node version only)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   create-release-pr:
@@ -22,7 +27,8 @@ jobs:
     uses: CLDMV/.github/.github/workflows/release.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }} # Enable debug logging
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
+      # skip_matrix_tests: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_matrix_tests || false }}
 
       # Node.js Version Configuration (choose one approach)
       # Option 1: Single Node.js version (simple)

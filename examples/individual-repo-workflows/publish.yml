@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      skip_publish:
+        description: "Skip ALL publishing, for testing"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   publish-package:
@@ -19,7 +24,8 @@ jobs:
     uses: CLDMV/.github/.github/workflows/publish.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }} # Enable debug logging
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
+      # skip_publish: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_publish || false }}
       # version: "1.0.0" # Version to publish - auto-detected from package.json if not provided (default: "")
 
       # Node.js Version Configuration

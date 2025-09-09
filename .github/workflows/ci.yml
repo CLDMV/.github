@@ -8,6 +8,11 @@ on:
         required: true
         type: string
         description: "NPM package name (e.g., @cldmv/slothlet)"
+      debug:
+        required: false
+        type: boolean
+        default: false
+        description: "Enable debug logging for troubleshooting"
       node_version:
         required: false
         type: string
@@ -67,6 +72,7 @@ jobs:
     uses: ./.github/workflows/ci-jobs.yml
     with:
       package_name: ${{ inputs.package_name }}
+      debug: ${{ inputs.debug }}
       run_build_and_test: true
       node_version: ${{ inputs.node_version }}
       min_node_version: ${{ inputs.min_node_version }}

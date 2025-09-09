@@ -13,24 +13,24 @@ on:
         type: boolean
         required: false
         default: false
-      use_gpg:
-        description: "Use GPG signing via CLDMV_ secrets?"
+      create_documentation:
+        description: "Whether to create/update VERSION_TAGS.md documentation"
         type: boolean
         required: false
         default: true
       sign:
-        description: "sign mode: auto | true | false"
+        description: "Smart signing mode (auto/true/false)"
         required: false
         default: "auto"
       annotate:
-        description: "annotate mode: auto | true | false"
+        description: "Smart annotate mode (auto/true/false)"
         required: false
         default: "auto"
-      create_documentation:
-        description: "Create/update VERSION_TAGS.md documentation"
+      use_gpg:
+        description: "If true, forward provided secrets to enable signing"
         type: boolean
         required: false
-        default: true
+        default: false
 
 jobs:
   update-tags:
@@ -42,7 +42,7 @@ jobs:
       create_documentation: ${{ github.event_name == 'workflow_dispatch' && inputs.create_documentation || true }}
       sign: ${{ github.event_name == 'workflow_dispatch' && inputs.sign || 'auto' }}
       annotate: ${{ github.event_name == 'workflow_dispatch' && inputs.annotate || 'auto' }}
-      use_gpg: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gpg || true }}
+      use_gpg: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gpg || false }}
     secrets:
       # Map your repo/org secrets to the expected names
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
