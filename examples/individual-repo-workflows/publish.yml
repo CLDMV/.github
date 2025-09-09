@@ -69,7 +69,7 @@ jobs:
       # CLDMV Bot credentials for enhanced permissions and proper attribution
       # Uncomment these lines to use your bot instead of github-actions[bot]
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
       # Optional: GPG signing credentials (only needed if use_gpg: true)
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

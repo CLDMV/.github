@@ -70,7 +70,7 @@ jobs:
       # Optional: CLDMV Bot credentials for enhanced permissions and proper attribution
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
   # ✅ Stable check that runs on BOTH push and PR and mirrors ci result
   required-check:
