@@ -40,9 +40,15 @@ runs:
     - name: Create or update pull request
       id: create-pr
       shell: bash
-      env:
-        GH_TOKEN: ${{ env.GITHUB_TOKEN || github.token }}
       run: |
+        # Set the token - prefer passed GITHUB_TOKEN, fallback to default github.token
+        if [ -n "$GITHUB_TOKEN" ]; then
+          export GH_TOKEN="$GITHUB_TOKEN"
+          echo "🔑 Using passed GITHUB_TOKEN for GitHub CLI"
+        else
+          export GH_TOKEN="${{ github.token }}"
+          echo "🔑 Using default github.token for GitHub CLI"
+        fi
         # Check if PR already exists
         EXISTING_PR=$(gh pr list --head ${{ inputs.head-branch }} --base ${{ inputs.base-branch }} --json number --jq '.[0].number' 2>/dev/null || echo "")
 
