@@ -39,20 +39,17 @@ runs:
   steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      shell: bash
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
         name: build-artifacts
-      shell: bash
 
     - name: Setup Node.js for ${{ inputs.registry-name }}
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
         registry-url: ${{ inputs.registry-url }}
-      shell: bash
 
     - name: Publish to ${{ inputs.registry-name }}
       id: publish
@@ -80,7 +77,3 @@ runs:
 
         echo "published=true" >> $GITHUB_OUTPUT
         echo "✅ Successfully published to ${{ inputs.registry-name }}"
-
-
-
-

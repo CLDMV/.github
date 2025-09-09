@@ -42,9 +42,9 @@ runs:
         echo "📂 Extracting npm pack contents..."
         tar -xzf "$TGZ_FILE" -C "$TEMP_DIR"
 
-        # Create output files with proper naming
-        TAR_GZ_PATH="${PACKAGE_NAME}.tar.gz"
-        ZIP_PATH="${PACKAGE_NAME}.zip"
+        # Create output files with proper naming (production marked)
+        TAR_GZ_PATH="${PACKAGE_NAME}-production.tar.gz"
+        ZIP_PATH="${PACKAGE_NAME}-production.zip"
 
         # Create .tar.gz from extracted contents
         echo "🗜️ Creating .tar.gz file..."
@@ -53,7 +53,7 @@ runs:
         cd - > /dev/null
 
         # Create .zip from extracted contents
-        echo "� Creating .zip file..."
+        echo "📁 Creating .zip file..."
         cd "$TEMP_DIR"
         zip -r "../$ZIP_PATH" .
         cd - > /dev/null

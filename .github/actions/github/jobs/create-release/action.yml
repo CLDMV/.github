@@ -110,13 +110,13 @@ runs:
 
     - name: Create tag if needed
       id: create-tag
-      uses: CLDMV/.github/.github/actions/github/api/tags/create@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/create@v1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         tag: v${{ steps.detect-version.outputs.version }}
+        sha: ${{ steps.get-sha.outputs.commit-sha }}
         message: Release v${{ steps.detect-version.outputs.version }}
-        commit-sha: ${{ steps.get-sha.outputs.commit-sha }}
-        github-token: ${{ inputs.github-token }}
-        force: false
 
     - name: Update Summary - Tag Created
       shell: bash
@@ -169,13 +169,14 @@ runs:
     - name: Create GitHub release
       id: create-release
       uses: CLDMV/.github/.github/actions/github/api/release/create@v1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         tag_name: v${{ steps.detect-version.outputs.version }}
         name: ${{ steps.names.outputs.release-name }}
         body: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
         is_prerelease: ${{ inputs.is-prerelease }}
         is_draft: false
-        github_token: ${{ inputs.github-token }}
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
 
     - name: Update Summary - Release Created
@@ -188,10 +189,11 @@ runs:
 
     - name: Verify tag signature
       id: verify-tag
-      uses: CLDMV/.github/.github/actions/github/api/tags/verify@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/verify@v1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag-sha: ${{ steps.create-tag.outputs.tag-sha }}
-        github-token: ${{ inputs.github-token }}
+        tag: v${{ steps.detect-version.outputs.version }}
 
     - name: Update Summary - Final
       shell: bash
