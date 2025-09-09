@@ -26,7 +26,7 @@ runs:
       shell: bash
       run: |
         echo "📦 Creating release package files..."
-        
+
         # Check if we have package-contents directory (preferred)
         # Look both in current directory and artifacts directory
         if [ -d "package-contents" ]; then
@@ -58,10 +58,10 @@ runs:
           PACKAGE_DIR="$TEMP_DIR/package"
           PACKAGE_JSON_PATH="$TEMP_DIR/package/package.json"
         fi
-        
+
         # Get package name from package.json
         PACKAGE_NAME=$(node -p "require('$PACKAGE_JSON_PATH').name")
-        
+
         echo "📦 Package name: $PACKAGE_NAME"
         echo "📂 Package directory: $PACKAGE_DIR"
 
@@ -74,7 +74,7 @@ runs:
 
         # Create temporary directory for proper folder structure
         BUILD_DIR=$(mktemp -d)
-        
+
         # Create directory with package name (e.g., @cldmv/slothlet)
         # Handle scoped packages by creating nested directories
         if [[ "$PACKAGE_NAME" == *"/"* ]]; then
@@ -87,9 +87,9 @@ runs:
           # Unscoped package
           FINAL_PACKAGE_DIR="$BUILD_DIR/$PACKAGE_NAME"
         fi
-        
+
         mkdir -p "$FINAL_PACKAGE_DIR"
-        
+
         echo "📁 Creating package structure: $FINAL_PACKAGE_DIR"
 
         # Copy all package contents to the properly named directory

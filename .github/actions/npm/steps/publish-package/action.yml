@@ -53,7 +53,7 @@ runs:
       shell: bash
       run: |
         echo "📦 Verifying package contents from artifacts..."
-        
+
         if [ -d "package-contents" ]; then
           echo "✅ Package contents directory found in artifacts"
           echo "📋 Files in package-contents:"
@@ -85,20 +85,20 @@ runs:
       run: |
         echo "🚀 Publishing ${{ inputs.package-name }} v${{ inputs.version }} to ${{ inputs.registry-name }}"
         echo "📂 Publishing from package-contents directory"
-        
+
         # Show what files are available for publishing
         echo "📋 Files in package:"
         ls -la
-        
+
         # Verify package.json exists
         if [ ! -f "package.json" ]; then
           echo "❌ No package.json found in package-contents"
           exit 1
         fi
-        
+
         # Set the publish command
         PUBLISH_CMD="${{ inputs.publish-command }}"
-        
+
         # Try to publish with the provided command
         echo "🔧 Running command: $PUBLISH_CMD"
         if eval "$PUBLISH_CMD"; then
@@ -128,5 +128,5 @@ runs:
             fi
           fi
         fi
-        
+
         echo "✅ Successfully published to ${{ inputs.registry-name }}"

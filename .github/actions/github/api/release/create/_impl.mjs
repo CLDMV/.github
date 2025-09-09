@@ -19,12 +19,12 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	});
 
 	let releaseData;
-	
+
 	if (existingReleaseResponse.ok) {
 		// Release already exists
 		releaseData = await existingReleaseResponse.json();
 		console.log(`ℹ️ Release ${tag_name} already exists (ID: ${releaseData.id}). Updating it...`);
-		
+
 		// Update the existing release
 		const updatePayload = {
 			name,
@@ -53,7 +53,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		}
 
 		releaseData = await updateResponse.json();
-		
+
 		if (debug) {
 			console.log(`✅ Updated existing release: ${releaseData.id}`);
 		}
