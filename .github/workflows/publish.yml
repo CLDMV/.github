@@ -101,6 +101,22 @@ on:
         type: boolean
         default: false
         description: "Skip matrix testing (use single node version only)"
+      # Bot signing parameters
+      use_gpg:
+        required: false
+        type: boolean
+        default: false
+        description: "If true, forward provided secrets to enable GPG signing"
+      sign:
+        required: false
+        type: string
+        default: "auto"
+        description: "Smart signing mode (auto/true/false)"
+      annotate:
+        required: false
+        type: string
+        default: "auto"
+        description: "Smart annotate mode (auto/true/false)"
 
     secrets:
       NPM_TOKEN:
@@ -111,6 +127,18 @@ on:
         required: false
       BOT_APP_PRIVATE_KEY:
         description: "GitHub App private key for CLDMV bot"
+        required: false
+      TAGGER_NAME:
+        description: "GPG tagger name for signing"
+        required: false
+      TAGGER_EMAIL:
+        description: "GPG tagger email for signing"
+        required: false
+      GPG_PRIVATE_KEY:
+        description: "ASCII-armored private key for signing"
+        required: false
+      GPG_PASSPHRASE:
+        description: "Passphrase for the private key (if protected)"
         required: false
 
     outputs:
@@ -169,10 +197,17 @@ jobs:
       publish_command_github_packages: ${{ inputs.github_packages_publish_command }}
       skip_performance_tests: ${{ inputs.skip_performance_tests }}
       skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+      use_gpg: ${{ inputs.use_gpg }}
+      sign: ${{ inputs.sign }}
+      annotate: ${{ inputs.annotate }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+      TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
+      TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
   summary:
     name: "📋 Publish Summary"

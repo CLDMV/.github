@@ -54,6 +54,11 @@ jobs:
       # skip_performance_tests: false # Skip performance tests during CI (default: false)
       # skip_matrix_tests: false # Skip matrix testing, use single version (default: false)
 
+      # Bot Configuration Options
+      # use_gpg: false # Enable GPG signing with your bot (default: false)
+      # sign: "auto" # Smart signing mode: auto/true/false (default: auto)
+      # annotate: "auto" # Smart annotate mode: auto/true/false (default: auto)
+
     # Authentication & Bot Configuration
     # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
     # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
@@ -65,3 +70,8 @@ jobs:
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_PRIVATE_KEY }}
+      # Optional: GPG signing credentials (only needed if use_gpg: true)
+      # TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
+      # TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
+      # GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      # GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
