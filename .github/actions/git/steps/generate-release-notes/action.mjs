@@ -59,6 +59,12 @@ if (!HAS_COMMITS) {
 			return acc;
 		}, {});
 		console.log("🔍 DEBUG: Commit categories:", categoryCounts);
+		
+		// Debug: Show each commit and its category
+		console.log("🔍 DEBUG: Individual commits and categories:");
+		allCommits.forEach((commit) => {
+			console.log(`  ${commit.hash}: "${commit.subject}" → ${commit.category}`);
+		});
 	} catch (error) {
 		console.log(`🔍 DEBUG: Could not parse commits: ${error.message}`);
 	}

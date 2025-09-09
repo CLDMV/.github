@@ -62,21 +62,36 @@ function categorizeCommits(commitRange) {
 				isBreaking = !!conventionalMatch[3];
 			}
 
-			// Determine category
-			if (isBreaking || lower.includes("breaking change") || lower.includes("break")) {
+			// Determine category - order matters!
+			// First check for release commits - these should be excluded entirely
+			if (type === "release" || lower.startsWith("release:") || lower.startsWith("release!:")) {
+				category = "maintenance";
+			}
+			// Then check for breaking changes (but not release commits)
+			else if ((isBreaking || lower.includes("breaking change") || lower.includes("break")) && type !== "release") {
 				category = "breaking";
-			} else if (type === "feat" || lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
-				category = "feature";
-			} else if (type === "fix" || lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
+			}
+			// Then check for content-based categorization (takes precedence over type)
+			else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
 				category = "fix";
-			} else if (
+			}
+			else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
+				category = "feature";
+			}
+			// Then check conventional commit types
+			else if (type === "feat") {
+				category = "feature";
+			}
+			else if (type === "fix") {
+				category = "fix";
+			}
+			else if (
 				type === "chore" ||
 				type === "docs" ||
 				type === "style" ||
 				type === "refactor" ||
 				type === "test" ||
-				type === "ci" ||
-				lower.includes("release")
+				type === "ci"
 			) {
 				category = "maintenance";
 			}
@@ -92,6 +107,14 @@ function categorizeCommits(commitRange) {
 				isBreaking
 			};
 		});
+
+		// Debug logging for each commit's categorization
+		if (DEBUG) {
+			console.log("🔍 DEBUG: Individual commit categorization:");
+			commits.forEach((commit) => {
+				console.log(`  ${commit.hash}: "${commit.subject}" → ${commit.category} (type: ${commit.type}, breaking: ${commit.isBreaking})`);
+			});
+		}
 
 		return commits;
 	} catch (error) {
