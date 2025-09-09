@@ -38,60 +38,71 @@ runs:
         elif [[ $COMMIT_MSG =~ ^release: ]]; then
           echo "should-create-pr=true" >> $GITHUB_OUTPUT
           echo "has-breaking=false" >> $GITHUB_OUTPUT
+          echo "analyze-commits=true" >> $GITHUB_OUTPUT
+        else
+          echo "should-create-pr=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"
+        fi
+
+    - name: Get commit range for analysis
+      id: commit-range
+      if: steps.check.outputs.analyze-commits == 'true'
+      uses: ./.github/actions/git/steps/get-commit-range
+      with:
+        debug: "true"
+
+    - name: Analyze commits for version bump
+      id: analyze
+      if: steps.check.outputs.analyze-commits == 'true'
+      shell: bash
+      run: |
+        COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
+        LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
+        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
+        
+        if [ "$HAS_COMMITS" = "false" ]; then
+          echo "No commits to analyze, defaulting to minor release"
+          echo "version-bump=minor" >> $GITHUB_OUTPUT
+        else
+          echo "Last tag: $LAST_TAG"
+          echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
           
-          # Fetch all tags to ensure we have the complete tag history
-          echo "🔍 Fetching all tags from remote..."
-          git fetch --tags --force
-          git fetch origin master --tags 2>/dev/null || true
-          git fetch origin main --tags 2>/dev/null || true
+          # Check for breaking changes in the range (exclude release commits)
+          echo "🔍 Checking for breaking changes..."
+          BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release" || true)
+          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release" || true)
           
-          # Debug: Show available tags
-          echo "📋 Available tags after fetch:"
-          git tag -l | sort -V | tail -10
+          echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
+          echo "$BREAKING_COMMITS"
+          echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
+          echo "$BREAKING_BODY"
           
-          # Analyze commits since last release to determine version bump
-          # Use the latest semantic version tag, not just reachable ones
-          LAST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          echo "🔍 DEBUG: Latest semantic version tag found: $LAST_TAG"
-          
-          if [ -z "$LAST_TAG" ]; then
-            echo "No previous semantic version tags found, defaulting to minor release"
-            echo "version-bump=minor" >> $GITHUB_OUTPUT
+          if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
+            echo "version-bump=major" >> $GITHUB_OUTPUT
+            echo "has-breaking=true" >> $GITHUB_OUTPUT
+            echo "🚀 Major release - breaking changes detected in commit history"
           else
-            echo "Last tag: $LAST_TAG"
-            COMMIT_RANGE="$LAST_TAG..HEAD"
-            
-            echo "🔍 DEBUG: Analyzing commit range: $COMMIT_RANGE"
-            echo "🔍 DEBUG: All commits in range:"
-            git log $COMMIT_RANGE --oneline | head -10 || true
-            
-            # Check for breaking changes in the range (exclude release commits)
-            echo "🔍 Checking for breaking changes..."
-            BREAKING_COMMITS=$(git log $COMMIT_RANGE --grep="!" --oneline | grep -v "^[a-f0-9]* release" || true)
-            BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --oneline | grep -v "^[a-f0-9]* release" || true)
-            
-            echo "🔍 DEBUG: Breaking commits found (after filtering release commits):"
-            echo "$BREAKING_COMMITS"
-            echo "🔍 DEBUG: Breaking change body found (after filtering release commits):"
-            echo "$BREAKING_BODY"
-            
-            if [[ -n "$BREAKING_COMMITS" ]] || [[ -n "$BREAKING_BODY" ]]; then
-              echo "version-bump=major" >> $GITHUB_OUTPUT
-              echo "has-breaking=true" >> $GITHUB_OUTPUT
-              echo "🚀 Major release - breaking changes detected in commit history"
+            # Check for features (exclude release commits)
+            FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release" || true)
+            if [[ -n "$FEATURE_COMMITS" ]]; then
+              echo "version-bump=minor" >> $GITHUB_OUTPUT
+              echo "🎉 Minor release - new features detected"
             else
-              # Check for features (exclude release commits)
-              FEATURE_COMMITS=$(git log $COMMIT_RANGE --grep="^feat:" --oneline | grep -v "^[a-f0-9]* release" || true)
-              if [[ -n "$FEATURE_COMMITS" ]]; then
-                echo "version-bump=minor" >> $GITHUB_OUTPUT
-                echo "🎉 Minor release - new features detected"
-              else
-                echo "version-bump=patch" >> $GITHUB_OUTPUT
-                echo "🐛 Patch release - only fixes and other changes"
-              fi
+              echo "version-bump=patch" >> $GITHUB_OUTPUT
+              echo "🐛 Patch release - only fixes and other changes"
             fi
           fi
-          echo "📦 Release commit detected - will create release PR"
+        fi
+
+    - name: Final output
+      if: steps.check.outputs.should-create-pr == 'true'
+      shell: bash
+      run: |
+        if [[ "${{ steps.check.outputs.analyze-commits }}" == "true" ]]; then
+          echo "version-bump=${{ steps.analyze.outputs.version-bump }}" >> $GITHUB_OUTPUT
+          echo "has-breaking=${{ steps.analyze.outputs.has-breaking || 'false' }}" >> $GITHUB_OUTPUT
+        fi
+        echo "📦 Release commit detected - will create release PR"
         else
           echo "should-create-pr=false" >> $GITHUB_OUTPUT
           echo "ℹ️ Not a release commit (must start with 'release:' or 'release!:')"

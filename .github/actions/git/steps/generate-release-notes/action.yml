@@ -21,37 +21,44 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Get commit range for release notes
+      id: commit-range
+      uses: ./.github/actions/git/steps/get-commit-range
+      with:
+        debug: "false"
+
     - name: Generate release notes
       id: generate
       shell: bash
       run: |
         VERSION="${{ inputs.version }}"
+        COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
+        LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
+        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
+        
+        echo "📋 Generating release notes for version: $VERSION"
+        echo "📋 Commit range: $COMMIT_RANGE"
+        echo "📋 Base tag: $LAST_TAG"
 
-        # Try to find the last release tag
-        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [ -z "$LAST_TAG" ]; then
-          echo "No previous tags found, using initial commit"
-          COMMIT_RANGE="$(git rev-list --max-parents=0 HEAD)..HEAD"
-        else
-          echo "Last tag: $LAST_TAG"
-          COMMIT_RANGE="$LAST_TAG..HEAD"
-        fi
-
-        echo "## 🚀 What's Changed" > RELEASE_NOTES.md
+        echo "## � What's Changed" > RELEASE_NOTES.md
         echo "" >> RELEASE_NOTES.md
 
-        # Check for release commits first (these are usually the most important)
-        RELEASE_COMMITS=$(git log $COMMIT_RANGE --grep="^release:" --pretty=format:"- %s (%h)" | head -5)
-        if [[ -n "$RELEASE_COMMITS" ]]; then
-          echo "### 🎯 Release Highlights" >> RELEASE_NOTES.md
-          echo "$RELEASE_COMMITS" >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-        fi
+        if [ "$HAS_COMMITS" = "false" ]; then
+          echo "ℹ️ No commits found in range - this may be a re-release or tag-only release"
+          echo "_No new commits since last release_" >> RELEASE_NOTES.md
+        else
+          # Check for release commits first (these are usually the most important)
+          RELEASE_COMMITS=$(git log $COMMIT_RANGE --grep="^release:" --pretty=format:"- %s (%h)" | head -5)
+          if [[ -n "$RELEASE_COMMITS" ]]; then
+            echo "### 🎯 Release Highlights" >> RELEASE_NOTES.md
+            echo "$RELEASE_COMMITS" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
 
-        # Breaking Changes
-        echo "### 💥 Breaking Changes" >> RELEASE_NOTES.md
-        BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
-        BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+          # Breaking Changes (exclude release commits)
+          echo "### 💥 Breaking Changes" >> RELEASE_NOTES.md
+          BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | grep -v "^- release" | head -10 || true)
+          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | grep -v "^- release" | head -10 || true)
         if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
           echo "$BREAKING" >> RELEASE_NOTES.md
           echo "$BREAKING_BODY" >> RELEASE_NOTES.md
@@ -60,9 +67,9 @@ runs:
         fi
         echo "" >> RELEASE_NOTES.md
 
-        # Features
+        # Features (exclude release commits)
         echo "### ✨ Features" >> RELEASE_NOTES.md
-        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | grep -v "^- release" | head -10 || true)
         if [[ -n "$FEATURES" ]]; then
           echo "$FEATURES" >> RELEASE_NOTES.md
         else
@@ -70,9 +77,9 @@ runs:
         fi
         echo "" >> RELEASE_NOTES.md
 
-        # Bug Fixes
+        # Bug Fixes (exclude release commits)
         echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
-        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | grep -v "^- release" | head -10 || true)
         if [[ -n "$FIXES" ]]; then
           echo "$FIXES" >> RELEASE_NOTES.md
         else
