@@ -138,8 +138,19 @@ runs:
       run: |
         if [ "${{ github.event_name }}" = "release" ]; then
           TAG_NAME="${{ github.event.release.tag_name }}"
+          echo "Using release tag: $TAG_NAME"
         else
-          TAG_NAME="${{ github.ref_name }}"
+          # For push events, find the latest semantic version tag
+          echo "Event is push, finding latest semantic version tag..."
+          git fetch --tags
+          LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          if [ -n "$LATEST_TAG" ]; then
+            TAG_NAME="$LATEST_TAG"
+            echo "Found latest semantic version tag: $TAG_NAME"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+            echo "No semantic version tags found, using ref: $TAG_NAME"
+          fi
         fi
         echo "tag-name=$TAG_NAME" >> "$GITHUB_OUTPUT"
         echo "Processing tag: $TAG_NAME"
