@@ -46,7 +46,7 @@ runs:
           if (publishToNPM && npmPublished) {
             comment += `
 
-          📦 **NPM:** [${packageName}@${version}](https://www.npmjs.com/package/${packageName}/v/${version})
+          📦 **NPM:** [${packageName}@${version}](https://www.npmjs.com/package/${packageName})
           📥 **Install:** \`npm install ${packageName}@${version}\``;
           }
 

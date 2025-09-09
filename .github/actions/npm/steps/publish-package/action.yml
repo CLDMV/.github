@@ -83,7 +83,7 @@ runs:
       env:
         NODE_AUTH_TOKEN: ${{ inputs.auth-token }}
       run: |
-        echo "🚀 Publishing ${{ inputs.package-name }} v${{ inputs.version }} to ${{ inputs.registry-name }}"
+        echo "🚀 Publishing ${{ inputs.package-name }}@${{ inputs.version }} to ${{ inputs.registry-name }}"
         echo "📂 Publishing from package-contents directory"
 
         # Show what files are available for publishing
@@ -98,8 +98,14 @@ runs:
 
         # Set the publish command
         PUBLISH_CMD="${{ inputs.publish-command }}"
+        
+        if [ -z "$PUBLISH_CMD" ]; then
+          echo "❌ No publish command provided"
+          echo "published=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
 
-        # Try to publish with the provided command
+        # Execute the provided command
         echo "🔧 Running command: $PUBLISH_CMD"
         if eval "$PUBLISH_CMD"; then
           echo "✅ Successfully published using primary command"

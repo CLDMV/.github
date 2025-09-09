@@ -42,6 +42,52 @@ runs:
         echo "- 🔄 Starting NPM publication for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
+    - name: Generate publish command
+      id: generate-command
+      shell: bash
+      run: |
+        # Generate appropriate publish command based on repository visibility and inputs
+        PACKAGE_NAME="${{ inputs.package-name }}"
+        CUSTOM_CMD="${{ inputs.publish-command }}"
+        
+        if [ -n "$CUSTOM_CMD" ]; then
+          echo "🔧 Using custom publish command"
+          FINAL_CMD="$CUSTOM_CMD"
+        else
+          echo "🔧 Generating publish command based on repository and package settings"
+          
+          # Check if repository is public or private
+          REPO_VISIBILITY="${{ github.event.repository.private == false && 'public' || 'private' }}"
+          echo "📊 Repository visibility: $REPO_VISIBILITY"
+          
+          # Determine access level (default based on repo visibility, can be overridden)
+          if [ "$REPO_VISIBILITY" = "public" ]; then
+            ACCESS_LEVEL="public"
+          else
+            ACCESS_LEVEL="restricted"
+          fi
+          
+          echo "🔒 Package access level: $ACCESS_LEVEL"
+          
+          # Generate command
+          if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+            if [ "$ACCESS_LEVEL" = "public" ]; then
+              FINAL_CMD="yarn publish --access public"
+            else
+              FINAL_CMD="yarn publish --access restricted"
+            fi
+          else
+            if [ "$ACCESS_LEVEL" = "public" ]; then
+              FINAL_CMD="npm publish --access public"
+            else
+              FINAL_CMD="npm publish --access restricted"
+            fi
+          fi
+        fi
+        
+        echo "📝 Final publish command: $FINAL_CMD"
+        echo "command=$FINAL_CMD" >> $GITHUB_OUTPUT
+
     - name: Publish package to NPM
       id: publish-package
       uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
@@ -52,7 +98,7 @@ runs:
         version: ${{ inputs.version }}
         node-version: ${{ inputs.node-version }}
         package-manager: ${{ inputs.package-manager }}
-        publish-command: ${{ inputs.publish-command }}
+        publish-command: ${{ steps.generate-command.outputs.command }}
         auth-token: ${{ inputs.npm-token }}
         artifact-name: ${{ inputs.artifact-name }}
 
@@ -62,7 +108,16 @@ runs:
       run: |
         # Extract package name for URL (remove @scope/ if present)
         PACKAGE_URL_NAME=$(echo "${{ inputs.package-name }}" | sed 's|^@[^/]*/||')
-        echo "- ✅ NPM Registry: Published [${{ inputs.package-name }}@${{ inputs.version }}](https://www.npmjs.com/package/${{ inputs.package-name }}/v/${{ inputs.version }}) successfully" >> $GITHUB_STEP_SUMMARY
+        
+        # Format version - ensure no double "v" prefix
+        VERSION="${{ inputs.version }}"
+        if [[ "$VERSION" =~ ^v ]]; then
+          DISPLAY_VERSION="$VERSION"
+        else
+          DISPLAY_VERSION="v$VERSION"
+        fi
+        
+        echo "- ✅ NPM Registry: Published [${{ inputs.package-name }} $DISPLAY_VERSION](https://www.npmjs.com/package/${{ inputs.package-name }})" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - NPM Failure
       if: steps.publish-package.outputs.published != 'true'
