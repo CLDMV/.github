@@ -49,7 +49,7 @@ runs:
         # Generate appropriate publish command for GitHub Packages
         PACKAGE_NAME="${{ inputs.package-name }}"
         CUSTOM_CMD="${{ inputs.publish-command }}"
-        
+
         if [ -n "$CUSTOM_CMD" ]; then
           echo "🔧 Using custom publish command"
           FINAL_CMD="$CUSTOM_CMD"
@@ -84,7 +84,7 @@ runs:
             fi
           fi
         fi
-        
+
         echo "📝 Final publish command: $FINAL_CMD"
         echo "command=$FINAL_CMD" >> $GITHUB_OUTPUT
 
@@ -109,7 +109,7 @@ runs:
         # Extract org and package name for GitHub Packages URL
         ORG_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f1)
         PACKAGE_NAME=$(echo "${{ inputs.package-name }}" | sed 's|^@[^/]*/||')
-        
+
         # Format version - ensure no double "v" prefix
         VERSION="${{ inputs.version }}"
         if [[ "$VERSION" =~ ^v ]]; then
@@ -117,7 +117,7 @@ runs:
         else
           DISPLAY_VERSION="v$VERSION"
         fi
-        
+
         echo "- ✅ GitHub Packages: Published [${{ inputs.package-name }} $DISPLAY_VERSION](https://github.com/orgs/$ORG_NAME/packages/npm/$PACKAGE_NAME)" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - GitHub Packages Failure

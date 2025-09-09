@@ -98,7 +98,7 @@ runs:
 
         # Set the publish command
         PUBLISH_CMD="${{ inputs.publish-command }}"
-        
+
         if [ -z "$PUBLISH_CMD" ]; then
           echo "❌ No publish command provided"
           echo "published=false" >> $GITHUB_OUTPUT

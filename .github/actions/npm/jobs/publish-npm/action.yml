@@ -49,7 +49,7 @@ runs:
         # Generate appropriate publish command based on repository visibility and inputs
         PACKAGE_NAME="${{ inputs.package-name }}"
         CUSTOM_CMD="${{ inputs.publish-command }}"
-        
+
         if [ -n "$CUSTOM_CMD" ]; then
           echo "🔧 Using custom publish command"
           FINAL_CMD="$CUSTOM_CMD"
@@ -84,7 +84,7 @@ runs:
             fi
           fi
         fi
-        
+
         echo "📝 Final publish command: $FINAL_CMD"
         echo "command=$FINAL_CMD" >> $GITHUB_OUTPUT
 
@@ -108,7 +108,7 @@ runs:
       run: |
         # Extract package name for URL (remove @scope/ if present)
         PACKAGE_URL_NAME=$(echo "${{ inputs.package-name }}" | sed 's|^@[^/]*/||')
-        
+
         # Format version - ensure no double "v" prefix
         VERSION="${{ inputs.version }}"
         if [[ "$VERSION" =~ ^v ]]; then
@@ -116,7 +116,7 @@ runs:
         else
           DISPLAY_VERSION="v$VERSION"
         fi
-        
+
         echo "- ✅ NPM Registry: Published [${{ inputs.package-name }} $DISPLAY_VERSION](https://www.npmjs.com/package/${{ inputs.package-name }})" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - NPM Failure
