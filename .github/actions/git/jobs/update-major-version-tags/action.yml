@@ -1,7 +1,8 @@
 name: "🔄 Git Tag Operations"
 description: "Composite action for updating major/minor version tags and fixing orphans"
+        exclude_tags: ${{ steps.fix-orphans.outputs.fixed-tags }}
 
-inputs:
+    - name: Determine if should run:
   debug:
     description: "Enable debug logging"
     required: false
@@ -123,12 +124,13 @@ runs:
       id: should-run
       shell: bash
       run: |
-        if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ]; then
+        # Check if we're in workflow_call mode OR we have version tags OR bot signatures were fixed
+        if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ] || [ "${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}" = "true" ]; then
           echo "result=true" >> "$GITHUB_OUTPUT"
-          echo "✅ Should run tag updates"
+          echo "✅ Should run tag updates (event: ${{ github.event_name }}, has_tags: ${{ steps.check-tags.outputs.has_version_tags }}, fixed_signatures: ${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }})"
         else
           echo "result=false" >> "$GITHUB_OUTPUT"
-          echo "❌ Skipping tag updates - no version tags found"
+          echo "❌ Skipping tag updates - no version tags found and no signatures fixed"
         fi
 
     - name: Get tag name
