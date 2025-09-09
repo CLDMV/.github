@@ -380,18 +380,18 @@ jobs:
           build-command: ${{ inputs.build_command }}
           version-bump: ${{ inputs.version_bump }}
           github-token: ${{ steps.app-token.outputs.token }}
-      - name: Dispatch CI for PR branch
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: "ci.yml",             // or the numeric ID
-              ref: process.env.GITHUB_REF_NAME,  // PR branch name
-              inputs: { debug: "false" }
-            })
+    #   - name: Dispatch CI for PR branch
+    #     uses: actions/github-script@v7
+    #     with:
+    #       github-token: ${{ secrets.GITHUB_TOKEN }}
+    #       script: |
+    #         await github.actions.createWorkflowDispatch({
+    #           owner: context.repo.owner,
+    #           repo: context.repo.repo,
+    #           workflow_id: "ci.yml",             // or the numeric ID
+    #           ref: process.env.GITHUB_REF_NAME,  // PR branch name
+    #           inputs: { debug: "false" }
+    #         })
   download-artifacts:
     name: "⬇️ Download Artifacts"
     if: inputs.run_download_artifacts == true
