@@ -31,100 +31,13 @@ runs:
       id: generate
       shell: bash
       run: |
-        VERSION="${{ inputs.version }}"
-        COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
-        LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
-        HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
+        # Set environment variables for the Node.js script
+        export VERSION="${{ inputs.version }}"
+        export COMMIT_RANGE="${{ steps.commit-range.outputs.commit-range }}"
+        export LAST_TAG="${{ steps.commit-range.outputs.last-tag }}"
+        export HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
+        export PACKAGE_NAME="${{ inputs.package-name }}"
+        export PACKAGE_MANAGER="${{ inputs.package-manager }}"
 
-        echo "📋 Generating release notes for version: $VERSION"
-        echo "📋 Commit range: $COMMIT_RANGE"
-        echo "📋 Base tag: $LAST_TAG"
-
-        echo "## � What's Changed" > RELEASE_NOTES.md
-        echo "" >> RELEASE_NOTES.md
-
-        if [ "$HAS_COMMITS" = "false" ]; then
-          echo "ℹ️ No commits found in range - this may be a re-release or tag-only release"
-          echo "_No new commits since last release_" >> RELEASE_NOTES.md
-        else
-          # Get all commits in range for intelligent categorization
-          ALL_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s (%h)")
-
-          # Breaking Changes - check for ! in commit type OR breaking change in body/footer
-          echo "### 💥 Breaking Changes" >> RELEASE_NOTES.md
-          BREAKING_COMMITS=""
-          
-          # Check for conventional commit breaking changes (type!)
-          BREAKING_TYPE=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10 || true)
-          # Check for BREAKING CHANGE in body
-          BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10 || true)
-          # Check release commits that mention breaking/major changes
-          BREAKING_RELEASE=$(git log $COMMIT_RANGE --grep="^release.*[Bb]reak" --pretty=format:"- %s (%h)" | head -5 || true)
-          
-          BREAKING_COMMITS="$BREAKING_TYPE$BREAKING_BODY$BREAKING_RELEASE"
-          if [[ -n "$BREAKING_COMMITS" ]]; then
-            echo "$BREAKING_TYPE" >> RELEASE_NOTES.md
-            echo "$BREAKING_BODY" >> RELEASE_NOTES.md
-            echo "$BREAKING_RELEASE" >> RELEASE_NOTES.md
-          else
-            echo "_No breaking changes_" >> RELEASE_NOTES.md
-          fi
-          echo "" >> RELEASE_NOTES.md
-
-          # Features - feat: prefix OR release commits mentioning features/add/new
-          echo "### ✨ Features" >> RELEASE_NOTES.md
-          FEATURE_COMMITS=""
-          FEAT_TYPE=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10 || true)
-          FEAT_RELEASE=$(git log $COMMIT_RANGE --grep="^release.*[Aa]dd\|^release.*[Nn]ew\|^release.*[Ff]eature" --pretty=format:"- %s (%h)" | head -5 || true)
-          
-          FEATURE_COMMITS="$FEAT_TYPE$FEAT_RELEASE"
-          if [[ -n "$FEATURE_COMMITS" ]]; then
-            echo "$FEAT_TYPE" >> RELEASE_NOTES.md
-            echo "$FEAT_RELEASE" >> RELEASE_NOTES.md
-          else
-            echo "_No new features_" >> RELEASE_NOTES.md
-          fi
-          echo "" >> RELEASE_NOTES.md
-
-          # Bug Fixes - fix: prefix OR release commits mentioning fix/bug/patch
-          echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
-          FIX_COMMITS=""
-          FIX_TYPE=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10 || true)
-          FIX_RELEASE=$(git log $COMMIT_RANGE --grep="^release.*[Ff]ix\|^release.*[Bb]ug\|^release.*[Pp]atch" --pretty=format:"- %s (%h)" | head -5 || true)
-          
-          FIX_COMMITS="$FIX_TYPE$FIX_RELEASE"
-          if [[ -n "$FIX_COMMITS" ]]; then
-            echo "$FIX_TYPE" >> RELEASE_NOTES.md
-            echo "$FIX_RELEASE" >> RELEASE_NOTES.md
-          else
-            echo "_No bug fixes_" >> RELEASE_NOTES.md
-          fi
-          echo "" >> RELEASE_NOTES.md
-
-          # Other Changes - everything else (excluding maintenance commits)
-          echo "### 🔧 Other Changes" >> RELEASE_NOTES.md
-          OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="BREAKING CHANGE" --grep="^release.*[Ff]ix" --grep="^release.*[Bb]ug" --grep="^release.*[Pp]atch" --grep="^release.*[Aa]dd" --grep="^release.*[Nn]ew" --grep="^release.*[Ff]eature" --grep="^release.*[Bb]reak" --grep="^chore:" --grep="^docs:" --grep="^style:" --grep="^refactor:" --grep="^test:" --grep="^ci:" --pretty=format:"- %s (%h)" | head -5 || true)
-          if [[ -n "$OTHER" ]]; then
-            echo "$OTHER" >> RELEASE_NOTES.md
-          else
-            echo "_No other changes_" >> RELEASE_NOTES.md
-          fi
-          echo "" >> RELEASE_NOTES.md
-
-        # Installation
-        echo "## 📦 Installation" >> RELEASE_NOTES.md
-        echo "" >> RELEASE_NOTES.md
-        echo '```bash' >> RELEASE_NOTES.md
-        echo "${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
-        if [ "${{ inputs.package-manager }}" = "yarn" ]; then
-          echo "yarn add ${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
-        else
-          echo "npm install ${{ inputs.package-name }}@$VERSION" >> RELEASE_NOTES.md
-        fi
-        echo '```' >> RELEASE_NOTES.md
-
-        # Output the release notes content for use in other steps
-        RELEASE_NOTES=$(cat RELEASE_NOTES.md)
-        echo "release-notes<<EOF" >> $GITHUB_OUTPUT
-        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        # Run the Node.js script
+        node "${{ github.action_path }}/action.mjs"
