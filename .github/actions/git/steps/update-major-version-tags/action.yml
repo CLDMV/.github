@@ -50,10 +50,15 @@ runs:
         echo "Tag SHA: $TAG_SHA"
 
         # Create JSON payload for upsert-batch action
-        JSON_PAYLOAD='[{"tag":"'"$MAJOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"Update major version tag '"$MAJOR_VERSION"' to point to '"$TAG_NAME"'"},{"tag":"'"$MINOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"Update minor version tag '"$MINOR_VERSION"' to point to '"$TAG_NAME"'"}]'
+        JSON_PAYLOAD='[{"tag":"'"$MAJOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"'"$MAJOR_VERSION"' → '"$TAG_NAME"'"},{"tag":"'"$MINOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"'"$MINOR_VERSION"' → '"$TAG_NAME"'"}]'
 
         echo "🏷️ Updating version tags using upsert-batch:"
-        echo "$JSON_PAYLOAD"
+        if [ "${{ inputs.debug }}" = "true" ]; then
+          echo "$JSON_PAYLOAD"
+        else
+          echo "- $MAJOR_VERSION -> $TAG_NAME"
+          echo "- $MINOR_VERSION -> $TAG_NAME"
+        fi
 
         # Set output for upsert-batch step
         echo "tags-payload=$JSON_PAYLOAD" >> $GITHUB_OUTPUT

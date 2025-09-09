@@ -116,7 +116,7 @@ runs:
       with:
         tag: v${{ steps.detect-version.outputs.version }}
         sha: ${{ steps.get-sha.outputs.commit-sha }}
-        message: Release v${{ steps.detect-version.outputs.version }}
+        message: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
 
     - name: Update Summary - Tag Created
       shell: bash
