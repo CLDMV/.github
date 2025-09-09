@@ -144,7 +144,7 @@ jobs:
   publish:
     name: "📦 Publish Package"
     needs: debug-inputs
-    uses: ./.github/workflows/ci-jobs.yml
+    uses: CLDMV/.github/.github/workflows/ci-jobs.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
