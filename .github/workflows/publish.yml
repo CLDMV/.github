@@ -117,7 +117,6 @@ on:
         type: string
         default: "auto"
         description: "Smart annotate mode (auto/true/false)"
-
     secrets:
       NPM_TOKEN:
         description: "NPM token for publishing packages"
@@ -140,7 +139,6 @@ on:
       GPG_PASSPHRASE:
         description: "Passphrase for the private key (if protected)"
         required: false
-
     outputs:
       npm-published:
         description: "Whether the package was published to NPM"
@@ -154,9 +152,33 @@ on:
       major-version:
         description: "The major version tag that was updated"
         value: ${{ jobs.publish.outputs.major-version }}
+      minor-version:
+        description: "The minor version tag that was updated"
+        value: ${{ jobs.publish.outputs.minor-version }}
       tags-updated:
         description: "Whether version tags were updated"
         value: ${{ jobs.publish.outputs.tags-updated }}
+  workflow_dispatch:
+    inputs:
+      package_name:
+        required: true
+        type: string
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+      debug:
+        required: false
+        type: boolean
+        default: false
+        description: "Enable debug logging for troubleshooting"
+      node_version:
+        required: false
+        type: string
+        default: "lts/*"
+        description: "Node.js version to use (default: lts/*)"
+      version:
+        required: false
+        type: string
+        default: ""
+        description: "Version to publish (auto-detected from package.json if not provided)"
 
 jobs:
   debug-inputs:
