@@ -98,41 +98,41 @@ on:
       # Version tag outputs
       major-version:
         description: "The major version tag that was updated"
-        value: ${{ jobs.update-version-tags.outputs.major-version || jobs.unified-tag-health.outputs.major-version }}
+        value: ${{ jobs.update-version-tags.outputs.major-version || jobs.unified-update-major-minor.outputs.major-version }}
       minor-version:
         description: "The minor version tag that was updated"
-        value: ${{ jobs.update-version-tags.outputs.minor-version || jobs.unified-tag-health.outputs.minor-version }}
+        value: ${{ jobs.update-version-tags.outputs.minor-version || jobs.unified-update-major-minor.outputs.minor-version }}
       tags-updated:
         description: "Whether version tags were updated"
-        value: ${{ jobs.update-version-tags.outputs.updated || jobs.unified-tag-health.outputs.updated }}
+        value: ${{ jobs.update-version-tags.outputs.updated || jobs.unified-update-major-minor.outputs.updated }}
       has-version-tags:
         description: "Whether the repository has version tags"
-        value: ${{ jobs.update-version-tags.outputs.has-version-tags || jobs.unified-tag-health.outputs.has-version-tags }}
+        value: ${{ jobs.update-version-tags.outputs.has-version-tags || jobs.unified-update-major-minor.outputs.has-version-tags }}
       should-run:
         description: "Whether tag updates should run"
-        value: ${{ jobs.update-version-tags.outputs.should-run || jobs.unified-tag-health.outputs.should-run }}
+        value: ${{ jobs.update-version-tags.outputs.should-run || jobs.unified-update-major-minor.outputs.should-run }}
       fixed-orphans:
         description: "Orphaned tags that were fixed"
-        value: ${{ jobs.update-version-tags.outputs.fixed-orphans || jobs.unified-tag-health.outputs.fixed-orphans }}
+        value: ${{ jobs.update-version-tags.outputs.fixed-orphans || jobs.unified-update-major-minor.outputs.fixed-orphans }}
       orphans-found:
         description: "Whether orphaned tags were found"
-        value: ${{ jobs.update-version-tags.outputs.orphans-found || jobs.unified-tag-health.outputs.orphans-found }}
+        value: ${{ jobs.update-version-tags.outputs.orphans-found || jobs.unified-update-major-minor.outputs.orphans-found }}
       fixed-bot-signatures:
         description: "Non-bot tags that were fixed"
-        value: ${{ jobs.fix-bot-signatures.outputs.fixed-tags || jobs.unified-tag-health.outputs.fixed-bot-signatures }}
+        value: ${{ jobs.fix-bot-signatures.outputs.fixed-tags || jobs.unified-summarize-results.outputs.fixed-bot-signatures }}
       non-bot-tags-found:
         description: "Whether non-bot tags were found"
-        value: ${{ jobs.fix-bot-signatures.outputs.non-bot-tags-found || jobs.unified-tag-health.outputs.non-bot-tags-found }}
+        value: ${{ jobs.fix-bot-signatures.outputs.non-bot-tags-found || jobs.unified-summarize-results.outputs.non-bot-tags-found }}
       # Unified outputs
       total_processed:
         description: "Total number of tags processed"
-        value: ${{ jobs.unified-tag-health.outputs.total_processed }}
+        value: ${{ jobs.unified-summarize-results.outputs.total_processed }}
       total_fixed:
         description: "Total number of tags fixed across all steps"
-        value: ${{ jobs.unified-tag-health.outputs.total_fixed }}
+        value: ${{ jobs.unified-summarize-results.outputs.total_fixed }}
       processing_summary:
         description: "Summary of all processing steps"
-        value: ${{ jobs.unified-tag-health.outputs.processing_summary }}
+        value: ${{ jobs.unified-summarize-results.outputs.processing_summary }}
 
 jobs:
   # Auto-detect GPG capability once at the beginning
@@ -158,108 +158,16 @@ jobs:
             fi
           fi
 
-  fix-bot-signatures:
-    name: "🤖 Fix Non-Bot-Signed Version Tags"
-    if: inputs.run_fix_bot_signatures == true
-    needs: [detect-gpg]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      fixed-tags: ${{ steps.fix-bot-signatures.outputs.fixed-tags }}
-      non-bot-tags-found: ${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}
-    steps:
-      - name: Create App token (auto-detect)
-        id: app-token
-        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
-        with:
-          app_id: ${{ secrets.BOT_APP_ID }}
-          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-        env:
-          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-      - name: Fix non-bot-signed version tags
-        id: fix-bot-signatures
-        uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v1
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
-        with:
-          debug: ${{ inputs.debug }}
-          gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
-          tagger_name: ${{ secrets.TAGGER_NAME }}
-          tagger_email: ${{ secrets.TAGGER_EMAIL }}
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
-  update-version-tags:
-    name: "🏷️ Update Major/Minor Version Tags"
-    if: inputs.run_update_version_tags == true
-    runs-on: ubuntu-latest
-    needs: [detect-gpg, fix-bot-signatures]
-    permissions:
-      contents: write
-    outputs:
-      major-version: ${{ steps.tags.outputs.major-version }}
-      minor-version: ${{ steps.tags.outputs.minor-version }}
-      updated: ${{ steps.tags.outputs.updated }}
-      has-version-tags: ${{ steps.tags.outputs.has-version-tags }}
-      should-run: ${{ steps.tags.outputs.should-run }}
-      fixed-orphans: ${{ steps.tags.outputs.fixed-orphans }}
-      orphans-found: ${{ steps.tags.outputs.orphans-found }}
-      # Pass through outputs from first job
-      fixed-bot-signatures: ${{ needs.fix-bot-signatures.outputs.fixed-tags }}
-      non-bot-tags-found: ${{ needs.fix-bot-signatures.outputs.non-bot-tags-found }}
-    steps:
-      - name: Create App token (auto-detect)
-        id: app-token
-        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
-        with:
-          app_id: ${{ secrets.BOT_APP_ID }}
-          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-        env:
-          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-      - name: Check for version tags and update
-        id: tags
-        uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
-        with:
-          debug: ${{ inputs.debug }}
-          create-documentation: ${{ inputs.create_documentation }}
-
-          # forward identity & GPG based on detection
-          tagger_name: ${{ needs.detect-gpg.outputs.gpg-enabled && secrets.TAGGER_NAME   || '' }}
-          tagger_email: ${{ needs.detect-gpg.outputs.gpg-enabled && secrets.TAGGER_EMAIL  || '' }}
-          gpg_private_key: ${{ needs.detect-gpg.outputs.gpg-enabled && secrets.GPG_PRIVATE_KEY || '' }}
-          gpg_passphrase: ${{ needs.detect-gpg.outputs.gpg-enabled && secrets.GPG_PASSPHRASE  || '' }}
-
-  unified-tag-health:
-    name: "🏷️ Unified Tag Health Check"
-    needs: [detect-gpg]
+  # Shared setup for unified tag health sequence
+  setup-shared:
+    name: "🔧 Setup Environment"
     if: inputs.run_unified_tag_health == true
+    needs: [detect-gpg]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      total_processed: ${{ steps.summarize.outputs.total-processed }}
-      total_fixed: ${{ steps.summarize.outputs.total-fixed }}
-      processing_summary: ${{ steps.summarize.outputs.processing-summary }}
-      # Individual step outputs for compatibility
-      fixed-bot-signatures: ${{ steps.fix-bot-sigs.outputs.fixed_count }}
-      non-bot-tags-found: ${{ steps.fix-bot-sigs.outputs.fixed_count }}
-      major-version: ${{ steps.update-major-tags.outputs.major-version }}
-      minor-version: ${{ steps.update-major-tags.outputs.minor-version }}
-      updated: ${{ steps.update-major-tags.outputs.updated }}
-      has-version-tags: ${{ steps.update-major-tags.outputs.has-version-tags }}
-      should-run: ${{ steps.update-major-tags.outputs.should-run }}
-      fixed-orphans: ${{ steps.update-major-tags.outputs.fixed-orphans }}
-      orphans-found: ${{ steps.update-major-tags.outputs.orphans-found }}
-
+      app-token: ${{ steps.app-token.outputs.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -281,7 +189,27 @@ jobs:
           BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      # Step 1: Get detailed tag list for processing
+  unified-update-major-minor:
+    name: "🏷️ Update Major/Minor Tags"
+    if: inputs.run_unified_tag_health == true
+    needs: [detect-gpg, setup-shared]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      major-version: ${{ steps.update-major-tags.outputs.major-version }}
+      minor-version: ${{ steps.update-major-tags.outputs.minor-version }}
+      updated: ${{ steps.update-major-tags.outputs.updated }}
+      has-version-tags: ${{ steps.update-major-tags.outputs.has-version-tags }}
+      should-run: ${{ steps.update-major-tags.outputs.should-run }}
+      fixed-orphans: ${{ steps.update-major-tags.outputs.fixed-orphans }}
+      orphans-found: ${{ steps.update-major-tags.outputs.orphans-found }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Get tags to process
         id: get-tags
         uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
@@ -294,12 +222,11 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
-      # Step 2: Update major/minor version tags FIRST (creates new tags if needed)
       - name: Update major/minor version tags
         id: update-major-tags
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
@@ -310,9 +237,23 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # Step 3: Re-scan tags after major/minor updates
-      - name: Re-scan tags after major/minor updates
-        id: rescan-after-major
+  unified-fix-bot-signatures:
+    name: "🤖 Fix Bot Signatures"
+    if: inputs.run_unified_tag_health == true
+    needs: [detect-gpg, setup-shared, unified-update-major-minor]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tags to process
+        id: get-tags
         uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
         with:
           debug: ${{ inputs.debug }}
@@ -323,25 +264,38 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
-      # Step 4: Fix non-bot signatures (using fresh tag data)
       - name: Fix non-bot signatures
         id: fix-bot-sigs
         uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v1
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
-          tags_detailed: ${{ steps.rescan-after-major.outputs.tags_detailed }}
+          tags_detailed: ${{ steps.get-tags.outputs.tags_detailed }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tagger_name: ${{ secrets.TAGGER_NAME }}
           tagger_email: ${{ secrets.TAGGER_EMAIL }}
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # Step 5: Re-scan tags after bot signature fixes
-      - name: Re-scan tags after bot signature fixes
-        id: rescan-after-bot-sigs
+  unified-fix-unsigned-tags:
+    name: "🔏 Fix Unsigned Tags"
+    if: inputs.run_unified_tag_health == true
+    needs: [detect-gpg, setup-shared, unified-fix-bot-signatures]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      fixed_count: ${{ steps.fix-unsigned.outputs.fixed_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tags to process
+        id: get-tags
         uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
         with:
           debug: ${{ inputs.debug }}
@@ -352,25 +306,38 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
-      # Step 6: Fix unsigned tags (using fresh tag data)
       - name: Fix unsigned tags
         id: fix-unsigned
         uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v1
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
-          tags_detailed: ${{ steps.rescan-after-bot-sigs.outputs.tags_detailed }}
+          tags_detailed: ${{ steps.get-tags.outputs.tags_detailed }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tagger_name: ${{ secrets.TAGGER_NAME }}
           tagger_email: ${{ secrets.TAGGER_EMAIL }}
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # Step 7: Re-scan tags after unsigned tag fixes
-      - name: Re-scan tags after unsigned tag fixes
-        id: rescan-after-unsigned
+  unified-fix-orphaned-tags:
+    name: "🔗 Fix Orphaned Tags"
+    if: inputs.run_unified_tag_health == true
+    needs: [detect-gpg, setup-shared, unified-fix-unsigned-tags]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      fixed_count: ${{ steps.fix-orphaned.outputs.fixed_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tags to process
+        id: get-tags
         uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
         with:
           debug: ${{ inputs.debug }}
@@ -381,23 +348,56 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
-      # Step 8: Fix orphaned tags (using fresh tag data)
       - name: Fix orphaned tags
         id: fix-orphaned
         uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v1
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
-          tags_detailed: ${{ steps.rescan-after-unsigned.outputs.tags_detailed }}
+          tags_detailed: ${{ steps.get-tags.outputs.tags_detailed }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tagger_name: ${{ secrets.TAGGER_NAME }}
           tagger_email: ${{ secrets.TAGGER_EMAIL }}
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # Step 9: Final scan for summary
+  unified-summarize-results:
+    name: "📊 Summarize Results"
+    if: inputs.run_unified_tag_health == true
+    needs:
+      [
+        detect-gpg,
+        setup-shared,
+        unified-update-major-minor,
+        unified-fix-bot-signatures,
+        unified-fix-unsigned-tags,
+        unified-fix-orphaned-tags
+      ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      total_processed: ${{ steps.summarize.outputs.total-processed }}
+      total_fixed: ${{ steps.summarize.outputs.total-fixed }}
+      processing_summary: ${{ steps.summarize.outputs.processing-summary }}
+      # Individual step outputs for compatibility
+      fixed-bot-signatures: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
+      non-bot-tags-found: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
+      major-version: ${{ needs.unified-update-major-minor.outputs.major-version }}
+      minor-version: ${{ needs.unified-update-major-minor.outputs.minor-version }}
+      updated: ${{ needs.unified-update-major-minor.outputs.updated }}
+      has-version-tags: ${{ needs.unified-update-major-minor.outputs.has-version-tags }}
+      should-run: ${{ needs.unified-update-major-minor.outputs.should-run }}
+      fixed-orphans: ${{ needs.unified-update-major-minor.outputs.fixed-orphans }}
+      orphans-found: ${{ needs.unified-update-major-minor.outputs.orphans-found }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Final tag scan for summary
         id: final-scan
         uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
@@ -410,31 +410,29 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
-      # Step 10: Summarize all processing
       - name: Summarize processing
         id: summarize
         run: |
           echo "🔄 Unified Tag Health Summary for ${{ github.repository }}:"
 
-          INITIAL_COUNT="${{ steps.get-tags.outputs.tags_count }}"
+          # Get initial count from setup job (we'll use current count as approximation)
           FINAL_COUNT="${{ steps.final-scan.outputs.tags_count }}"
-          BOT_FIXED="${{ steps.fix-bot-sigs.outputs.fixed_count }}"
-          UNSIGNED_FIXED="${{ steps.fix-unsigned.outputs.fixed_count }}"
-          ORPHANED_FIXED="${{ steps.fix-orphaned.outputs.fixed_count }}"
-          MAJOR_UPDATED="${{ steps.update-major-tags.outputs.updated == 'true' && '1' || '0' }}"
+          BOT_FIXED="${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}"
+          UNSIGNED_FIXED="${{ needs.unified-fix-unsigned-tags.outputs.fixed_count }}"
+          ORPHANED_FIXED="${{ needs.unified-fix-orphaned-tags.outputs.fixed_count }}"
+          MAJOR_UPDATED="${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}"
 
           TOTAL_FIXED=$((BOT_FIXED + UNSIGNED_FIXED + ORPHANED_FIXED + MAJOR_UPDATED))
 
-          echo "  📊 Initial tags: $INITIAL_COUNT"
-          echo "  📌 Major/minor tags updated: $MAJOR_UPDATED (ran first)"
+          echo "  📌 Major/minor tags updated: $MAJOR_UPDATED"
           echo "  🤖 Bot signature fixes: $BOT_FIXED"
           echo "  🔏 Unsigned tag fixes: $UNSIGNED_FIXED"
           echo "  🔗 Orphaned tag fixes: $ORPHANED_FIXED"
           echo "  📊 Final tag count: $FINAL_COUNT"
           echo "  ✅ Total operations: $TOTAL_FIXED"
 
-          SUMMARY="Processed $INITIAL_COUNT tags for ${{ github.repository }}. Updated $MAJOR_UPDATED major/minor tags (first), then fixed: $BOT_FIXED bot signatures, $UNSIGNED_FIXED unsigned tags, $ORPHANED_FIXED orphaned tags. Final count: $FINAL_COUNT. Total operations: $TOTAL_FIXED"
+          SUMMARY="Processed tags for ${{ github.repository }}. Updated $MAJOR_UPDATED major/minor tags, then fixed: $BOT_FIXED bot signatures, $UNSIGNED_FIXED unsigned tags, $ORPHANED_FIXED orphaned tags. Final count: $FINAL_COUNT. Total operations: $TOTAL_FIXED"
 
-          echo "total-processed=$INITIAL_COUNT" >> $GITHUB_OUTPUT
+          echo "total-processed=$FINAL_COUNT" >> $GITHUB_OUTPUT
           echo "total-fixed=$TOTAL_FIXED" >> $GITHUB_OUTPUT
           echo "processing-summary=$SUMMARY" >> $GITHUB_OUTPUT

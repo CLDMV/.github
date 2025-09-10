@@ -37,16 +37,6 @@ on:
         type: boolean
         required: false
         default: true
-      publish_command:
-        description: "Custom NPM publish command"
-        type: string
-        required: false
-        default: ""
-      github_packages_publish_command:
-        description: "Custom GitHub Packages publish command"
-        type: string
-        required: false
-        default: ""
       skip_publish:
         description: "Skip ALL publishing (for testing)"
         type: boolean
@@ -62,16 +52,6 @@ on:
         type: string
         required: false
         default: "22"
-      is_prerelease:
-        description: "Whether this is a prerelease"
-        type: boolean
-        required: false
-        default: false
-      create_documentation:
-        description: "Whether to create/update VERSION_TAGS.md"
-        type: boolean
-        required: false
-        default: true
       use_gpg:
         description: "Enable GPG signing (if GPG secrets provided)"
         type: boolean
@@ -90,16 +70,16 @@ jobs:
       version: ${{ github.event.inputs.version || '' }}
       publish_to_npm: ${{ github.event.inputs.publish_to_npm || true }}
       publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages || true }}
-      publish_command: ${{ github.event.inputs.publish_command || '' }}
-      github_packages_publish_command: ${{ github.event.inputs.github_packages_publish_command || '' }}
+      publish_command: ""
+      github_packages_publish_command: ""
       skip_publish: ${{ github.event.inputs.skip_publish || false }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
       test_command: "npm test"
       build_command: "npm run build:ci"
-      is_prerelease: ${{ github.event.inputs.is_prerelease || false }}
+      is_prerelease: false
       release_source_only: false
-      create_documentation: ${{ github.event.inputs.create_documentation || true }}
+      create_documentation: true
       skip_performance_tests: false
       skip_matrix_tests: false
       use_gpg: ${{ github.event.inputs.use_gpg || false }}
