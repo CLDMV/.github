@@ -1,0 +1,184 @@
+# Publishing Workflow Package
+name: 📦 Publishing Jobs
+
+on:
+  workflow_call:
+    inputs:
+      # Package information
+      package_name:
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+        required: true
+        type: string
+
+      # Debug control
+      debug:
+        description: "Enable debug logging for troubleshooting"
+        required: false
+        type: boolean
+        default: false
+
+      # Job control flags
+      run_detect_repo_config:
+        description: "Run detect repository config job"
+        required: false
+        type: boolean
+        default: false
+      run_publish_npm:
+        description: "Run publish to NPM job"
+        required: false
+        type: boolean
+        default: false
+      run_publish_github_packages:
+        description: "Run publish to GitHub Packages job"
+        required: false
+        type: boolean
+        default: false
+
+      # Build parameters
+      node_version:
+        description: "Node.js version to use (default: lts/*)"
+        required: false
+        type: string
+        default: "lts/*"
+      package_manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+
+      # Version parameter
+      version:
+        description: "Specific version for publishing"
+        required: false
+        type: string
+        default: ""
+
+      # Publishing parameters
+      publish_command_npm:
+        description: "Command to publish to NPM"
+        required: false
+        type: string
+        default: ""
+      publish_command_github_packages:
+        description: "Command to publish to GitHub Packages"
+        required: false
+        type: string
+        default: ""
+
+    secrets:
+      NPM_TOKEN:
+        description: "NPM token for publishing packages"
+        required: false
+
+    outputs:
+      # Repository config outputs
+      npm-command:
+        description: "Detected NPM publish command"
+        value: ${{ jobs.detect-repo-config.outputs.npm-command }}
+      github-packages-command:
+        description: "Detected GitHub Packages publish command"
+        value: ${{ jobs.detect-repo-config.outputs.github-packages-command }}
+      repo-is-private:
+        description: "Whether the repository is private"
+        value: ${{ jobs.detect-repo-config.outputs.repo-is-private }}
+
+      # Publishing outputs
+      npm-published:
+        description: "Whether the package was published to NPM"
+        value: ${{ jobs.publish-npm.outputs.published }}
+      github-packages-published:
+        description: "Whether the package was published to GitHub Packages"
+        value: ${{ jobs.publish-github-packages.outputs.published }}
+
+jobs:
+  detect-repo-config:
+    name: "🔧 Detect Repository Config"
+    if: inputs.run_detect_repo_config == true
+    runs-on: ubuntu-latest
+    outputs:
+      npm-command: ${{ steps.detect.outputs.npm-command }}
+      github-packages-command: ${{ steps.detect.outputs.github-packages-command }}
+      repo-is-private: ${{ steps.detect.outputs.repo-is-private }}
+    steps:
+      - name: Detect Repository Config
+        id: detect
+        uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v1
+        with:
+          package-manager: ${{ inputs.package_manager }}
+          custom-npm-command: ${{ inputs.publish_command_npm }}
+          custom-github-packages-command: ${{ inputs.publish_command_github_packages }}
+          github-token: ${{ github.token }}
+
+  publish-npm:
+    name: "📦 Publish to NPM"
+    if: inputs.run_publish_npm == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract and validate version
+        id: extract-version
+        uses: ./.github/actions/npm/steps/extract-version
+        with:
+          package-name: ${{ inputs.package_name }}
+          version-override: ${{ inputs.version }}
+
+      - name: Calculate artifact names
+        id: names
+        uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+        with:
+          node-version: ${{ inputs.node_version }}
+          package-name: ${{ inputs.package_name }}
+          version: ${{ steps.extract-version.outputs.version }}
+
+      - name: Publish to NPM
+        id: publish
+        uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          version: ${{ steps.extract-version.outputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ inputs.publish_command_npm }}
+          npm-token: ${{ secrets.NPM_TOKEN }}
+          artifact-name: ${{ steps.names.outputs.artifact-name }}
+
+  publish-github-packages:
+    name: "📦 Publish to GitHub Packages"
+    if: inputs.run_publish_github_packages == true
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract and validate version
+        id: extract-version
+        uses: ./.github/actions/npm/steps/extract-version
+        with:
+          package-name: ${{ inputs.package_name }}
+          version-override: ${{ inputs.version }}
+
+      - name: Calculate artifact names
+        id: names
+        uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+        with:
+          node-version: ${{ inputs.node_version }}
+          package-name: ${{ inputs.package_name }}
+          version: ${{ steps.extract-version.outputs.version }}
+
+      - name: Publish to GitHub Packages
+        id: publish
+        uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          version: ${{ steps.extract-version.outputs.version }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          publish-command: ${{ inputs.publish_command_github_packages }}
+          github-token: ${{ github.token }}
+          artifact-name: ${{ steps.names.outputs.artifact-name }}

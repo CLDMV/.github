@@ -6,6 +6,10 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
+    required: false
+    default: "false"
   tag-name:
     description: "The semantic version tag to process (e.g., v1.2.3)"
     required: true
@@ -72,5 +76,4 @@ runs:
       with:
         debug: ${{ inputs.debug }}
         payload: ${{ steps.update.outputs.tags-payload }}
-        sign: "auto"
-        annotate: "auto"
+        gpg_enabled: ${{ inputs.gpg_enabled }}

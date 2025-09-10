@@ -4,29 +4,16 @@ import { shouldSign, ensureGitAuthRemote, configureGitIdentity, importGpgIfNeede
 import { inferAnnotate, getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
 
-function runGitSmartTag({
-	repo,
-	token,
-	tag,
-	sha,
-	message,
-	annotate,
-	sign,
-	tagger_name,
-	tagger_email,
-	gpg_private_key,
-	gpg_passphrase,
-	push
-}) {
+function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push }) {
 	debugLog(`runGitSmartTag: repo=${repo}, tag=${tag}, sha=${sha}`);
 	debugLog(`runGitSmartTag: token starts with ${token?.substring(0, 10)}...`);
-	debugLog(`runGitSmartTag: sign=${sign}, annotate=${annotate}, push=${push}`);
+	debugLog(`runGitSmartTag: gpg_enabled=${gpg_enabled}, push=${push}`);
 	debugLog(`runGitSmartTag: tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
 	debugLog(`runGitSmartTag: gpg_private_key present=${!!gpg_private_key}`);
 
 	ensureGitAuthRemote(repo, token);
-	const willSign = shouldSign({ sign, gpg_private_key });
-	const willAnnotate = inferAnnotate({ annotate, sign: willSign ? "true" : "false", message });
+	const willSign = gpg_enabled && gpg_private_key;
+	const willAnnotate = gpg_enabled; // Always annotate when GPG is enabled
 	let keyid = "";
 	if (willSign) keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
 	configureGitIdentity({ tagger_name, tagger_email, keyid, enableSign: willSign });
@@ -69,8 +56,7 @@ export async function run({
 	tag,
 	sha,
 	message,
-	sign = "auto",
-	annotate = "auto",
+	gpg_enabled = false,
 	tagger_name = "",
 	tagger_email = "",
 	gpg_private_key = "",
@@ -86,8 +72,7 @@ export async function run({
 			tag,
 			sha,
 			message,
-			annotate,
-			sign,
+			gpg_enabled,
 			tagger_name,
 			tagger_email,
 			gpg_private_key,

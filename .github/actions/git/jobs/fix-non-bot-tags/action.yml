@@ -6,14 +6,10 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
-  sign:
-    description: "Smart signing mode for retagging (auto/true/false)"
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected)"
     required: false
-    default: "auto"
-  annotate:
-    description: "Smart annotate mode (auto/true/false)"
-    required: false
-    default: "auto"
+    default: "false"
   tagger_name:
     description: "Bot tagger name"
     required: false
@@ -71,8 +67,7 @@ runs:
       with:
         debug: ${{ inputs.debug }}
         payload: ${{ steps.gather.outputs.non-bot-tags-json }}
-        sign: ${{ inputs.sign }}
-        annotate: ${{ inputs.annotate }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}

@@ -86,16 +86,6 @@ on:
         type: boolean
         default: false
         description: "If true, forward provided secrets to enable GPG signing"
-      sign:
-        required: false
-        type: string
-        default: "auto"
-        description: "Smart signing mode (auto/true/false)"
-      annotate:
-        required: false
-        type: string
-        default: "auto"
-        description: "Smart annotate mode (auto/true/false)"
     outputs:
       release-pr-created:
         description: "Whether a release PR was created"
@@ -131,31 +121,40 @@ on:
         required: false
 
 jobs:
-  release:
-    name: "🚀 Release Management"
-    uses: CLDMV/.github/.github/workflows/ci-jobs.yml@v1
+  build-and-test:
+    name: "🏗️ Build and Test"
+    uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
-      run_build_and_test: true
-      run_detect_release: true
-      run_create_release_pr: true
       node_version: ${{ inputs.node_version }}
       min_node_version: ${{ inputs.min_node_version }}
       max_node_major: ${{ inputs.max_node_major }}
       package_manager: ${{ inputs.package_manager }}
       test_command: ${{ inputs.test_command }}
       build_command: ${{ inputs.build_command }}
+      skip_performance_tests: ${{ inputs.skip_performance_tests }}
+      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+  release:
+    name: "🚀 Release Management"
+    needs: build-and-test
+    uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
+    with:
+      package_name: ${{ inputs.package_name }}
+      debug: ${{ inputs.debug }}
+      node_version: ${{ inputs.node_version }}
+      package_manager: ${{ inputs.package_manager }}
       version_bump: ${{ inputs.version_bump }}
       version: ${{ inputs.version }}
       is_prerelease: ${{ inputs.is_prerelease }}
       release_source_only: ${{ inputs.release_source_only }}
       create_documentation: ${{ inputs.create_documentation }}
-      skip_performance_tests: ${{ inputs.skip_performance_tests }}
-      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
       use_gpg: ${{ inputs.use_gpg }}
-      sign: ${{ inputs.sign }}
-      annotate: ${{ inputs.annotate }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
@@ -167,7 +166,7 @@ jobs:
 
   summary:
     name: "📋 Release Summary"
-    needs: release
+    needs: [build-and-test, release]
     if: always()
     runs-on: ubuntu-latest
     steps:

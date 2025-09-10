@@ -1,0 +1,179 @@
+# Release Management Workflow Package
+name: 📋 Release Management Jobs
+
+on:
+  workflow_call:
+    inputs:
+      # Package information
+      package_name:
+        description: "NPM package name (e.g., @cldmv/slothlet)"
+        required: true
+        type: string
+
+      # Debug control
+      debug:
+        description: "Enable debug logging for troubleshooting"
+        required: false
+        type: boolean
+        default: false
+
+      # Job control flags
+      run_detect_release:
+        description: "Run detect release job"
+        required: false
+        type: boolean
+        default: false
+      run_create_release_pr:
+        description: "Run create release PR job"
+        required: false
+        type: boolean
+        default: false
+      run_create_release:
+        description: "Run create GitHub release job"
+        required: false
+        type: boolean
+        default: false
+
+      # Build parameters for release
+      node_version:
+        description: "Node.js version to use (default: lts/*)"
+        required: false
+        type: string
+        default: "lts/*"
+      package_manager:
+        description: "Package manager (npm or yarn)"
+        required: false
+        type: string
+        default: "npm"
+      build_command:
+        description: "Command to build package"
+        required: false
+        type: string
+        default: "npm run build:ci"
+
+      # Release parameters
+      version_bump:
+        description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
+        required: false
+        type: string
+        default: ""
+      version:
+        description: "Specific version for release"
+        required: false
+        type: string
+        default: ""
+      is_prerelease:
+        description: "Whether this is a prerelease"
+        required: false
+        type: boolean
+        default: false
+      release_source_only:
+        description: "Whether to create source-only release (no package assets)"
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      BOT_APP_ID:
+        description: "GitHub App ID for CLDMV bot"
+        required: false
+      BOT_APP_PRIVATE_KEY:
+        description: "GitHub App private key for CLDMV bot"
+        required: false
+
+    outputs:
+      # Release management outputs
+      pr-created:
+        description: "Whether a release PR was created"
+        value: ${{ jobs.create-release-pr.outputs.pr-created }}
+      pr-number:
+        description: "The number of the created release PR"
+        value: ${{ jobs.create-release-pr.outputs.pr-number }}
+      new-version:
+        description: "The new version that will be released"
+        value: ${{ jobs.create-release-pr.outputs.new-version }}
+
+      # Release detection outputs
+      should-release:
+        description: "Whether this commit should trigger a release"
+        value: ${{ jobs.detect-release.outputs.should-release }}
+
+      # GitHub release outputs
+      release-id:
+        description: "The ID of the created GitHub release"
+        value: ${{ jobs.create-release.outputs.release-id }}
+
+jobs:
+  detect-release:
+    name: "🔍 Detect Release"
+    if: inputs.run_detect_release == true
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.detect.outputs.should-release }}
+      version: ${{ steps.detect.outputs.version }}
+      is-prerelease: ${{ steps.detect.outputs.is-prerelease }}
+    steps:
+      - name: Detect Release
+        id: detect
+        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+
+  create-release-pr:
+    name: "📋 Create Release PR"
+    if: inputs.run_create_release_pr == true
+    runs-on: ubuntu-latest
+    outputs:
+      pr-created: ${{ steps.create.outputs.pr-created }}
+      pr-number: ${{ steps.create.outputs.pr-number }}
+      new-version: ${{ steps.create.outputs.new-version }}
+    steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Create Release PR
+        id: create
+        uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v1
+        with:
+          package-name: ${{ inputs.package_name }}
+          node-version: ${{ inputs.node_version }}
+          package-manager: ${{ inputs.package_manager }}
+          build-command: ${{ inputs.build_command }}
+          version-bump: ${{ inputs.version_bump }}
+          github-token: ${{ steps.app-token.outputs.token }}
+
+  create-release:
+    name: "📋 Create GitHub Release"
+    if: inputs.run_create_release == true
+    runs-on: ubuntu-latest
+    needs: [detect-release]
+    outputs:
+      release-id: ${{ steps.create.outputs.release-id }}
+    steps:
+      - name: Create App token (auto-detect)
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+        env:
+          BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+          BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Create GitHub Release
+        id: create
+        uses: CLDMV/.github/.github/actions/github/jobs/create-release@v1
+        with:
+          version: ${{ needs.detect-release.outputs.version || inputs.version }}
+          package-name: ${{ inputs.package_name }}
+          is-prerelease: ${{ inputs.is_prerelease }}
+          package-manager: ${{ inputs.package_manager }}
+          release-source-only: ${{ inputs.release_source_only }}
+          node-version: ${{ inputs.node_version }}
+          build-command: ${{ inputs.build_command }}
+          github-token: ${{ steps.app-token.outputs.token }}

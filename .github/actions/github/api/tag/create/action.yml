@@ -6,14 +6,10 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
-  sign:
-    description: "Sign the tag? 'auto' (default) signs if a GPG key is provided; 'true' forces signing; 'false' disables it."
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
     required: false
-    default: "auto"
-  annotate:
-    description: "Create an annotated tag? 'auto' (default) annotates if signing or a message is provided; 'true' forces annotated; 'false' creates a lightweight tag."
-    required: false
-    default: "auto"
+    default: "false"
   tagger_name:
     description: "Tagger name (defaults to bot/user name if unset)"
     required: false

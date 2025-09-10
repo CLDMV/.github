@@ -12,8 +12,93 @@ on:
         type: boolean
         required: false
         default: false
+      node_version:
+        description: "Node.js version to use (default: lts/*)"
+        type: string
+        required: false
+        default: "lts/*"
+      package_manager:
+        description: "Package manager (npm or yarn)"
+        type: string
+        required: false
+        default: "npm"
+      version:
+        description: "Version to publish (auto-detected from package.json if not provided)"
+        type: string
+        required: false
+        default: ""
+      publish_to_npm:
+        description: "Publish to NPM registry"
+        type: boolean
+        required: false
+        default: true
+      publish_to_github_packages:
+        description: "Publish to GitHub Packages registry"
+        type: boolean
+        required: false
+        default: true
+      publish_command:
+        description: "Custom NPM publish command"
+        type: string
+        required: false
+        default: ""
+      github_packages_publish_command:
+        description: "Custom GitHub Packages publish command"
+        type: string
+        required: false
+        default: ""
       skip_publish:
-        description: "Skip ALL publishing, for testing"
+        description: "Skip ALL publishing (for testing)"
+        type: boolean
+        required: false
+        default: false
+      min_node_version:
+        description: "Minimum Node.js version for matrix testing (enables matrix when set)"
+        type: string
+        required: false
+        default: "20"
+      max_node_major:
+        description: "Override max Node.js major version (default: 22)"
+        type: string
+        required: false
+        default: "22"
+      test_command:
+        description: "Command to run tests"
+        type: string
+        required: false
+        default: "npm test"
+      build_command:
+        description: "Command to build package"
+        type: string
+        required: false
+        default: "npm run build:ci"
+      is_prerelease:
+        description: "Whether this is a prerelease"
+        type: boolean
+        required: false
+        default: false
+      release_source_only:
+        description: "Whether to create source-only release (no package assets)"
+        type: boolean
+        required: false
+        default: false
+      create_documentation:
+        description: "Whether to create/update VERSION_TAGS.md"
+        type: boolean
+        required: false
+        default: true
+      skip_performance_tests:
+        description: "Skip performance tests during CI"
+        type: boolean
+        required: false
+        default: false
+      skip_matrix_tests:
+        description: "Skip matrix testing (use single node version only)"
+        type: boolean
+        required: false
+        default: false
+      use_gpg:
+        description: "Enable GPG signing (if GPG secrets provided)"
         type: boolean
         required: false
         default: false
@@ -21,56 +106,32 @@ on:
 jobs:
   publish-package:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
-    uses: CLDMV/.github/.github/workflows/publish.yml@v1
+    uses: CLDMV/.github/.github/workflows/workflow-publish.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
-      # skip_publish: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_publish || false }}
-      # version: "1.0.0" # Version to publish - auto-detected from package.json if not provided (default: "")
-
-      # Node.js Version Configuration
-      # node_version: "lts/*" # Single Node.js version for build/test (default: lts/*)
-      # min_node_version: "20" # Minimum Node.js version for matrix testing (default: 20)
-      # max_node_major: "22" # Maximum Node.js major version (default: 22)
-
-      # Package & Build Configuration
-      # package_manager: "npm" # Package manager - npm or yarn (default: npm)
-      # test_command: "npm test" # Command to run tests (default: npm test)
-      # build_command: "npm run build:ci" # Command to build package (default: npm run build:ci)
-
-      # Publishing Configuration
-      # publish_to_npm: true # Publish to NPM registry (default: true)
-      # publish_to_github_packages: true # Publish to GitHub Packages registry (default: true)
-      # skip_publish: false # Skip ALL publishing, for testing (default: false)
-      # publish_command: "" # Custom NPM publish command - auto-detects access level (default: "")
-      # github_packages_publish_command: "" # Custom GitHub Packages publish command (default: "")
-
-      # Release Configuration
-      # is_prerelease: false # Whether this is a prerelease (default: false)
-      # release_source_only: false # Create source-only release, no package assets (default: false)
-      # create_documentation: true # Create/update VERSION_TAGS.md (default: true)
-
-      # Test Control Options
-      # skip_performance_tests: false # Skip performance tests during CI (default: false)
-      # skip_matrix_tests: false # Skip matrix testing, use single version (default: false)
-
-      # Bot Configuration Options
-      # use_gpg: false # Enable GPG signing with your bot (default: false)
-      # sign: "auto" # Smart signing mode: auto/true/false (default: auto)
-      # annotate: "auto" # Smart annotate mode: auto/true/false (default: auto)
-
-    # Authentication & Bot Configuration
-    # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
-    # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
-    # - WITHOUT App secrets: Falls back to GitHub Actions bot with standard permissions
-    # To set up App authentication, add these secrets to your repository settings:
+      debug: ${{ github.event.inputs.debug || false }}
+      node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
+      package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
+      version: ${{ github.event.inputs.version || '' }}
+      publish_to_npm: ${{ github.event.inputs.publish_to_npm || true }}
+      publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages || true }}
+      publish_command: ${{ github.event.inputs.publish_command || '' }}
+      github_packages_publish_command: ${{ github.event.inputs.github_packages_publish_command || '' }}
+      skip_publish: ${{ github.event.inputs.skip_publish || false }}
+      min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
+      max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
+      test_command: ${{ github.event.inputs.test_command || 'npm test' }}
+      build_command: ${{ github.event.inputs.build_command || 'npm run build:ci' }}
+      is_prerelease: ${{ github.event.inputs.is_prerelease || false }}
+      release_source_only: ${{ github.event.inputs.release_source_only || false }}
+      create_documentation: ${{ github.event.inputs.create_documentation || true }}
+      skip_performance_tests: ${{ github.event.inputs.skip_performance_tests || false }}
+      skip_matrix_tests: ${{ github.event.inputs.skip_matrix_tests || false }}
+      use_gpg: ${{ github.event.inputs.use_gpg || false }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # CLDMV Bot credentials for enhanced permissions and proper attribution
-      # Uncomment these lines to use your bot instead of github-actions[bot]
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-      # Optional: GPG signing credentials (only needed if use_gpg: true)
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
       GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}

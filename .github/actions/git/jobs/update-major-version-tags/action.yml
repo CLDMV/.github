@@ -6,6 +6,10 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
+    required: false
+    default: "false"
   create-documentation:
     description: "Whether to create/update VERSION_TAGS.md documentation"
     required: false
@@ -13,14 +17,6 @@ inputs:
   repo:
     description: "owner/repo (defaults to the caller repository). Passed through to orphan fixer."
     required: false
-  sign:
-    description: "Smart signing mode for tag updates (auto/true/false)"
-    required: false
-    default: "auto"
-  annotate:
-    description: "Smart annotate mode (auto/true/false)"
-    required: false
-    default: "auto"
   tagger_name:
     description: "Tagger name"
     required: false
@@ -97,8 +93,7 @@ runs:
         debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
         github_token: ${{ env.GITHUB_TOKEN }}
-        sign: ${{ inputs.sign }}
-        annotate: ${{ inputs.annotate }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}
@@ -111,8 +106,7 @@ runs:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
         debug: ${{ inputs.debug }}
-        sign: ${{ inputs.sign }}
-        annotate: ${{ inputs.annotate }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}
@@ -162,6 +156,7 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
       with:
         debug: ${{ inputs.debug }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
         tag-name: ${{ steps.get-tag.outputs.tag-name }}
 
     - name: Generate version documentation

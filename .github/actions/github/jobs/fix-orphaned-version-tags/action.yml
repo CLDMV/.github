@@ -16,14 +16,10 @@ inputs:
     description: "Mode: 'detect' to only detect, 'fix' to also repair tags via upsert-batch"
     required: false
     default: "fix"
-  sign:
-    description: "Smart signing mode for retagging (auto/true/false)"
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
     required: false
-    default: "auto"
-  annotate:
-    description: "Smart annotate mode (auto/true/false)"
-    required: false
-    default: "auto"
+    default: "false"
   tagger_name:
     description: "Tagger name"
     required: false
@@ -73,8 +69,7 @@ runs:
         debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
         payload: ${{ steps.gather.outputs.orphaned-tags-json }}
-        sign: ${{ inputs.sign }}
-        annotate: ${{ inputs.annotate }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
         gpg_private_key: ${{ inputs.gpg_private_key }}

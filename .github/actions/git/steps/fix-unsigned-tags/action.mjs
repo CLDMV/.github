@@ -13,8 +13,7 @@ import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../gi
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
-const SIGN = process.env.INPUT_SIGN || "auto";
-const ANNOTATE = process.env.INPUT_ANNOTATE || "auto";
+const GPG_ENABLED = (process.env.INPUT_GPG_ENABLED || "false").toLowerCase() === "true";
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
@@ -26,13 +25,13 @@ const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
  * @returns {boolean} True if tag needs fixing
  */
 function needsSigningFix(tagObj) {
-	// Check if it needs to be annotated
-	const needsAnnotation = ANNOTATE === "true" || (ANNOTATE === "auto" && !tagObj.isAnnotated);
-
-	// Check if it needs to be signed
-	const needsSigning = SIGN === "true" || (SIGN === "auto" && GPG_PRIVATE_KEY && !tagObj.isSigned);
-
-	return needsAnnotation || needsSigning;
+	// If GPG is enabled, check if it needs to be annotated or signed
+	if (GPG_ENABLED) {
+		const needsAnnotation = !tagObj.isAnnotated;
+		const needsSigning = GPG_PRIVATE_KEY && !tagObj.isSigned;
+		return needsAnnotation || needsSigning;
+	}
+	return false;
 }
 
 /**
@@ -51,7 +50,7 @@ function fixUnsignedTag(tagObj) {
 			return {
 				...tagObj,
 				isAnnotated: true,
-				isSigned: SIGN === "true" || (SIGN === "auto" && GPG_PRIVATE_KEY),
+				isSigned: GPG_ENABLED && GPG_PRIVATE_KEY,
 				tagger: TAGGER_NAME || "github-actions[bot]"
 			};
 		}
@@ -81,7 +80,7 @@ function fixUnsignedTag(tagObj) {
 		// Create new annotated and potentially signed tag
 		let tagCommand = `git tag -a ${tagName} ${commitSha} -m "${tagMessage}"`;
 
-		if (SIGN === "true" || (SIGN === "auto" && GPG_PRIVATE_KEY)) {
+		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
 			tagCommand = `git tag -a -s ${tagName} ${commitSha} -m "${tagMessage}"`;
 		}
 
@@ -96,7 +95,7 @@ function fixUnsignedTag(tagObj) {
 		return {
 			...tagObj,
 			isAnnotated: true,
-			isSigned: SIGN === "true" || (SIGN === "auto" && GPG_PRIVATE_KEY),
+			isSigned: GPG_ENABLED && GPG_PRIVATE_KEY,
 			tagger: TAGGER_NAME || "github-actions[bot]",
 			message: tagMessage
 		};

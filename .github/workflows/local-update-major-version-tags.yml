@@ -16,14 +16,6 @@ on:
         type: boolean
         required: true
         default: true
-      sign:
-        description: "sign mode: auto | true | false"
-        required: false
-        default: "auto"
-      annotate:
-        description: "annotate mode: auto | true | false"
-        required: false
-        default: "auto"
       create_documentation:
         description: "Create/update VERSION_TAGS.md"
         required: false
@@ -40,8 +32,6 @@ jobs:
     with:
       debug: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.debug == 'true' || github.event.inputs.debug == true)) || false }}
       create_documentation: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.create_documentation == 'true' || github.event.inputs.create_documentation == true)) || (github.event_name != 'workflow_dispatch' && true) }}
-      sign: "${{ github.event.inputs.sign || 'auto' }}"
-      annotate: "${{ github.event.inputs.annotate || 'auto' }}"
       # let the reusable decide whether to use secrets based on this flag
       use_gpg: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.use_gpg == 'true' || github.event.inputs.use_gpg == true)) || (github.event_name != 'workflow_dispatch' && true) }}
       # Note: use_app_token is automatically determined in the reusable workflow based on BOT_APP_ID presence

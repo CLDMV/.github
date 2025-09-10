@@ -1,23 +1,5 @@
-# Individual repo: .github/workflows/update-version-tags.yml
-njobs:
-  update-tags:
-    uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
-    permissions:
-      contents: write
-    with:
-      debug: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true') || false }}
-      create_documentation: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.create_documentation == 'true') || true }}
-      sign: ${{ github.event.inputs.sign || 'auto' }}
-      annotate: ${{ github.event.inputs.annotate || 'auto' }}
-      use_gpg: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_gpg == 'true') || false }}
-      # Tag health configuration - customize these for your project
-      max_tags: ${{ github.event.inputs.max_tags || '100' }}
-      max_major_versions: ${{ github.event.inputs.max_major_versions || '10' }}
-      max_minor_versions: ${{ github.event.inputs.max_minor_versions || '10' }}
-      bot_patterns: ${{ github.event.inputs.bot_patterns || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]' }}
-      include_patterns: ${{ github.event.inputs.include_patterns || '["v*"]' }}
-      exclude_patterns: ${{ github.event.inputs.exclude_patterns || '[]' }}
-    secrets: inheritate Version Tags
+# Individual repo: .github/workflows/update-major-version-tags.yml
+name: 🏷️ Update Major Version Tags
 
 on:
   release:
@@ -39,16 +21,8 @@ on:
         type: boolean
         required: false
         default: true
-      sign:
-        description: "Smart signing mode (auto/true/false)"
-        required: false
-        default: "auto"
-      annotate:
-        description: "Smart annotate mode (auto/true/false)"
-        required: false
-        default: "auto"
       use_gpg:
-        description: "If true, forward provided secrets to enable signing"
+        description: "Enable GPG signing (if GPG secrets provided)"
         type: boolean
         required: false
         default: false
@@ -80,15 +54,20 @@ on:
 
 jobs:
   update-tags:
-    uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
+    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1
     permissions:
       contents: write
     with:
-      debug: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.debug == 'true' || github.event.inputs.debug == true)) || false }}
-      create_documentation: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.create_documentation == 'true' || github.event.inputs.create_documentation == true)) || (github.event_name != 'workflow_dispatch' && true) }}
-      sign: "${{ github.event.inputs.sign || 'auto' }}"
-      annotate: "${{ github.event.inputs.annotate || 'auto' }}"
-      use_gpg: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.use_gpg == 'true' || github.event.inputs.use_gpg == true)) || (github.event_name != 'workflow_dispatch' && true) }}
+      package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      debug: ${{ github.event.inputs.debug || false }}
+      create_documentation: ${{ github.event.inputs.create_documentation || true }}
+      use_gpg: ${{ github.event.inputs.use_gpg || false }}
+      max_tags: ${{ github.event.inputs.max_tags || '100' }}
+      max_major_versions: ${{ github.event.inputs.max_major_versions || '10' }}
+      max_minor_versions: ${{ github.event.inputs.max_minor_versions || '10' }}
+      bot_patterns: ${{ github.event.inputs.bot_patterns || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]' }}
+      include_patterns: ${{ github.event.inputs.include_patterns || '["v*"]' }}
+      exclude_patterns: ${{ github.event.inputs.exclude_patterns || '[]' }}
     secrets:
       # Map your repo/org secrets to the expected names
       TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}

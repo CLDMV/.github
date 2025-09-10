@@ -14,8 +14,7 @@ const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
 const BOT_PATTERNS = JSON.parse(process.env.INPUT_BOT_PATTERNS || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]');
-const SIGN = process.env.INPUT_SIGN || "auto";
-const ANNOTATE = process.env.INPUT_ANNOTATE || "auto";
+const GPG_ENABLED = (process.env.INPUT_GPG_ENABLED || "false").toLowerCase() === "true";
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
@@ -132,7 +131,7 @@ if (TAGS_DETAILED.length === 0) {
 }
 
 // Setup git identity and GPG if provided
-const willSign = shouldSign({ sign: SIGN, gpg_private_key: GPG_PRIVATE_KEY });
+const willSign = GPG_ENABLED && GPG_PRIVATE_KEY;
 let keyid = "";
 
 if (willSign) {

@@ -6,6 +6,10 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
+    required: false
+    default: "false"
   dry_run:
     description: "Show what would be done without making changes"
     required: false
@@ -13,14 +17,6 @@ inputs:
   tags_detailed:
     description: "JSON array of detailed tag objects from previous step"
     required: true
-  sign:
-    description: "Smart signing mode (auto/true/false)"
-    required: false
-    default: "auto"
-  annotate:
-    description: "Smart annotate mode (auto/true/false)"
-    required: false
-    default: "auto"
   tagger_name:
     description: "Bot tagger name for new tags"
     required: false
@@ -56,8 +52,7 @@ runs:
         INPUT_DEBUG: ${{ inputs.debug }}
         INPUT_DRY_RUN: ${{ inputs.dry_run }}
         INPUT_TAGS_DETAILED: ${{ inputs.tags_detailed }}
-        INPUT_SIGN: ${{ inputs.sign }}
-        INPUT_ANNOTATE: ${{ inputs.annotate }}
+        INPUT_GPG_ENABLED: ${{ inputs.gpg_enabled }}
         INPUT_TAGGER_NAME: ${{ inputs.tagger_name }}
         INPUT_TAGGER_EMAIL: ${{ inputs.tagger_email }}
         INPUT_GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}

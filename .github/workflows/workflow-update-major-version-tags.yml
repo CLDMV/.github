@@ -14,18 +14,9 @@ on:
         required: false
         type: boolean
         default: true
-      sign:
-        description: "Smart signing mode (auto/true/false)"
-        required: false
-        type: string
-        default: "auto"
-      annotate:
-        description: "Smart annotate mode (auto/true/false)"
-        required: false
-        type: string
-        default: "auto"
+      # Bot signing parameters
       use_gpg:
-        description: "If true, forward provided secrets to enable signing"
+        description: "Enable GPG signing (if GPG secrets provided)"
         required: false
         type: boolean
         default: false
@@ -80,7 +71,7 @@ permissions:
 jobs:
   version-tag-operations:
     name: Version Tag Operations
-    uses: CLDMV/.github/.github/workflows/ci-jobs.yml@v1
+    uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1
     permissions:
       contents: write
     with:
@@ -88,8 +79,6 @@ jobs:
       debug: ${{ inputs.debug }}
       run_unified_tag_health: true
       create_documentation: ${{ inputs.create_documentation }}
-      sign: ${{ inputs.sign }}
-      annotate: ${{ inputs.annotate }}
       use_gpg: ${{ inputs.use_gpg }}
       # Tag health configuration
       max_tags: ${{ inputs.max_tags }}
@@ -105,3 +94,32 @@ jobs:
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+  # Summary job that runs after the main operations
+  summary:
+    name: "📋 Version Tag Update Summary"
+    needs: version-tag-operations
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Version Tag Update Summary
+        run: |
+          echo "## 📌 Version Tag Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository**: \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.version-tag-operations.result }}" = "success" ]; then
+            echo "✅ **Overall Status**: Version tag operations completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Processing Details**: ${{ needs.version-tag-operations.outputs.processing_summary }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📋 **Total Processed**: ${{ needs.version-tag-operations.outputs.total_processed }}" >> $GITHUB_STEP_SUMMARY
+            echo "🔧 **Total Fixed**: ${{ needs.version-tag-operations.outputs.total_fixed }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All major/minor version tags have been updated to point to their latest patch versions." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Overall Status**: Version tag operations failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
+          fi

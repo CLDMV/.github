@@ -69,7 +69,7 @@ on:
 jobs:
   ci:
     name: "🏗️ Continuous Integration"
-    uses: CLDMV/.github/.github/workflows/ci-jobs.yml@v1
+    uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}

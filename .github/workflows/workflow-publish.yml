@@ -107,16 +107,6 @@ on:
         type: boolean
         default: false
         description: "If true, forward provided secrets to enable GPG signing"
-      sign:
-        required: false
-        type: string
-        default: "auto"
-        description: "Smart signing mode (auto/true/false)"
-      annotate:
-        required: false
-        type: string
-        default: "auto"
-        description: "Smart annotate mode (auto/true/false)"
     secrets:
       NPM_TOKEN:
         description: "NPM token for publishing packages"
@@ -191,37 +181,44 @@ jobs:
           echo "🔍 DEBUG (publish.yml): max_node_major input = '${{ inputs.max_node_major }}'"
           echo "🔍 DEBUG (publish.yml): node_version input = '${{ inputs.node_version }}'"
 
-  publish:
-    name: "📦 Publish Package"
+  build-and-test:
+    name: "🏗️ Build and Test"
     needs: debug-inputs
-    uses: CLDMV/.github/.github/workflows/ci-jobs.yml@v1
+    uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
-      run_build_and_test: true
-      run_detect_repo_config: true
-      run_download_artifacts: true
-      run_publish_npm: ${{ inputs.publish_to_npm && !inputs.skip_publish }}
-      run_publish_github_packages: ${{ inputs.publish_to_github_packages && !inputs.skip_publish }}
-      run_create_release: true
-      run_update_major_version_tags: true
       node_version: ${{ inputs.node_version }}
       min_node_version: ${{ inputs.min_node_version }}
       max_node_major: ${{ inputs.max_node_major }}
       package_manager: ${{ inputs.package_manager }}
       test_command: ${{ inputs.test_command }}
       build_command: ${{ inputs.build_command }}
+      skip_performance_tests: ${{ inputs.skip_performance_tests }}
+      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+  publish:
+    name: "📦 Publish Package"
+    needs: build-and-test
+    uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v1
+    with:
+      package_name: ${{ inputs.package_name }}
+      debug: ${{ inputs.debug }}
+      node_version: ${{ inputs.node_version }}
+      package_manager: ${{ inputs.package_manager }}
       version: ${{ inputs.version }}
       is_prerelease: ${{ inputs.is_prerelease }}
       release_source_only: ${{ inputs.release_source_only }}
       create_documentation: ${{ inputs.create_documentation }}
       publish_command_npm: ${{ inputs.publish_command }}
       publish_command_github_packages: ${{ inputs.github_packages_publish_command }}
-      skip_performance_tests: ${{ inputs.skip_performance_tests }}
-      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+      publish_to_npm: ${{ inputs.publish_to_npm && !inputs.skip_publish }}
+      publish_to_github_packages: ${{ inputs.publish_to_github_packages && !inputs.skip_publish }}
       use_gpg: ${{ inputs.use_gpg }}
-      sign: ${{ inputs.sign }}
-      annotate: ${{ inputs.annotate }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
@@ -233,7 +230,7 @@ jobs:
 
   summary:
     name: "📋 Publish Summary"
-    needs: publish
+    needs: [build-and-test, publish]
     if: always()
     runs-on: ubuntu-latest
     steps:

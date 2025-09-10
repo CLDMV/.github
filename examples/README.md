@@ -12,19 +12,19 @@ The `individual-repo-workflows/` folder contains example workflow files that sho
 
   - Place in: `.github/workflows/ci.yml` in your project repo
   - Triggers: Push to any branch, PR to master/main
-  - Uses: `CLDMV/.github/.github/workflows/ci.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-ci.yml@v1`
 
 - **`release.yml`** - Release PR creation workflow
 
   - Place in: `.github/workflows/release.yml` in your project repo
   - Triggers: Push to non-master/main branches (when you push `release:` or `release!:` commits)
-  - Uses: `CLDMV/.github/.github/workflows/release.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-release.yml@v1`
   - **Auto-detects version bump**: Uses `release!:` for major, `release:` + commit analysis for minor/patch
 
 - **`publish.yml`** - Package publishing and release creation workflow
   - Place in: `.github/workflows/publish.yml` in your project repo
   - Triggers: PR closed on master branch (when release PRs are merged)
-  - Uses: `CLDMV/.github/.github/workflows/publish.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-publish.yml@v1`
   - Creates GitHub releases AND publishes to NPM/GitHub Packages
 
 ### Usage:
