@@ -23,23 +23,6 @@ on:
         required: false
         type: boolean
         default: false
-      run_download_artifacts:
-        description: "Run download artifacts job"
-        required: false
-        type: boolean
-        default: false
-
-      # Artifact management
-      download_artifact_name:
-        description: "Name of the artifact to download (e.g., build-artifacts-lts). Defaults to build-artifacts-lts or build-artifacts-{node_version}."
-        required: false
-        type: string
-        default: ${{ inputs.node_version && format('build-artifacts-{0}', inputs.node_version == 'lts/*' && 'lts' || inputs.node_version) || 'build-artifacts-lts' }}
-      download_artifact_path:
-        description: "Destination path for the downloaded artifact(s)"
-        required: false
-        type: string
-        default: "."
 
       # Build and test parameters
       node_version:
@@ -157,23 +140,3 @@ jobs:
           test-command: ${{ inputs.test_command }}
           build-command: ${{ inputs.build_command }}
           skip-performance-tests: ${{ inputs.skip_performance_tests }}
-
-  download-artifacts:
-    name: "⬇️ Download Artifacts"
-    if: inputs.run_download_artifacts == true
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    steps:
-      - name: Debug artifact name calculation
-        shell: bash
-        run: |
-          echo "🔍 DEBUG: Artifact name calculation"
-          echo "  node_version input: '${{ inputs.node_version }}'"
-          echo "  download_artifact_name input: '${{ inputs.download_artifact_name }}'"
-          echo "  Expected artifact name: ${{ inputs.download_artifact_name }}"
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.download_artifact_name }}
-          path: ${{ inputs.download_artifact_path }}

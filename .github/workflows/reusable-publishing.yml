@@ -235,11 +235,37 @@ jobs:
           github-token: ${{ github.token }}
           artifact-name: ${{ steps.names.outputs.artifact-name }}
 
+  download-artifacts:
+    name: "⬇️ Download Build Artifacts"
+    if: inputs.run_create_release == true && inputs.release_source_only == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate artifact names
+        id: names
+        uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+        with:
+          node-version: ${{ inputs.node_version }}
+          package-name: ${{ inputs.package_name }}
+          version: ${{ inputs.version }}
+
+      - name: Debug artifact name calculation
+        shell: bash
+        run: |
+          echo "🔍 DEBUG: Artifact name calculation"
+          echo "  node_version input: '${{ inputs.node_version }}'"
+          echo "  Expected artifact name: ${{ steps.names.outputs.artifact-name }}"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.names.outputs.artifact-name }}
+          path: ./artifacts
+
   create-release:
     name: "📋 Create GitHub Release"
     if: inputs.run_create_release == true && always() && (needs.publish-npm.result == 'success' || needs.publish-github-packages.result == 'success')
     runs-on: ubuntu-latest
-    needs: [publish-npm, publish-github-packages]
+    needs: [publish-npm, publish-github-packages, download-artifacts]
     outputs:
       release-id: ${{ steps.create.outputs.release-id }}
     steps:

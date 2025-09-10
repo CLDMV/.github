@@ -146,36 +146,27 @@ runs:
       run: |
         echo "- ✅ Git tag v${{ steps.detect-version.outputs.version }} created" >> $GITHUB_STEP_SUMMARY
 
-    - name: Download build artifacts (for package assets)
-      if: inputs.release-source-only == 'false'
-      id: download-artifacts
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        name: ${{ steps.names.outputs.artifact-name }}
-        path: ./artifacts
-
     - name: Setup Node.js (if no artifacts available)
-      if: inputs.release-source-only == 'false' && steps.download-artifacts.outcome == 'failure'
+      if: inputs.release-source-only == 'false'
       uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies (if no artifacts available)
-      if: inputs.release-source-only == 'false' && steps.download-artifacts.outcome == 'failure'
+      if: inputs.release-source-only == 'false'
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Build package (if no artifacts available)
-      if: inputs.release-source-only == 'false' && steps.download-artifacts.outcome == 'failure'
+      if: inputs.release-source-only == 'false'
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
       with:
         build-command: ${{ inputs.build-command || 'npm run build:ci' }}
         environment: production
 
     - name: Create npm package (if no artifacts available)
-      if: inputs.release-source-only == 'false' && steps.download-artifacts.outcome == 'failure'
+      if: inputs.release-source-only == 'false'
       id: create-package
       uses: CLDMV/.github/.github/actions/npm/steps/create-package@v1
       with:
@@ -187,7 +178,7 @@ runs:
       id: package-files
       uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v1
       with:
-        package-path: ${{ steps.download-artifacts.outcome == 'success' && './artifacts/*.tgz' || '*.tgz' }}
+        package-path: "./artifacts/*.tgz"
 
     - name: Create GitHub release
       id: create-release
