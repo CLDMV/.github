@@ -75,7 +75,7 @@ jobs:
     permissions:
       contents: write
     with:
-      package_name: "version-tags" # Required input, but not used for this operation
+      #   package_name: "version-tags" # Required input, but not used for this operation
       debug: ${{ inputs.debug }}
       run_unified_tag_health: true
       create_documentation: ${{ inputs.create_documentation }}

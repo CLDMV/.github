@@ -72,7 +72,6 @@ jobs:
     name: 🏗️ Continuous Integration
     uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v1
     with:
-      with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug || false }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
