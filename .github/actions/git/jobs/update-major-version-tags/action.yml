@@ -153,6 +153,8 @@ runs:
       id: update-tags
       if: steps.should-run.outputs.result == 'true'
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
         debug: ${{ inputs.debug }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
