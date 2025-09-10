@@ -62,23 +62,8 @@ on:
         type: string
         required: false
         default: "22"
-      test_command:
-        description: "Command to run tests"
-        type: string
-        required: false
-        default: "npm test"
-      build_command:
-        description: "Command to build package"
-        type: string
-        required: false
-        default: "npm run build:ci"
       is_prerelease:
         description: "Whether this is a prerelease"
-        type: boolean
-        required: false
-        default: false
-      release_source_only:
-        description: "Whether to create source-only release (no package assets)"
         type: boolean
         required: false
         default: false
@@ -87,16 +72,6 @@ on:
         type: boolean
         required: false
         default: true
-      skip_performance_tests:
-        description: "Skip performance tests during CI"
-        type: boolean
-        required: false
-        default: false
-      skip_matrix_tests:
-        description: "Skip matrix testing (use single node version only)"
-        type: boolean
-        required: false
-        default: false
       use_gpg:
         description: "Enable GPG signing (if GPG secrets provided)"
         type: boolean
@@ -120,13 +95,13 @@ jobs:
       skip_publish: ${{ github.event.inputs.skip_publish || false }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
-      test_command: ${{ github.event.inputs.test_command || 'npm test' }}
-      build_command: ${{ github.event.inputs.build_command || 'npm run build:ci' }}
+      test_command: "npm test"
+      build_command: "npm run build:ci"
       is_prerelease: ${{ github.event.inputs.is_prerelease || false }}
-      release_source_only: ${{ github.event.inputs.release_source_only || false }}
+      release_source_only: false
       create_documentation: ${{ github.event.inputs.create_documentation || true }}
-      skip_performance_tests: ${{ github.event.inputs.skip_performance_tests || false }}
-      skip_matrix_tests: ${{ github.event.inputs.skip_matrix_tests || false }}
+      skip_performance_tests: false
+      skip_matrix_tests: false
       use_gpg: ${{ github.event.inputs.use_gpg || false }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
