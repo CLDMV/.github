@@ -208,7 +208,7 @@ jobs:
       run_detect_repo_config: true
       run_publish_npm: ${{ inputs.publish_to_npm }}
       run_publish_github_packages: ${{ inputs.publish_to_github_packages }}
-      run_create_release: true  # Create GitHub release after publishing
+      run_create_release: true # Create GitHub release after publishing
       # Build parameters
       node_version: ${{ inputs.node_version }}
       package_manager: ${{ inputs.package_manager }}
