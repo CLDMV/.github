@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { sh } from "./core.mjs";
+import { sh } from "../../../common/common/core.mjs";
 
 function exportGpgEnv({ gpg_passphrase }) {
 	// make sure the wrapper (and gpg) can see the passphrase
