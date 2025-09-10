@@ -37,8 +37,8 @@ runs:
         ### 💥 Breaking Changes
         EOF
 
-        BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)" | head -10)
-        BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)" | head -10)
+        BREAKING=$(git log $COMMIT_RANGE --grep="!" --pretty=format:"- %s (%h)")
+        BREAKING_BODY=$(git log $COMMIT_RANGE --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)")
         if [[ -n "$BREAKING" ]] || [[ -n "$BREAKING_BODY" ]]; then
           echo "$BREAKING" >> CHANGELOG_ENTRY.md
           echo "$BREAKING_BODY" >> CHANGELOG_ENTRY.md
@@ -51,7 +51,7 @@ runs:
         ### ✨ Features
         EOF
 
-        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)" | head -10)
+        FEATURES=$(git log $COMMIT_RANGE --grep="^feat:" --pretty=format:"- %s (%h)")
         if [[ -n "$FEATURES" ]]; then
           echo "$FEATURES" >> CHANGELOG_ENTRY.md
         else
@@ -63,7 +63,7 @@ runs:
         ### 🐛 Bug Fixes
         EOF
 
-        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)" | head -10)
+        FIXES=$(git log $COMMIT_RANGE --grep="^fix:" --pretty=format:"- %s (%h)")
         if [[ -n "$FIXES" ]]; then
           echo "$FIXES" >> CHANGELOG_ENTRY.md
         else
@@ -75,7 +75,7 @@ runs:
         ### 🔧 Other Changes
         EOF
 
-        OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)" | head -5)
+        OTHER=$(git log $COMMIT_RANGE --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)")
         if [[ -n "$OTHER" ]]; then
           echo "$OTHER" >> CHANGELOG_ENTRY.md
         else
@@ -95,7 +95,7 @@ runs:
             jq -r '.[].login' 2>/dev/null)
         else
           # Get commits in range and extract unique authors via GitHub API
-          COMMIT_SHAS=$(git log $COMMIT_RANGE --pretty=format:"%H" | head -20)
+          COMMIT_SHAS=$(git log $COMMIT_RANGE --pretty=format:"%H")
           CONTRIBUTORS_LIST=""
           
           for sha in $COMMIT_SHAS; do
@@ -134,7 +134,3 @@ runs:
         echo "changelog-content<<EOF" >> $GITHUB_OUTPUT
         cat CHANGELOG_ENTRY.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-
-
-
-

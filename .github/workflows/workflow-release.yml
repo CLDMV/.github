@@ -121,8 +121,22 @@ on:
         required: false
 
 jobs:
+  detect-release:
+    name: "🔍 Detect Release"
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.detect.outputs.should-release }}
+      version: ${{ steps.detect.outputs.version }}
+      is-prerelease: ${{ steps.detect.outputs.is-prerelease }}
+    steps:
+      - name: Detect Release
+        id: detect
+        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+
   build-and-test:
     name: "🏗️ Build and Test"
+    if: needs.detect-release.outputs.should-release == 'true'
+    needs: detect-release
     uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
@@ -139,13 +153,14 @@ jobs:
 
   release:
     name: "🚀 Release Management"
-    needs: build-and-test
+    if: needs.detect-release.outputs.should-release == 'true'
+    needs: [detect-release, build-and-test]
     uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
-      # Job control flags - enable the jobs we want to run
-      run_detect_release: true
+      # Job control flags - only run create release PR since we already detected
+      run_detect_release: false
       run_create_release_pr: true
       # Build parameters
       node_version: ${{ inputs.node_version }}
@@ -158,7 +173,7 @@ jobs:
 
   summary:
     name: "📋 Release Summary"
-    needs: [build-and-test, release]
+    needs: [detect-release, build-and-test, release]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -169,7 +184,12 @@ jobs:
           echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ needs.release.result }}" = "success" ]; then
+          # Check if release was detected
+          if [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
+            echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.release.result }}" = "success" ]; then
             if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
               echo "✅ **Overall Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -180,7 +200,7 @@ jobs:
             else
               echo "ℹ️ **Overall Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
+              echo "Release was detected but no PR was created." >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "❌ **Overall Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
