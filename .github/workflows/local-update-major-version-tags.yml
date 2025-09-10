@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   update-tags:
-    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1
+    uses: ./.github/workflows/workflow-update-major-version-tags.yml
     permissions:
       contents: write
     with:
