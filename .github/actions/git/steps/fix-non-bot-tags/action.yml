@@ -53,6 +53,7 @@ runs:
       shell: bash
       run: node ${{ github.action_path }}/action.mjs
       env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
         INPUT_DEBUG: ${{ inputs.debug }}
         INPUT_DRY_RUN: ${{ inputs.dry_run }}
         INPUT_TAGS_DETAILED: ${{ inputs.tags_detailed }}
