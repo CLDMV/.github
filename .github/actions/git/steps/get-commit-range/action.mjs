@@ -40,10 +40,14 @@ function gitCommand(command, silent = false) {
  */
 function categorizeCommits(commitRange) {
 	try {
+		console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
 		const allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%an|%ad" --date=iso`, true);
 		if (!allCommits) {
 			return [];
 		}
+
+		console.log(`🔍 DEBUG: Raw git log output for ${commitRange}:`);
+		console.log(allCommits);
 
 		const commits = allCommits.split("\n").map((line) => {
 			const [hash, subject, author, date] = line.split("|");
@@ -60,40 +64,47 @@ function categorizeCommits(commitRange) {
 				type = conventionalMatch[1];
 				scope = conventionalMatch[2] ? conventionalMatch[2].slice(1, -1) : null; // Remove parentheses
 				isBreaking = !!conventionalMatch[3];
+
+				if (DEBUG) {
+					console.log(`🔍 REGEX DEBUG: "${subject}" → type: "${type}", scope: "${scope}", isBreaking: ${isBreaking}`);
+				}
+			} else {
+				if (DEBUG) {
+					console.log(`🔍 REGEX DEBUG: "${subject}" → NO MATCH`);
+				}
 			}
 
 			// Determine category - order matters!
 			// First check for release commits - these should be excluded entirely
 			if (type === "release" || lower.startsWith("release:") || lower.startsWith("release!:")) {
 				category = "maintenance";
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (release commit)`);
 			}
 			// Then check for breaking changes (but not release commits)
 			else if ((isBreaking || lower.includes("breaking change") || lower.includes("break")) && type !== "release") {
 				category = "breaking";
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → breaking`);
 			}
 			// Then check for content-based categorization (takes precedence over type)
 			else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
 				category = "fix";
-			}
-			else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (content-based)`);
+			} else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
 				category = "feature";
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (content-based)`);
 			}
 			// Then check conventional commit types
 			else if (type === "feat") {
 				category = "feature";
-			}
-			else if (type === "fix") {
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (conventional)`);
+			} else if (type === "fix") {
 				category = "fix";
-			}
-			else if (
-				type === "chore" ||
-				type === "docs" ||
-				type === "style" ||
-				type === "refactor" ||
-				type === "test" ||
-				type === "ci"
-			) {
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (conventional)`);
+			} else if (type === "chore" || type === "docs" || type === "style" || type === "refactor" || type === "test" || type === "ci") {
 				category = "maintenance";
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (conventional)`);
+			} else {
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → other (default)`);
 			}
 
 			return {
@@ -142,8 +153,25 @@ if (BASE_REF_OVERRIDE) {
 	console.log(`🔍 Using override base ref: ${baseRef}`);
 } else {
 	// Use the latest semantic version tag
+	console.log("🔍 DEBUG: Looking for latest semantic version tag...");
+	const allTags = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'", true);
+	console.log(`🔍 DEBUG: All semantic version tags found: ${allTags}`);
+	
 	baseRef = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1", true);
 	console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);
+	
+	// Debug: Check if the tag points to a commit that exists in current branch history
+	if (baseRef) {
+		const tagCommit = gitCommand(`git rev-list -n 1 ${baseRef}`, true);
+		const tagInHistory = gitCommand(`git merge-base --is-ancestor ${tagCommit} HEAD && echo "yes" || echo "no"`, true);
+		console.log(`🔍 DEBUG: Tag ${baseRef} points to commit ${tagCommit}`);
+		console.log(`🔍 DEBUG: Is tag commit in HEAD history? ${tagInHistory}`);
+		
+		if (tagInHistory === "no") {
+			console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
+			console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);
+		}
+	}
 }
 
 let commitRange;
