@@ -13,6 +13,13 @@
  * debugLog('Processing started', { tag: 'v1.0.0' });
  */
 
+import { execSync } from "node:child_process";
+
+export const sh = (cmd) =>
+	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], env: process.env })
+		.toString()
+		.trim();
+
 /**
  * Check if debug logging is currently enabled
  * @private

@@ -1,0 +1,69 @@
+name: "🤖 Fix Non-Bot Tag Signatures"
+description: "Fixes tags that weren't created by the bot by recreating them with proper bot signatures"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  dry_run:
+    description: "Show what would be done without making changes"
+    required: false
+    default: "false"
+  tags_detailed:
+    description: "JSON array of detailed tag objects from get-detailed-tags"
+    required: true
+  bot_patterns:
+    description: "JSON array of bot name patterns to identify bot signatures"
+    required: false
+    default: '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]'
+  sign:
+    description: "Smart signing mode (auto/true/false)"
+    required: false
+    default: "auto"
+  annotate:
+    description: "Smart annotate mode (auto/true/false)"
+    required: false
+    default: "auto"
+  tagger_name:
+    description: "Bot tagger name for new tags"
+    required: false
+  tagger_email:
+    description: "Bot tagger email for new tags"
+    required: false
+  gpg_private_key:
+    description: "GPG private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "GPG passphrase"
+    required: false
+
+outputs:
+  updated_tags_detailed:
+    description: "Updated JSON array of detailed tag objects after processing"
+    value: ${{ steps.fix-tags.outputs.updated-tags-detailed }}
+  fixed_count:
+    description: "Number of tags that were fixed"
+    value: ${{ steps.fix-tags.outputs.fixed-count }}
+  fixed_tags:
+    description: "JSON array of tag names that were fixed"
+    value: ${{ steps.fix-tags.outputs.fixed-tags }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fix non-bot tags
+      id: fix-tags
+      shell: bash
+      run: node ${{ github.action_path }}/action.mjs
+      env:
+        INPUT_DEBUG: ${{ inputs.debug }}
+        INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        INPUT_TAGS_DETAILED: ${{ inputs.tags_detailed }}
+        INPUT_BOT_PATTERNS: ${{ inputs.bot_patterns }}
+        INPUT_SIGN: ${{ inputs.sign }}
+        INPUT_ANNOTATE: ${{ inputs.annotate }}
+        INPUT_TAGGER_NAME: ${{ inputs.tagger_name }}
+        INPUT_TAGGER_EMAIL: ${{ inputs.tagger_email }}
+        INPUT_GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}
+        INPUT_GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}

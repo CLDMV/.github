@@ -1,0 +1,59 @@
+name: "🏷️ Get Detailed Tags List"
+description: "Generates detailed tag metadata list with filtering - provides comprehensive data for subsequent fix processes"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  max_tags:
+    description: "Maximum number of tags to process (safety limit)"
+    required: false
+    default: "100"
+  max_major_versions:
+    description: "Maximum number of major versions to process"
+    required: false
+    default: "10"
+  max_minor_versions:
+    description: "Maximum number of minor versions per major to process"
+    required: false
+    default: "10"
+  bot_patterns:
+    description: "JSON array of bot name patterns to identify bot signatures"
+    required: false
+    default: '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]'
+  include_patterns:
+    description: "JSON array of tag patterns to include (e.g. ['v*', 'release-*'])"
+    required: false
+    default: '["v*"]'
+  exclude_patterns:
+    description: "JSON array of tag patterns to exclude"
+    required: false
+    default: "[]"
+
+outputs:
+  tags_detailed:
+    description: "JSON array of detailed tag objects with metadata"
+    value: ${{ steps.analyze-tags.outputs.tags-detailed }}
+  tags_count:
+    description: "Number of tags returned"
+    value: ${{ steps.analyze-tags.outputs.tags-count }}
+  summary:
+    description: "Summary of tag analysis"
+    value: ${{ steps.analyze-tags.outputs.summary }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Analyze tags with detailed metadata
+      id: analyze-tags
+      shell: bash
+      run: node ${{ github.action_path }}/action.mjs
+      env:
+        INPUT_DEBUG: ${{ inputs.debug }}
+        INPUT_MAX_TAGS: ${{ inputs.max_tags }}
+        INPUT_MAX_MAJOR_VERSIONS: ${{ inputs.max_major_versions }}
+        INPUT_MAX_MINOR_VERSIONS: ${{ inputs.max_minor_versions }}
+        INPUT_BOT_PATTERNS: ${{ inputs.bot_patterns }}
+        INPUT_INCLUDE_PATTERNS: ${{ inputs.include_patterns }}
+        INPUT_EXCLUDE_PATTERNS: ${{ inputs.exclude_patterns }}

@@ -1,0 +1,127 @@
+name: "🏷️ Comprehensive Tag Health Check & Fix"
+description: "Analyzes all repository tags once and fixes multiple issues in separate visible steps"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  dry-run:
+    description: "Show what would be fixed without making changes"
+    required: false
+    default: "false"
+  max_tags:
+    description: "Maximum number of tags to process (safety limit)"
+    required: false
+    default: "100"
+  max_major_versions:
+    description: "Maximum number of major versions to process"
+    required: false
+    default: "10"
+  max_minor_versions:
+    description: "Maximum number of minor versions per major to process"
+    required: false
+    default: "10"
+  sign:
+    description: "Smart signing mode (auto/true/false)"
+    required: false
+    default: "auto"
+  annotate:
+    description: "Smart annotate mode (auto/true/false)"
+    required: false
+    default: "auto"
+  tagger_name:
+    description: "Bot tagger name"
+    required: false
+  tagger_email:
+    description: "Bot tagger email"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key"
+    required: false
+
+outputs:
+  tags-analyzed:
+    description: "Number of tags analyzed"
+    value: ${{ steps.analyze.outputs.tags-processed }}
+  issues-found:
+    description: "Whether any tag issues were found"
+    value: ${{ steps.analyze.outputs.has-issues }}
+  summary:
+    description: "Human-readable summary of analysis and fixes"
+    value: ${{ steps.analyze.outputs.summary }}
+  total-fixes:
+    description: "Total number of tags fixed across all steps"
+    value: ${{ steps.calculate-total.outputs.total-fixes }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🏷️ Get Detailed Tags List"
+      id: get-tags
+      uses: ./.github/actions/git/steps/get-detailed-tags
+      with:
+        debug: ${{ inputs.debug }}
+        max_tags: ${{ inputs.max_tags }}
+        max_major_versions: ${{ inputs.max_major_versions }}
+        max_minor_versions: ${{ inputs.max_minor_versions }}
+        bot_patterns: ${{ inputs.bot_patterns }}
+
+    - name: "🤖 Fix Non-Bot Tags"
+      id: fix-non-bot
+      uses: ./.github/actions/git/steps/fix-non-bot-tags
+      with:
+        debug: ${{ inputs.debug }}
+        dry_run: ${{ inputs.dry-run }}
+        tags_detailed: ${{ steps.get-tags.outputs.tags_detailed }}
+        bot_patterns: ${{ inputs.bot_patterns }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+
+    - name: "🔐 Fix Unsigned Tags"
+      id: fix-unsigned
+      uses: ./.github/actions/git/steps/fix-unsigned-tags
+      with:
+        debug: ${{ inputs.debug }}
+        dry_run: ${{ inputs.dry-run }}
+        tags_detailed: ${{ steps.fix-non-bot.outputs.updated_tags_detailed }}
+        sign: ${{ inputs.sign }}
+        annotate: ${{ inputs.annotate }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
+
+    - name: "🔗 Fix Orphaned Tags"
+      id: fix-orphaned
+      uses: ./.github/actions/git/steps/fix-orphaned-tags
+      with:
+        debug: ${{ inputs.debug }}
+        dry_run: ${{ inputs.dry-run }}
+        tags_detailed: ${{ steps.fix-unsigned.outputs.updated_tags_detailed }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+
+    - name: "📊 Calculate Total Fixes"
+      id: calculate-total
+      shell: bash
+      run: |
+        NON_BOT_FIXES=${{ steps.fix-non-bot.outputs.fixed_count || 0 }}
+        UNSIGNED_FIXES=${{ steps.fix-unsigned.outputs.fixed_count || 0 }}
+        ORPHANED_FIXES=${{ steps.fix-orphaned.outputs.fixed_count || 0 }}
+        TOTAL=$((NON_BOT_FIXES + UNSIGNED_FIXES + ORPHANED_FIXES))
+        echo "total-fixes=$TOTAL" >> $GITHUB_OUTPUT
+
+        echo "📊 Sequential Tag Health Processing Complete:"
+        echo "  🏷️ Initial tags processed: ${{ steps.get-tags.outputs.tags_count }}"
+        echo "  🤖 Non-bot tags fixed: $NON_BOT_FIXES"
+        echo "  🔐 Unsigned tags fixed: $UNSIGNED_FIXES"
+        echo "  🔗 Orphaned tags fixed: $ORPHANED_FIXES"
+        echo "  ✅ Total fixes applied: $TOTAL"

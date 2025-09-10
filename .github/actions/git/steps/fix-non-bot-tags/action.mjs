@@ -1,0 +1,210 @@
+#!/usr/bin/env node
+
+/**
+ * Fix Non-Bot Tag Signatures
+ * Analyzes detailed tags list, fixes tags not created by bot, returns updated list
+ */
+
+import { writeFileSync } from "fs";
+import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
+import { debugLog } from "../../../common/common/core.mjs";
+import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../github/api/_api/gpg.mjs";
+
+const DEBUG = process.env.INPUT_DEBUG === "true";
+const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
+const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
+const BOT_PATTERNS = JSON.parse(process.env.INPUT_BOT_PATTERNS || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]');
+const SIGN = process.env.INPUT_SIGN || "auto";
+const ANNOTATE = process.env.INPUT_ANNOTATE || "auto";
+const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
+const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
+const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
+const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
+
+/**
+ * Check if tag was created by bot based on patterns
+ * @param {object} tagObj - Tag object with metadata
+ * @returns {boolean} True if tag was created by bot
+ */
+function isTagCreatedByBot(tagObj) {
+	// Check if already marked as bot
+	if (tagObj.isBot !== undefined) {
+		return tagObj.isBot;
+	}
+
+	// Check tagger for annotated tags
+	if (tagObj.isAnnotated && tagObj.tagger) {
+		const isBotTag = BOT_PATTERNS.some((pattern) => tagObj.tagger.toLowerCase().includes(pattern.toLowerCase()));
+
+		debugLog(`Tag ${tagObj.name}: Annotated by "${tagObj.tagger}" - Bot: ${isBotTag ? "✅" : "❌"}`);
+		return isBotTag;
+	}
+
+	// Check author for lightweight tags
+	if (tagObj.isLightweight && tagObj.author) {
+		const isBotTag = BOT_PATTERNS.some((pattern) => tagObj.author.toLowerCase().includes(pattern.toLowerCase()));
+
+		debugLog(`Tag ${tagObj.name}: Lightweight by "${tagObj.author}" - Bot: ${isBotTag ? "✅" : "❌"}`);
+		return isBotTag;
+	}
+
+	debugLog(`Tag ${tagObj.name}: Could not determine creator - assuming non-bot`);
+	return false;
+}
+
+/**
+ * Fix a non-bot tag by recreating it with bot signature
+ * @param {object} tagObj - Tag object to fix
+ * @returns {object|null} Updated tag object or null if failed
+ */
+function fixNonBotTag(tagObj) {
+	try {
+		if (DRY_RUN) {
+			console.log(`🔄 [DRY RUN] Would recreate tag ${tagObj.name} with bot signature`);
+			// Return the tag object as if it was fixed
+			return {
+				...tagObj,
+				tagger: TAGGER_NAME || "CLDMV Bot",
+				isBot: true,
+				isSigned: willSign
+			};
+		}
+
+		console.log(`🔄 Recreating tag ${tagObj.name} with bot signature...`);
+
+		// Use original message or tag name as fallback
+		const tagMessage = tagObj.message || tagObj.name;
+
+		// Delete the existing tag
+		gitCommand(`git tag -d ${tagObj.name}`, true);
+		gitCommand(`git push origin :refs/tags/${tagObj.name}`, true);
+
+		// Create new annotated tag with bot signature
+		let tagCommand = `git tag -a ${tagObj.name} ${tagObj.commit} -m "${tagMessage}"`;
+
+		if (willSign) {
+			tagCommand = `git tag -a -s ${tagObj.name} ${tagObj.commit} -m "${tagMessage}"`;
+		}
+
+		gitCommand(tagCommand);
+
+		// Push the new tag
+		gitCommand(`git push origin ${tagObj.name}`);
+
+		console.log(`✅ Successfully recreated tag ${tagObj.name} with bot signature`);
+
+		// Return updated tag object
+		const updatedTagInfo = getTagInfo(tagObj.name);
+		if (updatedTagInfo) {
+			return {
+				...updatedTagInfo,
+				isBot: true
+			};
+		}
+
+		return {
+			...tagObj,
+			tagger: TAGGER_NAME || "CLDMV Bot",
+			isBot: true,
+			isSigned: willSign
+		};
+	} catch (error) {
+		console.error(`❌ Failed to fix tag ${tagObj.name}: ${error.message}`);
+		debugLog(`Failed to fix tag ${tagObj.name}`, { error: error.message });
+		return null;
+	}
+}
+
+console.log("🤖 Analyzing and fixing non-bot tag signatures...");
+
+if (TAGS_DETAILED.length === 0) {
+	console.log("ℹ️ No tags to process");
+	const outputs = {
+		"updated-tags-detailed": "[]",
+		"fixed-count": "0",
+		"fixed-tags": "[]"
+	};
+
+	Object.entries(outputs).forEach(([key, value]) => {
+		console.log(`${key}=${value}`);
+	});
+	process.exit(0);
+}
+
+// Setup git identity and GPG if provided
+const willSign = shouldSign({ sign: SIGN, gpg_private_key: GPG_PRIVATE_KEY });
+let keyid = "";
+
+if (willSign) {
+	keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
+}
+
+configureGitIdentity({
+	tagger_name: TAGGER_NAME,
+	tagger_email: TAGGER_EMAIL,
+	keyid,
+	enableSign: willSign
+});
+
+console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for bot signatures...`);
+
+const nonBotTags = [];
+const updatedTagsDetailed = [];
+const fixedTags = [];
+
+// Analyze each tag
+for (const tagObj of TAGS_DETAILED) {
+	if (!isTagCreatedByBot(tagObj)) {
+		nonBotTags.push(tagObj);
+	}
+}
+
+if (nonBotTags.length === 0) {
+	console.log("✅ All tags are properly created by bot");
+	// Return original tags list unchanged
+	updatedTagsDetailed.push(...TAGS_DETAILED);
+} else {
+	console.log(`🔧 Found ${nonBotTags.length} tags needing bot signature fixes:`);
+	nonBotTags.forEach((tag) => console.log(`  - ${tag.name}`));
+
+	// Process each tag (both bot and non-bot)
+	for (const tagObj of TAGS_DETAILED) {
+		if (nonBotTags.some((t) => t.name === tagObj.name)) {
+			// This tag needs fixing
+			const fixedTag = fixNonBotTag(tagObj);
+			if (fixedTag) {
+				updatedTagsDetailed.push(fixedTag);
+				fixedTags.push(fixedTag.name);
+			} else {
+				// Keep original if fix failed
+				updatedTagsDetailed.push(tagObj);
+			}
+		} else {
+			// Tag is already fine, keep as-is
+			updatedTagsDetailed.push(tagObj);
+		}
+	}
+}
+
+console.log(`✅ Fixed ${fixedTags.length} tags with bot signatures`);
+
+// Set outputs
+const outputs = {
+	"updated-tags-detailed": JSON.stringify(updatedTagsDetailed),
+	"fixed-count": fixedTags.length.toString(),
+	"fixed-tags": JSON.stringify(fixedTags)
+};
+
+Object.entries(outputs).forEach(([key, value]) => {
+	console.log(`${key}=${value}`);
+});
+
+// Write to GitHub output file
+const githubOutput = process.env.GITHUB_OUTPUT;
+if (githubOutput) {
+	const outputContent =
+		Object.entries(outputs)
+			.map(([key, value]) => `${key}=${value}`)
+			.join("\n") + "\n";
+	writeFileSync(githubOutput, outputContent, { flag: "a" });
+}

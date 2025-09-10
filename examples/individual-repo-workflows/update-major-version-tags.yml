@@ -1,5 +1,23 @@
 # Individual repo: .github/workflows/update-version-tags.yml
-name: 🏷️ Update Version Tags
+njobs:
+  update-tags:
+    uses: CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1
+    permissions:
+      contents: write
+    with:
+      debug: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true') || false }}
+      create_documentation: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.create_documentation == 'true') || true }}
+      sign: ${{ github.event.inputs.sign || 'auto' }}
+      annotate: ${{ github.event.inputs.annotate || 'auto' }}
+      use_gpg: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_gpg == 'true') || false }}
+      # Tag health configuration - customize these for your project
+      max_tags: ${{ github.event.inputs.max_tags || '100' }}
+      max_major_versions: ${{ github.event.inputs.max_major_versions || '10' }}
+      max_minor_versions: ${{ github.event.inputs.max_minor_versions || '10' }}
+      bot_patterns: ${{ github.event.inputs.bot_patterns || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]' }}
+      include_patterns: ${{ github.event.inputs.include_patterns || '["v*"]' }}
+      exclude_patterns: ${{ github.event.inputs.exclude_patterns || '[]' }}
+    secrets: inheritate Version Tags
 
 on:
   release:
@@ -34,6 +52,31 @@ on:
         type: boolean
         required: false
         default: false
+      # Tag health configuration
+      max_tags:
+        description: "Maximum number of tags to process (safety limit)"
+        required: false
+        default: "100"
+      max_major_versions:
+        description: "Maximum number of major versions to process"
+        required: false
+        default: "10"
+      max_minor_versions:
+        description: "Maximum number of minor versions per major to process"
+        required: false
+        default: "10"
+      bot_patterns:
+        description: "JSON array of bot name patterns to identify bot signatures"
+        required: false
+        default: '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]'
+      include_patterns:
+        description: "JSON array of tag patterns to include (e.g. ['v*', 'release-*'])"
+        required: false
+        default: '["v*"]'
+      exclude_patterns:
+        description: "JSON array of tag patterns to exclude"
+        required: false
+        default: "[]"
 
 jobs:
   update-tags:

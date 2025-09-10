@@ -156,17 +156,17 @@ if (BASE_REF_OVERRIDE) {
 	console.log("🔍 DEBUG: Looking for latest semantic version tag...");
 	const allTags = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'", true);
 	console.log(`🔍 DEBUG: All semantic version tags found: ${allTags}`);
-	
+
 	baseRef = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1", true);
 	console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);
-	
+
 	// Debug: Check if the tag points to a commit that exists in current branch history
 	if (baseRef) {
 		const tagCommit = gitCommand(`git rev-list -n 1 ${baseRef}`, true);
 		const tagInHistory = gitCommand(`git merge-base --is-ancestor ${tagCommit} HEAD && echo "yes" || echo "no"`, true);
 		console.log(`🔍 DEBUG: Tag ${baseRef} points to commit ${tagCommit}`);
 		console.log(`🔍 DEBUG: Is tag commit in HEAD history? ${tagInHistory}`);
-		
+
 		if (tagInHistory === "no") {
 			console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
 			console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);

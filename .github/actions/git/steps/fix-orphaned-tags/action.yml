@@ -1,0 +1,46 @@
+name: "🔗 Fix Orphaned Tags"
+description: "Fixes tags pointing to orphaned commits by re-pointing to equivalent commits in current branch"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  dry_run:
+    description: "Show what would be done without making changes"
+    required: false
+    default: "false"
+  tags_detailed:
+    description: "JSON array of detailed tag objects from previous step"
+    required: true
+  tagger_name:
+    description: "Bot tagger name for recreated tags"
+    required: false
+  tagger_email:
+    description: "Bot tagger email for recreated tags"
+    required: false
+
+outputs:
+  updated_tags_detailed:
+    description: "Updated JSON array of detailed tag objects after processing"
+    value: ${{ steps.fix-tags.outputs.updated-tags-detailed }}
+  fixed_count:
+    description: "Number of tags that were fixed"
+    value: ${{ steps.fix-tags.outputs.fixed-count }}
+  fixed_tags:
+    description: "JSON array of tag names that were fixed"
+    value: ${{ steps.fix-tags.outputs.fixed-tags }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fix orphaned tags
+      id: fix-tags
+      shell: bash
+      run: node ${{ github.action_path }}/action.mjs
+      env:
+        INPUT_DEBUG: ${{ inputs.debug }}
+        INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        INPUT_TAGS_DETAILED: ${{ inputs.tags_detailed }}
+        INPUT_TAGGER_NAME: ${{ inputs.tagger_name }}
+        INPUT_TAGGER_EMAIL: ${{ inputs.tagger_email }}
