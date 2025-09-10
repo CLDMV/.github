@@ -7,7 +7,7 @@
 
 import { writeFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
-import { importGpgIfNeeded, configureGitIdentity } from "../../github/api/_api/gpg.mjs";
+import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
