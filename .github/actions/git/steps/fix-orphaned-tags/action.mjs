@@ -5,35 +5,18 @@
  * Fixes tags pointing to orphaned commits by re-pointing to equivalent commits
  */
 
-import { execSync } from 'child_process';
 import { writeFileSync } from 'fs';
+import { gitCommand } from "../../utilities/git-utils.mjs";
+import { importGpgIfNeeded, configureGitIdentity } from "../../github/api/_api/gpg.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === 'true';
 const DRY_RUN = process.env.INPUT_DRY_RUN === 'true';
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || '[]');
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || '';
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || '';
-
-/**
- * Execute git command safely
- * @param {string} command - Git command to execute
- * @param {boolean} silent - Whether to suppress output on error
- * @returns {string} Command output
- */
-function gitCommand(command, silent = false) {
-	try {
-		return execSync(command, { 
-			encoding: 'utf8', 
-			stdio: silent ? 'pipe' : 'inherit' 
-		}).trim();
-	} catch (error) {
-		if (!silent) {
-			console.error(`❌ Command failed: ${command}`);
-			console.error(error.message);
-		}
-		return '';
-	}
-}
+const GPG_ENABLED = (process.env.INPUT_GPG_ENABLED || 'false').toLowerCase() === 'true';
+const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || '';
+const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || '';
 
 /**
  * Find equivalent commit in current branch for orphaned commit
@@ -144,11 +127,18 @@ function fixOrphanedTag(tagObj) {
 		// Use existing message or tag name as fallback
 		const tagMessage = tagObj.message || tagName;
 		
-		// Set up bot identity if provided
-		if (TAGGER_NAME && TAGGER_EMAIL) {
-			gitCommand(`git config user.name "${TAGGER_NAME}"`, true);
-			gitCommand(`git config user.email "${TAGGER_EMAIL}"`, true);
+		// Set up bot identity and GPG if provided
+		let keyid = "";
+		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
+			keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
 		}
+		
+		configureGitIdentity({
+			tagger_name: TAGGER_NAME,
+			tagger_email: TAGGER_EMAIL,
+			keyid,
+			enableSign: GPG_ENABLED && GPG_PRIVATE_KEY
+		});
 		
 		// Delete the existing tag locally and remotely
 		gitCommand(`git tag -d ${tagName}`, true);
@@ -156,7 +146,10 @@ function fixOrphanedTag(tagObj) {
 		
 		// Create new tag pointing to equivalent commit
 		let tagCommand;
-		if (tagObj.isAnnotated) {
+		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
+			// Always create signed annotated tags when GPG is enabled
+			tagCommand = `git tag -s -a ${tagName} ${equivalentCommit} -m "${tagMessage}"`;
+		} else if (tagObj.isAnnotated) {
 			tagCommand = `git tag -a ${tagName} ${equivalentCommit} -m "${tagMessage}"`;
 		} else {
 			tagCommand = `git tag ${tagName} ${equivalentCommit}`;
@@ -173,7 +166,10 @@ function fixOrphanedTag(tagObj) {
 		return {
 			...tagObj,
 			commitSha: equivalentCommit,
-			isOrphaned: false
+			isOrphaned: false,
+			isSigned: GPG_ENABLED && GPG_PRIVATE_KEY,
+			isAnnotated: (GPG_ENABLED && GPG_PRIVATE_KEY) || tagObj.isAnnotated,
+			tagger: TAGGER_NAME || tagObj.tagger
 		};
 		
 	} catch (error) {

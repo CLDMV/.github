@@ -19,6 +19,16 @@ inputs:
   tagger_email:
     description: "Bot tagger email for recreated tags"
     required: false
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected from workflow)"
+    required: false
+    default: "false"
+  gpg_private_key:
+    description: "ASCII-armored private key for signing (if gpg_enabled=true)"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if applicable)"
+    required: false
 
 outputs:
   updated_tags_detailed:

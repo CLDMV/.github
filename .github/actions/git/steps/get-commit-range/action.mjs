@@ -1,5 +1,5 @@
-import { execSync } from "child_process";
 import { appendFileSync } from "fs";
+import { gitCommand } from "../../utilities/git-utils.mjs";
 
 // Get inputs from environment
 const HEAD_REF = process.env.HEAD_REF || "HEAD";
@@ -10,27 +10,6 @@ console.log(`🔍 Getting commit range for ${HEAD_REF}`);
 if (DEBUG) {
 	console.log(`🔍 DEBUG: head-ref=${HEAD_REF}`);
 	console.log(`🔍 DEBUG: base-ref override=${BASE_REF_OVERRIDE || "(none)"}`);
-}
-
-/**
- * Helper function to execute git commands safely
- * @param {string} command - Git command to execute
- * @param {boolean} silent - Whether to suppress output on error
- * @returns {string} Command output or empty string on error
- */
-function gitCommand(command, silent = false) {
-	try {
-		const result = execSync(command, { encoding: "utf8" }).trim();
-		if (DEBUG && !silent) {
-			console.log(`🔍 DEBUG: ${command} → ${result || "(empty)"}`);
-		}
-		return result;
-	} catch (error) {
-		if (!silent) {
-			console.log(`🔍 DEBUG: ${command} failed: ${error.message}`);
-		}
-		return "";
-	}
 }
 
 /**

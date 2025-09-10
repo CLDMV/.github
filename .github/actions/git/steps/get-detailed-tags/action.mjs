@@ -5,8 +5,8 @@
  * Provides comprehensive tag metadata for subsequent fix processes
  */
 
-import { execSync } from "child_process";
 import { writeFileSync } from "fs";
+import { gitCommand } from "../../utilities/git-utils.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const MAX_TAGS = parseInt(process.env.INPUT_MAX_TAGS || "100");
@@ -15,27 +15,6 @@ const MAX_MINOR_VERSIONS = parseInt(process.env.INPUT_MAX_MINOR_VERSIONS || "10"
 const BOT_PATTERNS = JSON.parse(process.env.INPUT_BOT_PATTERNS || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]');
 const INCLUDE_PATTERNS = JSON.parse(process.env.INPUT_INCLUDE_PATTERNS || '["v*"]');
 const EXCLUDE_PATTERNS = JSON.parse(process.env.INPUT_EXCLUDE_PATTERNS || "[]");
-
-/**
- * Execute git command safely
- * @param {string} command - Git command to execute
- * @param {boolean} silent - Whether to suppress output on error
- * @returns {string} Command output
- */
-function gitCommand(command, silent = false) {
-	try {
-		return execSync(command, {
-			encoding: "utf8",
-			stdio: silent ? "pipe" : "inherit"
-		}).trim();
-	} catch (error) {
-		if (!silent) {
-			console.error(`❌ Command failed: ${command}`);
-			console.error(error.message);
-		}
-		return "";
-	}
-}
 
 /**
  * Check if tag matches include patterns and doesn't match exclude patterns
