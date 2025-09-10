@@ -4,12 +4,6 @@ name: 🏷️ Tag Health Management Jobs
 on:
   workflow_call:
     inputs:
-      # Package information
-      package_name:
-        description: "NPM package name (e.g., @cldmv/slothlet)"
-        required: true
-        type: string
-
       # Debug control
       debug:
         description: "Enable debug logging for troubleshooting"
@@ -420,7 +414,7 @@ jobs:
       - name: Summarize processing
         id: summarize
         run: |
-          echo "🔄 Unified Tag Health Summary for ${{ inputs.package_name }}:"
+          echo "🔄 Unified Tag Health Summary for ${{ github.repository }}:"
 
           INITIAL_COUNT="${{ steps.get-tags.outputs.tags_count }}"
           FINAL_COUNT="${{ steps.final-scan.outputs.tags_count }}"
@@ -439,7 +433,7 @@ jobs:
           echo "  📊 Final tag count: $FINAL_COUNT"
           echo "  ✅ Total operations: $TOTAL_FIXED"
 
-          SUMMARY="Processed $INITIAL_COUNT tags for ${{ inputs.package_name }}. Updated $MAJOR_UPDATED major/minor tags (first), then fixed: $BOT_FIXED bot signatures, $UNSIGNED_FIXED unsigned tags, $ORPHANED_FIXED orphaned tags. Final count: $FINAL_COUNT. Total operations: $TOTAL_FIXED"
+          SUMMARY="Processed $INITIAL_COUNT tags for ${{ github.repository }}. Updated $MAJOR_UPDATED major/minor tags (first), then fixed: $BOT_FIXED bot signatures, $UNSIGNED_FIXED unsigned tags, $ORPHANED_FIXED orphaned tags. Final count: $FINAL_COUNT. Total operations: $TOTAL_FIXED"
 
           echo "total-processed=$INITIAL_COUNT" >> $GITHUB_OUTPUT
           echo "total-fixed=$TOTAL_FIXED" >> $GITHUB_OUTPUT

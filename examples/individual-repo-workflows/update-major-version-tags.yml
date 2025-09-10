@@ -58,7 +58,6 @@ jobs:
     permissions:
       contents: write
     with:
-      # package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug || false }}
       create_documentation: ${{ github.event.inputs.create_documentation || true }}
       use_gpg: ${{ github.event.inputs.use_gpg || false }}
