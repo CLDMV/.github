@@ -129,6 +129,11 @@ jobs:
       version-bump: ${{ steps.check.outputs.version-bump }}
       has-breaking: ${{ steps.check.outputs.has-breaking }}
     steps:
+      - name: Checkout code
+        uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+        with:
+          fetch-depth: 0
+
       - name: Check Release Commit
         id: check
         uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
