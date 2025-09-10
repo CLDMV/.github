@@ -80,6 +80,18 @@ on:
       BOT_APP_PRIVATE_KEY:
         description: "GitHub App private key for CLDMV bot"
         required: false
+      TAGGER_NAME:
+        description: "GPG tagger name for signing"
+        required: false
+      TAGGER_EMAIL:
+        description: "GPG tagger email for signing"
+        required: false
+      GPG_PRIVATE_KEY:
+        description: "ASCII-armored private key for signing"
+        required: false
+      GPG_PASSPHRASE:
+        description: "Passphrase for the private key (if protected)"
+        required: false
 
     outputs:
       # Release management outputs
