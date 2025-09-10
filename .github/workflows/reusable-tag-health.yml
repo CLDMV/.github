@@ -167,7 +167,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      app-token: ${{ steps.app-token.outputs.token }}
+      auth-token: ${{ steps.app-token.outputs.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -226,7 +226,7 @@ jobs:
         id: update-major-tags
         uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
         env:
-          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
@@ -268,7 +268,7 @@ jobs:
         id: fix-bot-sigs
         uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v1
         env:
-          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
@@ -310,7 +310,7 @@ jobs:
         id: fix-unsigned
         uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v1
         env:
-          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
@@ -352,7 +352,7 @@ jobs:
         id: fix-orphaned
         uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v1
         env:
-          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.app-token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
