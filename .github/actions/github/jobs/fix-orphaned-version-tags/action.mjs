@@ -1,4 +1,4 @@
-import { sh } from "../../common/common/core.mjs";
+import { sh } from "../../../../common/common/core.mjs";
 import fs from "node:fs";
 
 const out = process.env.GITHUB_OUTPUT;
