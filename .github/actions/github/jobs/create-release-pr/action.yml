@@ -63,7 +63,6 @@ runs:
 
     - name: Check release commit for auto-detection
       id: commit-check
-      if: inputs.version-bump == ''
       uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
 
     - name: Calculate new version

@@ -36,7 +36,7 @@ runs:
         # Calculate new version based on bump type
         BUMP_TYPE="${{ inputs.version-bump }}"
         EXPLICIT_VERSION="${{ inputs.explicit-version }}"
-        
+
         if [ "$BUMP_TYPE" = "explicit" ]; then
           if [ -n "$EXPLICIT_VERSION" ]; then
             NEW_VERSION="$EXPLICIT_VERSION"
