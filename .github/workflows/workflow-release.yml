@@ -125,13 +125,13 @@ jobs:
     name: "🔍 Detect Release"
     runs-on: ubuntu-latest
     outputs:
-      should-release: ${{ steps.detect.outputs.should-release }}
-      version: ${{ steps.detect.outputs.version }}
-      is-prerelease: ${{ steps.detect.outputs.is-prerelease }}
+      should-release: ${{ steps.check.outputs.should-create-pr }}
+      version-bump: ${{ steps.check.outputs.version-bump }}
+      has-breaking: ${{ steps.check.outputs.has-breaking }}
     steps:
-      - name: Detect Release
-        id: detect
-        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+      - name: Check Release Commit
+        id: check
+        uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
 
   build-and-test:
     name: "🏗️ Build and Test"
@@ -165,7 +165,7 @@ jobs:
       # Build parameters
       node_version: ${{ inputs.node_version }}
       package_manager: ${{ inputs.package_manager }}
-      version_bump: ${{ inputs.version_bump }}
+      version_bump: ${{ needs.detect-release.outputs.version-bump }}
       version: ${{ inputs.version }}
     secrets:
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
