@@ -6,6 +6,9 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
+  github_token:
+    description: "GitHub token for API access (defaults to github.token)"
+    required: false
   gpg_enabled:
     description: "Whether GPG signing should be used (auto-detected)"
     required: false
@@ -63,7 +66,7 @@ runs:
       if: ${{ steps.gather.outputs.non-bot-tags-found == 'true' }}
       uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
       env:
-        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:
         debug: ${{ inputs.debug }}
         payload: ${{ steps.gather.outputs.non-bot-tags-json }}

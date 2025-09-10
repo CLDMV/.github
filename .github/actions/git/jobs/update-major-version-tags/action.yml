@@ -102,10 +102,9 @@ runs:
     - name: Fix non-bot-signed version tags
       id: fix-bot-signatures
       uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v1
-      env:
-        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
         debug: ${{ inputs.debug }}
+        github_token: ${{ env.GITHUB_TOKEN }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
