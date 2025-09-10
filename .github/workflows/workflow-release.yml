@@ -143,6 +143,11 @@ jobs:
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
+      # Job control flags - enable the jobs we want to run
+      run_detect_release: true
+      run_create_release_pr: true
+      run_create_release: false  # Don't auto-create releases, just PRs
+      # Build parameters
       node_version: ${{ inputs.node_version }}
       package_manager: ${{ inputs.package_manager }}
       version_bump: ${{ inputs.version_bump }}

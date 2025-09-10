@@ -41,6 +41,24 @@ inputs:
     required: false
     default: "npm run build:ci"
 
+  # GPG signing parameters
+  gpg_enabled:
+    description: "Whether GPG signing should be used (auto-detected)"
+    required: false
+    default: "false"
+  tagger_name:
+    description: "Tagger name for GPG signing"
+    required: false
+  tagger_email:
+    description: "Tagger email for GPG signing"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+
 outputs:
   release-id:
     description: "ID of the created GitHub release"
@@ -117,6 +135,11 @@ runs:
         tag: v${{ steps.detect-version.outputs.version }}
         sha: ${{ steps.get-sha.outputs.commit-sha }}
         message: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
+        gpg_enabled: ${{ inputs.gpg_enabled }}
+        tagger_name: ${{ inputs.tagger_name }}
+        tagger_email: ${{ inputs.tagger_email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
 
     - name: Update Summary - Tag Created
       shell: bash
