@@ -71,6 +71,7 @@ runs:
       uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
       with:
         version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
+        explicit-version: ${{ steps.commit-check.outputs.explicit-version }}
 
     - name: Update Summary - Version Calculated
       shell: bash

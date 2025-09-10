@@ -6,7 +6,7 @@ outputs:
     description: "Whether a release PR should be created"
     value: ${{ steps.check.outputs.should-create-pr }}
   version-bump:
-    description: "Type of version bump (major, minor, patch)"
+    description: "Type of version bump (major, minor, patch, explicit)"
     value: ${{ steps.check.outputs.version-bump }}
   commit-message:
     description: "The commit message that triggered the release"
@@ -14,6 +14,9 @@ outputs:
   has-breaking:
     description: "Whether this release has breaking changes"
     value: ${{ steps.check.outputs.has-breaking }}
+  explicit-version:
+    description: "Explicit version when version-bump is explicit"
+    value: ${{ steps.check.outputs.explicit-version }}
 
 runs:
   using: "composite"

@@ -3,8 +3,11 @@ description: "Calculate new version based on current package.json and bump type"
 
 inputs:
   version-bump:
-    description: "Type of version bump (major, minor, patch)"
+    description: "Type of version bump (major, minor, patch, explicit)"
     required: true
+  explicit-version:
+    description: "Explicit version to use when version-bump is explicit"
+    required: false
 
 outputs:
   current-version:
@@ -32,17 +35,25 @@ runs:
 
         # Calculate new version based on bump type
         BUMP_TYPE="${{ inputs.version-bump }}"
-        if [ "$BUMP_TYPE" = "major" ]; then
+        EXPLICIT_VERSION="${{ inputs.explicit-version }}"
+        
+        if [ "$BUMP_TYPE" = "explicit" ]; then
+          if [ -n "$EXPLICIT_VERSION" ]; then
+            NEW_VERSION="$EXPLICIT_VERSION"
+            echo "🏷️ Using explicit version: $CURRENT_VERSION → $NEW_VERSION (explicit)"
+          else
+            echo "❌ Error: explicit version-bump specified but no explicit-version provided"
+            exit 1
+          fi
+        elif [ "$BUMP_TYPE" = "major" ]; then
           NEW_VERSION="$((MAJOR + 1)).0.0"
+          echo "🏷️ Version bump: $CURRENT_VERSION → $NEW_VERSION (major)"
         elif [ "$BUMP_TYPE" = "minor" ]; then
           NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+          echo "🏷️ Version bump: $CURRENT_VERSION → $NEW_VERSION (minor)"
         else
           NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          echo "🏷️ Version bump: $CURRENT_VERSION → $NEW_VERSION (patch)"
         fi
 
         echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "🏷️ Version bump: $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)"
-
-
-
-

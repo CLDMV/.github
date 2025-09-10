@@ -48,11 +48,11 @@ function findReleaseCommits(commits) {
 
 /**
  * Analyze commits for version bump type
- * @param {Array} commits - Array of commit objects (excluding release commits)
+ * @param {Array} commits - Array of commit objects
  * @returns {object} Version bump analysis
  */
 function analyzeVersionBump(commits) {
-	// Filter out release commits for version analysis
+	// Filter out release commits for version analysis (but keep them for explicit version extraction)
 	const nonReleaseCommits = commits.filter((commit) => {
 		const subject = commit.subject.toLowerCase();
 		return !subject.startsWith("release:") && !subject.startsWith("release!");
@@ -67,6 +67,40 @@ function analyzeVersionBump(commits) {
 			hasBreaking: true,
 			reason: "Breaking changes detected in commit history"
 		};
+	}
+
+	// Check for explicit version in release commits (from original commits array, not filtered)
+	const releaseCommits = commits.filter((commit) => {
+		const subject = commit.subject.toLowerCase();
+		return subject.startsWith("release:") && !subject.startsWith("release!");
+	});
+
+	if (releaseCommits.length > 0) {
+		const releaseCommit = releaseCommits[0]; // Use the first/most recent release commit
+		
+		// Try to extract version from commit message
+		// Patterns to match: "release: v1.2.3", "release: 1.2.3", "release: bump to v1.2.3", etc.
+		const versionPatterns = [
+			/release:\s*v?(\d+\.\d+\.\d+)/i,
+			/release:\s*.*?v?(\d+\.\d+\.\d+)/i
+		];
+
+		for (const pattern of versionPatterns) {
+			const match = releaseCommit.subject.match(pattern);
+			if (match) {
+				const explicitVersion = match[1];
+				console.log(`🔍 Found explicit version in release commit: ${explicitVersion}`);
+				
+				return {
+					versionBump: "explicit",
+					hasBreaking: false,
+					explicitVersion: explicitVersion,
+					reason: `Explicit version specified in release commit: ${explicitVersion}`
+				};
+			}
+		}
+		
+		console.log(`🔍 Release commit found but no version extracted from: ${releaseCommit.subject}`);
 	}
 
 	// Check for features
@@ -119,7 +153,13 @@ if (releaseAnalysis.hasRelease) {
 		const versionAnalysis = analyzeVersionBump(commits);
 		outputs.push(`version-bump=${versionAnalysis.versionBump}`);
 		outputs.push(`has-breaking=${versionAnalysis.hasBreaking}`);
-		console.log(`🚀 Release commit detected - will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
+		
+		if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
+			outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
+			console.log(`🚀 Release commit with explicit version detected - will create PR for version ${versionAnalysis.explicitVersion}`);
+		} else {
+			console.log(`🚀 Release commit detected - will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
+		}
 	}
 
 	outputs.forEach((output) => {
