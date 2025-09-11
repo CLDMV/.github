@@ -17,6 +17,9 @@ outputs:
   explicit-version:
     description: "Explicit version when version-bump is explicit"
     value: ${{ steps.check.outputs.explicit-version }}
+  commits:
+    description: "JSON array of categorized commits"
+    value: ${{ steps.commit-range.outputs.commits }}
 
 runs:
   using: "composite"

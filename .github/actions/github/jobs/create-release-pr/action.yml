@@ -93,7 +93,7 @@ runs:
       id: changelog
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
       with:
-        github-token: ${{ inputs.github-token }}
+        commits: ${{ steps.commit-check.outputs.commits }}
 
     - name: Detect default branch
       id: default-branch

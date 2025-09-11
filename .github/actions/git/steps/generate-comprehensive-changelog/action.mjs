@@ -1,5 +1,6 @@
 import { appendFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
+import { categorizeCommits } from "../get-commit-range/action.mjs";
 
 // Get inputs from environment
 const COMMITS_INPUT = process.env.COMMITS_INPUT;
@@ -32,127 +33,68 @@ function generateComprehensiveChangelog(commitRange = null, commits = null) {
 
 	let changelog = "## 🚀 What's Changed\n\n";
 
-	if (commits) {
-		// Use provided categorized commits - this is the correct approach!
-		// Don't filter out release commits - they may contain useful information
-		
-		// Breaking Changes - use proper categorization
-		changelog += "### 💥 Breaking Changes\n";
-		const breakingCommits = commits.filter(c => c.category === 'breaking' || c.isBreaking);
-		if (breakingCommits.length > 0) {
-			breakingCommits.forEach(c => {
-				changelog += `- ${c.subject} (${c.hash})\n`;
-			});
-		} else {
-			changelog += "_No breaking changes_\n";
-		}
-		changelog += "\n";
-
-		// Features - use proper categorization
-		changelog += "### ✨ Features\n";
-		const featureCommits = commits.filter(c => c.category === 'feature');
-		if (featureCommits.length > 0) {
-			featureCommits.forEach(c => {
-				changelog += `- ${c.subject} (${c.hash})\n`;
-			});
-		} else {
-			changelog += "_No new features_\n";
-		}
-		changelog += "\n";
-
-		// Bug Fixes - use proper categorization
-		changelog += "### 🐛 Bug Fixes\n";
-		const fixCommits = commits.filter(c => c.category === 'fix');
-		if (fixCommits.length > 0) {
-			fixCommits.forEach(c => {
-				changelog += `- ${c.subject} (${c.hash})\n`;
-			});
-		} else {
-			changelog += "_No bug fixes_\n";
-		}
-		changelog += "\n";
-
-		// Other Changes - maintenance and other categories (including release commits)
-		changelog += "### 🔧 Other Changes\n";
-		const otherCommits = commits.filter(c => 
-			c.category === 'maintenance' || 
-			c.category === 'other'
-		);
-		if (otherCommits.length > 0) {
-			otherCommits.forEach(c => {
-				changelog += `- ${c.subject} (${c.hash})\n`;
-			});
-		} else {
-			changelog += "_No other changes_\n";
-		}
-		changelog += "\n";
-
-		// Contributors
-		changelog += "### 👥 Contributors\n";
-		const contributors = [...new Set(commits.map(c => c.author))];
-		contributors.forEach(author => {
-			changelog += `- ${author}\n`;
-		});
-		
-	} else {
-		// Fallback to git commands if no commits provided (original bash logic)
-		changelog += "### 💥 Breaking Changes\n";
-		try {
-			const breaking = gitCommand(`git log ${range} --grep="!" --pretty=format:"- %s (%h)"`, true);
-			const breakingBody = gitCommand(`git log ${range} --grep="BREAKING CHANGE" --pretty=format:"- %s (%h)"`, true);
-			if (breaking || breakingBody) {
-				if (breaking) changelog += breaking + "\n";
-				if (breakingBody) changelog += breakingBody + "\n";
-			} else {
-				changelog += "_No breaking changes_\n";
-			}
-		} catch (e) {
-			changelog += "_No breaking changes_\n";
-		}
-		changelog += "\n";
-
-		changelog += "### ✨ Features\n";
-		try {
-			const features = gitCommand(`git log ${range} --grep="^feat:" --pretty=format:"- %s (%h)"`, true);
-			if (features) {
-				changelog += features + "\n";
-			} else {
-				changelog += "_No new features_\n";
-			}
-		} catch (e) {
-			changelog += "_No new features_\n";
-		}
-		changelog += "\n";
-
-		changelog += "### 🐛 Bug Fixes\n";
-		try {
-			const fixes = gitCommand(`git log ${range} --grep="^fix:" --pretty=format:"- %s (%h)"`, true);
-			if (fixes) {
-				changelog += fixes + "\n";
-			} else {
-				changelog += "_No bug fixes_\n";
-			}
-		} catch (e) {
-			changelog += "_No bug fixes_\n";
-		}
-		changelog += "\n";
-
-		changelog += "### 🔧 Other Changes\n";
-		try {
-			const other = gitCommand(`git log ${range} --invert-grep --grep="^feat:" --grep="^fix:" --grep="!" --grep="^chore: bump version" --pretty=format:"- %s (%h)"`, true);
-			if (other) {
-				changelog += other + "\n";
-			} else {
-				changelog += "_No other changes_\n";
-			}
-		} catch (e) {
-			changelog += "_No other changes_\n";
-		}
-		changelog += "\n";
-
-		changelog += "### 👥 Contributors\n";
-		changelog += "_Contributors not available in git command mode_\n";
+	if (!commits) {
+		console.log(`⚠️ No commits provided, using categorizeCommits with range: ${range}`);
+		commits = categorizeCommits(range);
+		console.log(`📋 Categorized ${commits.length} commits from git history`);
 	}
+
+	// Don't filter out release commits - they may contain useful information
+
+	// Breaking Changes - use proper categorization
+	changelog += "### 💥 Breaking Changes\n";
+	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
+	if (breakingCommits.length > 0) {
+		breakingCommits.forEach((c) => {
+			changelog += `- ${c.subject} (${c.hash})\n`;
+		});
+	} else {
+		changelog += "_No breaking changes_\n";
+	}
+	changelog += "\n";
+
+	// Features - use proper categorization
+	changelog += "### ✨ Features\n";
+	const featureCommits = commits.filter((c) => c.category === "feature");
+	if (featureCommits.length > 0) {
+		featureCommits.forEach((c) => {
+			changelog += `- ${c.subject} (${c.hash})\n`;
+		});
+	} else {
+		changelog += "_No new features_\n";
+	}
+	changelog += "\n";
+
+	// Bug Fixes - use proper categorization
+	changelog += "### 🐛 Bug Fixes\n";
+	const fixCommits = commits.filter((c) => c.category === "fix");
+	if (fixCommits.length > 0) {
+		fixCommits.forEach((c) => {
+			changelog += `- ${c.subject} (${c.hash})\n`;
+		});
+	} else {
+		changelog += "_No bug fixes_\n";
+	}
+	changelog += "\n";
+
+	// Other Changes - maintenance and other categories (excluding release commits)
+	changelog += "### 🔧 Other Changes\n";
+	const otherCommits = commits.filter((c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release");
+	if (otherCommits.length > 0) {
+		otherCommits.forEach((c) => {
+			changelog += `- ${c.subject} (${c.hash})\n`;
+		});
+	} else {
+		changelog += "_No other changes_\n";
+	}
+	changelog += "\n";
+
+	// Contributors
+	changelog += "### 👥 Contributors\n";
+	const contributors = [...new Set(commits.map((c) => c.author))];
+	contributors.forEach((author) => {
+		changelog += `- ${author}\n`;
+	});
 
 	return changelog;
 }
@@ -169,7 +111,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			console.log(`📋 Using provided commits: ${commits.length} commits`);
 		} catch (error) {
 			console.log("⚠️ Failed to parse commits input, falling back to git commands");
+			console.log(`Debug: COMMITS_INPUT = ${COMMITS_INPUT}`);
 		}
+	} else {
+		console.log("⚠️ No commits input provided, falling back to git commands");
 	}
 
 	// Use commit range if provided
