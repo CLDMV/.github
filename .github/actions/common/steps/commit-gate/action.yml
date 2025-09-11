@@ -1,0 +1,58 @@
+name: "Commit Gate (multi-prefix)"
+description: "Check if commit message starts with any of the specified prefixes and set output for conditional workflow execution"
+inputs:
+  prefixes:
+    description: 'Comma-separated list of commit message prefixes to check (e.g., "chore: bump version,release:,hotfix:")'
+    required: true
+  commit_message:
+    description: "Commit message to check (defaults to github.event.head_commit.message)"
+    required: false
+    default: ""
+outputs:
+  should_skip:
+    description: "true if commit message starts with any of the specified prefixes, false otherwise"
+    value: ${{ steps.check.outputs.should_skip }}
+  matched_prefix:
+    description: "The prefix that was matched (if any)"
+    value: ${{ steps.check.outputs.matched_prefix }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check commit message against prefixes
+      id: check
+      shell: bash
+      run: |
+        # Get commit message - use input or default to github context
+        COMMIT_MSG="${{ inputs.commit_message }}"
+        if [ -z "$COMMIT_MSG" ]; then
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+        fi
+
+        echo "Checking commit message: $COMMIT_MSG"
+
+        # Split prefixes by comma and check each one
+        IFS=',' read -ra PREFIXES <<< "${{ inputs.prefixes }}"
+        SHOULD_SKIP="false"
+        MATCHED_PREFIX=""
+
+        for prefix in "${PREFIXES[@]}"; do
+          # Trim whitespace
+          prefix=$(echo "$prefix" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          echo "Checking prefix: '$prefix'"
+          
+          if [[ "$COMMIT_MSG" == "$prefix"* ]]; then
+            echo "✅ Commit message starts with '$prefix'"
+            SHOULD_SKIP="true"
+            MATCHED_PREFIX="$prefix"
+            break
+          fi
+        done
+
+        if [ "$SHOULD_SKIP" = "false" ]; then
+          echo "❌ Commit message does not start with any specified prefix"
+        fi
+
+        echo "should_skip=$SHOULD_SKIP" >> $GITHUB_OUTPUT
+        echo "matched_prefix=$MATCHED_PREFIX" >> $GITHUB_OUTPUT
+
+        echo "Final result: should_skip=$SHOULD_SKIP, matched_prefix=$MATCHED_PREFIX"

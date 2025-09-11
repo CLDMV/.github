@@ -67,8 +67,24 @@ on:
         required: false
 
 jobs:
+  # Check if we should skip CI based on commit message
+  commit-gate:
+    name: "🚪 Commit Gate"
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.gate.outputs.should_skip }}
+      matched_prefix: ${{ steps.gate.outputs.matched_prefix }}
+    steps:
+      - name: Check commit message
+        id: gate
+        uses: ./.github/actions/common/steps/commit-gate
+        with:
+          prefixes: "chore: bump version,release:,hotfix:"
+
   ci:
     name: "🏗️ Continuous Integration"
+    needs: commit-gate
+    if: needs.commit-gate.outputs.should_skip != 'true'
     uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
@@ -85,8 +101,8 @@ jobs:
 
   summary:
     name: "📊 CI Summary"
-    needs: ci
-    if: always()
+    needs: [commit-gate, ci]
+    if: always() && needs.commit-gate.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Generate CI Summary

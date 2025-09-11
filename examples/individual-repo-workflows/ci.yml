@@ -81,7 +81,7 @@ jobs:
     name: ✅ Required PR Check
     needs: ci
     # run on both push and PR so the context exists on the PR head SHA
-    if: ${{ always() }}
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Mirror reusable result

@@ -24,5 +24,4 @@ runs:
         COMMITS_INPUT: ${{ inputs.commits }}
         COMMIT_RANGE_INPUT: ${{ inputs.commit-range }}
       run: |
-        # Run the Node.js script
         node "${{ github.action_path }}/action.mjs"
