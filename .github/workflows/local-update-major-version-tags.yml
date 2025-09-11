@@ -55,8 +55,6 @@ on:
 jobs:
   update-tags:
     uses: ./.github/workflows/workflow-update-major-version-tags.yml
-    permissions:
-      contents: write
     with:
       debug: ${{ github.event.inputs.debug == 'true' }}
       create_documentation: ${{ github.event.inputs.create_documentation == 'true' }}
