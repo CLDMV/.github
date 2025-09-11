@@ -185,7 +185,6 @@ jobs:
           BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Debug - Dump app-token outputs
-        if: inputs.debug == true
         run: |
           echo "🔍 DEBUG: app-token step outputs:"
           echo '${{ toJSON(steps.app-token.outputs) }}' | jq .
