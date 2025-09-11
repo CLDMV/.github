@@ -77,9 +77,9 @@ jobs:
     steps:
       - name: Check commit message
         id: gate
-        uses: ./.github/actions/common/steps/commit-gate
+        uses: CLDMV/.github/.github/actions/common/steps/commit-gate@v1
         with:
-          prefixes: "chore: bump version,release:,hotfix:"
+          prefixes: "chore: bump version"
 
   ci:
     name: "🏗️ Continuous Integration"
