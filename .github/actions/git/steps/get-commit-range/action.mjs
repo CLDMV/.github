@@ -15,18 +15,23 @@ if (DEBUG) {
 /**
  * Categorize commits based on conventional commit patterns and content
  * @param {string} commitRange - Git commit range to analyze
+ * @param {string|null} allCommits - Optional pre-existing commit data (for testing)
  * @returns {Array} Array of commit objects with categorization
  */
-function categorizeCommits(commitRange) {
+function categorizeCommits(commitRange, allCommits = null) {
 	try {
-		console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
-		const allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%an|%ad" --date=iso`, true);
 		if (!allCommits) {
-			return [];
-		}
+			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
+			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%an|%ad" --date=iso`, true);
+			if (!allCommits) {
+				return [];
+			}
 
-		console.log(`🔍 DEBUG: Raw git log output for ${commitRange}:`);
-		console.log(allCommits);
+			console.log(`🔍 DEBUG: Raw git log output for ${commitRange}:`);
+			console.log(allCommits);
+		} else {
+			console.log(`🔍 DEBUG: Using provided commit data for range: ${commitRange}`);
+		}
 
 		const commits = allCommits.split("\n").map((line) => {
 			const [hash, subject, author, date] = line.split("|");
@@ -113,100 +118,106 @@ function categorizeCommits(commitRange) {
 	}
 }
 
-// Fetch all tags to ensure we have the complete tag history
-console.log("🔍 Fetching all tags from remote...");
-gitCommand("git fetch --tags --force", true);
-gitCommand("git fetch origin master --tags", true);
-gitCommand("git fetch origin main --tags", true);
+// Main logic - only run if this script is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+	// Fetch all tags to ensure we have the complete tag history
+	console.log("🔍 Fetching all tags from remote...");
+	gitCommand("git fetch --tags --force", true);
+	gitCommand("git fetch origin master --tags", true);
+	gitCommand("git fetch origin main --tags", true);
 
-if (DEBUG) {
-	console.log("🔍 DEBUG: Available tags after fetch:");
-	const tags = gitCommand("git tag -l | sort -V | tail -10", true);
-	console.log(tags);
-}
+	if (DEBUG) {
+		console.log("🔍 DEBUG: Available tags after fetch:");
+		const tags = gitCommand("git tag -l | sort -V | tail -10", true);
+		console.log(tags);
+	}
 
-// Determine base ref
-let baseRef;
-if (BASE_REF_OVERRIDE) {
-	baseRef = BASE_REF_OVERRIDE;
-	console.log(`🔍 Using override base ref: ${baseRef}`);
-} else {
-	// Use the latest semantic version tag
-	console.log("🔍 DEBUG: Looking for latest semantic version tag...");
-	const allTags = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'", true);
-	console.log(`🔍 DEBUG: All semantic version tags found: ${allTags}`);
+	// Determine base ref
+	let baseRef;
+	if (BASE_REF_OVERRIDE) {
+		baseRef = BASE_REF_OVERRIDE;
+		console.log(`🔍 Using override base ref: ${baseRef}`);
+	} else {
+		// Use the latest semantic version tag
+		console.log("🔍 DEBUG: Looking for latest semantic version tag...");
+		const allTags = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'", true);
+		console.log(`🔍 DEBUG: All semantic version tags found: ${allTags}`);
 
-	baseRef = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1", true);
-	console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);
+		baseRef = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1", true);
+		console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);
 
-	// Debug: Check if the tag points to a commit that exists in current branch history
-	if (baseRef) {
-		const tagCommit = gitCommand(`git rev-list -n 1 ${baseRef}`, true);
-		const tagInHistory = gitCommand(`git merge-base --is-ancestor ${tagCommit} HEAD && echo "yes" || echo "no"`, true);
-		console.log(`🔍 DEBUG: Tag ${baseRef} points to commit ${tagCommit}`);
-		console.log(`🔍 DEBUG: Is tag commit in HEAD history? ${tagInHistory}`);
+		// Debug: Check if the tag points to a commit that exists in current branch history
+		if (baseRef) {
+			const tagCommit = gitCommand(`git rev-list -n 1 ${baseRef}`, true);
+			const tagInHistory = gitCommand(`git merge-base --is-ancestor ${tagCommit} HEAD && echo "yes" || echo "no"`, true);
+			console.log(`🔍 DEBUG: Tag ${baseRef} points to commit ${tagCommit}`);
+			console.log(`🔍 DEBUG: Is tag commit in HEAD history? ${tagInHistory}`);
 
-		if (tagInHistory === "no") {
-			console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
-			console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);
+			if (tagInHistory === "no") {
+				console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
+				console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);
+			}
 		}
 	}
-}
 
-let commitRange;
-if (!baseRef) {
-	console.log("⚠️ No base ref found, using initial commit");
-	const initialCommit = gitCommand("git rev-list --max-parents=0 HEAD", true);
-	baseRef = initialCommit;
-	commitRange = `${baseRef}..${HEAD_REF}`;
-} else {
-	commitRange = `${baseRef}..${HEAD_REF}`;
-}
-
-console.log(`📋 Commit range: ${commitRange}`);
-
-// Check if there are commits in the range
-const commitCount = parseInt(gitCommand(`git rev-list --count ${commitRange}`, true) || "0");
-const hasCommits = commitCount > 0;
-
-if (hasCommits) {
-	console.log(`✅ Found ${commitCount} commits in range`);
-	if (DEBUG) {
-		console.log("🔍 DEBUG: Commits in range:");
-		const commits = gitCommand(`git log ${commitRange} --oneline | head -10`, true);
-		console.log(commits);
+	let commitRange;
+	if (!baseRef) {
+		console.log("⚠️ No base ref found, using initial commit");
+		const initialCommit = gitCommand("git rev-list --max-parents=0 HEAD", true);
+		baseRef = initialCommit;
+		commitRange = `${baseRef}..${HEAD_REF}`;
+	} else {
+		commitRange = `${baseRef}..${HEAD_REF}`;
 	}
-} else {
-	console.log("ℹ️ No commits found in range");
-}
 
-// Categorize commits for potential future use
-const categorizedCommits = categorizeCommits(commitRange);
+	console.log(`📋 Commit range: ${commitRange}`);
 
-if (DEBUG) {
-	console.log("🔍 DEBUG: Commit categorization:");
-	const counts = categorizedCommits.reduce((acc, commit) => {
-		acc[commit.category] = (acc[commit.category] || 0) + 1;
-		return acc;
-	}, {});
-	Object.entries(counts).forEach(([category, count]) => {
-		console.log(`  ${category}: ${count}`);
+	// Check if there are commits in the range
+	const commitCount = parseInt(gitCommand(`git rev-list --count ${commitRange}`, true) || "0");
+	const hasCommits = commitCount > 0;
+
+	if (hasCommits) {
+		console.log(`✅ Found ${commitCount} commits in range`);
+		if (DEBUG) {
+			console.log("🔍 DEBUG: Commits in range:");
+			const commits = gitCommand(`git log ${commitRange} --oneline | head -10`, true);
+			console.log(commits);
+		}
+	} else {
+		console.log("ℹ️ No commits found in range");
+	}
+
+	// Categorize commits for potential future use
+	const categorizedCommits = categorizeCommits(commitRange);
+
+	if (DEBUG) {
+		console.log("🔍 DEBUG: Commit categorization:");
+		const counts = categorizedCommits.reduce((acc, commit) => {
+			acc[commit.category] = (acc[commit.category] || 0) + 1;
+			return acc;
+		}, {});
+		Object.entries(counts).forEach(([category, count]) => {
+			console.log(`  ${category}: ${count}`);
+		});
+	}
+
+	// Set outputs for GitHub Actions
+	const outputs = [
+		`last-tag=${baseRef}`,
+		`commit-range=${commitRange}`,
+		`has-commits=${hasCommits}`,
+		`base-ref=${baseRef}`,
+		`commit-count=${commitCount}`,
+		// Single JSON array of all commits with categorization
+		`commits=${JSON.stringify(categorizedCommits)}`
+	];
+
+	outputs.forEach((output) => {
+		appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
 	});
-}
 
-// Set outputs for GitHub Actions
-const outputs = [
-	`last-tag=${baseRef}`,
-	`commit-range=${commitRange}`,
-	`has-commits=${hasCommits}`,
-	`base-ref=${baseRef}`,
-	`commit-count=${commitCount}`,
-	// Single JSON array of all commits with categorization
-	`commits=${JSON.stringify(categorizedCommits)}`
-];
+	console.log("✅ Commit range analysis complete");
+} // End main execution block
 
-outputs.forEach((output) => {
-	appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
-});
-
-console.log("✅ Commit range analysis complete");
+// Export functions for testing
+export { categorizeCommits };

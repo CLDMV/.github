@@ -54,6 +54,24 @@ function findReleaseCommits(commits) {
 }
 
 /**
+ * Extract explicit version from a release commit subject
+ * @param {string} subject - Commit subject line
+ * @returns {string|null} Extracted version or null if not found
+ */
+function extractExplicitVersion(subject) {
+	// Patterns to match: "release: v1.2.3", "release(api): 1.2.3", "release(ui): bump to v1.2.3", etc.
+	const versionPatterns = [/^release(\([^)]*\))?:\s*v?(\d+\.\d+\.\d+)/i, /^release(\([^)]*\))?:\s*.*?v?(\d+\.\d+\.\d+)/i];
+
+	for (const pattern of versionPatterns) {
+		const match = subject.match(pattern);
+		if (match) {
+			return match[2]; // Version is in capture group 2
+		}
+	}
+	return null;
+}
+
+/**
  * Analyze commits for version bump type
  * @param {Array} commits - Array of commit objects
  * @returns {object} Version bump analysis
@@ -88,22 +106,16 @@ function analyzeVersionBump(commits) {
 		const releaseCommit = releaseCommits[0]; // Use the first/most recent release commit
 
 		// Try to extract version from commit message
-		// Patterns to match: "release: v1.2.3", "release(api): 1.2.3", "release(ui): bump to v1.2.3", etc.
-		const versionPatterns = [/^release(\([^)]*\))?:\s*v?(\d+\.\d+\.\d+)/i, /^release(\([^)]*\))?:\s*.*?v?(\d+\.\d+\.\d+)/i];
+		const explicitVersion = extractExplicitVersion(releaseCommit.subject);
+		if (explicitVersion) {
+			console.log(`🔍 Found explicit version in release commit: ${explicitVersion}`);
 
-		for (const pattern of versionPatterns) {
-			const match = releaseCommit.subject.match(pattern);
-			if (match) {
-				const explicitVersion = match[2]; // Version is in capture group 2 now
-				console.log(`🔍 Found explicit version in release commit: ${explicitVersion}`);
-
-				return {
-					versionBump: "explicit",
-					hasBreaking: false,
-					explicitVersion: explicitVersion,
-					reason: `Explicit version specified in release commit: ${explicitVersion}`
-				};
-			}
+			return {
+				versionBump: "explicit",
+				hasBreaking: false,
+				explicitVersion: explicitVersion,
+				reason: `Explicit version specified in release commit: ${explicitVersion}`
+			};
 		}
 
 		console.log(`🔍 Release commit found but no version extracted from: ${releaseCommit.subject}`);
@@ -128,50 +140,55 @@ function analyzeVersionBump(commits) {
 	};
 }
 
-// Main logic
-if (!HAS_COMMITS) {
-	console.log("ℹ️ No commits in range - not triggering release");
-	appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
-	process.exit(0);
-}
-
-const commits = getCommits();
-console.log(`🔍 Analyzing ${commits.length} commits`);
-
-const releaseAnalysis = findReleaseCommits(commits);
-
-if (releaseAnalysis.hasRelease) {
-	const releaseCommit = releaseAnalysis.mostRecent;
-	console.log(`🔍 Found release commit: ${releaseCommit.subject}`);
-
-	// Output release commit details
-	const outputs = [
-		"should-create-pr=true",
-		`commit-message=${releaseCommit.subject}`,
-		`has-breaking=${releaseAnalysis.breakingRelease ? "true" : "false"}`
-	];
-
-	if (releaseAnalysis.breakingRelease) {
-		outputs.push("version-bump=major");
-		console.log("🚀 Breaking release commit detected - will create major version PR");
-	} else {
-		// For non-breaking release commits, analyze the other commits
-		const versionAnalysis = analyzeVersionBump(commits);
-		outputs.push(`version-bump=${versionAnalysis.versionBump}`);
-		outputs.push(`has-breaking=${versionAnalysis.hasBreaking}`);
-
-		if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
-			outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
-			console.log(`🚀 Release commit with explicit version detected - will create PR for version ${versionAnalysis.explicitVersion}`);
-		} else {
-			console.log(`🚀 Release commit detected - will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
-		}
+// Main logic - only run if this script is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+	if (!HAS_COMMITS) {
+		console.log("ℹ️ No commits in range - not triggering release");
+		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+		process.exit(0);
 	}
 
-	outputs.forEach((output) => {
-		appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
-	});
-} else {
-	console.log("ℹ️ No release commit found - not triggering release");
-	appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
-}
+	const commits = getCommits();
+	console.log(`🔍 Analyzing ${commits.length} commits`);
+
+	const releaseAnalysis = findReleaseCommits(commits);
+
+	if (releaseAnalysis.hasRelease) {
+		const releaseCommit = releaseAnalysis.mostRecent;
+		console.log(`🔍 Found release commit: ${releaseCommit.subject}`);
+
+		// Output release commit details
+		const outputs = [
+			"should-create-pr=true",
+			`commit-message=${releaseCommit.subject}`,
+			`has-breaking=${releaseAnalysis.breakingRelease ? "true" : "false"}`
+		];
+
+		if (releaseAnalysis.breakingRelease) {
+			outputs.push("version-bump=major");
+			console.log("🚀 Breaking release commit detected - will create major version PR");
+		} else {
+			// For non-breaking release commits, analyze the other commits
+			const versionAnalysis = analyzeVersionBump(commits);
+			outputs.push(`version-bump=${versionAnalysis.versionBump}`);
+			outputs.push(`has-breaking=${versionAnalysis.hasBreaking}`);
+
+			if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
+				outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
+				console.log(`🚀 Release commit with explicit version detected - will create PR for version ${versionAnalysis.explicitVersion}`);
+			} else {
+				console.log(`🚀 Release commit detected - will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
+			}
+		}
+
+		outputs.forEach((output) => {
+			appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
+		});
+	} else {
+		console.log("ℹ️ No release commit found - not triggering release");
+		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+	}
+} // End main execution block
+
+// Export functions for testing
+export { findReleaseCommits, analyzeVersionBump, extractExplicitVersion };
