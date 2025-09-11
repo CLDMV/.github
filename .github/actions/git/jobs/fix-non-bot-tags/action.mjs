@@ -1,120 +1,8 @@
 #!/usr/bin/env node
 
-import { execSync } from "child_process";
 import fs from "fs";
 import { debugLog } from "../../../common/common/core.mjs";
-
-/**
- * Get tag information including tagger details and message
- * @param {string} tagName - The tag name to inspect
- * @returns {Object|null} Tag information or null if not found
- */
-function getTagInfo(tagName) {
-	try {
-		// First check if this is an annotated tag by checking the object type
-		let tagInfo;
-		let isAnnotated = false;
-
-		try {
-			// Check what type of object the tag points to
-			const tagObjectType = execSync(`git cat-file -t ${tagName}`, { encoding: "utf8" }).trim();
-			debugLog(`Object type for ${tagName}: ${tagObjectType}`);
-
-			if (tagObjectType === "tag") {
-				// It's an annotated tag, get the tag object directly
-				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
-				isAnnotated = true;
-				debugLog(`Successfully found annotated tag object for ${tagName}`);
-			} else {
-				// It's a lightweight tag pointing directly to a commit
-				tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
-				isAnnotated = false;
-				debugLog(`Found lightweight tag ${tagName} pointing to ${tagObjectType}`);
-			}
-		} catch (tagObjectError) {
-			// If that fails, fall back to getting the commit it points to
-			debugLog(`Failed to get object type for ${tagName}: ${tagObjectError.message}`);
-			tagInfo = execSync(`git cat-file -p ${tagName}`, { encoding: "utf8" });
-			isAnnotated = false;
-		}
-		debugLog(tagInfo);
-		debugLog("End of tag info");
-
-		// Parse based on whether it's annotated or lightweight
-		if (isAnnotated) {
-			// Parse tagger info from annotated tag
-			const taggerMatch = tagInfo.match(/^tagger (.+) (\d+) ([\+\-]\d{4})$/m);
-			debugLog(`taggerMatch result:`, taggerMatch);
-			debugLog(`Checking tagger match for ${tagName} - Match: ${!!taggerMatch}`);
-
-			if (taggerMatch) {
-				const [, nameEmail, timestamp, timezone] = taggerMatch;
-				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
-				const name = emailMatch ? emailMatch[1] : nameEmail;
-				const email = emailMatch ? emailMatch[2] : "";
-
-				// Extract message from annotated tag (everything after the tagger line until PGP signature or end)
-				const messageMatch = tagInfo.match(/^tagger .+\n\n([\s\S]*?)(?:\n-----BEGIN PGP SIGNATURE-----[\s\S]*)?$/m);
-				const message = messageMatch ? messageMatch[1].trim() : `Update ${tagName}`;
-
-				return {
-					type: "annotated",
-					tagger: { name, email },
-					timestamp: parseInt(timestamp),
-					timezone,
-					message
-				};
-			} else {
-				debugLog(`No tagger info found in annotated tag ${tagName}, treating as lightweight`);
-				isAnnotated = false; // Fall through to lightweight logic
-			}
-		}
-
-		if (!isAnnotated) {
-			// Parse author info from commit (lightweight tag)
-			const authorMatch = tagInfo.match(/^author (.+) (\d+) ([\+\-]\d{4})$/m);
-			debugLog(`authorMatch result:`, authorMatch);
-			debugLog(`Checking author match for ${tagName} - Match: ${!!authorMatch}`);
-
-			if (authorMatch) {
-				const [, nameEmail, timestamp, timezone] = authorMatch;
-				const emailMatch = nameEmail.match(/^(.+) <(.+)>$/);
-				const name = emailMatch ? emailMatch[1] : nameEmail;
-				const email = emailMatch ? emailMatch[2] : "";
-
-				// For lightweight tags, use the commit message as the tag message
-				const commitMessage = tagInfo.match(/\n\n([\s\S]*?)$/);
-				const message = commitMessage ? commitMessage[1].trim() : `Update ${tagName}`;
-
-				return {
-					type: "lightweight",
-					author: { name, email },
-					timestamp: parseInt(timestamp),
-					timezone,
-					message
-				};
-			}
-		}
-
-		return null;
-	} catch (error) {
-		console.error(`Error getting tag info for ${tagName}:`, error.message);
-		return null;
-	}
-}
-
-/**
- * Check if a tagger/author name matches bot patterns
- * @param {string} name - The tagger/author name
- * @param {string[]} botPatterns - Array of bot name patterns
- * @returns {boolean} True if the name matches a bot pattern
- */
-function isBotSigned(name, botPatterns) {
-	if (!name) return false;
-
-	const lowerName = name.toLowerCase();
-	return botPatterns.some((pattern) => lowerName.includes(pattern.toLowerCase()) || lowerName === pattern.toLowerCase());
-}
+import { getTagInfo } from "../../utilities/git-utils.mjs";
 
 /**
  * Get all version tags (semantic versioning pattern)
@@ -182,28 +70,20 @@ async function main() {
 				continue;
 			}
 
-			const tagInfo = getTagInfo(tag);
-
+			const tagInfo = getTagInfo(tag, botPatterns);
 			if (!tagInfo) {
 				console.log(`⚠️  Could not get info for tag: ${tag}`);
 				continue;
 			}
-
-			const signerName = tagInfo.tagger?.name || tagInfo.author?.name || "";
-			const signerEmail = tagInfo.tagger?.email || tagInfo.author?.email || "";
-			const isBot = isBotSigned(signerName, botPatterns) || isBotSigned(signerEmail, botPatterns);
-
-			console.log(`🏷️  ${tag} (${tagInfo.type}): ${signerName} <${signerEmail}> - ${isBot ? "✅ Bot" : "❌ Not Bot"}`);
-
-			if (!isBot) {
-				// Get the commit SHA this tag points to
-				const commitSha = execSync(`git rev-list -n 1 ${tag}`, { encoding: "utf8" }).trim();
+			const type = tagInfo.isAnnotated ? "annotated" : tagInfo.isLightweight ? "lightweight" : "unknown";
+			console.log(`🏷️  ${tag} (${type}): ${tagInfo.signerName} <${tagInfo.signerEmail}> - ${tagInfo.isBot ? "✅ Bot" : "❌ Not Bot"}`);
+			if (!tagInfo.isBot) {
 				nonBotTags.push({
 					tag,
-					sha: commitSha,
-					currentSigner: signerName,
-					currentEmail: signerEmail,
-					type: tagInfo.type,
+					sha: tagInfo.commit,
+					currentSigner: tagInfo.signerName,
+					currentEmail: tagInfo.signerEmail,
+					type,
 					message: tagInfo.message || `Update ${tag}`
 				});
 			}

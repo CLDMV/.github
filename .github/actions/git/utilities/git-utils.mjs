@@ -76,9 +76,28 @@ export function tagExists(tagName) {
  *   console.log(`Tag ${tagInfo.name} points to ${tagInfo.commit}`);
  * }
  */
-export function getTagInfo(tagName) {
+/**
+ * Get detailed information about a tag, including parsed tagger/author and bot detection.
+ * @public
+ * @param {string} tagName - Name of the tag
+ * @param {string[]} [botPatterns] - Array of bot name/email patterns
+ * @returns {object|null} Tag information object or null if tag doesn't exist
+ */
+export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]) {
 	if (!tagExists(tagName)) {
 		return null;
+	}
+
+	function parseNameEmail(str) {
+		if (!str) return { name: "", email: "" };
+		const match = str.match(/^(.+) <(.+)>$/);
+		return match ? { name: match[1], email: match[2] } : { name: str, email: "" };
+	}
+
+	function isBot(name, email) {
+		const lowerName = (name || "").toLowerCase();
+		const lowerEmail = (email || "").toLowerCase();
+		return botPatterns.some((pattern) => lowerName.includes(pattern.toLowerCase()) || lowerEmail.includes(pattern.toLowerCase()));
 	}
 
 	try {
@@ -89,7 +108,14 @@ export function getTagInfo(tagName) {
 			name: tagName,
 			commit: commit,
 			isAnnotated: objectType === "tag",
-			isLightweight: objectType === "commit"
+			isLightweight: objectType === "commit",
+			isSigned: false,
+			tagger: null,
+			author: null,
+			signerName: "",
+			signerEmail: "",
+			isBot: false,
+			message: ""
 		};
 
 		if (info.isAnnotated) {
@@ -97,9 +123,14 @@ export function getTagInfo(tagName) {
 			const taggerMatch = tagContent.match(/^tagger (.+) (\d{10,}) ([\+\-]\d{4})$/m);
 
 			if (taggerMatch) {
-				info.tagger = taggerMatch[1];
+				const taggerStr = taggerMatch[1];
+				const taggerObj = parseNameEmail(taggerStr);
+				info.tagger = taggerObj;
 				info.taggerTimestamp = parseInt(taggerMatch[2]);
 				info.taggerTimezone = taggerMatch[3];
+				info.signerName = taggerObj.name;
+				info.signerEmail = taggerObj.email;
+				info.isBot = isBot(taggerObj.name, taggerObj.email);
 			}
 
 			// Check for GPG signature
@@ -122,7 +153,11 @@ export function getTagInfo(tagName) {
 		} else {
 			// For lightweight tags, get commit author info
 			const authorInfo = gitCommand(`git log -1 --format="%an <%ae>" ${commit}`, true);
-			info.author = authorInfo;
+			const authorObj = parseNameEmail(authorInfo);
+			info.author = authorObj;
+			info.signerName = authorObj.name;
+			info.signerEmail = authorObj.email;
+			info.isBot = isBot(authorObj.name, authorObj.email);
 			info.isSigned = false;
 		}
 
