@@ -222,20 +222,36 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
+      - name: Find latest semantic version tag
+        id: find-latest
+        shell: bash
+        run: |
+          # Extract tags from detailed output and find latest semantic version
+          TAGS_JSON='${{ steps.get-tags.outputs.tags_detailed }}'
+          echo "Processing tags from detailed output..."
+
+          # Use jq to extract semantic version tags and find the latest
+          LATEST_TAG=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' | sort -V | tail -n 1)
+
+          if [ -n "$LATEST_TAG" ] && [ "$LATEST_TAG" != "null" ]; then
+            echo "Found latest semantic version tag: $LATEST_TAG"
+            echo "tag-name=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+            echo "has-tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No semantic version tags found"
+            echo "has-tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Update major/minor version tags
         id: update-major-tags
-        uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+        if: steps.find-latest.outputs.has-tag == 'true'
+        uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
         env:
           GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
-          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
-          create-documentation: ${{ inputs.create_documentation }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
-          tagger_name: ${{ secrets.TAGGER_NAME }}
-          tagger_email: ${{ secrets.TAGGER_EMAIL }}
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          tag-name: ${{ steps.find-latest.outputs.tag-name }}
 
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"
