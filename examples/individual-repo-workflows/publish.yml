@@ -64,15 +64,15 @@ jobs:
     uses: CLDMV/.github/.github/workflows/workflow-publish.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      debug: ${{ github.event.inputs.debug || false }}
+      debug: ${{ github.event.inputs.debug == 'true' }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
       version: ${{ github.event.inputs.version || '' }}
-      publish_to_npm: ${{ github.event.inputs.publish_to_npm || true }}
-      publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages || true }}
+      publish_to_npm: ${{ github.event.inputs.publish_to_npm != 'false' }}
+      publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages != 'false' }}
       publish_command: ""
       github_packages_publish_command: ""
-      skip_publish: ${{ github.event.inputs.skip_publish || false }}
+      skip_publish: ${{ github.event.inputs.skip_publish == 'true' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
       test_command: "npm test"
@@ -82,7 +82,7 @@ jobs:
       create_documentation: true
       skip_performance_tests: false
       skip_matrix_tests: false
-      use_gpg: ${{ github.event.inputs.use_gpg || false }}
+      use_gpg: ${{ github.event.inputs.use_gpg == 'true' }}
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}

@@ -30,10 +30,10 @@ jobs:
     permissions:
       contents: write
     with:
-      debug: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.debug == 'true' || github.event.inputs.debug == true)) || false }}
-      create_documentation: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.create_documentation == 'true' || github.event.inputs.create_documentation == true)) || (github.event_name != 'workflow_dispatch' && true) }}
+      debug: ${{ github.event.inputs.debug == 'true' }}
+      create_documentation: ${{ github.event.inputs.create_documentation != 'false' }}
       # let the reusable decide whether to use secrets based on this flag
-      use_gpg: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.use_gpg == 'true' || github.event.inputs.use_gpg == true)) || (github.event_name != 'workflow_dispatch' && true) }}
+      use_gpg: ${{ github.event.inputs.use_gpg != 'false' }}
       # Note: use_app_token is automatically determined in the reusable workflow based on BOT_APP_ID presence
     secrets:
       # map your repo/org secrets into generic names expected by the reusable

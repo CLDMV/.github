@@ -53,7 +53,7 @@ jobs:
     uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v1
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
-      debug: ${{ github.event.inputs.debug || false }}
+      debug: ${{ github.event.inputs.debug == 'true' }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}

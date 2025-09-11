@@ -20,12 +20,12 @@ on:
         description: "Whether to create/update VERSION_TAGS.md documentation"
         type: boolean
         required: false
-        default: true
+        default: false
       use_gpg:
         description: "Enable GPG signing (if GPG secrets provided)"
         type: boolean
         required: false
-        default: false
+        default: true
       # Tag health configuration
       max_tags:
         description: "Maximum number of tags to process (safety limit)"
@@ -58,9 +58,9 @@ jobs:
     permissions:
       contents: write
     with:
-      debug: ${{ github.event.inputs.debug || false }}
-      create_documentation: ${{ github.event.inputs.create_documentation || true }}
-      use_gpg: ${{ github.event.inputs.use_gpg || false }}
+      debug: ${{ github.event.inputs.debug == 'true' }}
+      create_documentation: ${{ github.event.inputs.create_documentation == 'true' }}
+      use_gpg: ${{ github.event.inputs.use_gpg != 'false' }}
       max_tags: ${{ github.event.inputs.max_tags || '100' }}
       max_major_versions: ${{ github.event.inputs.max_major_versions || '10' }}
       max_minor_versions: ${{ github.event.inputs.max_minor_versions || '10' }}

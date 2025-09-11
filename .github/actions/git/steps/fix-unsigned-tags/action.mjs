@@ -147,7 +147,7 @@ console.log(`🔧 Found ${unsignedTags.length} tags needing signing/annotation f
 unsignedTags.forEach((tagObj) => {
 	const status = [];
 	if (!tagObj.isAnnotated) status.push("not annotated");
-	if (!tagObj.isSigned && (SIGN === "true" || (SIGN === "auto" && GPG_PRIVATE_KEY))) status.push("not signed");
+	if (!tagObj.isSigned && GPG_ENABLED && GPG_PRIVATE_KEY) status.push("not signed");
 	console.log(`  - ${tagObj.name} (${status.join(", ")})`);
 });
 
