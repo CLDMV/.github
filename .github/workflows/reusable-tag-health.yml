@@ -176,7 +176,7 @@ jobs:
 
       - name: Create App token (auto-detect)
         id: app-token
-        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
         with:
           app_id: ${{ secrets.BOT_APP_ID }}
           private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
