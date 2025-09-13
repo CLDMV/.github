@@ -200,14 +200,14 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      - name: Get GitHub App User ID & Setup Git identity
-        id: get-user-id
-        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-      - run: |
-          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-          git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+    #   - name: Get GitHub App User ID & Setup Git identity
+    #     id: get-user-id
+    #     run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+    #     env:
+    #       GH_TOKEN: ${{ steps.app-token.outputs.token }}
+    #   - run: |
+    #       git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+    #       git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
 
   unified-update-major-minor:
     name: "🏷️ Update Major/Minor Tags"
@@ -272,6 +272,8 @@ jobs:
           debug: ${{ inputs.debug }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tag-name: ${{ steps.find-latest.outputs.tag-name }}
+          tagger-name: ${{ secrets.TAGGER_NAME }}
+          tagger-email: ${{ secrets.TAGGER_EMAIL }}
 
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"

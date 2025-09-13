@@ -16,6 +16,12 @@ inputs:
   tag-name:
     description: "The semantic version tag to process (e.g., v1.2.3)"
     required: true
+  tagger-name:
+    description: "Name for tag creation/signing"
+    required: false
+  tagger-email:
+    description: "Email for tag creation/signing"
+    required: false
 
 outputs:
   major-version:
@@ -82,3 +88,5 @@ runs:
         debug: ${{ inputs.debug }}
         payload: ${{ steps.update.outputs.tags-payload }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
+        tagger_name: ${{ inputs.tagger-name }}
+        tagger_email: ${{ inputs.tagger-email }}

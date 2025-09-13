@@ -40,9 +40,25 @@ export async function getTagObject({ token, repo, tagObjectSha }) {
  * Create a VERIFIED annotated tag object pointing to a commit.
  * Returns the raw tag object JSON (includes .sha).
  */
-export async function createAnnotatedTag({ token, repo, tag, message, objectSha }) {
+export async function createAnnotatedTag({ token, repo, tag, message, objectSha, tagger }) {
 	const { owner, repo: r } = parseRepo(repo);
-	return api("POST", "/git/tags", { tag, message: message || tag, object: objectSha, type: "commit" }, { token, owner, repo: r });
+	const payload = { 
+		tag, 
+		message: message || tag, 
+		object: objectSha, 
+		type: "commit" 
+	};
+	
+	// Add tagger object if provided
+	if (tagger && tagger.name && tagger.email) {
+		payload.tagger = {
+			name: tagger.name,
+			email: tagger.email,
+			date: tagger.date || new Date().toISOString()
+		};
+	}
+	
+	return api("POST", "/git/tags", payload, { token, owner, repo: r });
 }
 
 /** Create refs/tags/<tag> pointing to a tag object SHA. */
