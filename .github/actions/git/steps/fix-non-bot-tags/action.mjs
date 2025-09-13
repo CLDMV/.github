@@ -79,10 +79,10 @@ function fixNonBotTag(tagObj) {
 		gitCommand(`git push origin :refs/tags/${tagObj.name}`, true);
 
 		// Create new annotated tag with bot signature
-		let tagCommand = `git tag -a ${tagObj.name} ${tagObj.commit} -m "${tagMessage}"`;
+		let tagCommand = `git tag -a ${tagObj.name} ${tagObj.commitSha} -m "${tagMessage}"`;
 
 		if (willSign) {
-			tagCommand = `git tag -a -s ${tagObj.name} ${tagObj.commit} -m "${tagMessage}"`;
+			tagCommand = `git tag -a -s ${tagObj.name} ${tagObj.commitSha} -m "${tagMessage}"`;
 		}
 
 		gitCommand(tagCommand);

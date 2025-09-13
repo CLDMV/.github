@@ -170,7 +170,7 @@ jobs:
           # Check if this commit is reachable from main or master
           # First try to fetch the latest refs to ensure we have up-to-date information
           git fetch origin 2>/dev/null || true
-          
+
           MAIN_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/main && echo "true" || echo "false")
           MASTER_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/master && echo "true" || echo "false")
 
@@ -239,6 +239,8 @@ jobs:
       contents: write
     outputs:
       auth-token: ${{ steps.app-token.outputs.token }}
+      user-name: ${{ steps.setup-git.outputs.user-name }}
+      user-email: ${{ steps.setup-git.outputs.user-email }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -271,14 +273,23 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
-    #   - name: Get GitHub App User ID & Setup Git identity
-    #     id: get-user-id
-    #     run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-    #     env:
-    #       GH_TOKEN: ${{ steps.app-token.outputs.token }}
-    #   - run: |
-    #       git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-    #       git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+      - name: Get GitHub App User ID & Setup Git identity
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure Git identity
+        id: setup-git
+        run: |
+          USER_NAME='${{ steps.app-token.outputs.app-slug }}[bot]'
+          USER_EMAIL='${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$USER_EMAIL"
+
+          echo "user-name=$USER_NAME" >> "$GITHUB_OUTPUT"
+          echo "user-email=$USER_EMAIL" >> "$GITHUB_OUTPUT"
 
   unified-update-major-minor:
     name: "🏷️ Update Major/Minor Tags"

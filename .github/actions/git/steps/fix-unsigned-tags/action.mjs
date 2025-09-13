@@ -67,12 +67,6 @@ function fixUnsignedTag(tagObj) {
 		// Use existing message or tag name as fallback
 		const tagMessage = tagObj.message || tagName;
 
-		// Set up bot identity if provided
-		if (TAGGER_NAME && TAGGER_EMAIL) {
-			gitCommand(`git config user.name "${TAGGER_NAME}"`, true);
-			gitCommand(`git config user.email "${TAGGER_EMAIL}"`, true);
-		}
-
 		// Delete the existing tag locally and remotely
 		gitCommand(`git tag -d ${tagName}`, true);
 		gitCommand(`git push origin :refs/tags/${tagName}`, true);
@@ -149,6 +143,20 @@ unsignedTags.forEach((tagObj) => {
 	if (!tagObj.isAnnotated) status.push("not annotated");
 	if (!tagObj.isSigned && GPG_ENABLED && GPG_PRIVATE_KEY) status.push("not signed");
 	console.log(`  - ${tagObj.name} (${status.join(", ")})`);
+});
+
+// Setup GPG and git identity if signing is enabled
+let keyid = "";
+if (GPG_ENABLED && GPG_PRIVATE_KEY) {
+	keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
+	debugLog("GPG key imported", { keyid });
+}
+
+configureGitIdentity({
+	tagger_name: TAGGER_NAME,
+	tagger_email: TAGGER_EMAIL,
+	keyid,
+	enableSign: GPG_ENABLED && GPG_PRIVATE_KEY
 });
 
 // Create a copy of the detailed tags list to update
