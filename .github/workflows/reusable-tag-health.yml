@@ -168,21 +168,26 @@ jobs:
           echo "📍 Tag points to commit: $TAG_COMMIT"
 
           # Check if this commit is reachable from main or master
-          MAIN_EXISTS=$(git show-ref --verify --quiet refs/heads/main && echo "true" || echo "false")
-          MASTER_EXISTS=$(git show-ref --verify --quiet refs/heads/master && echo "true" || echo "false")
+          # First try to fetch the latest refs to ensure we have up-to-date information
+          git fetch origin 2>/dev/null || true
+          
+          MAIN_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/main && echo "true" || echo "false")
+          MASTER_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/master && echo "true" || echo "false")
 
           REACHABLE_FROM_MAIN="false"
           REACHABLE_FROM_MASTER="false"
 
           if [[ "$MAIN_EXISTS" == "true" ]]; then
-            if git merge-base --is-ancestor "$TAG_COMMIT" "origin/main" 2>/dev/null; then
+            # Check if commit is in the history of origin/main
+            if git rev-list "origin/main" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
               REACHABLE_FROM_MAIN="true"
               echo "✅ Tag commit is reachable from main branch"
             fi
           fi
 
           if [[ "$MASTER_EXISTS" == "true" ]]; then
-            if git merge-base --is-ancestor "$TAG_COMMIT" "origin/master" 2>/dev/null; then
+            # Check if commit is in the history of origin/master  
+            if git rev-list "origin/master" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
               REACHABLE_FROM_MASTER="true"
               echo "✅ Tag commit is reachable from master branch"
             fi
