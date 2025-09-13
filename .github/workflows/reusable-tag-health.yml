@@ -356,6 +356,8 @@ jobs:
           tag-name: ${{ steps.find-latest.outputs.tag-name }}
           tagger-name: ${{ secrets.TAGGER_NAME }}
           tagger-email: ${{ secrets.TAGGER_EMAIL }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"

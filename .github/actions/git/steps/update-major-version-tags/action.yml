@@ -22,6 +22,12 @@ inputs:
   tagger-email:
     description: "Email for tag creation/signing"
     required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
 
 outputs:
   major-version:
@@ -90,3 +96,5 @@ runs:
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger-name }}
         tagger_email: ${{ inputs.tagger-email }}
+        gpg_private_key: ${{ inputs.gpg_private_key }}
+        gpg_passphrase: ${{ inputs.gpg_passphrase }}
