@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import { sh } from "../../../../common/common/core.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
-import { getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
+import {
+	getRefTag,
+	createRefToCommit,
+	forceMoveRefToCommit,
+	createAnnotatedTag,
+	createRefForTagObject,
+	forceMoveRefToTagObject
+} from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
 
 function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push }) {
@@ -80,15 +87,23 @@ export async function run({
 		});
 	} catch (e) {
 		debugLog(`update/_impl: runGitSmartTag failed: ${e.message}`);
-		console.warn("Git-based tagging failed, falling back to API lightweight tag:", e.message);
+		console.warn("Git-based tagging failed, falling back to API tag update:", e.message);
+
+		// For updates, we always move existing refs rather than create new tag objects
+		// (tag objects are immutable - can't create new ones with same name)
 		const state = await getRefTag({ token, repo, tag });
 		if (state.exists) {
 			await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
 		} else {
-			try {
+			// If ref doesn't exist, this is actually a create operation
+			const shouldAnnotate = gpg_enabled || (message && message !== tag);
+			if (shouldAnnotate && tagger_name && tagger_email) {
+				const tagger = { name: tagger_name, email: tagger_email };
+				const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
+				await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
+				return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
+			} else {
 				await createRefToCommit({ token, repo, tag, commitSha: sha });
-			} catch {
-				await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
 			}
 		}
 		return { tag_obj_sha: "", ref_sha: sha };

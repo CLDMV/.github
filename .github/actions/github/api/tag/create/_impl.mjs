@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import { sh } from "../../../../common/common/core.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
-import { getRefTag, createRefToCommit, forceMoveRefToCommit } from "../../_api/tag.mjs";
+import {
+	getRefTag,
+	createRefToCommit,
+	forceMoveRefToCommit,
+	createAnnotatedTag,
+	createRefForTagObject,
+	forceMoveRefToTagObject
+} from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
 
 function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push }) {
@@ -80,17 +87,38 @@ export async function run({
 			push
 		});
 	} catch (e) {
-		console.warn("Git-based tagging failed, falling back to API lightweight tag:", e.message);
+		console.warn("Git-based tagging failed, falling back to API tag creation:", e.message);
+
+		// Check if tag ref already exists
 		const state = await getRefTag({ token, repo, tag });
-		if (state.exists) {
-			await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
-		} else {
+
+		// Determine if we should create an annotated tag
+		const shouldAnnotate = gpg_enabled || (message && message !== tag);
+
+		if (shouldAnnotate && tagger_name && tagger_email && !state.exists) {
+			// Only create annotated tag if ref doesn't exist (tag objects are immutable)
+			const tagger = { name: tagger_name, email: tagger_email };
+			const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
+
+			// Create the ref to point to the tag object
 			try {
-				await createRefToCommit({ token, repo, tag, commitSha: sha });
+				await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
 			} catch {
-				await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+				await forceMoveRefToTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
 			}
+			return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
+		} else {
+			// Fallback to lightweight tag (or move existing ref)
+			if (state.exists) {
+				await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+			} else {
+				try {
+					await createRefToCommit({ token, repo, tag, commitSha: sha });
+				} catch {
+					await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+				}
+			}
+			return { tag_obj_sha: "", ref_sha: sha };
 		}
-		return { tag_obj_sha: "", ref_sha: sha };
 	}
 }

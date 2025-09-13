@@ -42,13 +42,13 @@ export async function getTagObject({ token, repo, tagObjectSha }) {
  */
 export async function createAnnotatedTag({ token, repo, tag, message, objectSha, tagger }) {
 	const { owner, repo: r } = parseRepo(repo);
-	const payload = { 
-		tag, 
-		message: message || tag, 
-		object: objectSha, 
-		type: "commit" 
+	const payload = {
+		tag,
+		message: message || tag,
+		object: objectSha,
+		type: "commit"
 	};
-	
+
 	// Add tagger object if provided
 	if (tagger && tagger.name && tagger.email) {
 		payload.tagger = {
@@ -57,7 +57,7 @@ export async function createAnnotatedTag({ token, repo, tag, message, objectSha,
 			date: tagger.date || new Date().toISOString()
 		};
 	}
-	
+
 	return api("POST", "/git/tags", payload, { token, owner, repo: r });
 }
 
