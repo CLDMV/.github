@@ -256,16 +256,44 @@ if (DEBUG) {
 const updatedTagsJson = JSON.stringify(updatedTagsList);
 const fixedTagsJson = JSON.stringify(fixedTags);
 
+// Create detailed summary JSON with title, description, and pre-formatted lines
+const summaryData = {
+	orphaned_tag_fixes: {
+		title: "🔗 Fixed Orphaned Tags",
+		description: "The following orphaned tags were retargeted:",
+		fixed_count: fixedTags.length,
+		lines: [],
+		stats_template: "🔗 Orphaned tag fixes: {count}"
+	}
+};
+
+// Create pre-formatted lines for each fixed tag
+for (const tagName of fixedTags) {
+	const originalTag = orphanedTags.find(t => t.name === tagName);
+	const fixedTag = updatedTagsList.find(t => t.name === tagName);
+	
+	if (originalTag && fixedTag) {
+		const line = `- **${tagName}** → **${fixedTag.commitSha.substring(0, 7)}** (was: ${originalTag.commitSha.substring(0, 7)})`;
+		summaryData.orphaned_tag_fixes.lines.push(line);
+	}
+}
+
+const summaryJson = JSON.stringify(summaryData);
+
 console.log(`updated-tags-detailed=${updatedTagsJson}`);
 console.log(`fixed-count=${fixedTags.length}`);
 console.log(`fixed-tags=${fixedTagsJson}`);
+console.log(`summary-json=${summaryJson}`);
 
 // Write to GitHub output file
 const githubOutput = process.env.GITHUB_OUTPUT;
 if (githubOutput) {
 	writeFileSync(
 		githubOutput,
-		`updated-tags-detailed=${updatedTagsJson}\n` + `fixed-count=${fixedTags.length}\n` + `fixed-tags=${fixedTagsJson}\n`,
+		`updated-tags-detailed=${updatedTagsJson}\n` +
+			`fixed-count=${fixedTags.length}\n` +
+			`fixed-tags=${fixedTagsJson}\n` +
+			`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
 	);
 }

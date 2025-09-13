@@ -187,11 +187,34 @@ if (nonBotTags.length === 0) {
 
 console.log(`✅ Fixed ${fixedTags.length} tags with bot signatures`);
 
+// Create detailed summary JSON with title, description, and pre-formatted lines
+const summaryData = {
+	bot_signature_fixes: {
+		title: "🤖 Fixed Bot Signatures",
+		description: "The following version tags were recreated with proper bot signatures:",
+		fixed_count: fixedTags.length,
+		lines: [],
+		stats_template: "🤖 Bot signature fixes: {count}"
+	}
+};
+
+// Create pre-formatted lines for each fixed tag
+for (const tagName of fixedTags) {
+	const originalTag = TAGS_DETAILED.find(t => t.name === tagName);
+	
+	if (originalTag) {
+		const previousTagger = originalTag.tagger || originalTag.author || "unknown";
+		const line = `- **${tagName}** (was: ${previousTagger})`;
+		summaryData.bot_signature_fixes.lines.push(line);
+	}
+}
+
 // Set outputs
 const outputs = {
 	"updated-tags-detailed": JSON.stringify(updatedTagsDetailed),
 	"fixed-count": fixedTags.length.toString(),
-	"fixed-tags": JSON.stringify(fixedTags)
+	"fixed-tags": JSON.stringify(fixedTags),
+	"summary-json": JSON.stringify(summaryData)
 };
 
 Object.entries(outputs).forEach(([key, value]) => {

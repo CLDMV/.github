@@ -133,6 +133,9 @@ on:
       processing_summary:
         description: "Summary of all processing steps"
         value: ${{ jobs.unified-summarize-results.outputs.processing_summary }}
+      summary_json:
+        description: "Detailed JSON summary of all operations"
+        value: ${{ jobs.unified-summarize-results.outputs.summary_json }}
 
 jobs:
   # Validate that tag commits are reachable from main/master
@@ -306,6 +309,7 @@ jobs:
       should-run: ${{ steps.update-major-tags.outputs.should-run }}
       fixed-orphans: ${{ steps.update-major-tags.outputs.fixed-orphans }}
       orphans-found: ${{ steps.update-major-tags.outputs.orphans-found }}
+      summary-json: ${{ steps.generate-summary.outputs.summary-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -359,6 +363,47 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      - name: Generate summary for major/minor updates
+        id: generate-summary
+        run: |
+          # Create initial summary JSON structure
+          SUMMARY_JSON='{
+            "major_minor_updates": {
+              "updated": ${{ steps.update-major-tags.outputs.updated == 'true' && 'true' || 'false' }},
+              "major_version": "${{ steps.update-major-tags.outputs.major-version }}",
+              "minor_version": "${{ steps.update-major-tags.outputs.minor-version }}",
+              "source_tag": "${{ steps.find-latest.outputs.tag-name }}",
+              "tags": []
+            },
+            "statistics": {
+              "by_operation": {
+                "major_minor_updates": ${{ steps.update-major-tags.outputs.updated == 'true' && '1' || '0' }}
+              }
+            }
+          }'
+
+          # Add tag details if updated
+          if [[ "${{ steps.update-major-tags.outputs.updated }}" == "true" ]]; then
+            MAJOR_TAG="${{ steps.update-major-tags.outputs.major-version }}"
+            MINOR_TAG="${{ steps.update-major-tags.outputs.minor-version }}"
+            SOURCE_TAG="${{ steps.find-latest.outputs.tag-name }}"
+            
+            # Update the tags array with actual updates
+            SUMMARY_JSON=$(echo "$SUMMARY_JSON" | jq --arg major "$MAJOR_TAG" --arg minor "$MINOR_TAG" --arg source "$SOURCE_TAG" '
+              .major_minor_updates.tags = [
+                {"tag": $major, "target": $source},
+                {"tag": $minor, "target": $source}
+              ]
+            ')
+          fi
+
+          echo "summary-json=$SUMMARY_JSON" >> $GITHUB_OUTPUT
+
+          if [[ "${{ inputs.debug }}" == "true" ]]; then
+            echo "Generated summary JSON:"
+            echo "$SUMMARY_JSON" | jq .
+          fi
+
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"
     if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
@@ -368,6 +413,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed_count }}
+      summary_json: ${{ steps.fix-bot-sigs.outputs.summary_json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -410,6 +456,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-unsigned.outputs.fixed_count }}
+      summary_json: ${{ steps.fix-unsigned.outputs.summary_json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -452,6 +499,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-orphaned.outputs.fixed_count }}
+      summary_json: ${{ steps.fix-orphaned.outputs.summary_json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -504,6 +552,7 @@ jobs:
       total_processed: ${{ steps.summarize.outputs.total-processed }}
       total_fixed: ${{ steps.summarize.outputs.total-fixed }}
       processing_summary: ${{ steps.summarize.outputs.processing-summary }}
+      summary_json: ${{ steps.summarize.outputs.summary-json }}
       # Individual step outputs for compatibility
       fixed-bot-signatures: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
       non-bot-tags-found: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
@@ -539,29 +588,18 @@ jobs:
         with:
           auth-token: ${{ needs.setup-shared.outputs.auth-token }}
 
-      - name: Summarize processing
+      - name: Build comprehensive summary
         id: summarize
-        run: |
-          echo "🔄 Unified Tag Health Summary for ${{ github.repository }}:"
-
-          # Get initial count from setup job (we'll use current count as approximation)
-          FINAL_COUNT="${{ steps.final-scan.outputs.tags_count }}"
-          BOT_FIXED="${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}"
-          UNSIGNED_FIXED="${{ needs.unified-fix-unsigned-tags.outputs.fixed_count }}"
-          ORPHANED_FIXED="${{ needs.unified-fix-orphaned-tags.outputs.fixed_count }}"
-          MAJOR_UPDATED="${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}"
-
-          TOTAL_FIXED=$((BOT_FIXED + UNSIGNED_FIXED + ORPHANED_FIXED + MAJOR_UPDATED))
-
-          echo "  📌 Major/minor tags updated: $MAJOR_UPDATED"
-          echo "  🤖 Bot signature fixes: $BOT_FIXED"
-          echo "  🔏 Unsigned tag fixes: $UNSIGNED_FIXED"
-          echo "  🔗 Orphaned tag fixes: $ORPHANED_FIXED"
-          echo "  📊 Final tag count: $FINAL_COUNT"
-          echo "  ✅ Total operations: $TOTAL_FIXED"
-
-          SUMMARY="Processed tags for ${{ github.repository }}. Updated $MAJOR_UPDATED major/minor tags, then fixed: $BOT_FIXED bot signatures, $UNSIGNED_FIXED unsigned tags, $ORPHANED_FIXED orphaned tags. Final count: $FINAL_COUNT. Total operations: $TOTAL_FIXED"
-
-          echo "total-processed=$FINAL_COUNT" >> $GITHUB_OUTPUT
-          echo "total-fixed=$TOTAL_FIXED" >> $GITHUB_OUTPUT
-          echo "processing-summary=$SUMMARY" >> $GITHUB_OUTPUT
+        run: node ./.github/workflows/node/workflow-update-major-version-tags.mjs
+        env:
+          FINAL_COUNT: ${{ steps.final-scan.outputs.tags_count }}
+          BOT_FIXED: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count || '0' }}
+          UNSIGNED_FIXED: ${{ needs.unified-fix-unsigned-tags.outputs.fixed_count || '0' }}
+          ORPHANED_FIXED: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
+          MAJOR_UPDATED: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
+          REPO_NAME: ${{ github.repository }}
+          BOT_SUMMARY_JSON: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
+          UNSIGNED_SUMMARY_JSON: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
+          ORPHANED_SUMMARY_JSON: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
+          MAJOR_MINOR_SUMMARY_JSON: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}
+          INPUT_DEBUG: ${{ inputs.debug }}

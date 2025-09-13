@@ -193,16 +193,47 @@ if (DEBUG) {
 const updatedTagsJson = JSON.stringify(updatedTagsList);
 const fixedTagsJson = JSON.stringify(fixedTags);
 
+// Create detailed summary JSON with title, description, and pre-formatted lines
+const summaryData = {
+	unsigned_tag_fixes: {
+		title: "🔏 Fixed Unsigned Tags",
+		description: "The following tags were converted to signed/annotated tags:",
+		fixed_count: fixedTags.length,
+		lines: [],
+		stats_template: "🔏 Unsigned tag fixes: {count}"
+	}
+};
+
+// Create pre-formatted lines for each fixed tag
+for (const tagName of fixedTags) {
+	const originalTag = TAGS_DETAILED.find(t => t.name === tagName);
+	const fixedTag = updatedTagsList.find(t => t.name === tagName);
+	
+	if (originalTag && fixedTag) {
+		const status = [];
+		if (!originalTag.isAnnotated) status.push("was lightweight");
+		if (!originalTag.isSigned) status.push("was unsigned");
+		const line = `- **${tagName}** (${status.join(", ")})`;
+		summaryData.unsigned_tag_fixes.lines.push(line);
+	}
+}
+
+const summaryJson = JSON.stringify(summaryData);
+
 console.log(`updated-tags-detailed=${updatedTagsJson}`);
 console.log(`fixed-count=${fixedTags.length}`);
 console.log(`fixed-tags=${fixedTagsJson}`);
+console.log(`summary-json=${summaryJson}`);
 
 // Write to GitHub output file
 const githubOutput = process.env.GITHUB_OUTPUT;
 if (githubOutput) {
 	writeFileSync(
 		githubOutput,
-		`updated-tags-detailed=${updatedTagsJson}\n` + `fixed-count=${fixedTags.length}\n` + `fixed-tags=${fixedTagsJson}\n`,
+		`updated-tags-detailed=${updatedTagsJson}\n` + 
+		`fixed-count=${fixedTags.length}\n` + 
+		`fixed-tags=${fixedTagsJson}\n` +
+		`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
 	);
 }
