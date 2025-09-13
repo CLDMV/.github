@@ -20,6 +20,12 @@ outputs:
   using_app_token:
     description: "Whether an App token was created (true/false)"
     value: ${{ steps.check-app.outputs.use_app_token }}
+  installation-id:
+    description: "GitHub App installation ID"
+    value: ${{ steps.app-token.outputs.installation-id }}
+  app-slug:
+    description: "GitHub App slug"
+    value: ${{ steps.app-token.outputs.app-slug }}
 
 runs:
   using: composite
