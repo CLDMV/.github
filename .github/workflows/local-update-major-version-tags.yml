@@ -4,7 +4,7 @@ name: 🏷️ Update Major Version Tags
 on:
   release:
     types: [published]
-  push:  # Allow all pushes (branches and tags)
+  push: # Allow all pushes (branches and tags)
 
   workflow_dispatch:
     inputs:

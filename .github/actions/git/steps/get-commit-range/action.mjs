@@ -1,16 +1,6 @@
 import { appendFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
-
-// Get inputs from environment
-const HEAD_REF = process.env.HEAD_REF || "HEAD";
-const BASE_REF_OVERRIDE = process.env.BASE_REF_OVERRIDE;
-const DEBUG = process.env.DEBUG === "true";
-
-console.log(`🔍 Getting commit range for ${HEAD_REF}`);
-if (DEBUG) {
-	console.log(`🔍 DEBUG: head-ref=${HEAD_REF}`);
-	console.log(`🔍 DEBUG: base-ref override=${BASE_REF_OVERRIDE || "(none)"}`);
-}
+import { debugLog } from "../../../common/common/core.mjs";
 
 /**
  * Categorize commits based on conventional commit patterns and content
@@ -18,7 +8,7 @@ if (DEBUG) {
  * @param {string|null} allCommits - Optional pre-existing commit data (for testing)
  * @returns {Array} Array of commit objects with categorization
  */
-function categorizeCommits(commitRange, allCommits = null) {
+export function categorizeCommits(commitRange, allCommits = null) {
 	try {
 		if (!allCommits) {
 			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
@@ -120,6 +110,15 @@ function categorizeCommits(commitRange, allCommits = null) {
 
 // Main logic - only run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
+	// Get inputs from environment
+	const HEAD_REF = process.env.HEAD_REF || "HEAD";
+	const BASE_REF_OVERRIDE = process.env.BASE_REF_OVERRIDE;
+	const DEBUG = process.env.DEBUG === "true";
+
+	debugLog(`Getting commit range for ${HEAD_REF}`);
+	debugLog(`head-ref=${HEAD_REF}`);
+	debugLog(`base-ref override=${BASE_REF_OVERRIDE || "(none)"}`);
+
 	// Fetch all tags to ensure we have the complete tag history
 	console.log("🔍 Fetching all tags from remote...");
 	gitCommand("git fetch --tags --force", true);
@@ -218,6 +217,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 	console.log("✅ Commit range analysis complete");
 } // End main execution block
-
-// Export functions for testing
-export { categorizeCommits };

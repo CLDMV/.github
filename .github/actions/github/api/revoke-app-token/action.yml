@@ -1,0 +1,17 @@
+name: "Revoke GitHub App Token"
+description: "Revokes a GitHub App installation token"
+
+inputs:
+  auth-token:
+    description: "GitHub App installation token to revoke"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Revoke GitHub App Token
+      shell: bash
+      run: |
+        node "${{ github.action_path }}/action.mjs"
+      env:
+        AUTH_TOKEN: ${{ inputs.auth-token }}

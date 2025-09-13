@@ -88,24 +88,59 @@ export async function run({
 	} catch (e) {
 		debugLog(`update/_impl: runGitSmartTag failed: ${e.message}`);
 		console.warn("Git-based tagging failed, falling back to API tag update:", e.message);
+		debugLog(`update/_impl: API fallback starting for tag=${tag}, sha=${sha}`);
+		debugLog(`update/_impl: API fallback params - gpg_enabled=${gpg_enabled}, tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
+		debugLog(`update/_impl: API fallback message="${message}"`);
 
 		// For updates, we always move existing refs rather than create new tag objects
 		// (tag objects are immutable - can't create new ones with same name)
+		debugLog(`update/_impl: Checking if tag ref exists...`);
 		const state = await getRefTag({ token, repo, tag });
+		debugLog(`update/_impl: Tag ref exists: ${state.exists}, refSha: ${state.refSha}, objectType: ${state.objectType}`);
+
 		if (state.exists) {
-			await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+			debugLog(`update/_impl: Moving existing ref to new commit...`);
+			try {
+				const moveResult = await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+				debugLog(`update/_impl: Ref moved successfully: ${JSON.stringify(moveResult)}`);
+			} catch (moveError) {
+				debugLog(`update/_impl: Ref move failed: ${moveError.message}`);
+				throw moveError;
+			}
 		} else {
+			debugLog(`update/_impl: Ref doesn't exist, treating as create operation`);
 			// If ref doesn't exist, this is actually a create operation
 			const shouldAnnotate = gpg_enabled || (message && message !== tag);
+			debugLog(`update/_impl: shouldAnnotate=${shouldAnnotate} (gpg_enabled=${gpg_enabled}, message differs=${message !== tag})`);
+
 			if (shouldAnnotate && tagger_name && tagger_email) {
+				debugLog(`update/_impl: Creating annotated tag with API...`);
 				const tagger = { name: tagger_name, email: tagger_email };
-				const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
-				await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
-				return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
+				debugLog(`update/_impl: Tagger object: ${JSON.stringify(tagger)}`);
+
+				try {
+					const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
+					debugLog(`update/_impl: Annotated tag created successfully, tagObj.sha=${tagObj.sha}`);
+
+					const refResult = await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
+					debugLog(`update/_impl: Ref created successfully: ${JSON.stringify(refResult)}`);
+					return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
+				} catch (tagError) {
+					debugLog(`update/_impl: Annotated tag creation failed: ${tagError.message}`);
+					throw tagError;
+				}
 			} else {
-				await createRefToCommit({ token, repo, tag, commitSha: sha });
+				debugLog(`update/_impl: Creating lightweight tag with API...`);
+				try {
+					const createResult = await createRefToCommit({ token, repo, tag, commitSha: sha });
+					debugLog(`update/_impl: Lightweight ref created successfully: ${JSON.stringify(createResult)}`);
+				} catch (createError) {
+					debugLog(`update/_impl: Lightweight ref creation failed: ${createError.message}`);
+					throw createError;
+				}
 			}
 		}
+		debugLog(`update/_impl: API fallback completed successfully`);
 		return { tag_obj_sha: "", ref_sha: sha };
 	}
 }

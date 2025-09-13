@@ -448,6 +448,13 @@ jobs:
           include_patterns: ${{ inputs.include_patterns }}
           exclude_patterns: ${{ inputs.exclude_patterns }}
 
+      - name: Revoke App token
+        if: needs.setup-shared.outputs.auth-token != ''
+        id: revoke-token
+        uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v1
+        with:
+          auth-token: ${{ needs.setup-shared.outputs.auth-token }}
+
       - name: Summarize processing
         id: summarize
         run: |

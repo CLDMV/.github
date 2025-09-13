@@ -88,34 +88,70 @@ export async function run({
 		});
 	} catch (e) {
 		console.warn("Git-based tagging failed, falling back to API tag creation:", e.message);
+		debugLog(`create/_impl: API fallback starting for tag=${tag}, sha=${sha}`);
+		debugLog(`create/_impl: API fallback params - gpg_enabled=${gpg_enabled}, tagger_name=${tagger_name}, tagger_email=${tagger_email}`);
+		debugLog(`create/_impl: API fallback message="${message}"`);
 
 		// Check if tag ref already exists
+		debugLog(`create/_impl: Checking if tag ref exists...`);
 		const state = await getRefTag({ token, repo, tag });
+		debugLog(`create/_impl: Tag ref exists: ${state.exists}, refSha: ${state.refSha}, objectType: ${state.objectType}`);
 
 		// Determine if we should create an annotated tag
 		const shouldAnnotate = gpg_enabled || (message && message !== tag);
+		debugLog(`create/_impl: shouldAnnotate=${shouldAnnotate} (gpg_enabled=${gpg_enabled}, message differs=${message !== tag})`);
 
 		if (shouldAnnotate && tagger_name && tagger_email && !state.exists) {
+			debugLog(`create/_impl: Creating annotated tag with API...`);
 			// Only create annotated tag if ref doesn't exist (tag objects are immutable)
 			const tagger = { name: tagger_name, email: tagger_email };
-			const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
+			debugLog(`create/_impl: Tagger object: ${JSON.stringify(tagger)}`);
 
-			// Create the ref to point to the tag object
 			try {
-				await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
-			} catch {
-				await forceMoveRefToTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
+				const tagObj = await createAnnotatedTag({ token, repo, tag, message: message || tag, objectSha: sha, tagger });
+				debugLog(`create/_impl: Annotated tag created successfully, tagObj.sha=${tagObj.sha}`);
+
+				// Create the ref to point to the tag object
+				debugLog(`create/_impl: Creating ref to point to tag object...`);
+				try {
+					const refResult = await createRefForTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
+					debugLog(`create/_impl: Ref created successfully: ${JSON.stringify(refResult)}`);
+				} catch (refError) {
+					debugLog(`create/_impl: Ref creation failed, trying force move: ${refError.message}`);
+					const forceResult = await forceMoveRefToTagObject({ token, repo, tag, tagObjectSha: tagObj.sha });
+					debugLog(`create/_impl: Force move successful: ${JSON.stringify(forceResult)}`);
+				}
+				return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
+			} catch (tagError) {
+				debugLog(`create/_impl: Annotated tag creation failed: ${tagError.message}`);
+				throw tagError;
 			}
-			return { tag_obj_sha: tagObj.sha, ref_sha: tagObj.sha };
 		} else {
+			debugLog(`create/_impl: Creating lightweight tag with API (shouldAnnotate=${shouldAnnotate}, state.exists=${state.exists})`);
 			// Fallback to lightweight tag (or move existing ref)
 			if (state.exists) {
-				await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
-			} else {
+				debugLog(`create/_impl: Moving existing ref to new commit...`);
 				try {
-					await createRefToCommit({ token, repo, tag, commitSha: sha });
-				} catch {
-					await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+					const moveResult = await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+					debugLog(`create/_impl: Ref moved successfully: ${JSON.stringify(moveResult)}`);
+				} catch (moveError) {
+					debugLog(`create/_impl: Ref move failed: ${moveError.message}`);
+					throw moveError;
+				}
+			} else {
+				debugLog(`create/_impl: Creating new lightweight tag ref...`);
+				try {
+					const createResult = await createRefToCommit({ token, repo, tag, commitSha: sha });
+					debugLog(`create/_impl: Lightweight ref created successfully: ${JSON.stringify(createResult)}`);
+				} catch (createError) {
+					debugLog(`create/_impl: Lightweight ref creation failed, trying force move: ${createError.message}`);
+					try {
+						const forceResult = await forceMoveRefToCommit({ token, repo, tag, commitSha: sha });
+						debugLog(`create/_impl: Force move successful: ${JSON.stringify(forceResult)}`);
+					} catch (forceError) {
+						debugLog(`create/_impl: Force move failed: ${forceError.message}`);
+						throw forceError;
+					}
 				}
 			}
 			return { tag_obj_sha: "", ref_sha: sha };

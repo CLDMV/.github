@@ -53,5 +53,6 @@ runs:
         app-id: ${{ inputs.app_id || env.BOT_APP_ID }}
         private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
         owner: ${{ inputs.owner }}
+        skip-token-revoke: true # Don't revoke token - needed for multi-job workflows
         # permission-contents: write
         # permission-workflows: write

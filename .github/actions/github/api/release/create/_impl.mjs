@@ -1,13 +1,13 @@
+import { debugLog } from "../../../common/common/core.mjs";
+
 export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
-	if (debug) {
-		console.log(`🔍 Creating release for ${repo}:`);
-		console.log(`  tag_name: ${tag_name}`);
-		console.log(`  name: ${name}`);
-		console.log(`  is_prerelease: ${is_prerelease}`);
-		console.log(`  is_draft: ${is_draft}`);
-		console.log(`  body length: ${body.length}`);
-		console.log(`  assets: ${assets}`);
-	}
+	debugLog(`Creating release for ${repo}:`);
+	debugLog(`  tag_name: ${tag_name}`);
+	debugLog(`  name: ${name}`);
+	debugLog(`  is_prerelease: ${is_prerelease}`);
+	debugLog(`  is_draft: ${is_draft}`);
+	debugLog(`  body length: ${body.length}`);
+	debugLog(`  assets: ${assets}`);
 
 	// Check if release already exists
 	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag_name}`, {
@@ -23,7 +23,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	if (existingReleaseResponse.ok) {
 		// Release already exists
 		releaseData = await existingReleaseResponse.json();
-		console.log(`ℹ️ Release ${tag_name} already exists (ID: ${releaseData.id}). Updating it...`);
+		debugLog(`Release ${tag_name} already exists (ID: ${releaseData.id}). Updating it...`);
 
 		// Update the existing release
 		const updatePayload = {
@@ -33,9 +33,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 			prerelease: is_prerelease
 		};
 
-		if (debug) {
-			console.log(`🔍 Update payload:`, JSON.stringify(updatePayload, null, 2));
-		}
+		debugLog(`Update payload:`, JSON.stringify(updatePayload, null, 2));
 
 		const updateResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
@@ -54,9 +52,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		releaseData = await updateResponse.json();
 
-		if (debug) {
-			console.log(`✅ Updated existing release: ${releaseData.id}`);
-		}
+		debugLog(`Updated existing release: ${releaseData.id}`);
 	} else if (existingReleaseResponse.status === 404) {
 		// Release doesn't exist, create new one
 		const releasePayload = {
@@ -67,9 +63,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 			prerelease: is_prerelease
 		};
 
-		if (debug) {
-			console.log(`🔍 Release payload:`, JSON.stringify(releasePayload, null, 2));
-		}
+		debugLog(`Release payload:`, JSON.stringify(releasePayload, null, 2));
 
 		const releaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases`, {
 			method: "POST",
@@ -88,9 +82,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		releaseData = await releaseResponse.json();
 
-		if (debug) {
-			console.log(`✅ Created new release: ${releaseData.id}`);
-		}
+		debugLog(`Created new release: ${releaseData.id}`);
 	} else {
 		// Some other error checking for existing release
 		const errorText = await existingReleaseResponse.text();
@@ -142,9 +134,7 @@ async function uploadAssets({ token, repo, release_id, upload_url, assets, debug
 
 	for (const assetPath of assets) {
 		try {
-			if (debug) {
-				console.log(`🔍 Uploading asset: ${assetPath}`);
-			}
+			debugLog(`Uploading asset: ${assetPath}`);
 
 			// Check if file exists
 			await fs.access(assetPath);
@@ -169,12 +159,12 @@ async function uploadAssets({ token, repo, release_id, upload_url, assets, debug
 
 			if (!uploadResponse.ok) {
 				const errorText = await uploadResponse.text();
-				console.error(`⚠️ Failed to upload ${fileName}: ${uploadResponse.status} ${errorText}`);
+				console.error(`Failed to upload ${fileName}: ${uploadResponse.status} ${errorText}`);
 			} else {
-				console.log(`✅ Uploaded asset: ${fileName}`);
+				debugLog(`Uploaded asset: ${fileName}`);
 			}
 		} catch (error) {
-			console.error(`⚠️ Error uploading ${assetPath}: ${error.message}`);
+			console.error(`Error uploading ${assetPath}: ${error.message}`);
 		}
 	}
 }
