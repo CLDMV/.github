@@ -189,8 +189,11 @@ console.log(`✅ Fixed ${fixedTags.length} tags with bot signatures`);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	title: "🤖 Fixed Bot Signatures",
-	description: "The following version tags were recreated with proper bot signatures:",
+	title: "🤖 Bot Signature Analysis",
+	description:
+		fixedTags.length > 0
+			? "The following version tags were recreated with proper bot signatures:"
+			: "Analyzed version tags for bot signature compliance.",
 	fixed_count: fixedTags.length,
 	lines: [],
 	stats_template: "🤖 Bot signature fixes: {count}",
@@ -199,8 +202,8 @@ const summaryData = {
 
 // Create pre-formatted lines for each fixed tag
 for (const tagName of fixedTags) {
-	const originalTag = TAGS_DETAILED.find(t => t.name === tagName);
-	
+	const originalTag = TAGS_DETAILED.find((t) => t.name === tagName);
+
 	if (originalTag) {
 		const previousTagger = originalTag.tagger || originalTag.author || "unknown";
 		const line = `- **${tagName}** (was: ${previousTagger})`;
@@ -208,9 +211,12 @@ for (const tagName of fixedTags) {
 	}
 }
 
-// Add notes if any tags were fixed
+// Add appropriate notes
 if (fixedTags.length > 0) {
 	summaryData.notes.push(`Successfully recreated ${fixedTags.length} tag(s) with proper bot signatures`);
+} else {
+	summaryData.lines.push("- ✅ **No issues found**: All version tags have proper bot signatures");
+	summaryData.notes.push("All analyzed tags already have correct bot signatures");
 }
 
 // Set outputs

@@ -1,6 +1,11 @@
 # Tag Health Workflow Package
 name: 🏷️ Tag Health Management Jobs
 
+# Concurrency control: Cancel previous runs when new ones start
+concurrency:
+  group: tag-health-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:

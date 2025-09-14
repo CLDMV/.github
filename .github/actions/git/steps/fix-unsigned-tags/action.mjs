@@ -195,8 +195,11 @@ const fixedTagsJson = JSON.stringify(fixedTags);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	title: "🔏 Fixed Unsigned Tags",
-	description: "The following tags were converted to signed/annotated tags:",
+	title: "🔏 Signature Analysis",
+	description:
+		fixedTags.length > 0
+			? "The following tags were converted to signed/annotated tags:"
+			: "Analyzed version tags for signature compliance.",
 	fixed_count: fixedTags.length,
 	lines: [],
 	stats_template: "🔏 Unsigned tag fixes: {count}",
@@ -205,9 +208,9 @@ const summaryData = {
 
 // Create pre-formatted lines for each fixed tag
 for (const tagName of fixedTags) {
-	const originalTag = TAGS_DETAILED.find(t => t.name === tagName);
-	const fixedTag = updatedTagsList.find(t => t.name === tagName);
-	
+	const originalTag = TAGS_DETAILED.find((t) => t.name === tagName);
+	const fixedTag = updatedTagsList.find((t) => t.name === tagName);
+
 	if (originalTag && fixedTag) {
 		const status = [];
 		if (!originalTag.isAnnotated) status.push("was lightweight");
@@ -217,9 +220,12 @@ for (const tagName of fixedTags) {
 	}
 }
 
-// Add notes if any tags were fixed
+// Add appropriate notes
 if (fixedTags.length > 0) {
 	summaryData.notes.push(`Successfully fixed ${fixedTags.length} unsigned tag(s)`);
+} else {
+	summaryData.lines.push("- ✅ **No issues found**: All version tags are properly signed");
+	summaryData.notes.push("All analyzed tags are already properly signed and annotated");
 }
 
 const summaryJson = JSON.stringify(summaryData);
@@ -234,10 +240,10 @@ const githubOutput = process.env.GITHUB_OUTPUT;
 if (githubOutput) {
 	writeFileSync(
 		githubOutput,
-		`updated-tags-detailed=${updatedTagsJson}\n` + 
-		`fixed-count=${fixedTags.length}\n` + 
-		`fixed-tags=${fixedTagsJson}\n` +
-		`summary-json=${summaryJson}\n`,
+		`updated-tags-detailed=${updatedTagsJson}\n` +
+			`fixed-count=${fixedTags.length}\n` +
+			`fixed-tags=${fixedTagsJson}\n` +
+			`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
 	);
 }

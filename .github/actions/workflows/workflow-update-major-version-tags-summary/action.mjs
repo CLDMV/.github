@@ -52,8 +52,8 @@ function generateDetailedSummary(summaryData) {
 		if (operationKey !== "overall_success" && operationKey !== "statistics" && operationKey !== "errors" && operationKey !== "repository") {
 			const operation = summaryData[operationKey];
 
-			// Check if this operation has results to display
-			if (operation && operation.title && (operation.fixed_count > 0 || operation.updated === true)) {
+			// Show ALL operations that have a title (whether they made changes or not)
+			if (operation && operation.title) {
 				hasOperations = true;
 				summary += `## ${operation.title}\n\n`;
 				summary += `${operation.description}\n\n`;
@@ -94,7 +94,7 @@ function generateDetailedSummary(summaryData) {
 				operationKey !== "repository"
 			) {
 				const operation = summaryData[operationKey];
-				if (operation && operation.stats_template && (operation.fixed_count > 0 || operation.updated === true)) {
+				if (operation && operation.stats_template) {
 					if (!hasDetailedStats) {
 						summary += `\n**Operations Breakdown**:\n`;
 						hasDetailedStats = true;
@@ -171,14 +171,18 @@ function generateFallbackSummary() {
 
 // Main execution
 console.log("📋 Generating detailed summary for " + repository + "...");
-console.log("🔍 DEBUG: summaryJson input length:", summaryJson.length);
-console.log("🔍 DEBUG: summaryJson input:", summaryJson);
 
 try {
 	// Parse the comprehensive summary JSON
 	const summaryData = safeJsonParse(summaryJson);
 
-	console.log("🔍 DEBUG: Parsed summaryData:", JSON.stringify(summaryData, null, 2));
+	if (debug) {
+		console.log("🔍 DEBUG: summaryJson input length:", summaryJson.length);
+		console.log("🔍 DEBUG: summaryJson input:", summaryJson);
+		console.log("🔍 DEBUG: Parsed summaryData:", JSON.stringify(summaryData, null, 2));
+		console.log("🔍 DEBUG: summaryData keys:", Object.keys(summaryData));
+		console.log("🔍 DEBUG: summaryData.overall_success:", summaryData.overall_success);
+	}
 
 	// Generate the detailed summary
 	let summary;
@@ -187,8 +191,6 @@ try {
 		summary = generateDetailedSummary(summaryData);
 	} else {
 		console.log("⚠️ Using fallback summary (detailed data not available)");
-		console.log("🔍 DEBUG: summaryData keys:", Object.keys(summaryData));
-		console.log("🔍 DEBUG: summaryData.overall_success:", summaryData.overall_success);
 		summary = generateFallbackSummary();
 	}
 

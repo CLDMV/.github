@@ -258,8 +258,8 @@ const fixedTagsJson = JSON.stringify(fixedTags);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	title: "🔗 Fixed Orphaned Tags",
-	description: "The following orphaned tags were retargeted:",
+	title: "🔗 Orphaned Tag Analysis",
+	description: fixedTags.length > 0 ? "The following orphaned tags were retargeted:" : "Analyzed version tags for orphaned references.",
 	fixed_count: fixedTags.length,
 	lines: [],
 	stats_template: "🔗 Orphaned tag fixes: {count}",
@@ -268,18 +268,21 @@ const summaryData = {
 
 // Create pre-formatted lines for each fixed tag
 for (const tagName of fixedTags) {
-	const originalTag = orphanedTags.find(t => t.name === tagName);
-	const fixedTag = updatedTagsList.find(t => t.name === tagName);
-	
+	const originalTag = orphanedTags.find((t) => t.name === tagName);
+	const fixedTag = updatedTagsList.find((t) => t.name === tagName);
+
 	if (originalTag && fixedTag) {
 		const line = `- **${tagName}** → **${fixedTag.commitSha.substring(0, 7)}** (was: ${originalTag.commitSha.substring(0, 7)})`;
 		summaryData.lines.push(line);
 	}
 }
 
-// Add notes if any tags were fixed
+// Add appropriate notes
 if (fixedTags.length > 0) {
 	summaryData.notes.push(`Successfully retargeted ${fixedTags.length} orphaned tag(s)`);
+} else {
+	summaryData.lines.push("- ✅ **No issues found**: All version tags point to reachable commits");
+	summaryData.notes.push("All analyzed tags are properly targeting reachable commits");
 }
 
 const summaryJson = JSON.stringify(summaryData);
