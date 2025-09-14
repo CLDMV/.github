@@ -22,6 +22,9 @@ const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
 const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
 
+// Setup signing capability
+const willSign = GPG_ENABLED && GPG_PRIVATE_KEY;
+
 console.log(`🔍 DEBUG: Processing ${TAGS_DETAILED.length} tags for bot signature analysis`);
 
 /**
@@ -145,7 +148,6 @@ if (TAGS_DETAILED.length === 0) {
 } else {
 
 // Setup git identity and GPG if provided
-const willSign = GPG_ENABLED && GPG_PRIVATE_KEY;
 let keyid = "";
 
 if (willSign) {
