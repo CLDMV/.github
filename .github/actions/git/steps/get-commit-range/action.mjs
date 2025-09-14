@@ -2,6 +2,9 @@ import { appendFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 
+// Global DEBUG flag - read from environment
+const DEBUG = process.env.DEBUG === "true";
+
 /**
  * Categorize commits based on conventional commit patterns and content
  * @param {string} commitRange - Git commit range to analyze
@@ -113,7 +116,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	// Get inputs from environment
 	const HEAD_REF = process.env.HEAD_REF || "HEAD";
 	const BASE_REF_OVERRIDE = process.env.BASE_REF_OVERRIDE;
-	const DEBUG = process.env.DEBUG === "true";
 
 	debugLog(`Getting commit range for ${HEAD_REF}`);
 	debugLog(`head-ref=${HEAD_REF}`);

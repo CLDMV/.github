@@ -2,6 +2,10 @@
 .vscode/
 .backup/
 
+# Development/Testing Directories
+.github/actions/core/
+.github/actions/core2/
+
 # AI Agent Files
 .cursorrules
 .windsurfrules
