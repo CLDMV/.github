@@ -15,7 +15,7 @@ export function categorizeCommits(commitRange, allCommits = null) {
 	try {
 		if (!allCommits) {
 			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
-			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%an|%ad" --date=iso`, true);
+			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%an|%ae|%ad" --date=iso`, true);
 			if (!allCommits) {
 				return [];
 			}
@@ -27,7 +27,7 @@ export function categorizeCommits(commitRange, allCommits = null) {
 		}
 
 		const commits = allCommits.split("\n").map((line) => {
-			const [hash, subject, author, date] = line.split("|");
+			const [hash, subject, author, email, date] = line.split("|");
 			const lower = subject.toLowerCase();
 
 			let category = "other";
@@ -88,6 +88,7 @@ export function categorizeCommits(commitRange, allCommits = null) {
 				hash: hash.substring(0, 7), // Short hash
 				subject,
 				author,
+				email,
 				date,
 				category,
 				type,
