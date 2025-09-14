@@ -1,0 +1,52 @@
+name: "Generate Detailed Summary"
+description: "Generates detailed summary from comprehensive tag health operation results"
+author: "CLDMV"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  summary_json:
+    description: "Comprehensive JSON summary from tag health operations"
+    required: true
+  repository_name:
+    description: "Repository name for summary"
+    required: true
+  operation_result:
+    description: "Overall result status (success/failure)"
+    required: false
+    default: "success"
+  total_processed:
+    description: "Total number of tags processed"
+    required: false
+    default: "0"
+  total_fixed:
+    description: "Total number of operations performed"
+    required: false
+    default: "0"
+  processing_summary:
+    description: "Brief processing summary for fallback"
+    required: false
+    default: ""
+
+outputs:
+  summary_generated:
+    description: "Whether the detailed summary was successfully generated"
+    value: ${{ steps.generate.outputs.summary_generated }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate detailed summary
+      id: generate
+      shell: bash
+      run: node ${{ github.action_path }}/action.mjs
+      env:
+        SUMMARY_JSON: ${{ inputs.summary_json }}
+        GITHUB_REPOSITORY: ${{ inputs.repository_name }}
+        OPERATION_RESULT: ${{ inputs.operation_result }}
+        TOTAL_PROCESSED: ${{ inputs.total_processed }}
+        TOTAL_FIXED: ${{ inputs.total_fixed }}
+        PROCESSING_SUMMARY: ${{ inputs.processing_summary }}
+        INPUT_DEBUG: ${{ inputs.debug }}
