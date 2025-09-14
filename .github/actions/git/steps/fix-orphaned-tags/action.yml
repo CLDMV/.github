@@ -40,7 +40,7 @@ outputs:
   fixed_tags:
     description: "JSON array of tag names that were fixed"
     value: ${{ steps.fix-tags.outputs.fixed-tags }}
-  summary_json:
+  summary-json:
     description: "Complete summary JSON with title, description, and detailed results"
     value: ${{ steps.fix-tags.outputs.summary-json }}
 

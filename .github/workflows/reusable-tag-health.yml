@@ -138,9 +138,9 @@ on:
       processing_summary:
         description: "Summary of all processing steps"
         value: ${{ jobs.unified-summarize-results.outputs.processing_summary }}
-      summary_json:
+      summary-json:
         description: "Detailed JSON summary of all operations"
-        value: ${{ jobs.unified-summarize-results.outputs.summary_json }}
+        value: ${{ jobs.unified-summarize-results.outputs.summary-json }}
 
 jobs:
   # Validate that tag commits are reachable from main/master
@@ -428,7 +428,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed-count }}
-      summary_json: ${{ steps.fix-bot-sigs.outputs.summary-json }}
+      summary-json: ${{ steps.fix-bot-sigs.outputs.summary-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -471,7 +471,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-unsigned.outputs.fixed-count }}
-      summary_json: ${{ steps.fix-unsigned.outputs.summary-json }}
+      summary-json: ${{ steps.fix-unsigned.outputs.summary-json }}
     steps:
       - name: Debug job start
         run: echo "🔍 DEBUG - Unsigned tags job is starting..."
@@ -517,7 +517,7 @@ jobs:
       contents: write
     outputs:
       fixed_count: ${{ steps.fix-orphaned.outputs.fixed-count }}
-      summary_json: ${{ steps.fix-orphaned.outputs.summary-json }}
+      summary-json: ${{ steps.fix-orphaned.outputs.summary-json }}
     steps:
       - name: Debug job start
         run: echo "🔍 DEBUG - Orphaned tags job is starting..."
@@ -573,7 +573,7 @@ jobs:
       total_processed: ${{ steps.summarize.outputs.total_processed }}
       total_fixed: ${{ steps.summarize.outputs.total_fixed }}
       processing_summary: ${{ steps.summarize.outputs.processing_summary }}
-      summary_json: ${{ steps.summarize.outputs.summary_json }}
+      summary-json: ${{ steps.summarize.outputs.summary-json }}
       # Individual step outputs for compatibility
       fixed-bot-signatures: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
       non-bot-tags-found: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
@@ -620,7 +620,7 @@ jobs:
           orphaned_fixed: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
           major_updated: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
           repository_name: ${{ github.repository }}
-          bot_summary_json: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
-          unsigned_summary_json: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
-          orphaned_summary_json: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
-          major_minor_summary_json: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}
+          bot_summary-json: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
+          unsigned_summary-json: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
+          orphaned_summary-json: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
+          major_minor_summary-json: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}

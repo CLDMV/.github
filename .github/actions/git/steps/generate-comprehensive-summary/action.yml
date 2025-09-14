@@ -29,19 +29,19 @@ inputs:
   repository_name:
     description: "Repository name for summary"
     required: true
-  bot_summary_json:
+  bot_summary-json:
     description: "JSON summary from bot signature fixes"
     required: false
     default: "{}"
-  unsigned_summary_json:
+  unsigned_summary-json:
     description: "JSON summary from unsigned tag fixes"
     required: false
     default: "{}"
-  orphaned_summary_json:
+  orphaned_summary-json:
     description: "JSON summary from orphaned tag fixes"
     required: false
     default: "{}"
-  major_minor_summary_json:
+  major_minor_summary-json:
     description: "JSON summary from major/minor updates"
     required: false
     default: "{}"
@@ -56,9 +56,9 @@ outputs:
   processing_summary:
     description: "Brief processing summary"
     value: ${{ steps.generate.outputs.processing_summary }}
-  summary_json:
+  summary-json:
     description: "Detailed JSON summary of all operations"
-    value: ${{ steps.generate.outputs.summary_json }}
+    value: ${{ steps.generate.outputs.summary-json }}
 
 runs:
   using: "composite"
@@ -74,8 +74,8 @@ runs:
         ORPHANED_FIXED: ${{ inputs.orphaned_fixed }}
         MAJOR_UPDATED: ${{ inputs.major_updated }}
         REPO_NAME: ${{ inputs.repository_name }}
-        BOT_SUMMARY_JSON: ${{ inputs.bot_summary_json }}
-        UNSIGNED_SUMMARY_JSON: ${{ inputs.unsigned_summary_json }}
-        ORPHANED_SUMMARY_JSON: ${{ inputs.orphaned_summary_json }}
-        MAJOR_MINOR_SUMMARY_JSON: ${{ inputs.major_minor_summary_json }}
+        BOT_SUMMARY_JSON: ${{ inputs.bot_summary-json }}
+        UNSIGNED_SUMMARY_JSON: ${{ inputs.unsigned_summary-json }}
+        ORPHANED_SUMMARY_JSON: ${{ inputs.orphaned_summary-json }}
+        MAJOR_MINOR_SUMMARY_JSON: ${{ inputs.major_minor_summary-json }}
         INPUT_DEBUG: ${{ inputs.debug }}

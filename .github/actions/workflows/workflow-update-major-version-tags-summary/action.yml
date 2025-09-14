@@ -7,7 +7,7 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
-  summary_json:
+  summary-json:
     description: "Comprehensive JSON summary from tag health operations"
     required: true
   repository_name:
@@ -43,7 +43,7 @@ runs:
       shell: bash
       run: node ${{ github.action_path }}/action.mjs
       env:
-        SUMMARY_JSON: ${{ inputs.summary_json }}
+        SUMMARY_JSON: ${{ inputs.summary-json }}
         GITHUB_REPOSITORY: ${{ inputs.repository_name }}
         OPERATION_RESULT: ${{ inputs.operation_result }}
         TOTAL_PROCESSED: ${{ inputs.total_processed }}

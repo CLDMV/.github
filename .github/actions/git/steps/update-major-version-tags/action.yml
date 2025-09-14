@@ -39,7 +39,7 @@ outputs:
   updated:
     description: "Whether tags were successfully updated"
     value: ${{ steps.update.outputs.updated }}
-  summary_json:
+  summary-json:
     description: "Complete summary JSON with title, description, and detailed results"
     value: ${{ steps.update.outputs.summary-json }}
 
@@ -88,7 +88,7 @@ runs:
         echo "major-version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
         echo "minor-version=$MINOR_VERSION" >> $GITHUB_OUTPUT
         echo "updated=true" >> $GITHUB_OUTPUT
-        
+
         # Create summary JSON with title, description, and pre-formatted lines
         SUMMARY_JSON='{"major_minor_updates":{"title":"📌 Version Tags Updated","description":"The following major/minor version tags have been updated:","updated":true,"lines":["- **'"$MAJOR_VERSION"'** → **'"$TAG_NAME"'**","- **'"$MINOR_VERSION"'** → **'"$TAG_NAME"'**"],"stats_template":"📌 Major/minor tag updates: {count}","notes":["Workflows can reference major version tags (e.g., `@'"$MAJOR_VERSION"'`) for automatic updates."]}}'
         echo "summary-json=$SUMMARY_JSON" >> $GITHUB_OUTPUT
