@@ -195,13 +195,12 @@ const fixedTagsJson = JSON.stringify(fixedTags);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	unsigned_tag_fixes: {
-		title: "🔏 Fixed Unsigned Tags",
-		description: "The following tags were converted to signed/annotated tags:",
-		fixed_count: fixedTags.length,
-		lines: [],
-		stats_template: "🔏 Unsigned tag fixes: {count}"
-	}
+	title: "🔏 Fixed Unsigned Tags",
+	description: "The following tags were converted to signed/annotated tags:",
+	fixed_count: fixedTags.length,
+	lines: [],
+	stats_template: "🔏 Unsigned tag fixes: {count}",
+	notes: []
 };
 
 // Create pre-formatted lines for each fixed tag
@@ -214,8 +213,13 @@ for (const tagName of fixedTags) {
 		if (!originalTag.isAnnotated) status.push("was lightweight");
 		if (!originalTag.isSigned) status.push("was unsigned");
 		const line = `- **${tagName}** (${status.join(", ")})`;
-		summaryData.unsigned_tag_fixes.lines.push(line);
+		summaryData.lines.push(line);
 	}
+}
+
+// Add notes if any tags were fixed
+if (fixedTags.length > 0) {
+	summaryData.notes.push(`Successfully fixed ${fixedTags.length} unsigned tag(s)`);
 }
 
 const summaryJson = JSON.stringify(summaryData);

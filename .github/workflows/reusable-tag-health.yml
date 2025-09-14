@@ -404,6 +404,9 @@ jobs:
             const fs = require('fs');
             const output = 'summary-json=' + JSON.stringify(summary) + '\n';
             
+            console.log('🔍 DEBUG: Major/Minor update summary data:');
+            console.log(JSON.stringify(summary, null, 2));
+            
             if (process.env.GITHUB_OUTPUT) {
               fs.appendFileSync(process.env.GITHUB_OUTPUT, output);
             }

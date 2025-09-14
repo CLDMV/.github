@@ -189,13 +189,12 @@ console.log(`✅ Fixed ${fixedTags.length} tags with bot signatures`);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	bot_signature_fixes: {
-		title: "🤖 Fixed Bot Signatures",
-		description: "The following version tags were recreated with proper bot signatures:",
-		fixed_count: fixedTags.length,
-		lines: [],
-		stats_template: "🤖 Bot signature fixes: {count}"
-	}
+	title: "🤖 Fixed Bot Signatures",
+	description: "The following version tags were recreated with proper bot signatures:",
+	fixed_count: fixedTags.length,
+	lines: [],
+	stats_template: "🤖 Bot signature fixes: {count}",
+	notes: []
 };
 
 // Create pre-formatted lines for each fixed tag
@@ -205,8 +204,13 @@ for (const tagName of fixedTags) {
 	if (originalTag) {
 		const previousTagger = originalTag.tagger || originalTag.author || "unknown";
 		const line = `- **${tagName}** (was: ${previousTagger})`;
-		summaryData.bot_signature_fixes.lines.push(line);
+		summaryData.lines.push(line);
 	}
+}
+
+// Add notes if any tags were fixed
+if (fixedTags.length > 0) {
+	summaryData.notes.push(`Successfully recreated ${fixedTags.length} tag(s) with proper bot signatures`);
 }
 
 // Set outputs
@@ -216,6 +220,9 @@ const outputs = {
 	"fixed-tags": JSON.stringify(fixedTags),
 	"summary-json": JSON.stringify(summaryData)
 };
+
+console.log(`🔍 DEBUG: Bot signature action summary data:`);
+console.log(JSON.stringify(summaryData, null, 2));
 
 Object.entries(outputs).forEach(([key, value]) => {
 	console.log(`${key}=${value}`);

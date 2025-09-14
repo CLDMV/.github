@@ -258,13 +258,12 @@ const fixedTagsJson = JSON.stringify(fixedTags);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
-	orphaned_tag_fixes: {
-		title: "🔗 Fixed Orphaned Tags",
-		description: "The following orphaned tags were retargeted:",
-		fixed_count: fixedTags.length,
-		lines: [],
-		stats_template: "🔗 Orphaned tag fixes: {count}"
-	}
+	title: "🔗 Fixed Orphaned Tags",
+	description: "The following orphaned tags were retargeted:",
+	fixed_count: fixedTags.length,
+	lines: [],
+	stats_template: "🔗 Orphaned tag fixes: {count}",
+	notes: []
 };
 
 // Create pre-formatted lines for each fixed tag
@@ -274,8 +273,13 @@ for (const tagName of fixedTags) {
 	
 	if (originalTag && fixedTag) {
 		const line = `- **${tagName}** → **${fixedTag.commitSha.substring(0, 7)}** (was: ${originalTag.commitSha.substring(0, 7)})`;
-		summaryData.orphaned_tag_fixes.lines.push(line);
+		summaryData.lines.push(line);
 	}
+}
+
+// Add notes if any tags were fixed
+if (fixedTags.length > 0) {
+	summaryData.notes.push(`Successfully retargeted ${fixedTags.length} orphaned tag(s)`);
 }
 
 const summaryJson = JSON.stringify(summaryData);
