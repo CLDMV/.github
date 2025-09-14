@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      dry_run:
+        description: "Dry run mode - validate everything but don't publish or create releases"
+        type: boolean
+        required: false
+        default: false
       node_version:
         description: "Node.js version to use (default: lts/*)"
         type: string
@@ -65,6 +70,7 @@ jobs:
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
       version: ${{ github.event.inputs.version || '' }}

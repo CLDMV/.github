@@ -54,14 +54,87 @@ This repository uses a **streamlined orchestrator pattern** to eliminate hundred
 - **Purpose**: Creates release PRs from release commits with changelog generation
 - **Triggers**: Push to non-master/main branches (when you push `release:` or `release!:` commits)
 - **Features**: Calls orchestrator with `run_detect_release` and `run_create_release_pr` flags
+- **Dry Run Support**: Test the entire release process without making any changes
 - **Usage**: `CLDMV/.github/.github/workflows/release.yml@v1`
+
+#### 🧪 Dry Run Mode
+
+The release workflow supports a comprehensive dry run mode that validates the entire release process without making any changes:
+
+```yaml
+# Manual trigger with dry run
+workflow_dispatch:
+  inputs:
+    dry_run:
+      description: "Dry run mode - validate everything but don't create PR or make changes"
+      type: boolean
+      default: false
+```
+
+**What dry run validates:**
+
+- ✅ Release commit detection
+- ✅ Version calculation and bumping logic
+- ✅ Build and test execution
+- ✅ Changelog generation
+- ✅ All prerequisites for PR creation
+
+**What dry run skips:**
+
+- ❌ Package.json version updates
+- ❌ Git commit creation
+- ❌ Pull request creation
+
+**Perfect for:**
+
+- Testing release workflows before committing to version bumps
+- Debugging release detection issues
+- Validating changelog generation
+- Confirming version calculation logic
 
 ### Publish Workflow (`publish.yml`)
 
 - **Purpose**: Publishes packages to NPM and creates GitHub releases
 - **Triggers**: PR closed on master branch (when release PRs are merged)
 - **Features**: Full publishing pipeline using orchestrator with multiple flags
+- **Dry Run Support**: Test the entire publishing process without making any changes
 - **Usage**: `CLDMV/.github/.github/workflows/publish.yml@v1`
+
+#### 🧪 Dry Run Mode
+
+The publish workflow supports comprehensive dry run validation for the complete publishing pipeline:
+
+```yaml
+# Manual trigger with dry run
+workflow_dispatch:
+  inputs:
+    dry_run:
+      description: "Dry run mode - validate everything but don't publish or create releases"
+      type: boolean
+      default: false
+```
+
+**What dry run validates:**
+
+- ✅ Build and test execution
+- ✅ NPM authentication and publish commands
+- ✅ GitHub Packages authentication and publish commands
+- ✅ GitHub release creation prerequisites
+- ✅ Package version and metadata validation
+
+**What dry run skips:**
+
+- ❌ Actual NPM publishing
+- ❌ Actual GitHub Packages publishing
+- ❌ GitHub release creation
+- ❌ Git tag creation
+
+**Perfect for:**
+
+- Testing publish workflow before merging release PRs
+- Validating NPM token permissions
+- Confirming package build and configuration
+- Debugging publishing setup issues
 
 ### Update Major Version Tags Workflow (`update-major-version-tags.yml`)
 

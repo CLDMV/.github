@@ -21,6 +21,10 @@ inputs:
     description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
     required: false
     default: ""
+  dry-run:
+    description: "Dry run mode - validate everything but don't create PR or make changes"
+    required: false
+    default: "false"
   github-token:
     description: "GitHub token for API operations"
     required: true
@@ -28,10 +32,10 @@ inputs:
 outputs:
   pr-created:
     description: "Whether a release PR was created"
-    value: ${{ steps.create-pr.outputs.pr-created }}
+    value: ${{ (inputs.dry-run == 'true' && steps.create-pr-dry.outputs.pr-created) || steps.create-pr.outputs.pr-created }}
   pr-number:
     description: "The release PR number if created"
-    value: ${{ steps.create-pr.outputs.pr-number }}
+    value: ${{ (inputs.dry-run == 'true' && steps.create-pr-dry.outputs.pr-number) || steps.create-pr.outputs.pr-number }}
   new-version:
     description: "The new version that was set"
     value: ${{ steps.version.outputs.new-version }}
@@ -42,8 +46,13 @@ runs:
     - name: Update Summary - Release PR Start
       shell: bash
       run: |
-        echo "## 📋 Release PR Progress" >> $GITHUB_STEP_SUMMARY
-        echo "- 🔄 Starting release PR creation for ${{ inputs.package-name }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "## 🧪 Dry Run - Release PR Validation" >> $GITHUB_STEP_SUMMARY
+          echo "- � Validating release PR creation for ${{ inputs.package-name }} (NO CHANGES WILL BE MADE)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## �📋 Release PR Progress" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Starting release PR creation for ${{ inputs.package-name }}" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Checkout code
@@ -76,6 +85,9 @@ runs:
       shell: bash
       run: |
         echo "- ✅ New version calculated: v${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "- 🧪 **DRY RUN**: Version would be bumped to v${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Build package
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
@@ -84,10 +96,17 @@ runs:
         environment: production
 
     - name: Update package version
+      if: inputs.dry-run != 'true'
       uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v1
       with:
         new-version: ${{ steps.version.outputs.new-version }}
         package-manager: ${{ inputs.package-manager }}
+
+    - name: Dry Run - Package Version Update
+      if: inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        echo "- 🧪 **DRY RUN**: Would update package.json version to ${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate comprehensive changelog
       id: changelog
@@ -95,18 +114,39 @@ runs:
       with:
         commits: ${{ steps.commit-check.outputs.commits }}
 
+    - name: Update Summary - Changelog Generated
+      shell: bash
+      run: |
+        echo "- ✅ Changelog generated successfully" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "- 🧪 **DRY RUN**: Changelog content preview:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.changelog.outputs.changelog-content }}" | head -20 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Detect default branch
       id: default-branch
       uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v1
 
     - name: Create signed commit
+      if: inputs.dry-run != 'true'
       id: commit
       uses: CLDMV/.github/.github/actions/github/api/commit@v1
       with:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
         github-token: ${{ inputs.github-token }}
 
+    - name: Dry Run - Commit Creation
+      if: inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        echo "- 🧪 **DRY RUN**: Would create commit with message: 'chore: bump version to ${{ steps.version.outputs.new-version }}'" >> $GITHUB_STEP_SUMMARY
+
     - name: Create pull request
+      if: inputs.dry-run != 'true'
       id: create-pr
       uses: CLDMV/.github/.github/actions/github/api/pull-requests@v1
       with:
@@ -118,16 +158,47 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
+    - name: Dry Run - PR Creation
+      if: inputs.dry-run == 'true'
+      id: create-pr-dry
+      shell: bash
+      run: |
+        echo "- 🧪 **DRY RUN**: Would create PR with:" >> $GITHUB_STEP_SUMMARY
+        echo "  - **Title**: release: v${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "  - **Base Branch**: ${{ steps.default-branch.outputs.default-branch }}" >> $GITHUB_STEP_SUMMARY
+        echo "  - **Head Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "  - **Labels**: release,${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        # Set outputs for dry run (simulate PR creation success)
+        echo "pr-created=true" >> $GITHUB_OUTPUT
+        echo "pr-number=DRY-RUN" >> $GITHUB_OUTPUT
+
     - name: Update Summary - PR Created
-      if: steps.create-pr.outputs.pr-created == 'true'
+      if: steps.create-pr.outputs.pr-created == 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         echo "- ✅ Release PR created: [#${{ steps.create-pr.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "🎉 **Release PR Complete** - [Ready for review and merge →](${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.create-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
 
+    - name: Update Summary - Dry Run Complete
+      if: inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🧪 **DRY RUN COMPLETE** - All validations passed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### What would happen in a real run:" >> $GITHUB_STEP_SUMMARY
+        echo "1. ✅ Version would be bumped to **v${{ steps.version.outputs.new-version }}**" >> $GITHUB_STEP_SUMMARY
+        echo "2. ✅ Package.json would be updated" >> $GITHUB_STEP_SUMMARY
+        echo "3. ✅ Changelog would be generated" >> $GITHUB_STEP_SUMMARY
+        echo "4. ✅ Release commit would be created" >> $GITHUB_STEP_SUMMARY
+        echo "5. ✅ Release PR would be opened" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **To proceed**: Run this workflow again with \`dry_run: false\`" >> $GITHUB_STEP_SUMMARY
+
     - name: Update Summary - No PR Created
-      if: steps.create-pr.outputs.pr-created != 'true'
+      if: steps.create-pr.outputs.pr-created != 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         echo "- ℹ️ No release PR created (not a release commit)" >> $GITHUB_STEP_SUMMARY

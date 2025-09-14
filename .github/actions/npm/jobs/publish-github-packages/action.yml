@@ -19,6 +19,10 @@ inputs:
   publish-command:
     description: "Command to publish the package"
     required: true
+  dry-run:
+    description: "Dry run mode - validate everything but don't publish"
+    required: false
+    default: "false"
   github-token:
     description: "GitHub token for authentication"
     required: true
@@ -99,11 +103,12 @@ runs:
         node-version: ${{ inputs.node-version }}
         package-manager: ${{ inputs.package-manager }}
         publish-command: ${{ steps.generate-command.outputs.command }}
+        dry-run: ${{ inputs.dry-run }}
         auth-token: ${{ inputs.github-token }}
         artifact-name: ${{ inputs.artifact-name }}
 
     - name: Update Summary - GitHub Packages Success
-      if: steps.publish-package.outputs.published == 'true'
+      if: steps.publish-package.outputs.published == 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         # Extract org and package name for GitHub Packages URL
@@ -120,8 +125,20 @@ runs:
 
         echo "- ✅ GitHub Packages: Published [${{ inputs.package-name }} $DISPLAY_VERSION](https://github.com/orgs/$ORG_NAME/packages/npm/$PACKAGE_NAME)" >> $GITHUB_STEP_SUMMARY
 
+    - name: Update Summary - GitHub Packages Dry Run Success
+      if: steps.publish-package.outputs.published == 'true' && inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        echo "- 🧪 **DRY RUN**: GitHub Packages validation successful" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ Package name and version are valid" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ GitHub token has proper permissions" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ Publish command generated successfully" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ All prerequisites met for GitHub Packages publication" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Would publish**: \`${{ steps.generate-command.outputs.command }}\`" >> $GITHUB_STEP_SUMMARY
+
     - name: Update Summary - GitHub Packages Failure
-      if: steps.publish-package.outputs.published != 'true'
+      if: steps.publish-package.outputs.published != 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         echo "- ❌ GitHub Packages: Publication failed for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY

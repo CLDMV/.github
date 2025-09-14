@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      dry_run:
+        description: "Dry run mode - validate everything but don't publish or create releases"
+        required: false
+        type: boolean
+        default: false
 
       # Job control flags
       run_detect_repo_config:
@@ -195,6 +200,7 @@ jobs:
           node-version: ${{ inputs.node_version }}
           package-manager: ${{ inputs.package_manager }}
           publish-command: ${{ inputs.publish_command_npm }}
+          dry-run: ${{ inputs.dry_run }}
           npm-token: ${{ secrets.NPM_TOKEN }}
           artifact-name: ${{ steps.names.outputs.artifact-name }}
 
@@ -232,6 +238,7 @@ jobs:
           node-version: ${{ inputs.node_version }}
           package-manager: ${{ inputs.package_manager }}
           publish-command: ${{ inputs.publish_command_github_packages }}
+          dry-run: ${{ inputs.dry_run }}
           github-token: ${{ github.token }}
           artifact-name: ${{ steps.names.outputs.artifact-name }}
 
@@ -290,6 +297,7 @@ jobs:
           release-source-only: ${{ inputs.release_source_only }}
           node-version: ${{ inputs.node_version }}
           build-command: ${{ inputs.build_command }}
+          dry-run: ${{ inputs.dry_run }}
           github-token: ${{ steps.app-token.outputs.token }}
           # GPG signing parameters
           gpg_enabled: ${{ inputs.use_gpg }}

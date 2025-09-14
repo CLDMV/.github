@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      dry_run:
+        description: "Dry run mode - validate everything but don't create PR or make changes"
+        required: false
+        type: boolean
+        default: false
 
       # Job control flags
       run_detect_release:
@@ -125,4 +130,5 @@ jobs:
           package-manager: ${{ inputs.package_manager }}
           build-command: ${{ inputs.build_command }}
           version-bump: ${{ inputs.version_bump }}
+          dry-run: ${{ inputs.dry_run }}
           github-token: ${{ steps.app-token.outputs.token }}

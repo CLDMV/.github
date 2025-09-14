@@ -13,6 +13,11 @@ on:
         type: boolean
         default: false
         description: "Enable debug logging for troubleshooting"
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+        description: "Dry run mode - validate everything but don't publish or create releases"
       node_version:
         required: false
         type: string
@@ -159,6 +164,11 @@ on:
         type: boolean
         default: false
         description: "Enable debug logging for troubleshooting"
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+        description: "Dry run mode - validate everything but don't publish or create releases"
       node_version:
         required: false
         type: string
@@ -205,6 +215,7 @@ jobs:
     with:
       package_name: ${{ inputs.package_name }}
       debug: ${{ inputs.debug }}
+      dry_run: ${{ inputs.dry_run }}
       # Job control flags - enable the jobs we want to run
       run_detect_repo_config: true
       run_publish_npm: ${{ inputs.publish_to_npm }}
@@ -238,16 +249,35 @@ jobs:
     steps:
       - name: Generate Publish Summary
         run: |
-          echo "## 📦 Publish Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "## 🧪 Dry Run - Publish Workflow Validation" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 📦 Publish Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Version**: \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.publish.result }}" = "success" ]; then
-            echo "✅ **Overall Status**: Publishing workflow completed successfully" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the detailed progress above for specific publishing results to each registry." >> $GITHUB_STEP_SUMMARY
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🧪 **Dry Run Complete**: All validations passed! No publishing or releases were created." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
+              echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
+              echo "- Package configuration is valid" >> $GITHUB_STEP_SUMMARY
+              echo "- NPM authentication and commands validated" >> $GITHUB_STEP_SUMMARY
+              echo "- GitHub Packages authentication and commands validated" >> $GITHUB_STEP_SUMMARY
+              echo "- Release creation prerequisites verified" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🚀 **Ready to Publish**: Re-run with \`dry_run: false\` to execute the actual publishing." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ **Overall Status**: Publishing workflow completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Check the detailed progress above for specific publishing results to each registry." >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "❌ **Overall Status**: Publishing workflow failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

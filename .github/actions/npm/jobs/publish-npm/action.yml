@@ -19,6 +19,10 @@ inputs:
   publish-command:
     description: "Command to publish the package"
     required: true
+  dry-run:
+    description: "Dry run mode - validate everything but don't publish"
+    required: false
+    default: "false"
   npm-token:
     description: "NPM token for authentication"
     required: true
@@ -38,8 +42,13 @@ runs:
     - name: Update Summary - NPM Publishing Start
       shell: bash
       run: |
-        echo "## 📦 NPM Publishing Progress" >> $GITHUB_STEP_SUMMARY
-        echo "- 🔄 Starting NPM publication for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "## 🧪 Dry Run - NPM Publishing Validation" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Validating NPM publication for ${{ inputs.package-name }}@${{ inputs.version }} (NO PUBLISHING WILL OCCUR)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## 📦 NPM Publishing Progress" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Starting NPM publication for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate publish command
@@ -99,11 +108,12 @@ runs:
         node-version: ${{ inputs.node-version }}
         package-manager: ${{ inputs.package-manager }}
         publish-command: ${{ steps.generate-command.outputs.command }}
+        dry-run: ${{ inputs.dry-run }}
         auth-token: ${{ inputs.npm-token }}
         artifact-name: ${{ inputs.artifact-name }}
 
     - name: Update Summary - NPM Success
-      if: steps.publish-package.outputs.published == 'true'
+      if: steps.publish-package.outputs.published == 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         # Extract package name for URL (remove @scope/ if present)
@@ -119,8 +129,20 @@ runs:
 
         echo "- ✅ NPM Registry: Published [${{ inputs.package-name }} $DISPLAY_VERSION](https://www.npmjs.com/package/${{ inputs.package-name }})" >> $GITHUB_STEP_SUMMARY
 
+    - name: Update Summary - Dry Run Success
+      if: steps.publish-package.outputs.published == 'true' && inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        echo "- 🧪 **DRY RUN**: NPM Registry validation successful" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ Package name and version are valid" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ Authentication token is valid" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ Publish command generated successfully" >> $GITHUB_STEP_SUMMARY
+        echo "  - ✅ All prerequisites met for NPM publication" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Would publish**: \`${{ steps.generate-command.outputs.command }}\`" >> $GITHUB_STEP_SUMMARY
+
     - name: Update Summary - NPM Failure
-      if: steps.publish-package.outputs.published != 'true'
+      if: steps.publish-package.outputs.published != 'true' && inputs.dry-run != 'true'
       shell: bash
       run: |
         echo "- ❌ NPM Registry: Publication failed for ${{ inputs.package-name }}@${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
