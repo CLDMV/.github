@@ -107,7 +107,7 @@ jobs:
           fetch-depth: 0
 
       - name: Generate Detailed Version Tag Update Summary
-        uses: CLDMV/.github/.github/workflows/node/workflow-update-major-version-tags@v1
+        uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v1
         with:
           debug: ${{ inputs.debug }}
           summary_json: ${{ needs.version-tag-operations.outputs.summary_json || '{}' }}
