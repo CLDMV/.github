@@ -120,6 +120,11 @@ function fixNonBotTag(tagObj) {
 
 console.log("🤖 Analyzing and fixing non-bot tag signatures...");
 
+// Initialize variables for summary generation
+let fixedCount = 0;
+let updatedTagsDetailed = [];
+let fixedTagsArray = [];
+
 if (TAGS_DETAILED.length === 0) {
 	console.log("ℹ️ No tags to process");
 	const outputs = {
@@ -131,8 +136,13 @@ if (TAGS_DETAILED.length === 0) {
 	Object.entries(outputs).forEach(([key, value]) => {
 		console.log(`${key}=${value}`);
 	});
-	process.exit(0);
-}
+	
+	// Continue to summary generation instead of exiting
+	fixedCount = 0;
+	updatedTagsDetailed = TAGS_DETAILED;
+	fixedTagsArray = [];
+	console.log("🔍 Continuing to summary generation...");
+} else {
 
 // Setup git identity and GPG if provided
 const willSign = GPG_ENABLED && GPG_PRIVATE_KEY;
@@ -152,7 +162,6 @@ configureGitIdentity({
 console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for bot signatures...`);
 
 const nonBotTags = [];
-const updatedTagsDetailed = [];
 const fixedTags = [];
 
 // Analyze each tag
@@ -187,25 +196,30 @@ if (nonBotTags.length === 0) {
 			updatedTagsDetailed.push(tagObj);
 		}
 	}
+	
+	// Set variables for summary generation
+	fixedCount = fixedTags.length;
+	fixedTagsArray = fixedTags;
+}
 }
 
-console.log(`✅ Fixed ${fixedTags.length} tags with bot signatures`);
+console.log(`✅ Fixed ${fixedTagsArray.length} tags with bot signatures`);
 
 // Create detailed summary JSON with title, description, and pre-formatted lines
 const summaryData = {
 	title: "🤖 Bot Signature Analysis",
 	description:
-		fixedTags.length > 0
+		fixedTagsArray.length > 0
 			? "The following version tags were recreated with proper bot signatures:"
 			: "Analyzed version tags for bot signature compliance.",
-	fixed_count: fixedTags.length,
+	fixed_count: fixedTagsArray.length,
 	lines: [],
 	stats_template: "🤖 Bot signature fixes: {count}",
 	notes: []
 };
 
 // Create pre-formatted lines for each fixed tag
-for (const tagName of fixedTags) {
+for (const tagName of fixedTagsArray) {
 	const originalTag = TAGS_DETAILED.find((t) => t.name === tagName);
 
 	if (originalTag) {
@@ -216,8 +230,8 @@ for (const tagName of fixedTags) {
 }
 
 // Add appropriate notes
-if (fixedTags.length > 0) {
-	summaryData.notes.push(`Successfully recreated ${fixedTags.length} tag(s) with proper bot signatures`);
+if (fixedTagsArray.length > 0) {
+	summaryData.notes.push(`Successfully recreated ${fixedTagsArray.length} tag(s) with proper bot signatures`);
 } else {
 	summaryData.lines.push("- ✅ **No issues found**: All version tags have proper bot signatures");
 	summaryData.notes.push("All analyzed tags already have correct bot signatures");
@@ -226,8 +240,8 @@ if (fixedTags.length > 0) {
 // Set outputs
 const outputs = {
 	"updated-tags-detailed": JSON.stringify(updatedTagsDetailed),
-	"fixed-count": fixedTags.length.toString(),
-	"fixed-tags": JSON.stringify(fixedTags),
+	"fixed-count": fixedTagsArray.length.toString(),
+	"fixed-tags": JSON.stringify(fixedTagsArray),
 	"summary-json": JSON.stringify(summaryData)
 };
 

@@ -314,12 +314,10 @@ if (TAGS_DETAILED.length === 0) {
 	console.log(`🔍 DEBUG: Orphaned tags action summary data:`);
 	console.log(JSON.stringify(summaryData, null, 2));
 
-	console.log(`updated-tags-detailed=${updatedTagsJson}`);
-	console.log(`fixed-count=${fixedTags.length}`);
-	console.log(`fixed-tags=${fixedTagsJson}`);
-	console.log(`summary-json=${summaryJson}`);
-
-	// Write to GitHub output file
+console.log(`updated-tags-detailed=${updatedTagsJson}`);
+console.log(`fixed-count=${fixedTagsArray.length}`);
+console.log(`fixed-tags=${fixedTagsJson}`);
+console.log(`summary-json=${summaryJson}`);	// Write to GitHub output file
 	const githubOutput = process.env.GITHUB_OUTPUT;
 	if (githubOutput) {
 		writeFileSync(

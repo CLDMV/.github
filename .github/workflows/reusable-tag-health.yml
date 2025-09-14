@@ -620,7 +620,7 @@ jobs:
           orphaned_fixed: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
           major_updated: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
           repository_name: ${{ github.repository }}
-          bot_summary_json: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
-          unsigned_summary_json: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
-          orphaned_summary_json: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
-          major_minor_summary_json: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}
+          bot_summary_json: ${{ needs.unified-fix-bot-signatures.outputs.summary_json || '{}' }}
+          unsigned_summary_json: ${{ needs.unified-fix-unsigned-tags.outputs.summary_json || '{}' }}
+          orphaned_summary_json: ${{ needs.unified-fix-orphaned-tags.outputs.summary_json || '{}' }}
+          major_minor_summary_json: ${{ needs.unified-update-major-minor.outputs.summary_json || '{}' }}

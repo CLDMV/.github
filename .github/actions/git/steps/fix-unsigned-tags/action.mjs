@@ -147,8 +147,13 @@ if (TAGS_DETAILED.length === 0) {
 		if (githubOutput) {
 			writeFileSync(githubOutput, `updated-tags-detailed=${updatedTagsJson}\n` + "fixed-count=0\n" + "fixed-tags=[]\n", { flag: "a" });
 		}
-		process.exit(0);
-	}
+		
+		// Continue to summary generation instead of exiting
+		fixedCount = 0;
+		updatedTagsDetailed = TAGS_DETAILED;
+		fixedTagsArray = [];
+		console.log("🔍 Continuing to summary generation...");
+	} else {
 
 	console.log(`🔧 Found ${unsignedTags.length} tags needing signing/annotation fixes:`);
 	unsignedTags.forEach((tagObj) => {
@@ -206,6 +211,7 @@ if (TAGS_DETAILED.length === 0) {
 	fixedCount = fixedTags.length;
 	updatedTagsDetailed = updatedTagsList;
 	fixedTagsArray = fixedTags;
+	}
 }
 
 // Set outputs
@@ -240,8 +246,8 @@ for (const tagName of fixedTagsArray) {
 }
 
 // Add appropriate notes
-if (fixedTags.length > 0) {
-	summaryData.notes.push(`Successfully fixed ${fixedTags.length} unsigned tag(s)`);
+if (fixedTagsArray.length > 0) {
+	summaryData.notes.push(`Successfully fixed ${fixedTagsArray.length} unsigned tag(s)`);
 } else {
 	summaryData.lines.push("- ✅ **No issues found**: All version tags are properly signed");
 	summaryData.notes.push("All analyzed tags are already properly signed and annotated");
@@ -253,7 +259,7 @@ console.log(`🔍 DEBUG: Unsigned tags action summary data:`);
 console.log(JSON.stringify(summaryData, null, 2));
 
 console.log(`updated-tags-detailed=${updatedTagsJson}`);
-console.log(`fixed-count=${fixedTags.length}`);
+console.log(`fixed-count=${fixedTagsArray.length}`);
 console.log(`fixed-tags=${fixedTagsJson}`);
 console.log(`summary-json=${summaryJson}`);
 
@@ -263,7 +269,7 @@ if (githubOutput) {
 	writeFileSync(
 		githubOutput,
 		`updated-tags-detailed=${updatedTagsJson}\n` +
-			`fixed-count=${fixedTags.length}\n` +
+			`fixed-count=${fixedTagsArray.length}\n` +
 			`fixed-tags=${fixedTagsJson}\n` +
 			`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
