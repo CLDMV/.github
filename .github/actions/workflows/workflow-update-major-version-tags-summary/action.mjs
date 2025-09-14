@@ -169,64 +169,10 @@ function generateFallbackSummary() {
 	return summary;
 }
 
-// Main execution
-console.log("📋 Generating detailed summary for " + repository + "...");
-
-try {
-	// Parse the comprehensive summary JSON
-	const summaryData = safeJsonParse(summaryJson);
-
-	if (debug) {
-		console.log("Summary JSON input:");
-		console.log(JSON.stringify(summaryData, null, 2));
-	}
-
-	// Generate the detailed summary
-	let summary;
-	if (summaryData && Object.keys(summaryData).length > 0 && summaryData.overall_success !== undefined) {
-		console.log("✅ Using detailed summary data");
-		summary = generateDetailedSummary(summaryData);
-	} else {
-		console.log("⚠️ Using fallback summary (detailed data not available)");
-		summary = generateFallbackSummary();
-	}
-
-	// Write to GitHub Step Summary
-	if (githubStepSummary) {
-		writeFileSync(githubStepSummary, summary, { flag: "a" });
-		console.log("✅ Detailed summary written to GitHub Step Summary");
-	} else {
-		console.log("⚠️ GITHUB_STEP_SUMMARY not available, outputting to console:");
-		console.log(summary);
-	}
-
-	// Set output
-	if (githubOutput) {
-		writeFileSync(githubOutput, "summary_generated=true\n", { flag: "a" });
-	}
-
-	console.log("✅ Generated detailed summary using Node.js action");
-} catch (error) {
-	console.error("❌ Node.js detailed summary action failed:", error.message);
-
-	// Generate fallback summary on error
-	const fallbackSummary = generateFallbackSummary();
-
-	if (githubStepSummary) {
-		writeFileSync(githubStepSummary, fallbackSummary, { flag: "a" });
-	}
-
-	if (githubOutput) {
-		writeFileSync(githubOutput, "summary_generated=false\n", { flag: "a" });
-	}
-
-	console.log("⚠️ Used fallback summary due to error");
-}
-
 /**
  * Generate detailed summary from comprehensive JSON data
  */
-function generateDetailedSummary(summaryData) {
+/* function generateDetailedSummary(summaryData) {
 	let summary = `## 📌 Version Tag Update Summary
 
 `;
@@ -376,12 +322,12 @@ function generateDetailedSummary(summaryData) {
 	}
 
 	return summary;
-}
+} */
 
 /**
  * Generate fallback summary when detailed data is not available
  */
-function generateFallbackSummary() {
+/* function generateFallbackSummary() {
 	let summary = `## 📌 Version Tag Update Summary (Fallback)
 
 `;
@@ -414,7 +360,7 @@ function generateFallbackSummary() {
 	}
 
 	return summary;
-}
+} */
 
 /**
  * Set GitHub outputs
@@ -545,6 +491,61 @@ function generateSummary(summaryData) {
 }
 
 // Main execution
+console.log("📋 Generating detailed summary for " + repository + "...");
+
+try {
+	// Parse the comprehensive summary JSON
+	const summaryData = safeJsonParse(summaryJson);
+
+	if (debug) {
+		console.log("Summary JSON input:");
+		console.log(JSON.stringify(summaryData, null, 2));
+	}
+
+	// Generate the detailed summary
+	let summary;
+	if (summaryData && Object.keys(summaryData).length > 0 && summaryData.overall_success !== undefined) {
+		console.log("✅ Using detailed summary data");
+		summary = generateDetailedSummary(summaryData);
+	} else {
+		console.log("⚠️ Using fallback summary (detailed data not available)");
+		summary = generateFallbackSummary();
+	}
+
+	// Write to GitHub Step Summary
+	if (githubStepSummary) {
+		writeFileSync(githubStepSummary, summary, { flag: "a" });
+		console.log("✅ Detailed summary written to GitHub Step Summary");
+	} else {
+		console.log("⚠️ GITHUB_STEP_SUMMARY not available, outputting to console:");
+		console.log(summary);
+	}
+
+	// Set output
+	if (githubOutput) {
+		writeFileSync(githubOutput, "summary_generated=true\n", { flag: "a" });
+	}
+
+	console.log("✅ Generated detailed summary using Node.js action");
+} catch (error) {
+	console.error("❌ Node.js detailed summary action failed:", error.message);
+
+	// Generate fallback summary on error
+	const fallbackSummary = generateFallbackSummary();
+
+	if (githubStepSummary) {
+		writeFileSync(githubStepSummary, fallbackSummary, { flag: "a" });
+	}
+
+	if (githubOutput) {
+		writeFileSync(githubOutput, "summary_generated=false\n", { flag: "a" });
+	}
+
+	console.log("⚠️ Used fallback summary due to error");
+}
+
+/* 
+// Main execution
 console.log("🔄 Building comprehensive summary for " + repository + "...");
 
 try {
@@ -591,3 +592,4 @@ try {
 
 	process.exit(1);
 }
+ */
