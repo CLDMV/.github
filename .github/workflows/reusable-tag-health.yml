@@ -473,6 +473,9 @@ jobs:
       fixed_count: ${{ steps.fix-unsigned.outputs.fixed-count }}
       summary_json: ${{ steps.fix-unsigned.outputs.summary-json }}
     steps:
+      - name: Debug job start
+        run: echo "🔍 DEBUG - Unsigned tags job is starting..."
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -516,6 +519,9 @@ jobs:
       fixed_count: ${{ steps.fix-orphaned.outputs.fixed-count }}
       summary_json: ${{ steps.fix-orphaned.outputs.summary-json }}
     steps:
+      - name: Debug job start
+        run: echo "🔍 DEBUG - Orphaned tags job is starting..."
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
