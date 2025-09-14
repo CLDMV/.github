@@ -139,70 +139,69 @@ if (TAGS_DETAILED.length === 0) {
 	Object.entries(outputs).forEach(([key, value]) => {
 		console.log(`${key}=${value}`);
 	});
-	
+
 	// Continue to summary generation instead of exiting
 	fixedCount = 0;
 	updatedTagsDetailed = TAGS_DETAILED;
 	fixedTagsArray = [];
 	console.log("🔍 Continuing to summary generation...");
 } else {
+	// Setup git identity and GPG if provided
+	let keyid = "";
 
-// Setup git identity and GPG if provided
-let keyid = "";
-
-if (willSign) {
-	keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
-}
-
-configureGitIdentity({
-	tagger_name: TAGGER_NAME,
-	tagger_email: TAGGER_EMAIL,
-	keyid,
-	enableSign: willSign
-});
-
-console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for bot signatures...`);
-
-const nonBotTags = [];
-const fixedTags = [];
-
-// Analyze each tag
-for (const tagObj of TAGS_DETAILED) {
-	if (!isTagCreatedByBot(tagObj)) {
-		nonBotTags.push(tagObj);
+	if (willSign) {
+		keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
 	}
-}
 
-if (nonBotTags.length === 0) {
-	console.log("✅ All tags are properly created by bot");
-	// Return original tags list unchanged
-	updatedTagsDetailed.push(...TAGS_DETAILED);
-} else {
-	console.log(`🔧 Found ${nonBotTags.length} tags needing bot signature fixes:`);
-	nonBotTags.forEach((tag) => console.log(`  - ${tag.name}`));
+	configureGitIdentity({
+		tagger_name: TAGGER_NAME,
+		tagger_email: TAGGER_EMAIL,
+		keyid,
+		enableSign: willSign
+	});
 
-	// Process each tag (both bot and non-bot)
+	console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for bot signatures...`);
+
+	const nonBotTags = [];
+	const fixedTags = [];
+
+	// Analyze each tag
 	for (const tagObj of TAGS_DETAILED) {
-		if (nonBotTags.some((t) => t.name === tagObj.name)) {
-			// This tag needs fixing
-			const fixedTag = fixNonBotTag(tagObj);
-			if (fixedTag) {
-				updatedTagsDetailed.push(fixedTag);
-				fixedTags.push(fixedTag.name);
-			} else {
-				// Keep original if fix failed
-				updatedTagsDetailed.push(tagObj);
-			}
-		} else {
-			// Tag is already fine, keep as-is
-			updatedTagsDetailed.push(tagObj);
+		if (!isTagCreatedByBot(tagObj)) {
+			nonBotTags.push(tagObj);
 		}
 	}
-	
-	// Set variables for summary generation
-	fixedCount = fixedTags.length;
-	fixedTagsArray = fixedTags;
-}
+
+	if (nonBotTags.length === 0) {
+		console.log("✅ All tags are properly created by bot");
+		// Return original tags list unchanged
+		updatedTagsDetailed.push(...TAGS_DETAILED);
+	} else {
+		console.log(`🔧 Found ${nonBotTags.length} tags needing bot signature fixes:`);
+		nonBotTags.forEach((tag) => console.log(`  - ${tag.name}`));
+
+		// Process each tag (both bot and non-bot)
+		for (const tagObj of TAGS_DETAILED) {
+			if (nonBotTags.some((t) => t.name === tagObj.name)) {
+				// This tag needs fixing
+				const fixedTag = fixNonBotTag(tagObj);
+				if (fixedTag) {
+					updatedTagsDetailed.push(fixedTag);
+					fixedTags.push(fixedTag.name);
+				} else {
+					// Keep original if fix failed
+					updatedTagsDetailed.push(tagObj);
+				}
+			} else {
+				// Tag is already fine, keep as-is
+				updatedTagsDetailed.push(tagObj);
+			}
+		}
+
+		// Set variables for summary generation
+		fixedCount = fixedTags.length;
+		fixedTagsArray = fixedTags;
+	}
 }
 
 console.log(`✅ Fixed ${fixedTagsArray.length} tags with bot signatures`);

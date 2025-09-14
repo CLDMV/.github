@@ -147,70 +147,69 @@ if (TAGS_DETAILED.length === 0) {
 		if (githubOutput) {
 			writeFileSync(githubOutput, `updated-tags-detailed=${updatedTagsJson}\n` + "fixed-count=0\n" + "fixed-tags=[]\n", { flag: "a" });
 		}
-		
+
 		// Continue to summary generation instead of exiting
 		fixedCount = 0;
 		updatedTagsDetailed = TAGS_DETAILED;
 		fixedTagsArray = [];
 		console.log("🔍 Continuing to summary generation...");
 	} else {
-
-	console.log(`🔧 Found ${unsignedTags.length} tags needing signing/annotation fixes:`);
-	unsignedTags.forEach((tagObj) => {
-		const status = [];
-		if (!tagObj.isAnnotated) status.push("not annotated");
-		if (!tagObj.isSigned && GPG_ENABLED && GPG_PRIVATE_KEY) status.push("not signed");
-		console.log(`  - ${tagObj.name} (${status.join(", ")})`);
-	});
-
-	// Setup GPG and git identity if signing is enabled
-	let keyid = "";
-	if (GPG_ENABLED && GPG_PRIVATE_KEY) {
-		keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
-		debugLog("GPG key imported", { keyid });
-	}
-
-	configureGitIdentity({
-		tagger_name: TAGGER_NAME,
-		tagger_email: TAGGER_EMAIL,
-		keyid,
-		enableSign: GPG_ENABLED && GPG_PRIVATE_KEY
-	});
-
-	// Create a copy of the detailed tags list to update
-	const updatedTagsList = [...TAGS_DETAILED];
-	const fixedTags = [];
-
-	// Fix each unsigned tag
-	for (const tagObj of unsignedTags) {
-		const fixedTagObj = fixUnsignedTag(tagObj);
-
-		if (fixedTagObj) {
-			// Update the tag object in the list
-			const index = updatedTagsList.findIndex((t) => t.name === tagObj.name);
-			if (index !== -1) {
-				updatedTagsList[index] = fixedTagObj;
-			}
-			fixedTags.push(tagObj.name);
-		}
-	}
-
-	console.log(`✅ Fixed ${fixedTags.length} unsigned/unannotated tags`);
-
-	if (DEBUG) {
-		console.log("🔍 Fixed tags details:");
-		fixedTags.forEach((tagName) => {
-			const tagObj = updatedTagsList.find((t) => t.name === tagName);
-			if (tagObj) {
-				console.log(`  - ${tagName}: annotated=${tagObj.isAnnotated}, signed=${tagObj.isSigned}`);
-			}
+		console.log(`🔧 Found ${unsignedTags.length} tags needing signing/annotation fixes:`);
+		unsignedTags.forEach((tagObj) => {
+			const status = [];
+			if (!tagObj.isAnnotated) status.push("not annotated");
+			if (!tagObj.isSigned && GPG_ENABLED && GPG_PRIVATE_KEY) status.push("not signed");
+			console.log(`  - ${tagObj.name} (${status.join(", ")})`);
 		});
-	}
 
-	// Set variables for summary generation
-	fixedCount = fixedTags.length;
-	updatedTagsDetailed = updatedTagsList;
-	fixedTagsArray = fixedTags;
+		// Setup GPG and git identity if signing is enabled
+		let keyid = "";
+		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
+			keyid = importGpgIfNeeded({ gpg_private_key: GPG_PRIVATE_KEY, gpg_passphrase: GPG_PASSPHRASE });
+			debugLog("GPG key imported", { keyid });
+		}
+
+		configureGitIdentity({
+			tagger_name: TAGGER_NAME,
+			tagger_email: TAGGER_EMAIL,
+			keyid,
+			enableSign: GPG_ENABLED && GPG_PRIVATE_KEY
+		});
+
+		// Create a copy of the detailed tags list to update
+		const updatedTagsList = [...TAGS_DETAILED];
+		const fixedTags = [];
+
+		// Fix each unsigned tag
+		for (const tagObj of unsignedTags) {
+			const fixedTagObj = fixUnsignedTag(tagObj);
+
+			if (fixedTagObj) {
+				// Update the tag object in the list
+				const index = updatedTagsList.findIndex((t) => t.name === tagObj.name);
+				if (index !== -1) {
+					updatedTagsList[index] = fixedTagObj;
+				}
+				fixedTags.push(tagObj.name);
+			}
+		}
+
+		console.log(`✅ Fixed ${fixedTags.length} unsigned/unannotated tags`);
+
+		if (DEBUG) {
+			console.log("🔍 Fixed tags details:");
+			fixedTags.forEach((tagName) => {
+				const tagObj = updatedTagsList.find((t) => t.name === tagName);
+				if (tagObj) {
+					console.log(`  - ${tagName}: annotated=${tagObj.isAnnotated}, signed=${tagObj.isSigned}`);
+				}
+			});
+		}
+
+		// Set variables for summary generation
+		fixedCount = fixedTags.length;
+		updatedTagsDetailed = updatedTagsList;
+		fixedTagsArray = fixedTags;
 	}
 }
 
