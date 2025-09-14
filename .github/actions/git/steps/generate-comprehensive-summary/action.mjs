@@ -46,7 +46,7 @@ function buildComprehensiveSummary() {
 	const orphanedSummary = safeJsonParse(orphanedSummaryJson);
 	const majorMinorSummary = safeJsonParse(majorMinorSummaryJson);
 
-	// Build comprehensive summary by merging all job data
+	// Build comprehensive summary by including all job data
 	const comprehensiveSummary = {
 		overall_success: true,
 		repository: repository,
@@ -62,26 +62,22 @@ function buildComprehensiveSummary() {
 		}
 	};
 
-	// Merge job data dynamically
-	const jobSummaries = [
-		{ key: "major_minor_updates", data: majorMinorSummary },
-		{ key: "bot_signature_fixes", data: botSummary },
-		{ key: "unsigned_tag_fixes", data: unsignedSummary },
-		{ key: "orphaned_tag_fixes", data: orphanedSummary }
-	];
-
-	jobSummaries.forEach(({ key, data }) => {
-		if (data && Object.keys(data).length > 0) {
-			// Find the operation key in the data
-			const operationKey = Object.keys(data).find(
-				(k) => k.includes(key.split("_")[0]) || k.includes(key.replace("_fixes", "").replace("_updates", ""))
-			);
-
-			if (operationKey && data[operationKey]) {
-				comprehensiveSummary[operationKey] = data[operationKey];
-			}
-		}
-	});
+	// Add individual job summaries directly if they have data
+	if (majorMinorSummary && Object.keys(majorMinorSummary).length > 0) {
+		comprehensiveSummary.major_minor_updates = majorMinorSummary;
+	}
+	
+	if (botSummary && Object.keys(botSummary).length > 0) {
+		comprehensiveSummary.bot_signature_fixes = botSummary;
+	}
+	
+	if (unsignedSummary && Object.keys(unsignedSummary).length > 0) {
+		comprehensiveSummary.unsigned_tag_fixes = unsignedSummary;
+	}
+	
+	if (orphanedSummary && Object.keys(orphanedSummary).length > 0) {
+		comprehensiveSummary.orphaned_tag_fixes = orphanedSummary;
+	}
 
 	return comprehensiveSummary;
 }

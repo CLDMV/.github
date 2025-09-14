@@ -549,10 +549,10 @@ jobs:
     permissions:
       contents: read
     outputs:
-      total_processed: ${{ steps.summarize.outputs.total-processed }}
-      total_fixed: ${{ steps.summarize.outputs.total-fixed }}
-      processing_summary: ${{ steps.summarize.outputs.processing-summary }}
-      summary_json: ${{ steps.summarize.outputs.summary-json }}
+      total_processed: ${{ steps.summarize.outputs.total_processed }}
+      total_fixed: ${{ steps.summarize.outputs.total_fixed }}
+      processing_summary: ${{ steps.summarize.outputs.processing_summary }}
+      summary_json: ${{ steps.summarize.outputs.summary_json }}
       # Individual step outputs for compatibility
       fixed-bot-signatures: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
       non-bot-tags-found: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count }}
