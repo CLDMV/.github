@@ -100,7 +100,7 @@ jobs:
     steps:
       - name: Detect Release
         id: detect
-        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+        uses: CLDMV/.github/.github/actions/git/jobs/detect-release@master
 
   create-release-pr:
     name: "📋 Create Release PR"

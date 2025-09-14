@@ -178,7 +178,7 @@ jobs:
 
       - name: Extract and validate version
         id: extract-version
-        uses: ./.github/actions/npm/steps/extract-version
+        uses: CLDMV/.github/.github/actions/npm/steps/extract-version@v1
         with:
           package-name: ${{ inputs.package_name }}
           version-override: ${{ inputs.version }}
@@ -216,7 +216,7 @@ jobs:
 
       - name: Extract and validate version
         id: extract-version
-        uses: ./.github/actions/npm/steps/extract-version
+        uses: CLDMV/.github/.github/actions/npm/steps/extract-version@v1
         with:
           package-name: ${{ inputs.package_name }}
           version-override: ${{ inputs.version }}

@@ -65,11 +65,6 @@ on:
         type: boolean
         required: false
         default: true
-      use_gpg:
-        description: "Enable GPG signing (if GPG secrets provided)"
-        type: boolean
-        required: false
-        default: false
 
 jobs:
   create-release-pr:
@@ -96,7 +91,6 @@ jobs:
       create_documentation: ${{ github.event.inputs.create_documentation != 'false' }}
       skip_performance_tests: false
       skip_matrix_tests: false
-      use_gpg: ${{ github.event.inputs.use_gpg == 'true' }}
 
     # Authentication & Bot Configuration
     # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
