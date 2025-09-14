@@ -95,24 +95,24 @@ jobs:
       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
   # Summary job that runs after the main operations
-  summary:
-    name: "📋 Version Tag Update Summary"
-    needs: version-tag-operations
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository for Node.js script
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+#   summary:
+#     name: "📋 Version Tag Update Summary"
+#     needs: version-tag-operations
+#     if: always()
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository for Node.js script
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
 
-      - name: Generate Detailed Version Tag Update Summary
-        uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v1
-        with:
-          debug: ${{ inputs.debug }}
-          summary_json: ${{ needs.version-tag-operations.outputs.summary_json || '{}' }}
-          repository_name: ${{ github.repository }}
-          operation_result: ${{ needs.version-tag-operations.result }}
-          total_processed: ${{ needs.version-tag-operations.outputs.total_processed || '0' }}
-          total_fixed: ${{ needs.version-tag-operations.outputs.total_fixed || '0' }}
-          processing_summary: ${{ needs.version-tag-operations.outputs.processing_summary || '' }}
+#       - name: Generate Detailed Version Tag Update Summary
+#         uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v1
+#         with:
+#           debug: ${{ inputs.debug }}
+#           summary_json: ${{ needs.version-tag-operations.outputs.summary_json || '{}' }}
+#           repository_name: ${{ github.repository }}
+#           operation_result: ${{ needs.version-tag-operations.result }}
+#           total_processed: ${{ needs.version-tag-operations.outputs.total_processed || '0' }}
+#           total_fixed: ${{ needs.version-tag-operations.outputs.total_fixed || '0' }}
+#           processing_summary: ${{ needs.version-tag-operations.outputs.processing_summary || '' }}

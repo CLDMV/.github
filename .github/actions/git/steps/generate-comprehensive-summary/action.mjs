@@ -66,15 +66,15 @@ function buildComprehensiveSummary() {
 	if (majorMinorSummary && Object.keys(majorMinorSummary).length > 0) {
 		comprehensiveSummary.major_minor_updates = majorMinorSummary;
 	}
-	
+
 	if (botSummary && Object.keys(botSummary).length > 0) {
 		comprehensiveSummary.bot_signature_fixes = botSummary;
 	}
-	
+
 	if (unsignedSummary && Object.keys(unsignedSummary).length > 0) {
 		comprehensiveSummary.unsigned_tag_fixes = unsignedSummary;
 	}
-	
+
 	if (orphanedSummary && Object.keys(orphanedSummary).length > 0) {
 		comprehensiveSummary.orphaned_tag_fixes = orphanedSummary;
 	}
@@ -134,11 +134,9 @@ function generateSummary(summaryData) {
 			const operation = summaryData[operationKey];
 
 			// Check if this operation has results to display
-			if (operation && operation.title && (operation.fixed_count > 0 || operation.updated === true)) {
+			if (operation && operation.title) {
 				summary += `## ${operation.title}\n\n`;
-				summary += `${operation.description}\n\n`;
-
-				// Output the pre-formatted lines from the job
+				summary += `${operation.description}\n\n`; // Output the pre-formatted lines from the job
 				if (operation.lines && operation.lines.length > 0) {
 					operation.lines.forEach((line) => {
 						summary += `${line}\n`;
