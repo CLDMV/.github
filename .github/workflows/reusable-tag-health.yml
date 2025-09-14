@@ -366,30 +366,39 @@ jobs:
       - name: Generate summary for major/minor updates
         id: generate-summary
         run: |
-          # Simple output generation without JSON construction
-          UPDATED="${{ steps.update-major-tags.outputs.updated }}"
-          MAJOR_VERSION="${{ steps.update-major-tags.outputs.major-version }}"
-          MINOR_VERSION="${{ steps.update-major-tags.outputs.minor-version }}"
-          SOURCE_TAG="${{ steps.find-latest.outputs.tag-name }}"
-
-          # Create a simple summary JSON using node instead of bash
+          # Generate complete summary JSON with rich display data
           node -e "
+            const updated = '${{ steps.update-major-tags.outputs.updated }}' === 'true';
+            const majorVersion = '${{ steps.update-major-tags.outputs.major-version }}';
+            const minorVersion = '${{ steps.update-major-tags.outputs.minor-version }}';
+            const sourceTag = '${{ steps.find-latest.outputs.tag-name }}';
+            const fixedCount = updated ? 1 : 0;
+            
             const summary = {
-              major_minor_updates: {
-                updated: '${{ steps.update-major-tags.outputs.updated }}' === 'true',
-                major_version: '${{ steps.update-major-tags.outputs.major-version }}',
-                minor_version: '${{ steps.update-major-tags.outputs.minor-version }}',
-                source_tag: '${{ steps.find-latest.outputs.tag-name }}',
-                tags: '${{ steps.update-major-tags.outputs.updated }}' === 'true' ? [
-                  {tag: '${{ steps.update-major-tags.outputs.major-version }}', target: '${{ steps.find-latest.outputs.tag-name }}'},
-                  {tag: '${{ steps.update-major-tags.outputs.minor-version }}', target: '${{ steps.find-latest.outputs.tag-name }}'}
-                ] : []
-              },
-              statistics: {
-                by_operation: {
-                  major_minor_updates: '${{ steps.update-major-tags.outputs.updated }}' === 'true' ? 1 : 0
-                }
-              }
+              title: '🔧 Update Major/Minor Version Tags',
+              description: 'Updates major and minor version tags to point to the latest semantic version.',
+              lines: updated ? [
+                \`- ✅ **Updated major tag**: \\\`\${majorVersion}\\\` → \\\`\${sourceTag}\\\`\`,
+                \`- ✅ **Updated minor tag**: \\\`\${minorVersion}\\\` → \\\`\${sourceTag}\\\`\`,
+                \`- 📋 **Source tag**: \\\`\${sourceTag}\\\`\`
+              ] : [
+                '- ℹ️ **No updates needed**: Version tags are already current'
+              ],
+              stats_template: '🏷️ Major/Minor Updates: {count}',
+              notes: updated ? [
+                \`Version tags \\\`\${majorVersion}\\\` and \\\`\${minorVersion}\\\` now point to \\\`\${sourceTag}\\\`\`
+              ] : [
+                'All version tags are already pointing to the correct targets'
+              ],
+              fixed_count: fixedCount,
+              updated: updated,
+              major_version: majorVersion,
+              minor_version: minorVersion,
+              source_tag: sourceTag,
+              tags: updated ? [
+                {tag: majorVersion, target: sourceTag},
+                {tag: minorVersion, target: sourceTag}
+              ] : []
             };
             
             const fs = require('fs');
@@ -399,9 +408,7 @@ jobs:
               fs.appendFileSync(process.env.GITHUB_OUTPUT, output);
             }
             
-            if ('${{ inputs.debug }}' === 'true') {
-              console.log('Generated summary JSON:', JSON.stringify(summary, null, 2));
-            }
+            console.log('🔍 DEBUG: Generated major/minor summary JSON:', JSON.stringify(summary, null, 2));
           "
 
   unified-fix-bot-signatures:
@@ -412,8 +419,8 @@ jobs:
     permissions:
       contents: write
     outputs:
-      fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed_count }}
-      summary_json: ${{ steps.fix-bot-sigs.outputs.summary_json }}
+      fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed-count }}
+      summary_json: ${{ steps.fix-bot-sigs.outputs.summary-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -455,8 +462,8 @@ jobs:
     permissions:
       contents: write
     outputs:
-      fixed_count: ${{ steps.fix-unsigned.outputs.fixed_count }}
-      summary_json: ${{ steps.fix-unsigned.outputs.summary_json }}
+      fixed_count: ${{ steps.fix-unsigned.outputs.fixed-count }}
+      summary_json: ${{ steps.fix-unsigned.outputs.summary-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -498,8 +505,8 @@ jobs:
     permissions:
       contents: write
     outputs:
-      fixed_count: ${{ steps.fix-orphaned.outputs.fixed_count }}
-      summary_json: ${{ steps.fix-orphaned.outputs.summary_json }}
+      fixed_count: ${{ steps.fix-orphaned.outputs.fixed-count }}
+      summary_json: ${{ steps.fix-orphaned.outputs.summary-json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

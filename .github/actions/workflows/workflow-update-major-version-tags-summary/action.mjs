@@ -171,15 +171,14 @@ function generateFallbackSummary() {
 
 // Main execution
 console.log("📋 Generating detailed summary for " + repository + "...");
+console.log("🔍 DEBUG: summaryJson input length:", summaryJson.length);
+console.log("🔍 DEBUG: summaryJson input:", summaryJson);
 
 try {
 	// Parse the comprehensive summary JSON
 	const summaryData = safeJsonParse(summaryJson);
 
-	if (debug) {
-		console.log("Summary JSON input:");
-		console.log(JSON.stringify(summaryData, null, 2));
-	}
+	console.log("🔍 DEBUG: Parsed summaryData:", JSON.stringify(summaryData, null, 2));
 
 	// Generate the detailed summary
 	let summary;
@@ -188,6 +187,8 @@ try {
 		summary = generateDetailedSummary(summaryData);
 	} else {
 		console.log("⚠️ Using fallback summary (detailed data not available)");
+		console.log("🔍 DEBUG: summaryData keys:", Object.keys(summaryData));
+		console.log("🔍 DEBUG: summaryData.overall_success:", summaryData.overall_success);
 		summary = generateFallbackSummary();
 	}
 

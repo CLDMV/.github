@@ -219,10 +219,23 @@ function generateSummary(summaryData) {
 
 // Main execution
 console.log("🔄 Building comprehensive summary for " + repository + "...");
+console.log("🔍 DEBUG: Input values:");
+console.log("🔍 DEBUG: finalCount:", finalCount);
+console.log("🔍 DEBUG: botFixed:", botFixed);
+console.log("🔍 DEBUG: unsignedFixed:", unsignedFixed);
+console.log("🔍 DEBUG: orphanedFixed:", orphanedFixed);
+console.log("🔍 DEBUG: majorUpdated:", majorUpdated);
+console.log("🔍 DEBUG: botSummaryJson:", botSummaryJson);
+console.log("🔍 DEBUG: unsignedSummaryJson:", unsignedSummaryJson);
+console.log("🔍 DEBUG: orphanedSummaryJson:", orphanedSummaryJson);
+console.log("🔍 DEBUG: majorMinorSummaryJson:", majorMinorSummaryJson);
 
 try {
 	// Build comprehensive summary data
 	const summaryData = buildComprehensiveSummary();
+
+	console.log("🔍 DEBUG: Built comprehensive summary:");
+	console.log(JSON.stringify(summaryData, null, 2));
 
 	// Set GitHub outputs
 	const outputs = setGitHubOutputs(summaryData);
