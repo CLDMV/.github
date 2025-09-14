@@ -95,53 +95,53 @@ jobs:
       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
   # Summary job that runs after the main operations
-  summary:
-    name: "📋 Version Tag Update Summary"
-    needs: version-tag-operations
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository for Node.js script
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+#   summary:
+#     name: "📋 Version Tag Update Summary"
+#     needs: version-tag-operations
+#     if: always()
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository for Node.js script
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
 
-      - name: Generate Detailed Version Tag Update Summary
-        run: |
-          # Get the detailed JSON summary from the operations
-          SUMMARY_JSON='${{ needs.version-tag-operations.outputs.summary_json || '{}' }}'
+#       - name: Generate Detailed Version Tag Update Summary
+#         run: |
+#           # Get the detailed JSON summary from the operations
+#           SUMMARY_JSON='${{ needs.version-tag-operations.outputs.summary_json || '{}' }}'
 
-          # Export for Node.js script
-          export SUMMARY_JSON="$SUMMARY_JSON"
-          export GITHUB_REPOSITORY="${{ github.repository }}"
+#           # Export for Node.js script
+#           export SUMMARY_JSON="$SUMMARY_JSON"
+#           export GITHUB_REPOSITORY="${{ github.repository }}"
 
-          echo "📋 Generating detailed summary using Node.js parser..."
+#           echo "📋 Generating detailed summary using Node.js parser..."
 
-          if [[ "${{ inputs.debug }}" == "true" ]]; then
-            echo "Summary JSON input:"
-            echo "$SUMMARY_JSON" | jq . || echo "Invalid JSON or jq not available"
-          fi
+#           if [[ "${{ inputs.debug }}" == "true" ]]; then
+#             echo "Summary JSON input:"
+#             echo "$SUMMARY_JSON" | jq . || echo "Invalid JSON or jq not available"
+#           fi
 
-          # Run the Node.js summary generator
-          node .github-org/.github/workflows/node/workflow-update-major-version-tags.mjs >> $GITHUB_STEP_SUMMARY
+#           # Run the Node.js summary generator
+#           node .github-org/.github/workflows/node/workflow-update-major-version-tags.mjs >> $GITHUB_STEP_SUMMARY
 
-          # Fallback summary if Node.js script fails
-          if [ $? -ne 0 ]; then
-            echo "## 📌 Version Tag Update Summary (Fallback)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Repository**: \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            if [ "${{ needs.version-tag-operations.result }}" = "success" ]; then
-              echo "✅ **Overall Status**: Version tag operations completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Processing Details**: ${{ needs.version-tag-operations.outputs.processing_summary }}" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "📋 **Total Processed**: ${{ needs.version-tag-operations.outputs.total_processed }}" >> $GITHUB_STEP_SUMMARY
-              echo "🔧 **Total Fixed**: ${{ needs.version-tag-operations.outputs.total_fixed }}" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ **Overall Status**: Version tag operations failed" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
+#           # Fallback summary if Node.js script fails
+#           if [ $? -ne 0 ]; then
+#             echo "## 📌 Version Tag Update Summary (Fallback)" >> $GITHUB_STEP_SUMMARY
+#             echo "" >> $GITHUB_STEP_SUMMARY
+#             echo "**Repository**: \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+#             echo "" >> $GITHUB_STEP_SUMMARY
+
+#             if [ "${{ needs.version-tag-operations.result }}" = "success" ]; then
+#               echo "✅ **Overall Status**: Version tag operations completed successfully" >> $GITHUB_STEP_SUMMARY
+#               echo "" >> $GITHUB_STEP_SUMMARY
+#               echo "**Processing Details**: ${{ needs.version-tag-operations.outputs.processing_summary }}" >> $GITHUB_STEP_SUMMARY
+#               echo "" >> $GITHUB_STEP_SUMMARY
+#               echo "📋 **Total Processed**: ${{ needs.version-tag-operations.outputs.total_processed }}" >> $GITHUB_STEP_SUMMARY
+#               echo "🔧 **Total Fixed**: ${{ needs.version-tag-operations.outputs.total_fixed }}" >> $GITHUB_STEP_SUMMARY
+#             else
+#               echo "❌ **Overall Status**: Version tag operations failed" >> $GITHUB_STEP_SUMMARY
+#               echo "" >> $GITHUB_STEP_SUMMARY
+#               echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
+#             fi
+#           fi

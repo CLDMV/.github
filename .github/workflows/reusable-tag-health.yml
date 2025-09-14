@@ -366,43 +366,43 @@ jobs:
       - name: Generate summary for major/minor updates
         id: generate-summary
         run: |
-          # Create initial summary JSON structure
-          SUMMARY_JSON='{
-            "major_minor_updates": {
-              "updated": ${{ steps.update-major-tags.outputs.updated == 'true' && 'true' || 'false' }},
-              "major_version": "${{ steps.update-major-tags.outputs.major-version }}",
-              "minor_version": "${{ steps.update-major-tags.outputs.minor-version }}",
-              "source_tag": "${{ steps.find-latest.outputs.tag-name }}",
-              "tags": []
-            },
-            "statistics": {
-              "by_operation": {
-                "major_minor_updates": ${{ steps.update-major-tags.outputs.updated == 'true' && '1' || '0' }}
+          # Simple output generation without JSON construction
+          UPDATED="${{ steps.update-major-tags.outputs.updated }}"
+          MAJOR_VERSION="${{ steps.update-major-tags.outputs.major-version }}"
+          MINOR_VERSION="${{ steps.update-major-tags.outputs.minor-version }}"
+          SOURCE_TAG="${{ steps.find-latest.outputs.tag-name }}"
+
+          # Create a simple summary JSON using node instead of bash
+          node -e "
+            const summary = {
+              major_minor_updates: {
+                updated: '${{ steps.update-major-tags.outputs.updated }}' === 'true',
+                major_version: '${{ steps.update-major-tags.outputs.major-version }}',
+                minor_version: '${{ steps.update-major-tags.outputs.minor-version }}',
+                source_tag: '${{ steps.find-latest.outputs.tag-name }}',
+                tags: '${{ steps.update-major-tags.outputs.updated }}' === 'true' ? [
+                  {tag: '${{ steps.update-major-tags.outputs.major-version }}', target: '${{ steps.find-latest.outputs.tag-name }}'},
+                  {tag: '${{ steps.update-major-tags.outputs.minor-version }}', target: '${{ steps.find-latest.outputs.tag-name }}'}
+                ] : []
+              },
+              statistics: {
+                by_operation: {
+                  major_minor_updates: '${{ steps.update-major-tags.outputs.updated }}' === 'true' ? 1 : 0
+                }
               }
-            }
-          }'
-
-          # Add tag details if updated
-          if [[ "${{ steps.update-major-tags.outputs.updated }}" == "true" ]]; then
-            MAJOR_TAG="${{ steps.update-major-tags.outputs.major-version }}"
-            MINOR_TAG="${{ steps.update-major-tags.outputs.minor-version }}"
-            SOURCE_TAG="${{ steps.find-latest.outputs.tag-name }}"
+            };
             
-            # Update the tags array with actual updates
-            SUMMARY_JSON=$(echo "$SUMMARY_JSON" | jq --arg major "$MAJOR_TAG" --arg minor "$MINOR_TAG" --arg source "$SOURCE_TAG" '
-              .major_minor_updates.tags = [
-                {"tag": $major, "target": $source},
-                {"tag": $minor, "target": $source}
-              ]
-            ')
-          fi
-
-          echo "summary-json=$SUMMARY_JSON" >> $GITHUB_OUTPUT
-
-          if [[ "${{ inputs.debug }}" == "true" ]]; then
-            echo "Generated summary JSON:"
-            echo "$SUMMARY_JSON" | jq .
-          fi
+            const fs = require('fs');
+            const output = 'summary-json=' + JSON.stringify(summary) + '\n';
+            
+            if (process.env.GITHUB_OUTPUT) {
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, output);
+            }
+            
+            if ('${{ inputs.debug }}' === 'true') {
+              console.log('Generated summary JSON:', JSON.stringify(summary, null, 2));
+            }
+          "
 
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"
@@ -590,16 +590,16 @@ jobs:
 
       - name: Build comprehensive summary
         id: summarize
-        run: node ./.github/workflows/node/workflow-update-major-version-tags.mjs
-        env:
-          FINAL_COUNT: ${{ steps.final-scan.outputs.tags_count }}
-          BOT_FIXED: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count || '0' }}
-          UNSIGNED_FIXED: ${{ needs.unified-fix-unsigned-tags.outputs.fixed_count || '0' }}
-          ORPHANED_FIXED: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
-          MAJOR_UPDATED: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
-          REPO_NAME: ${{ github.repository }}
-          BOT_SUMMARY_JSON: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
-          UNSIGNED_SUMMARY_JSON: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
-          ORPHANED_SUMMARY_JSON: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
-          MAJOR_MINOR_SUMMARY_JSON: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}
-          INPUT_DEBUG: ${{ inputs.debug }}
+        uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-summary@v1
+        with:
+          debug: ${{ inputs.debug }}
+          final_count: ${{ steps.final-scan.outputs.tags_count }}
+          bot_fixed: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count || '0' }}
+          unsigned_fixed: ${{ needs.unified-fix-unsigned-tags.outputs.fixed_count || '0' }}
+          orphaned_fixed: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
+          major_updated: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
+          repository_name: ${{ github.repository }}
+          bot_summary_json: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
+          unsigned_summary_json: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
+          orphaned_summary_json: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
+          major_minor_summary_json: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}

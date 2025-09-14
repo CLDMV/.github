@@ -1,0 +1,81 @@
+name: "Generate Comprehensive Summary"
+description: "Generates comprehensive summary from multiple tag health operation results"
+author: "CLDMV"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  final_count:
+    description: "Final count of tags processed"
+    required: true
+  bot_fixed:
+    description: "Number of bot signature fixes"
+    required: false
+    default: "0"
+  unsigned_fixed:
+    description: "Number of unsigned tag fixes"
+    required: false
+    default: "0"
+  orphaned_fixed:
+    description: "Number of orphaned tag fixes"
+    required: false
+    default: "0"
+  major_updated:
+    description: "Number of major/minor tag updates"
+    required: false
+    default: "0"
+  repository_name:
+    description: "Repository name for summary"
+    required: true
+  bot_summary_json:
+    description: "JSON summary from bot signature fixes"
+    required: false
+    default: "{}"
+  unsigned_summary_json:
+    description: "JSON summary from unsigned tag fixes"
+    required: false
+    default: "{}"
+  orphaned_summary_json:
+    description: "JSON summary from orphaned tag fixes"
+    required: false
+    default: "{}"
+  major_minor_summary_json:
+    description: "JSON summary from major/minor updates"
+    required: false
+    default: "{}"
+
+outputs:
+  total_processed:
+    description: "Total number of tags processed"
+    value: ${{ steps.generate.outputs.total_processed }}
+  total_fixed:
+    description: "Total number of operations performed"
+    value: ${{ steps.generate.outputs.total_fixed }}
+  processing_summary:
+    description: "Brief processing summary"
+    value: ${{ steps.generate.outputs.processing_summary }}
+  summary_json:
+    description: "Detailed JSON summary of all operations"
+    value: ${{ steps.generate.outputs.summary_json }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate comprehensive summary
+      id: generate
+      shell: bash
+      run: node ${{ github.action_path }}/action.mjs
+      env:
+        FINAL_COUNT: ${{ inputs.final_count }}
+        BOT_FIXED: ${{ inputs.bot_fixed }}
+        UNSIGNED_FIXED: ${{ inputs.unsigned_fixed }}
+        ORPHANED_FIXED: ${{ inputs.orphaned_fixed }}
+        MAJOR_UPDATED: ${{ inputs.major_updated }}
+        REPO_NAME: ${{ inputs.repository_name }}
+        BOT_SUMMARY_JSON: ${{ inputs.bot_summary_json }}
+        UNSIGNED_SUMMARY_JSON: ${{ inputs.unsigned_summary_json }}
+        ORPHANED_SUMMARY_JSON: ${{ inputs.orphaned_summary_json }}
+        MAJOR_MINOR_SUMMARY_JSON: ${{ inputs.major_minor_summary_json }}
+        INPUT_DEBUG: ${{ inputs.debug }}
