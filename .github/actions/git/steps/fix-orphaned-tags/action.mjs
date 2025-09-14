@@ -9,10 +9,14 @@ import { writeFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
+console.log("🔍 DEBUG: Orphaned tags action starting...");
+
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
+
+console.log(`🔍 DEBUG: Processing ${TAGS_DETAILED.length} tags for orphaned analysis`);
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_ENABLED = (process.env.INPUT_GPG_ENABLED || "false").toLowerCase() === "true";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
@@ -287,6 +291,9 @@ if (fixedTags.length > 0) {
 
 const summaryJson = JSON.stringify(summaryData);
 
+console.log(`🔍 DEBUG: Orphaned tags action summary data:`);
+console.log(JSON.stringify(summaryData, null, 2));
+
 console.log(`updated-tags-detailed=${updatedTagsJson}`);
 console.log(`fixed-count=${fixedTags.length}`);
 console.log(`fixed-tags=${fixedTagsJson}`);
@@ -303,4 +310,9 @@ if (githubOutput) {
 			`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
 	);
+	console.log("🔍 DEBUG: Orphaned tags action outputs written to GITHUB_OUTPUT");
+} else {
+	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
+
+console.log("🔍 DEBUG: Orphaned tags action completed successfully");

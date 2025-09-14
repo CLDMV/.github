@@ -2,13 +2,15 @@
 
 /**
  * Fix Unsigned Tags
- * Converts unsigned/lightweight tags to properly signed annotated tags
+ * Fixes all unsigned and lightweight tags by recreating them as signed annotated tags
  */
 
 import { writeFileSync } from "fs";
 import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../github/api/_api/gpg.mjs";
+
+console.log("🔍 DEBUG: Unsigned tags action starting...");
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
@@ -18,6 +20,8 @@ const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
 const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
+
+console.log(`🔍 DEBUG: Processing ${TAGS_DETAILED.length} tags for unsigned analysis`);
 
 /**
  * Check if a tag needs signing/annotation fixes
@@ -230,6 +234,9 @@ if (fixedTags.length > 0) {
 
 const summaryJson = JSON.stringify(summaryData);
 
+console.log(`🔍 DEBUG: Unsigned tags action summary data:`);
+console.log(JSON.stringify(summaryData, null, 2));
+
 console.log(`updated-tags-detailed=${updatedTagsJson}`);
 console.log(`fixed-count=${fixedTags.length}`);
 console.log(`fixed-tags=${fixedTagsJson}`);
@@ -246,4 +253,9 @@ if (githubOutput) {
 			`summary-json=${summaryJson}\n`,
 		{ flag: "a" }
 	);
+	console.log("🔍 DEBUG: Unsigned tags action outputs written to GITHUB_OUTPUT");
+} else {
+	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
+
+console.log("🔍 DEBUG: Unsigned tags action completed successfully");

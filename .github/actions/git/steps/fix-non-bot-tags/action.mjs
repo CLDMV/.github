@@ -10,6 +10,8 @@ import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../github/api/_api/gpg.mjs";
 
+console.log("🔍 DEBUG: Bot signature action starting...");
+
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
@@ -19,6 +21,8 @@ const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
 const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
+
+console.log(`🔍 DEBUG: Processing ${TAGS_DETAILED.length} tags for bot signature analysis`);
 
 /**
  * Check if tag was created by bot based on patterns
@@ -242,4 +246,9 @@ if (githubOutput) {
 			.map(([key, value]) => `${key}=${value}`)
 			.join("\n") + "\n";
 	writeFileSync(githubOutput, outputContent, { flag: "a" });
+	console.log("🔍 DEBUG: Bot signature action outputs written to GITHUB_OUTPUT");
+} else {
+	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
+
+console.log("🔍 DEBUG: Bot signature action completed successfully");
