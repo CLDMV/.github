@@ -53,11 +53,6 @@ on:
         type: string
         default: ""
         description: "Custom GitHub Packages publish command"
-      skip_publish:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip ALL publishing (for testing)"
       # Build parameters
       min_node_version:
         required: false

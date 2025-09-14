@@ -42,11 +42,6 @@ on:
         type: boolean
         required: false
         default: true
-      skip_publish:
-        description: "Skip ALL publishing (for testing)"
-        type: boolean
-        required: false
-        default: false
       min_node_version:
         description: "Minimum Node.js version for matrix testing (enables matrix when set)"
         type: string
@@ -78,7 +73,6 @@ jobs:
       publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages != 'false' }}
       publish_command: ""
       github_packages_publish_command: ""
-      skip_publish: ${{ github.event.inputs.skip_publish == 'true' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
       test_command: "npm test"

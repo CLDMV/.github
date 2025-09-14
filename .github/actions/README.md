@@ -163,7 +163,7 @@ jobs:
 
 - `publish_to_npm`: Enable/disable NPM publishing
 - `publish_to_github_packages`: Enable/disable GitHub Packages publishing
-- `skip_publish`: Skip all publishing (for testing)
+- `dry_run`: Validate everything but don't publish or create releases (recommended for testing)
 - `publish_command`: Custom NPM publish command
 - `github_packages_publish_command`: Custom GitHub Packages command
 
