@@ -41,24 +41,37 @@ runs:
           # Fallback: extract from .tgz file
           echo "📦 Extracting from .tgz file as fallback..."
           
-          # Try multiple patterns to find the .tgz file
+          # Try multiple locations to find the .tgz file
           TGZ_FILE=""
-          for pattern in "${{ inputs.package-path }}" "./artifacts/*.tgz" "./*.tgz" "*.tgz"; do
-            TGZ_FILE=$(find . -name "$pattern" -type f | head -1)
+          
+          # First try the custom input pattern
+          if [ -n "${{ inputs.package-path }}" ] && [ "${{ inputs.package-path }}" != "*.tgz" ]; then
+            TGZ_FILE=$(find . -path "${{ inputs.package-path }}" -type f | head -1)
             if [ -n "$TGZ_FILE" ]; then
-              echo "📦 Found .tgz file with pattern '$pattern': $TGZ_FILE"
-              break
+              echo "📦 Found .tgz file with input pattern: $TGZ_FILE"
             fi
-          done
+          fi
+          
+          # If not found, try common locations
+          if [ -z "$TGZ_FILE" ]; then
+            for location in "./artifacts" "." "./dist" "./build"; do
+              TGZ_FILE=$(find "$location" -name "*.tgz" -type f 2>/dev/null | head -1)
+              if [ -n "$TGZ_FILE" ]; then
+                echo "📦 Found .tgz file in $location: $TGZ_FILE"
+                break
+              fi
+            done
+          fi
 
           if [ -z "$TGZ_FILE" ]; then
-            echo "❌ No .tgz file found. Tried patterns:"
-            echo "  - ${{ inputs.package-path }}"
-            echo "  - ./artifacts/*.tgz"
-            echo "  - ./*.tgz"
-            echo "  - *.tgz"
+            echo "❌ No .tgz file found. Searched in:"
+            echo "  - Custom pattern: ${{ inputs.package-path }}"
+            echo "  - ./artifacts/"
+            echo "  - ./ (current directory)"
+            echo "  - ./dist/"
+            echo "  - ./build/"
             echo "Available files:"
-            find . -name "*.tgz" -type f 2>/dev/null || echo "  No .tgz files found"
+            find . -name "*.tgz" -type f 2>/dev/null || echo "  No .tgz files found anywhere"
             exit 1
           fi
 
