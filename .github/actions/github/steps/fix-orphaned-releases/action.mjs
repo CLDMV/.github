@@ -7,9 +7,8 @@
 
 import { writeFileSync } from "fs";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
-import { importGpgIfNeeded, configureGitIdentity } from "../../api/_api/gpg.mjs";
+import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote } from "../../api/_api/gpg.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
-import { createAnnotatedTag, createRefForTagObject, createRefToCommit } from "../../api/_api/tag.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const GITHUB_TOKEN = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
@@ -166,121 +165,95 @@ function findTargetCommit(tagName, targetCommitish) {
 }
 
 /**
- * Create a missing tag using GitHub API
+ * Create a missing tag using git commands (more reliable for signing)
  */
 async function createMissingTag(tagName, targetCommit, releaseName) {
 	try {
 		console.log(`🔗 Creating missing tag ${tagName} pointing to ${targetCommit}`);
 
-		// Configure git identity for local operations
-		configureGitIdentity({
-			tagger_name: TAGGER_NAME,
-			tagger_email: TAGGER_EMAIL,
-			keyid: "",
-			enableSign: false
-		});
+		// Setup git authentication with token (same approach as working release workflow)
+		const repo = process.env.GITHUB_REPOSITORY;
+		ensureGitAuthRemote(repo, GITHUB_TOKEN);
 
-		// Create tag message - use release name if available, otherwise tag name
-		const tagMessage = releaseName && releaseName !== "null" ? releaseName : tagName;
-
-		const repository = process.env.GITHUB_REPOSITORY;
-		if (!repository) {
-			throw new Error("GITHUB_REPOSITORY environment variable not set");
-		}
-
-		const { owner, repo } = parseRepo(repository);
-
-		// Set up tagger info for annotated tags
-		const tagger = {
-			name: TAGGER_NAME,
-			email: TAGGER_EMAIL,
-			date: new Date().toISOString()
-		};
-
-		// Set up GPG if enabled (for local tag creation)
+		// Configure signing and identity (exactly like working release workflow)
+		const willSign = GPG_ENABLED && GPG_PRIVATE_KEY;
+		const willAnnotate = GPG_ENABLED; // Always annotate when GPG is enabled
 		let keyid = "";
-		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
+		if (willSign) {
 			keyid = importGpgIfNeeded({
 				gpg_private_key: GPG_PRIVATE_KEY,
 				gpg_passphrase: GPG_PASSPHRASE
 			});
 		}
 
-		// Use GitHub API to create the tag directly - this bypasses workflow file protection
+		configureGitIdentity({
+			tagger_name: TAGGER_NAME,
+			tagger_email: TAGGER_EMAIL,
+			keyid,
+			enableSign: willSign
+		});
+
+		// Create tag message - use release name if available, otherwise tag name
+		const tagMessage = releaseName && releaseName !== "null" ? releaseName : tagName;
+
+		// Test permissions first by trying to fetch refs (lightweight test)
 		try {
-			if (GPG_ENABLED && GPG_PRIVATE_KEY && keyid) {
-				console.log("🔐 Creating signed annotated tag via GitHub API");
-
-				// Create annotated tag object first
-				const tagObject = await createAnnotatedTag({
-					token: GITHUB_TOKEN.trim(),
-					repo: repository,
-					tag: tagName,
-					message: tagMessage,
-					objectSha: targetCommit,
-					tagger
-				});
-
-				// Create the ref pointing to the tag object
-				await createRefForTagObject({
-					token: GITHUB_TOKEN.trim(),
-					repo: repository,
-					tag: tagName,
-					tagObjectSha: tagObject.sha
-				});
-			} else {
-				console.log("🏷️ Creating lightweight tag via GitHub API");
-
-				// Create lightweight tag (ref pointing directly to commit)
-				await createRefToCommit({
-					token: GITHUB_TOKEN.trim(),
-					repo: repository,
-					tag: tagName,
-					commitSha: targetCommit
-				});
-			}
-
-			console.log(`✅ Successfully created tag ${tagName} via GitHub API`);
-			return true;
-		} catch (apiError) {
-			console.error(`❌ GitHub API tag creation failed: ${apiError.message}`);
-			
+			gitCommand(`git ls-remote --heads origin`, true);
 			if (DEBUG) {
-				console.log(`⚠️ Falling back to git push method`);
+				console.log("✅ Git remote access confirmed");
 			}
-			
-			// Fallback: create tag locally and push
-			let tagCommand;
-			if (GPG_ENABLED && GPG_PRIVATE_KEY && keyid) {
-				console.log("🔐 Creating signed tag locally");
-				tagCommand = `git tag -s -a ${tagName} ${targetCommit} -m "${tagMessage}"`;
-			} else {
-				console.log("🏷️ Creating unsigned annotated tag locally");
-				tagCommand = `git tag -a ${tagName} ${targetCommit} -m "${tagMessage}"`;
-			}
-
-			gitCommand(tagCommand, true);
-			
-			// This will throw if push fails - let it bubble up to the outer catch
-			gitCommand(`git push origin ${tagName}`, false);
-			
-			console.log(`✅ Successfully created and pushed tag ${tagName} via git push fallback`);
-			return true;
+		} catch (remoteError) {
+			console.error(`❌ Cannot access remote repository: ${remoteError.message}`);
+			return false;
 		}
+
+		// Create the tag locally using same pattern as working release workflow
+		if (willSign) {
+			console.log(`🔐 Creating signed tag: git tag -s -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
+			// Use temp file for message to handle multiline content properly
+			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
+			writeFileSync(tempFile, tagMessage, "utf8");
+			gitCommand(`git tag -s -f -F "${tempFile}" ${tagName} ${targetCommit}`);
+			try {
+				require("fs").unlinkSync(tempFile);
+			} catch {}
+		} else if (willAnnotate) {
+			console.log(`🏷️ Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
+			// Use temp file for message to handle multiline content properly
+			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
+			writeFileSync(tempFile, tagMessage, "utf8");
+			gitCommand(`git tag -a -f -F "${tempFile}" ${tagName} ${targetCommit}`);
+			try {
+				require("fs").unlinkSync(tempFile);
+			} catch {}
+		} else {
+			console.log(`🏷️ Creating lightweight tag: git tag -f ${tagName} ${targetCommit}`);
+			gitCommand(`git tag -f ${tagName} ${targetCommit}`);
+		}
+
+		// Push using force push (same as working workflow)
+		gitCommand(`git push origin +refs/tags/${tagName}`);
+		console.log(`✅ Successfully created and pushed tag ${tagName}`);
+		return true;
 	} catch (error) {
 		console.error(`❌ Failed to create tag ${tagName}: ${error.message}`);
 
-		// Try to delete the local tag if it was created but push failed
+		// Clean up local tag if remote push failed
 		try {
 			gitCommand(`git tag -d ${tagName}`, true);
-		} catch (deleteError) {
-			// Ignore deletion errors
+			console.log(`🧹 Cleaned up local tag ${tagName}`);
+		} catch (cleanupError) {
+			// Ignore cleanup errors
+		}
+
+		// Check for common permission issues
+		if (error.message.includes("403") || error.message.includes("Permission") || error.message.includes("denied")) {
+			console.error(`💡 Push failed due to insufficient permissions.`);
 		}
 
 		return false;
 	}
 }
-
 /**
  * Main execution
  */
@@ -303,6 +276,7 @@ async function main() {
 
 	let fixedCount = 0;
 	const fixedReleases = [];
+	const failedReleases = [];
 
 	for (const release of releases) {
 		const { tag_name: tagName, name: releaseName, target_commitish: targetCommitish } = release;
@@ -318,7 +292,7 @@ async function main() {
 		const tagRef = gitCommand(`git rev-parse refs/tags/${tagName}`, true);
 		if (tagRef && tagRef.trim()) {
 			console.log(`✅ Tag ${tagName} exists`);
-			
+
 			// Verify the tag points to the expected commit if we have a target
 			if (targetCommitish && targetCommitish !== "null" && targetCommitish !== "master") {
 				const expectedCommit = gitCommand(`git rev-parse ${targetCommitish}`, true);
@@ -328,7 +302,7 @@ async function main() {
 					console.log(`   Expected: ${expectedCommit.trim()}`);
 				}
 			}
-			
+
 			continue;
 		}
 
@@ -339,6 +313,7 @@ async function main() {
 		const targetCommit = findTargetCommit(tagName, targetCommitish);
 		if (!targetCommit) {
 			console.error(`❌ Could not find target commit for tag ${tagName}`);
+			failedReleases.push(`${tagName} (no target commit found)`);
 			continue;
 		}
 
@@ -346,20 +321,57 @@ async function main() {
 		if (await createMissingTag(tagName, targetCommit, releaseName)) {
 			fixedCount++;
 			fixedReleases.push(`${tagName} → ${targetCommit.substring(0, 7)}`);
+		} else {
+			failedReleases.push(`${tagName} → ${targetCommit.substring(0, 7)} (permissions issue)`);
 		}
+	}
+
+	// Console summary
+	console.log(`\n📊 Tag Health Summary:`);
+	console.log(`   Total releases processed: ${releases.length}`);
+	console.log(`   Orphaned releases fixed: ${fixedCount}`);
+	console.log(`   Orphaned releases failed: ${failedReleases.length}`);
+
+	if (fixedReleases.length > 0) {
+		console.log(`\n✅ Successfully created tags:`);
+		fixedReleases.forEach((tag) => console.log(`   ${tag}`));
+	}
+
+	if (failedReleases.length > 0) {
+		console.log(`\n❌ Failed to create tags:`);
+		failedReleases.forEach((tag) => console.log(`   ${tag}`));
+
+		console.log(`\n💡 Most failures are due to insufficient GitHub App permissions.`);
+		console.log(`   Ensure the GitHub App has 'Contents: Write' and 'Actions: Write' permissions.`);
 	}
 
 	// Generate summary
 	let summaryJson;
 	if (fixedCount > 0) {
 		const lines = fixedReleases.map((fix) => `- ✅ **Fixed**: \`${fix}\``);
+		if (failedReleases.length > 0) {
+			lines.push(...failedReleases.map((fail) => `- ❌ **Failed**: \`${fail}\``));
+		}
 		summaryJson = {
 			title: "📦 Orphaned Release Analysis",
-			description: "Fixed releases that were missing their associated tags.",
+			description: `Fixed ${fixedCount} releases, ${failedReleases.length} failed due to permissions.`,
 			fixed_count: fixedCount,
 			lines,
 			stats_template: "📦 Orphaned release fixes: {count}",
-			notes: [`Successfully recreated ${fixedCount} missing tag(s) for orphaned releases`]
+			notes: [
+				`Successfully recreated ${fixedCount} missing tag(s) for orphaned releases`,
+				...(failedReleases.length > 0 ? [`${failedReleases.length} tags failed due to insufficient permissions`] : [])
+			]
+		};
+	} else if (failedReleases.length > 0) {
+		const lines = failedReleases.map((fail) => `- ❌ **Failed**: \`${fail}\``);
+		summaryJson = {
+			title: "📦 Orphaned Release Analysis",
+			description: "Found orphaned releases but failed to fix due to permissions.",
+			fixed_count: 0,
+			lines,
+			stats_template: "📦 Orphaned release fixes: {count}",
+			notes: [`${failedReleases.length} orphaned releases found but GitHub App lacks required permissions`]
 		};
 	} else {
 		summaryJson = {
@@ -373,7 +385,14 @@ async function main() {
 	}
 
 	writeFileSync(process.env.GITHUB_OUTPUT, `fixed-count=${fixedCount}\nsummary-json=${JSON.stringify(summaryJson)}\n`, { flag: "a" });
-	console.log(`✅ Fixed ${fixedCount} orphaned releases`);
+
+	// Final status
+	if (failedReleases.length > 0) {
+		console.log(`❌ Failed to fix ${failedReleases.length} orphaned releases due to permissions`);
+		process.exit(1); // Exit with failure for proper error reporting
+	} else {
+		console.log(`✅ Fixed ${fixedCount} orphaned releases`);
+	}
 }
 
 // Run if this script is executed directly
