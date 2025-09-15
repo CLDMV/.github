@@ -1,0 +1,51 @@
+name: "Fix Orphaned Releases"
+description: "Detect and fix GitHub releases that are missing their associated tags"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  gpg_enabled:
+    description: "Whether GPG signing is enabled"
+    required: false
+    default: "false"
+  tagger_name:
+    description: "Tagger name for creating tags"
+    required: false
+    default: "CLDMV Bot"
+  tagger_email:
+    description: "Tagger email for creating tags"
+    required: false
+    default: "cldmv-bot@users.noreply.github.com"
+  gpg_private_key:
+    description: "GPG private key for signing"
+    required: false
+    default: ""
+  gpg_passphrase:
+    description: "GPG passphrase"
+    required: false
+    default: ""
+
+outputs:
+  fixed-count:
+    description: "Number of orphaned releases fixed"
+    value: ${{ steps.fix-releases.outputs.fixed-count }}
+  summary-json:
+    description: "JSON summary of the fixes"
+    value: ${{ steps.fix-releases.outputs.summary-json }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fix orphaned releases
+      id: fix-releases
+      shell: bash
+      env:
+        INPUT_DEBUG: ${{ inputs.debug }}
+        INPUT_GPG_ENABLED: ${{ inputs.gpg_enabled }}
+        INPUT_TAGGER_NAME: ${{ inputs.tagger_name }}
+        INPUT_TAGGER_EMAIL: ${{ inputs.tagger_email }}
+        INPUT_GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}
+        INPUT_GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+      run: node ${{ github.action_path }}/action.mjs

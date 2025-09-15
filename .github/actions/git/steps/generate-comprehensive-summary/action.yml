@@ -22,6 +22,10 @@ inputs:
     description: "Number of orphaned tag fixes"
     required: false
     default: "0"
+  orphaned_releases_fixed:
+    description: "Number of orphaned release fixes"
+    required: false
+    default: "0"
   major_updated:
     description: "Number of major/minor tag updates"
     required: false
@@ -43,6 +47,10 @@ inputs:
     default: "{}"
   major_minor_summary-json:
     description: "JSON summary from major/minor updates"
+    required: false
+    default: "{}"
+  orphaned_releases_summary-json:
+    description: "JSON summary from orphaned release fixes"
     required: false
     default: "{}"
 
@@ -72,10 +80,12 @@ runs:
         BOT_FIXED: ${{ inputs.bot_fixed }}
         UNSIGNED_FIXED: ${{ inputs.unsigned_fixed }}
         ORPHANED_FIXED: ${{ inputs.orphaned_fixed }}
+        ORPHANED_RELEASES_FIXED: ${{ inputs.orphaned_releases_fixed }}
         MAJOR_UPDATED: ${{ inputs.major_updated }}
         REPO_NAME: ${{ inputs.repository_name }}
         BOT_SUMMARY_JSON: ${{ inputs.bot_summary-json }}
         UNSIGNED_SUMMARY_JSON: ${{ inputs.unsigned_summary-json }}
         ORPHANED_SUMMARY_JSON: ${{ inputs.orphaned_summary-json }}
         MAJOR_MINOR_SUMMARY_JSON: ${{ inputs.major_minor_summary-json }}
+        ORPHANED_RELEASES_SUMMARY_JSON: ${{ inputs.orphaned_releases_summary-json }}
         INPUT_DEBUG: ${{ inputs.debug }}

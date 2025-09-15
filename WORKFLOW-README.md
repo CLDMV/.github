@@ -143,6 +143,58 @@ workflow_dispatch:
 - **Features**: Calls orchestrator with `run_update_major_version_tags: true`
 - **Usage**: `CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1`
 
+### Tag Health Workflow (`reusable-tag-health.yml`)
+
+- **Purpose**: Comprehensive tag maintenance and health monitoring for Git repositories
+- **Triggers**: Manual dispatch, tag push events, scheduled maintenance
+- **Features**: Multi-stage tag health operations with intelligent validation
+- **Usage**: `CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1`
+
+#### 🏥 Health Check Operations
+
+The tag health workflow performs comprehensive tag maintenance in a coordinated sequence:
+
+1. **🔍 Validation**: Ensures tag push comes from main/master branch
+2. **🏷️ Bot Signature Fixes**: Updates tags with incorrect author signatures
+3. **✍️ Unsigned Tag Fixes**: Adds GPG signatures to unsigned tags
+4. **🔗 Orphaned Release Fixes**: Recreates missing tags for GitHub releases
+5. **🚨 Orphaned Tag Fixes**: Relocates tags pointing to orphaned commits
+6. **📈 Major/Minor Updates**: Maintains major version references (v1, v2, etc.)
+7. **🔄 Token Management**: Coordinates authentication across all operations
+
+#### 🎯 Key Features
+
+- **Priority-Based Orphan Detection**: Uses advanced commit searching with multiple fallback strategies
+- **GPG Signature Management**: Automatic signing with bot credentials
+- **Release Synchronization**: Ensures all GitHub releases have corresponding tags
+- **Comprehensive Reporting**: Detailed summaries of all operations performed
+- **Smart Validation**: Prevents tag operations on commits not in main/master branch
+
+#### 🧪 Tag Source Validation
+
+Before any tag health operations, the workflow validates that tag pushes originate from the main or master branch:
+
+```yaml
+# Validates tag source branch
+validate-tag-source:
+  runs-on: ubuntu-latest
+  outputs:
+    should-proceed: ${{ steps.validate.outputs.should-proceed }}
+    validation-message: ${{ steps.validate.outputs.message }}
+```
+
+**What validation checks:**
+
+- ✅ Tag commit is reachable from main or master branch
+- ✅ Repository has proper branch structure
+- ✅ Tag points to valid commit in branch history
+
+**What validation prevents:**
+
+- ❌ Tag operations on feature branch commits
+- ❌ Tag health fixes on orphaned commits
+- ❌ Accidental tag updates from development branches
+
 ## 🏗️ Orchestrator Architecture
 
 The new streamlined architecture uses a single `ci-jobs.yml` orchestrator that contains all job logic:

@@ -13,12 +13,14 @@ const finalCount = parseInt(process.env.FINAL_COUNT || "0");
 const botFixed = parseInt(process.env.BOT_FIXED || "0");
 const unsignedFixed = parseInt(process.env.UNSIGNED_FIXED || "0");
 const orphanedFixed = parseInt(process.env.ORPHANED_FIXED || "0");
+const orphanedReleasesFixed = parseInt(process.env.ORPHANED_RELEASES_FIXED || "0");
 const majorUpdated = parseInt(process.env.MAJOR_UPDATED || "0");
 
 // Get individual job summaries
 const botSummaryJson = process.env.BOT_SUMMARY_JSON || "{}";
 const unsignedSummaryJson = process.env.UNSIGNED_SUMMARY_JSON || "{}";
 const orphanedSummaryJson = process.env.ORPHANED_SUMMARY_JSON || "{}";
+const orphanedReleasesSummaryJson = process.env.ORPHANED_RELEASES_SUMMARY_JSON || "{}";
 const majorMinorSummaryJson = process.env.MAJOR_MINOR_SUMMARY_JSON || "{}";
 
 const githubOutput = process.env.GITHUB_OUTPUT;
@@ -44,6 +46,7 @@ function buildComprehensiveSummary() {
 	const botSummary = safeJsonParse(botSummaryJson);
 	const unsignedSummary = safeJsonParse(unsignedSummaryJson);
 	const orphanedSummary = safeJsonParse(orphanedSummaryJson);
+	const orphanedReleasesSummary = safeJsonParse(orphanedReleasesSummaryJson);
 	const majorMinorSummary = safeJsonParse(majorMinorSummaryJson);
 
 	// Build comprehensive summary by including all job data
@@ -52,12 +55,13 @@ function buildComprehensiveSummary() {
 		repository: repository,
 		statistics: {
 			total_processed: finalCount,
-			total_operations: botFixed + unsignedFixed + orphanedFixed + majorUpdated,
+			total_operations: botFixed + unsignedFixed + orphanedFixed + orphanedReleasesFixed + majorUpdated,
 			by_operation: {
 				major_minor_updates: majorUpdated,
 				bot_signature_fixes: botFixed,
 				unsigned_fixes: unsignedFixed,
-				orphaned_fixes: orphanedFixed
+				orphaned_fixes: orphanedFixed,
+				orphaned_release_fixes: orphanedReleasesFixed
 			}
 		}
 	};
@@ -65,6 +69,10 @@ function buildComprehensiveSummary() {
 	// Add individual job summaries directly if they have data
 	if (majorMinorSummary && Object.keys(majorMinorSummary).length > 0) {
 		comprehensiveSummary.major_minor_updates = majorMinorSummary;
+	}
+
+	if (orphanedReleasesSummary && Object.keys(orphanedReleasesSummary).length > 0) {
+		comprehensiveSummary.orphaned_release_fixes = orphanedReleasesSummary;
 	}
 
 	if (botSummary && Object.keys(botSummary).length > 0) {

@@ -243,8 +243,8 @@ jobs:
     if: inputs.run_unified_tag_health == true
     needs: [detect-gpg]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # permissions:
+    #   contents: write
     outputs:
       auth-token: ${{ steps.app-token.outputs.token }}
       user-name: ${{ steps.setup-git.outputs.user-name }}
@@ -299,10 +299,40 @@ jobs:
           echo "user-name=$USER_NAME" >> "$GITHUB_OUTPUT"
           echo "user-email=$USER_EMAIL" >> "$GITHUB_OUTPUT"
 
+  unified-fix-orphaned-releases:
+    name: "📦 Fix Orphaned Releases"
+    if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
+    needs: [detect-gpg, setup-shared]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      fixed_count: ${{ steps.fix-orphaned-releases.outputs.fixed-count }}
+      summary-json: ${{ steps.fix-orphaned-releases.outputs.summary-json }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix orphaned releases
+        id: fix-orphaned-releases
+        uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v1
+        env:
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
+        with:
+          debug: ${{ inputs.debug }}
+          gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
+          tagger_name: ${{ secrets.TAGGER_NAME }}
+          tagger_email: ${{ secrets.TAGGER_EMAIL }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
   unified-update-major-minor:
     name: "🏷️ Update Major/Minor Tags"
     if: inputs.run_unified_tag_health == true
-    needs: [detect-gpg, setup-shared]
+    needs: [detect-gpg, setup-shared, unified-fix-orphaned-releases]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -422,7 +452,7 @@ jobs:
   unified-fix-bot-signatures:
     name: "🤖 Fix Bot Signatures"
     if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
-    needs: [detect-gpg, setup-shared, unified-update-major-minor]
+    needs: [detect-gpg, setup-shared, unified-fix-orphaned-releases]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -562,6 +592,7 @@ jobs:
         detect-gpg,
         setup-shared,
         unified-update-major-minor,
+        unified-fix-orphaned-releases,
         unified-fix-bot-signatures,
         unified-fix-unsigned-tags,
         unified-fix-orphaned-tags
@@ -618,9 +649,11 @@ jobs:
           bot_fixed: ${{ needs.unified-fix-bot-signatures.outputs.fixed_count || '0' }}
           unsigned_fixed: ${{ needs.unified-fix-unsigned-tags.outputs.fixed_count || '0' }}
           orphaned_fixed: ${{ needs.unified-fix-orphaned-tags.outputs.fixed_count || '0' }}
+          orphaned_releases_fixed: ${{ needs.unified-fix-orphaned-releases.outputs.fixed_count || '0' }}
           major_updated: ${{ needs.unified-update-major-minor.outputs.updated == 'true' && '1' || '0' }}
           repository_name: ${{ github.repository }}
           bot_summary-json: ${{ needs.unified-fix-bot-signatures.outputs.summary-json || '{}' }}
           unsigned_summary-json: ${{ needs.unified-fix-unsigned-tags.outputs.summary-json || '{}' }}
           orphaned_summary-json: ${{ needs.unified-fix-orphaned-tags.outputs.summary-json || '{}' }}
+          orphaned_releases_summary-json: ${{ needs.unified-fix-orphaned-releases.outputs.summary-json || '{}' }}
           major_minor_summary-json: ${{ needs.unified-update-major-minor.outputs.summary-json || '{}' }}
