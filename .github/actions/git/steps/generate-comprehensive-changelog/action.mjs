@@ -300,8 +300,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		const changelog = await generateComprehensiveChangelog(commitRange, commits, GITHUB_TOKEN, USE_SINGLE_COMMIT_MESSAGE);
 		console.log("📄 Generated comprehensive changelog");
 
-		// Output the changelog content
-		appendFileSync(process.env.GITHUB_OUTPUT, `changelog-content<<EOF\n${changelog}EOF\n`);
+		// Output the changelog content using a unique delimiter
+		const delimiter = `EOF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		appendFileSync(process.env.GITHUB_OUTPUT, `changelog-content<<${delimiter}\n${changelog}\n${delimiter}\n`);
 	}
 
 	// Run the main function
