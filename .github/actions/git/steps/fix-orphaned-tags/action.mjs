@@ -25,9 +25,10 @@ const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
 /**
  * Find equivalent commit in current branch for orphaned commit
  * @param {string} orphanedCommit - SHA of orphaned commit
+ * @param {string} tagName - Name of the tag (to extract version from)
  * @returns {string|null} SHA of equivalent commit or null if not found
  */
-function findEquivalentCommit(orphanedCommit) {
+function findEquivalentCommit(orphanedCommit, tagName = "") {
 	try {
 		// Get the commit message and author from orphaned commit
 		const orphanedMessage = gitCommand(`git log -1 --format="%s" ${orphanedCommit}`, true);
@@ -41,49 +42,102 @@ function findEquivalentCommit(orphanedCommit) {
 
 		if (DEBUG) {
 			console.log(`🔍 Looking for equivalent of: "${orphanedMessage}" by ${orphanedAuthor}`);
+			console.log(`🔍 Tag name: "${tagName}"`);
 		}
 
-		// Special handling for release commits - look for version pattern
-		const releaseMatch = orphanedMessage.match(/^release:\s*(v?\d+\.\d+\.\d+)/);
-		if (releaseMatch) {
-			const version = releaseMatch[1];
-			console.log(`🔍 Detected release commit for version ${version}, searching for pattern...`);
-			
-			// Search for commits containing this version in a release message
-			const versionSearch = `git log --format="%H|%s|%an <%ae>|%ct" --oneline HEAD | grep -i "release.*${version}"`;
-			try {
-				const versionResults = gitCommand(versionSearch, true);
-				if (versionResults) {
-					const lines = versionResults.split("\n").filter(line => line.trim());
-					for (const line of lines) {
-						const parts = line.split("|");
-						if (parts.length >= 2) {
-							const [sha, message] = parts;
-							// Check if this is a release message for the same version
-							if (message.toLowerCase().includes("release") && message.includes(version)) {
-								console.log(`✅ Found equivalent release commit by version pattern: ${sha} - "${message}"`);
-								return sha;
-							}
-						}
-					}
-				}
-			} catch (error) {
-				console.log(`🔍 Version pattern search failed: ${error.message}, falling back to exact message search`);
+		// Extract version from tag name (e.g., "v2.0.0" -> "2.0.0")
+		let versionFromTag = null;
+		let fullVersionFromTag = null; // includes 'v' prefix if present
+		if (tagName) {
+			const tagVersionMatch = tagName.match(/^(v?\d+\.\d+\.\d+)/);
+			if (tagVersionMatch) {
+				fullVersionFromTag = tagVersionMatch[1]; // e.g., "v2.0.0"
+				versionFromTag = tagVersionMatch[1].replace(/^v/, ""); // e.g., "2.0.0"
+				console.log(`🔍 Extracted version from tag: ${fullVersionFromTag} (numeric: ${versionFromTag})`);
 			}
 		}
 
-		// Fallback to exact message search without author restriction
+		// Priority-based search for tag version
+		if (versionFromTag && fullVersionFromTag) {
+			const allCommits = gitCommand(`git log --format="%H|%s|%an <%ae>|%ct" HEAD`, true);
+
+			if (allCommits) {
+				const lines = allCommits.split("\n").filter((line) => line.trim());
+
+				// 1st Priority: Look for "release: <extracted version>" at start of commit
+				console.log(`🔍 Priority 1: Searching for "release: ${fullVersionFromTag}" at start of commit...`);
+				for (const line of lines) {
+					const [sha, message, author, timestamp] = line.split("|");
+					if (sha === orphanedCommit) continue;
+
+					if (message.startsWith(`release: ${fullVersionFromTag}`)) {
+						console.log(`✅ Found equivalent commit by release pattern: ${sha} - "${message}"`);
+						return sha;
+					}
+				}
+
+				// 2nd Priority: Look for full version (with v) anywhere in commit title
+				console.log(`🔍 Priority 2: Searching for "${fullVersionFromTag}" anywhere in commit title...`);
+				for (const line of lines) {
+					const [sha, message, author, timestamp] = line.split("|");
+					if (sha === orphanedCommit) continue;
+
+					if (message.includes(fullVersionFromTag)) {
+						console.log(`✅ Found equivalent commit by full version match: ${sha} - "${message}"`);
+						return sha;
+					}
+				}
+
+				// 3rd Priority: Look for numeric version (without v) anywhere in commit title
+				console.log(`🔍 Priority 3: Searching for "${versionFromTag}" anywhere in commit title...`);
+				for (const line of lines) {
+					const [sha, message, author, timestamp] = line.split("|");
+					if (sha === orphanedCommit) continue;
+
+					if (message.includes(versionFromTag)) {
+						console.log(`✅ Found equivalent commit by numeric version match: ${sha} - "${message}"`);
+						return sha;
+					}
+				}
+			}
+		}
+
+		// Second priority: Look for version pattern in orphaned commit message
+		const releaseMatch = orphanedMessage.match(/^(release|chore):\s*(v?\d+\.\d+\.\d+)/);
+		if (releaseMatch) {
+			const version = releaseMatch[2];
+			console.log(`🔍 Detected version commit for ${version}, searching for pattern...`);
+
+			const allCommits = gitCommand(`git log --format="%H|%s|%an <%ae>|%ct" HEAD`, true);
+			if (allCommits) {
+				const lines = allCommits.split("\n").filter((line) => line.trim());
+				for (const line of lines) {
+					const [sha, message, author, timestamp] = line.split("|");
+
+					// Skip if it's the same commit
+					if (sha === orphanedCommit) continue;
+
+					// Look for same version in any commit message
+					if (message.includes(version) || message.includes(version.replace(/^v/, ""))) {
+						console.log(`✅ Found equivalent commit by message version: ${sha} - "${message}"`);
+						return sha;
+					}
+				}
+			}
+		}
+
+		// Final fallback: exact message search
 		console.log(`🔍 Searching for exact message match: "${orphanedMessage}"`);
 		const allCommits = gitCommand(`git log --format="%H|%s|%an <%ae>|%ct" HEAD`, true);
-		
+
 		if (allCommits) {
-			const lines = allCommits.split("\n").filter(line => line.trim());
+			const lines = allCommits.split("\n").filter((line) => line.trim());
 			for (const line of lines) {
 				const [sha, message, author, timestamp] = line.split("|");
-				
-				// Skip if it's the same commit (shouldn't happen in current branch, but safety check)
+
+				// Skip if it's the same commit
 				if (sha === orphanedCommit) continue;
-				
+
 				// Check for exact message match
 				if (message === orphanedMessage) {
 					console.log(`✅ Found equivalent commit by exact message: ${sha} - "${message}"`);
@@ -122,7 +176,7 @@ function fixOrphanedTag(tagObj) {
 		console.log(`🔗 Re-pointing orphaned tag ${tagName}...`);
 
 		// Find equivalent commit
-		const equivalentCommit = findEquivalentCommit(tagObj.commitSha);
+		const equivalentCommit = findEquivalentCommit(tagObj.commitSha, tagName);
 		if (!equivalentCommit) {
 			console.error(`❌ Could not find equivalent commit for orphaned tag ${tagName}`);
 			return null;

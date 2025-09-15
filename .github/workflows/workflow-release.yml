@@ -140,7 +140,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           head-branch: ${{ github.ref_name }}
-          base-branch: "master"
+          base-branch: ${{ github.event.repository.default_branch }}
 
   detect-release:
     name: "🔍 Detect Release"
