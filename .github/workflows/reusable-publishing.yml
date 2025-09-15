@@ -280,9 +280,9 @@ jobs:
 
   create-release:
     name: "📋 Create GitHub Release"
-    if: inputs.run_create_release == true && always() && (needs.publish-npm.result == 'success' || needs.publish-github-packages.result == 'success')
+    if: inputs.run_create_release == true
     runs-on: ubuntu-latest
-    needs: [detect-version, publish-npm, publish-github-packages, download-artifacts]
+    needs: [detect-version]
     outputs:
       release-id: ${{ steps.create.outputs.release-id }}
     steps:

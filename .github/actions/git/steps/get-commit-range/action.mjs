@@ -155,15 +155,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	} else {
 		// Use the latest semantic version tag (excluding specified version if provided)
 		console.log("🔍 DEBUG: Looking for latest semantic version tag...");
-		
+
 		let tagCommand = "git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'";
 		if (EXCLUDE_VERSION) {
 			console.log(`🔍 DEBUG: Excluding version ${EXCLUDE_VERSION} from tag search`);
 			tagCommand += ` | grep -v '^${EXCLUDE_VERSION}$'`;
 		}
-		
+
 		const allTags = gitCommand(tagCommand, true);
-		console.log(`🔍 DEBUG: All semantic version tags found${EXCLUDE_VERSION ? ` (excluding ${EXCLUDE_VERSION})` : ''}: ${allTags}`);
+		console.log(`🔍 DEBUG: All semantic version tags found${EXCLUDE_VERSION ? ` (excluding ${EXCLUDE_VERSION})` : ""}: ${allTags}`);
 
 		baseRef = gitCommand(tagCommand + " | sort -V | tail -1", true);
 		console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);

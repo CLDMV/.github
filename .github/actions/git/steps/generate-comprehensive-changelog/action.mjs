@@ -102,22 +102,27 @@ async function convertAuthorToGitHubLink(author, email, token) {
 async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false) {
 	console.log(`🔍 DEBUG: generateComprehensiveChangelog called with:`);
 	console.log(`  - commitRange: ${commitRange}`);
-	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + ' commits' : 'provided but not array') : 'null'}`);
+	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + " commits" : "provided but not array") : "null"}`);
 	console.log(`  - useSingleCommitMessage: ${useSingleCommitMessage}`);
-	
+
 	if (commits && Array.isArray(commits)) {
-		console.log(`  - commits preview: ${commits.slice(0, 3).map(c => c.subject || c).join(', ')}${commits.length > 3 ? '...' : ''}`);
+		console.log(
+			`  - commits preview: ${commits
+				.slice(0, 3)
+				.map((c) => c.subject || c)
+				.join(", ")}${commits.length > 3 ? "..." : ""}`
+		);
 	}
 
 	// Handle edge case: if no commits provided and single commit message requested,
 	// get the current commit message as release notes
 	if ((!commits || commits.length === 0) && useSingleCommitMessage) {
 		console.log(`📝 No commits in range but single commit message requested - using current commit`);
-		
+
 		try {
 			const currentCommitInfo = gitCommand(`git log -1 --pretty=format:"%s|%b"`, true);
 			if (currentCommitInfo) {
-				const [subject, body] = currentCommitInfo.split('|');
+				const [subject, body] = currentCommitInfo.split("|");
 				let releaseNotes = subject;
 				if (body && body.trim()) {
 					releaseNotes += "\n\n" + body.trim();
@@ -174,15 +179,15 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			const subject = commit.subject.toLowerCase();
 			return /^release(\([^)]*\))?!?:/.test(subject);
 		});
-		
+
 		if (releaseCommit) {
 			console.log(`📝 Single commit message requested with multiple commits, using release commit: ${releaseCommit.subject}`);
-			
+
 			let singleCommitChangelog = releaseCommit.subject;
 			if (releaseCommit.body && releaseCommit.body.trim()) {
 				singleCommitChangelog += "\n\n" + releaseCommit.body.trim();
 			}
-			
+
 			return singleCommitChangelog;
 		}
 	}
