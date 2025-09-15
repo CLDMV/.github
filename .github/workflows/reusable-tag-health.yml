@@ -324,6 +324,7 @@ jobs:
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
+          github_token: ${{ needs.setup-shared.outputs.auth-token }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tagger_name: ${{ secrets.TAGGER_NAME }}
           tagger_email: ${{ secrets.TAGGER_EMAIL }}

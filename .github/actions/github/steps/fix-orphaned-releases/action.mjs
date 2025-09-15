@@ -10,14 +10,20 @@ import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../api/_api/gpg.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
+const GITHUB_TOKEN = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 const GPG_ENABLED = process.env.INPUT_GPG_ENABLED === "true";
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "CLDMV Bot";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "cldmv-bot@users.noreply.github.com";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
 const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 
 console.log("🔍 Checking for orphaned releases...");
+
+if (DEBUG) {
+	console.log("🐛 Debug mode enabled");
+	console.log(`🔑 Token available: ${GITHUB_TOKEN ? 'Yes' : 'No'}`);
+	console.log(`📦 Repository: ${process.env.GITHUB_REPOSITORY || 'Not set'}`);
+}
 
 /**
  * Get all releases from GitHub API

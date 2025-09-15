@@ -6,6 +6,9 @@ inputs:
     description: "Enable debug logging"
     required: false
     default: "false"
+  github_token:
+    description: "GitHub token for API access"
+    required: true
   gpg_enabled:
     description: "Whether GPG signing is enabled"
     required: false
