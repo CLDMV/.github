@@ -135,7 +135,7 @@ runs:
         echo "  - ✅ Publish command generated successfully" >> $GITHUB_STEP_SUMMARY
         echo "  - ✅ All prerequisites met for GitHub Packages publication" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "💡 **Would publish**: \`${{ steps.generate-command.outputs.command }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Would publish**: \`${{ steps.generate-command.outputs.command }}\` to registry \`https://npm.pkg.github.com\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Update Summary - GitHub Packages Failure
       if: steps.publish-package.outputs.published != 'true' && inputs.dry-run != 'true'

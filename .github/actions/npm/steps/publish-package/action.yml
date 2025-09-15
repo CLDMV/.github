@@ -132,6 +132,7 @@ runs:
         if [ "${{ inputs.dry-run }}" = "true" ]; then
           echo "🧪 DRY RUN MODE: Validating publish setup without executing"
           echo "📝 Would execute command: $PUBLISH_CMD"
+          echo "🌐 Target registry: ${{ inputs.registry-url }}"
           echo ""
           echo "✅ Validation completed successfully:"
           echo "  - Package directory structure is valid"
@@ -140,7 +141,7 @@ runs:
           echo "  - Publish command is properly formatted"
           echo "  - Authentication token is available"
           echo ""
-          echo "💡 In real run, would execute: $PUBLISH_CMD"
+          echo "💡 In real run, would execute: $PUBLISH_CMD (targeting ${{ inputs.registry-url }})"
           echo "published=true" >> $GITHUB_OUTPUT
           echo "error-type=" >> $GITHUB_OUTPUT
           echo "error-message=" >> $GITHUB_OUTPUT
