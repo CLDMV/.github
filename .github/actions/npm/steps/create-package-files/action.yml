@@ -50,9 +50,19 @@ runs:
           
           # First try the custom input pattern
           if [ -n "${{ inputs.package-path }}" ] && [ "${{ inputs.package-path }}" != "*.tgz" ]; then
-            TGZ_FILE=$(find . -path "${{ inputs.package-path }}" -type f | head -1)
-            if [ -n "$TGZ_FILE" ]; then
-              echo "📦 Found .tgz file with input pattern: $TGZ_FILE"
+            # Check if it's an absolute path
+            if [[ "${{ inputs.package-path }}" = /* ]]; then
+              # Absolute path - check if file exists directly
+              if [ -f "${{ inputs.package-path }}" ]; then
+                TGZ_FILE="${{ inputs.package-path }}"
+                echo "📦 Found .tgz file with absolute path: $TGZ_FILE"
+              fi
+            else
+              # Relative path - use find
+              TGZ_FILE=$(find . -path "${{ inputs.package-path }}" -type f | head -1)
+              if [ -n "$TGZ_FILE" ]; then
+                echo "📦 Found .tgz file with relative path pattern: $TGZ_FILE"
+              fi
             fi
           fi
           
