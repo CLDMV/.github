@@ -244,11 +244,11 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			return true;
 		} catch (apiError) {
 			console.error(`❌ GitHub API tag creation failed: ${apiError.message}`);
-
+			
 			if (DEBUG) {
 				console.log(`⚠️ Falling back to git push method`);
 			}
-
+			
 			// Fallback: create tag locally and push
 			let tagCommand;
 			if (GPG_ENABLED && GPG_PRIVATE_KEY && keyid) {
@@ -260,8 +260,10 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			}
 
 			gitCommand(tagCommand, true);
+			
+			// This will throw if push fails - let it bubble up to the outer catch
 			gitCommand(`git push origin ${tagName}`, false);
-
+			
 			console.log(`✅ Successfully created and pushed tag ${tagName} via git push fallback`);
 			return true;
 		}
@@ -316,6 +318,17 @@ async function main() {
 		const tagRef = gitCommand(`git rev-parse refs/tags/${tagName}`, true);
 		if (tagRef && tagRef.trim()) {
 			console.log(`✅ Tag ${tagName} exists`);
+			
+			// Verify the tag points to the expected commit if we have a target
+			if (targetCommitish && targetCommitish !== "null" && targetCommitish !== "master") {
+				const expectedCommit = gitCommand(`git rev-parse ${targetCommitish}`, true);
+				if (expectedCommit && expectedCommit.trim() && expectedCommit.trim() !== tagRef.trim()) {
+					console.log(`⚠️ Tag ${tagName} exists but points to different commit`);
+					console.log(`   Current: ${tagRef.trim()}`);
+					console.log(`   Expected: ${expectedCommit.trim()}`);
+				}
+			}
+			
 			continue;
 		}
 
