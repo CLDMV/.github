@@ -142,9 +142,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Don't filter out release commits - they may contain useful information
 
-	// Breaking Changes - use proper categorization
+	// Breaking Changes - use proper categorization (exclude merge commits)
 	changelog += "### 💥 Breaking Changes\n";
-	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
+	const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && c.category !== "merge");
 	if (breakingCommits.length > 0) {
 		breakingCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;
@@ -154,9 +154,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	}
 	changelog += "\n";
 
-	// Features - use proper categorization
+	// Features - use proper categorization (exclude merge commits)
 	changelog += "### ✨ Features\n";
-	const featureCommits = commits.filter((c) => c.category === "feature");
+	const featureCommits = commits.filter((c) => c.category === "feature" && c.category !== "merge");
 	if (featureCommits.length > 0) {
 		featureCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;
@@ -166,9 +166,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	}
 	changelog += "\n";
 
-	// Bug Fixes - use proper categorization
+	// Bug Fixes - use proper categorization (exclude merge commits)
 	changelog += "### 🐛 Bug Fixes\n";
-	const fixCommits = commits.filter((c) => c.category === "fix");
+	const fixCommits = commits.filter((c) => c.category === "fix" && c.category !== "merge");
 	if (fixCommits.length > 0) {
 		fixCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;
@@ -178,9 +178,11 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	}
 	changelog += "\n";
 
-	// Other Changes - maintenance and other categories (but NOT release commits)
+	// Other Changes - maintenance and other categories (but NOT release or merge commits)
 	changelog += "### 🔧 Other Changes\n";
-	const otherCommits = commits.filter((c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release");
+	const otherCommits = commits.filter(
+		(c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release" && c.category !== "merge"
+	);
 	if (otherCommits.length > 0) {
 		otherCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;

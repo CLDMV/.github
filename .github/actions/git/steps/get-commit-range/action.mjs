@@ -35,6 +35,18 @@ export function categorizeCommits(commitRange, allCommits = null) {
 			let scope = null;
 			let isBreaking = false;
 
+			// Skip merge commits - they shouldn't be in changelogs
+			if (
+				subject.startsWith("Merge ") ||
+				subject.includes("merge conflict") ||
+				subject.toLowerCase().includes("resolve conflict") ||
+				/^Merge branch '.+' into .+$/.test(subject) ||
+				/^Merge pull request #\d+/.test(subject)
+			) {
+				category = "merge";
+				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → merge (skipped from changelog)`);
+			}
+
 			// Parse conventional commit format
 			const conventionalMatch = subject.match(/^(\w+)(\([^)]+\))?(!)?:\s*(.+)/);
 			if (conventionalMatch) {

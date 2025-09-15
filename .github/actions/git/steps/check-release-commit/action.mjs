@@ -77,11 +77,11 @@ function extractExplicitVersion(subject) {
  * @returns {object} Version bump analysis
  */
 function analyzeVersionBump(commits) {
-	// Filter out release commits for version analysis (but keep them for explicit version extraction)
+	// Filter out release commits and merge commits for version analysis (but keep them for explicit version extraction)
 	const nonReleaseCommits = commits.filter((commit) => {
 		const subject = commit.subject.toLowerCase();
-		// Filter out: release:, release!:, release(scope):, release(scope)!:
-		return !/^release(\([^)]*\))?!?:/.test(subject);
+		// Filter out: release:, release!:, release(scope):, release(scope)!:, and merge commits
+		return !/^release(\([^)]*\))?!?:/.test(subject) && commit.category !== "merge";
 	});
 
 	// Check for breaking changes

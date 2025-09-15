@@ -1,0 +1,61 @@
+name: "Check for Existing Release PR"
+description: "Check if a release PR already exists for the current branch"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: true
+  head-branch:
+    description: "Head branch name (source branch)"
+    required: false
+    default: ${{ github.ref_name }}
+  base-branch:
+    description: "Base branch name (target branch)"
+    required: false
+    default: "master"
+
+outputs:
+  pr-exists:
+    description: "Whether an existing PR was found (true/false)"
+    value: ${{ steps.check.outputs.pr-exists }}
+  pr-number:
+    description: "Number of the existing PR (empty if no PR exists)"
+    value: ${{ steps.check.outputs.pr-number }}
+  should-skip:
+    description: "Whether the workflow should skip full processing (true if PR exists)"
+    value: ${{ steps.check.outputs.should-skip }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check for existing PR
+      id: check
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        HEAD_BRANCH: ${{ inputs.head-branch }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+      run: |
+        echo "🔍 Checking for existing PR from '$HEAD_BRANCH' to '$BASE_BRANCH'..."
+
+        # Check if PR already exists using GitHub API
+        EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:$HEAD_BRANCH&base=$BASE_BRANCH&state=open")
+
+        EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
+
+        if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
+          echo "📋 Existing PR found: #$EXISTING_PR_NUMBER"
+          echo "pr-exists=true" >> $GITHUB_OUTPUT
+          echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "should-skip=true" >> $GITHUB_OUTPUT
+          
+          echo "ℹ️ Since PR #$EXISTING_PR_NUMBER already exists, skipping full release processing."
+          echo "💡 The PR description should be updated instead of running full workflow."
+        else
+          echo "✅ No existing PR found - proceeding with release workflow"
+          echo "pr-exists=false" >> $GITHUB_OUTPUT
+          echo "pr-number=" >> $GITHUB_OUTPUT
+          echo "should-skip=false" >> $GITHUB_OUTPUT
+        fi

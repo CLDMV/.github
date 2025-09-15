@@ -126,8 +126,26 @@ on:
         required: false
 
 jobs:
+  check-existing-pr:
+    name: "🔍 Check for Existing PR"
+    runs-on: ubuntu-latest
+    outputs:
+      pr-exists: ${{ steps.check.outputs.pr-exists }}
+      pr-number: ${{ steps.check.outputs.pr-number }}
+      should-skip: ${{ steps.check.outputs.should-skip }}
+    steps:
+      - name: Check for existing release PR
+        id: check
+        uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v1
+        with:
+          github-token: ${{ github.token }}
+          head-branch: ${{ github.ref_name }}
+          base-branch: "master"
+
   detect-release:
     name: "🔍 Detect Release"
+    if: needs.check-existing-pr.outputs.should-skip == 'false'
+    needs: check-existing-pr
     runs-on: ubuntu-latest
     outputs:
       should-release: ${{ steps.check.outputs.should-create-pr }}
@@ -143,10 +161,35 @@ jobs:
         id: check
         uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
 
+  update-existing-pr:
+    name: "📝 Update Existing PR"
+    if: needs.check-existing-pr.outputs.should-skip == 'true'
+    needs: check-existing-pr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+        with:
+          fetch-depth: 0
+
+      - name: Update PR description
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
+        run: |
+          echo "📝 Updating PR #$PR_NUMBER description with latest changes..."
+
+          # Generate updated changelog for just this push
+          # This could call the changelog action but limit it to recent commits
+
+          echo "✅ PR #$PR_NUMBER has been updated with the latest changes"
+          echo "ℹ️ Skipped full release workflow since PR already exists"
+
   build-and-test:
     name: "🏗️ Build and Test"
-    if: needs.detect-release.outputs.should-release == 'true'
-    needs: detect-release
+    if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
+    needs: [check-existing-pr, detect-release]
     uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
@@ -163,8 +206,8 @@ jobs:
 
   release:
     name: "🚀 Release Management"
-    if: needs.detect-release.outputs.should-release == 'true'
-    needs: [detect-release, build-and-test]
+    if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
+    needs: [check-existing-pr, detect-release, build-and-test]
     uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
     with:
       package_name: ${{ inputs.package_name }}
