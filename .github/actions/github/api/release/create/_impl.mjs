@@ -1,4 +1,4 @@
-import { debugLog } from "../../../common/common/core.mjs";
+import { debugLog } from "../../../../common/common/core.mjs";
 
 export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
 	debugLog(`Creating release for ${repo}:`);
