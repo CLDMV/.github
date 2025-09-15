@@ -8,6 +8,10 @@ inputs:
   commit-range:
     description: "Git commit range (fallback if commits not provided)"
     required: false
+  use-single-commit-message:
+    description: "Whether to use commit message directly for single commits (true for publish, false for PR)"
+    required: false
+    default: "false"
 
 outputs:
   changelog-content:
@@ -23,5 +27,6 @@ runs:
       env:
         COMMITS_INPUT: ${{ inputs.commits }}
         COMMIT_RANGE_INPUT: ${{ inputs.commit-range }}
+        USE_SINGLE_COMMIT_MESSAGE: ${{ inputs.use-single-commit-message }}
       run: |
         node "${{ github.action_path }}/action.mjs"

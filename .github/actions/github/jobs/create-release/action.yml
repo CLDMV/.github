@@ -113,13 +113,16 @@ runs:
           echo "📋 Using provided version: ${{ inputs.version }}"
         fi
 
-    - name: Generate release notes
+    - name: Get commits for changelog
+      id: get-commits
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+
+    - name: Generate comprehensive changelog for release notes
       id: release-notes
-      uses: CLDMV/.github/.github/actions/git/steps/generate-release-notes@v1
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
       with:
-        version: ${{ steps.detect-version.outputs.version }}
-        package-name: ${{ inputs.package-name }}
-        package-manager: ${{ inputs.package-manager }}
+        commits: ${{ steps.get-commits.outputs.commits }}
+        use-single-commit-message: "true"
 
     - name: Get current commit SHA
       id: get-sha
@@ -144,7 +147,7 @@ runs:
       with:
         tag: v${{ steps.detect-version.outputs.version }}
         sha: ${{ steps.get-sha.outputs.commit-sha }}
-        message: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
+        message: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
@@ -212,7 +215,7 @@ runs:
       with:
         tag_name: v${{ steps.detect-version.outputs.version }}
         name: ${{ steps.names.outputs.release-name }}
-        body: ${{ inputs.release-notes || steps.release-notes.outputs.release-notes }}
+        body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
         is_draft: false
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
@@ -264,7 +267,7 @@ runs:
         fi
 
         if [ "${{ inputs.release-source-only }}" != "true" ]; then
-          echo "  - Package assets: ✅ Will be attached (.tgz and .zip)"
+          echo "  - Package assets: ✅ Will be attached (.tar.gz and .zip)"
         else
           echo "  - Package assets: ⏭️ Source-only release (no assets)"
         fi
@@ -283,7 +286,7 @@ runs:
       run: |
         echo "- ✅ GitHub Release [v${{ steps.detect-version.outputs.version }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }}) created successfully" >> $GITHUB_STEP_SUMMARY
         if [ "${{ inputs.release-source-only }}" != "true" ]; then
-          echo "- ✅ Package assets (.tgz and .zip) attached to release" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Package assets (.tar.gz and .zip) attached to release" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Update Summary - Dry Run Complete

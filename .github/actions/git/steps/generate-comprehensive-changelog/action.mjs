@@ -6,6 +6,7 @@ import { api } from "../../../github/api/_api/core.mjs";
 // Get inputs from environment
 const COMMITS_INPUT = process.env.COMMITS_INPUT;
 const COMMIT_RANGE_INPUT = process.env.COMMIT_RANGE_INPUT;
+const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === 'true';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 /**
@@ -98,7 +99,7 @@ async function convertAuthorToGitHubLink(author, email, token) {
  * @param {string} token - GitHub API token for user lookups
  * @returns {Promise<string>} Generated changelog content
  */
-async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null) {
+async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false) {
 	let lastTag = "";
 	let range = "";
 
@@ -117,13 +118,27 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		range = commitRange || "HEAD";
 	}
 
-	let changelog = "## 🚀 What's Changed\n\n";
-
 	if (!commits) {
 		console.log(`⚠️ No commits provided, using categorizeCommits with range: ${range}`);
 		commits = categorizeCommits(range);
 		console.log(`📋 Categorized ${commits.length} commits from git history`);
 	}
+
+	// If only one commit AND flag is enabled (like a PR squash and merge for publish), 
+	// use its message directly as it's usually more descriptive than auto-generated changelog
+	if (commits.length === 1 && useSingleCommitMessage) {
+		const commit = commits[0];
+		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
+		
+		let singleCommitChangelog = commit.subject;
+		if (commit.body && commit.body.trim()) {
+			singleCommitChangelog += '\n\n' + commit.body.trim();
+		}
+		
+		return singleCommitChangelog;
+	}
+
+	let changelog = "## 🚀 What's Changed\n\n";
 
 	// Don't filter out release commits - they may contain useful information
 
@@ -226,7 +241,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			console.log(`📋 Using commit range: ${commitRange}`);
 		}
 
-		const changelog = await generateComprehensiveChangelog(commitRange, commits, GITHUB_TOKEN);
+		const changelog = await generateComprehensiveChangelog(commitRange, commits, GITHUB_TOKEN, USE_SINGLE_COMMIT_MESSAGE);
 		console.log("📄 Generated comprehensive changelog");
 
 		// Output the changelog content
