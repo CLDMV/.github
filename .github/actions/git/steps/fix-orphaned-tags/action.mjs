@@ -43,58 +43,56 @@ function findEquivalentCommit(orphanedCommit) {
 			console.log(`🔍 Looking for equivalent of: "${orphanedMessage}" by ${orphanedAuthor}`);
 		}
 
-		// Search for commits with same message and author in current branch
-		const searchCommand = `git log --format="%H|%s|%an <%ae>|%ct" --grep="${orphanedMessage.replace(
-			/"/g,
-			'\\"'
-		)}" --author="${orphanedAuthor}" HEAD`;
-		const searchResults = gitCommand(searchCommand, true);
-
-		if (!searchResults) {
-			// Try broader search with just message
-			const broaderSearch = `git log --format="%H|%s|%an <%ae>|%ct" --grep="${orphanedMessage.replace(/"/g, '\\"')}" HEAD`;
-			const broaderResults = gitCommand(broaderSearch, true);
-
-			if (broaderResults) {
-				const lines = broaderResults.split("\n");
-				for (const line of lines) {
-					const [sha, message, author, timestamp] = line.split("|");
-					if (message === orphanedMessage) {
-						console.log(`✅ Found equivalent commit by message: ${sha}`);
-						return sha;
+		// Special handling for release commits - look for version pattern
+		const releaseMatch = orphanedMessage.match(/^release:\s*(v?\d+\.\d+\.\d+)/);
+		if (releaseMatch) {
+			const version = releaseMatch[1];
+			console.log(`🔍 Detected release commit for version ${version}, searching for pattern...`);
+			
+			// Search for commits containing this version in a release message
+			const versionSearch = `git log --format="%H|%s|%an <%ae>|%ct" --oneline HEAD | grep -i "release.*${version}"`;
+			try {
+				const versionResults = gitCommand(versionSearch, true);
+				if (versionResults) {
+					const lines = versionResults.split("\n").filter(line => line.trim());
+					for (const line of lines) {
+						const parts = line.split("|");
+						if (parts.length >= 2) {
+							const [sha, message] = parts;
+							// Check if this is a release message for the same version
+							if (message.toLowerCase().includes("release") && message.includes(version)) {
+								console.log(`✅ Found equivalent release commit by version pattern: ${sha} - "${message}"`);
+								return sha;
+							}
+						}
 					}
 				}
-			}
-
-			console.warn(`⚠️ No equivalent commit found for orphaned commit ${orphanedCommit}`);
-			return null;
-		}
-
-		// Parse results and find best match
-		const lines = searchResults.split("\n");
-		for (const line of lines) {
-			const [sha, message, author, timestamp] = line.split("|");
-
-			// Skip if it's the same commit (shouldn't happen in current branch, but safety check)
-			if (sha === orphanedCommit) continue;
-
-			// Exact match on message and author
-			if (message === orphanedMessage && author === orphanedAuthor) {
-				console.log(`✅ Found equivalent commit: ${sha}`);
-				return sha;
+			} catch (error) {
+				console.log(`🔍 Version pattern search failed: ${error.message}, falling back to exact message search`);
 			}
 		}
 
-		// If no exact match, try the first one with same message
-		const firstLine = lines[0];
-		if (firstLine) {
-			const [sha, message] = firstLine.split("|");
-			if (message === orphanedMessage) {
-				console.log(`✅ Found equivalent commit (different author): ${sha}`);
-				return sha;
+		// Fallback to exact message search without author restriction
+		console.log(`🔍 Searching for exact message match: "${orphanedMessage}"`);
+		const allCommits = gitCommand(`git log --format="%H|%s|%an <%ae>|%ct" HEAD`, true);
+		
+		if (allCommits) {
+			const lines = allCommits.split("\n").filter(line => line.trim());
+			for (const line of lines) {
+				const [sha, message, author, timestamp] = line.split("|");
+				
+				// Skip if it's the same commit (shouldn't happen in current branch, but safety check)
+				if (sha === orphanedCommit) continue;
+				
+				// Check for exact message match
+				if (message === orphanedMessage) {
+					console.log(`✅ Found equivalent commit by exact message: ${sha} - "${message}"`);
+					return sha;
+				}
 			}
 		}
 
+		console.warn(`⚠️ No equivalent commit found for orphaned commit ${orphanedCommit}`);
 		return null;
 	} catch (error) {
 		console.error(`❌ Error finding equivalent commit: ${error.message}`);
