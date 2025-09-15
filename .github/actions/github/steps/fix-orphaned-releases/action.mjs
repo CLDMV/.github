@@ -12,6 +12,7 @@ import { api, parseRepo } from "../../api/_api/core.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const GITHUB_TOKEN = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+const USE_DEFAULT_TOKEN = process.env.INPUT_USE_DEFAULT_TOKEN === "true";
 const GPG_ENABLED = process.env.INPUT_GPG_ENABLED === "true";
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "CLDMV Bot";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "cldmv-bot@users.noreply.github.com";
@@ -31,10 +32,12 @@ if (DEBUG) {
 	if (process.env.INPUT_GITHUB_TOKEN) {
 		console.log(`  - INPUT_GITHUB_TOKEN length: ${process.env.INPUT_GITHUB_TOKEN.length}`);
 		console.log(`  - INPUT_GITHUB_TOKEN starts with: ${process.env.INPUT_GITHUB_TOKEN.substring(0, 7)}...`);
+		console.log(`  - INPUT_GITHUB_TOKEN type: ${process.env.INPUT_GITHUB_TOKEN.startsWith('ghs_') ? 'App token' : process.env.INPUT_GITHUB_TOKEN.startsWith('ghp_') ? 'Personal token' : 'Unknown type'}`);
 	}
 	if (process.env.GITHUB_TOKEN) {
 		console.log(`  - GITHUB_TOKEN length: ${process.env.GITHUB_TOKEN.length}`);
 		console.log(`  - GITHUB_TOKEN starts with: ${process.env.GITHUB_TOKEN.substring(0, 7)}...`);
+		console.log(`  - GITHUB_TOKEN type: ${process.env.GITHUB_TOKEN.startsWith('ghs_') ? 'App token' : process.env.GITHUB_TOKEN.startsWith('ghp_') ? 'Personal token' : 'Default workflow token'}`);
 	}
 }
 

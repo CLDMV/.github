@@ -1,0 +1,425 @@
+name: 🧪 Test Tag Creation Methods
+
+on:
+  workflow_call:
+    inputs:
+      package_name:
+        description: "Package name for testing"
+        required: true
+        type: string
+      test_tag_name:
+        description: "Tag name to create for testing (e.g., test-v1.0.0)"
+        required: true
+        type: string
+      target_commit:
+        description: "Commit SHA to tag (defaults to HEAD)"
+        required: false
+        type: string
+        default: ""
+      cleanup_tag:
+        description: "Whether to clean up the test tag after testing"
+        required: false
+        type: boolean
+        default: true
+      set_permissions:
+        description: "Whether to set explicit permissions on the job"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      BOT_APP_ID:
+        description: "GitHub App ID for CLDMV bot"
+        required: true
+      BOT_APP_PRIVATE_KEY:
+        description: "GitHub App private key for CLDMV bot"
+        required: true
+      TAGGER_NAME:
+        description: "GPG tagger name for signing"
+        required: false
+      TAGGER_EMAIL:
+        description: "GPG tagger email for signing"
+        required: false
+      GPG_PRIVATE_KEY:
+        description: "ASCII-armored private key for signing"
+        required: false
+      GPG_PASSPHRASE:
+        description: "Passphrase for the private key (if protected)"
+        required: false
+
+jobs:
+  test-tag-creation-no-permissions:
+    name: "🧪 Test Tag Creation (No Explicit Permissions)"
+    if: inputs.set_permissions == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📋 Test Configuration
+        run: |
+          echo "## 🧪 Tag Creation Test Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Package: ${{ inputs.package_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ Test Tag: ${{ inputs.test_tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Target Commit: ${{ inputs.target_commit || 'HEAD' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧹 Cleanup After: ${{ inputs.cleanup_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔐 Explicit Permissions: No" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔑 Create App Token
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: 🔍 Debug Token Information
+        run: |
+          echo "🔍 Token Analysis:"
+          echo "  - Token length: ${#GITHUB_TOKEN}"
+          echo "  - Token prefix: ${GITHUB_TOKEN:0:7}..."
+          echo "  - Token type: $(if [[ "$GITHUB_TOKEN" == ghs_* ]]; then echo "GitHub App token"; elif [[ "$GITHUB_TOKEN" == ghp_* ]]; then echo "Personal Access Token"; else echo "Unknown/Default token"; fi)"
+          echo "  - Repository: $GITHUB_REPOSITORY"
+          echo "  - Actor: $GITHUB_ACTOR"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: 🎯 Determine Target Commit
+        id: target
+        run: |
+          if [ -n "${{ inputs.target_commit }}" ]; then
+            TARGET_COMMIT="${{ inputs.target_commit }}"
+          else
+            TARGET_COMMIT=$(git rev-parse HEAD)
+          fi
+          echo "target_commit=$TARGET_COMMIT" >> $GITHUB_OUTPUT
+          echo "🎯 Target commit: $TARGET_COMMIT"
+
+      - name: 🔍 Pre-Test Repository State
+        run: |
+          echo "## 🔍 Pre-Test Repository State" >> $GITHUB_STEP_SUMMARY
+          echo "### Tags:" >> $GITHUB_STEP_SUMMARY
+          if git tag -l | head -10; then
+            git tag -l | head -10 | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No tags found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Releases:" >> $GITHUB_STEP_SUMMARY
+          if curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+               "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+               jq -r '.[0:5] | .[] | "- " + .tag_name + " (" + .name + ")"' 2>/dev/null; then
+            curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+                 "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+                 jq -r '.[0:5] | .[] | "- " + .tag_name + " (" + .name + ")"' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No releases found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧪 Test 1 - Create Tag via GitHub API
+        id: api-tag
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Test 1: GitHub API Tag Creation" >> $GITHUB_STEP_SUMMARY
+          
+          # Create tag via API
+          echo "🔄 Creating tag via GitHub API..."
+          
+          API_RESPONSE=$(curl -s -w "%{http_code}" -o api_response.json \
+            -X POST \
+            -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs" \
+            -d '{
+              "ref": "refs/tags/${{ inputs.test_tag_name }}-api",
+              "sha": "${{ steps.target.outputs.target_commit }}"
+            }')
+          
+          HTTP_CODE="${API_RESPONSE: -3}"
+          
+          echo "📊 API Response:"
+          echo "  - HTTP Code: $HTTP_CODE"
+          echo "  - Response Body:"
+          cat api_response.json | jq . || cat api_response.json
+          
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "api_success=true" >> $GITHUB_OUTPUT
+            echo "✅ API tag creation: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "api_success=false" >> $GITHUB_OUTPUT
+            echo "❌ API tag creation: FAILED (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            cat api_response.json >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: 🧪 Test 2 - Create Tag via Git Commands
+        id: git-tag
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Test 2: Git Command Tag Creation" >> $GITHUB_STEP_SUMMARY
+          
+          # Setup git with app token
+          git remote set-url origin "https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/$GITHUB_REPOSITORY.git"
+          git config user.name "${{ secrets.TAGGER_NAME || 'CLDMV Bot' }}"
+          git config user.email "${{ secrets.TAGGER_EMAIL || 'cldmv-bot@users.noreply.github.com' }}"
+          
+          echo "🔄 Creating tag via git commands..."
+          
+          # Create annotated tag
+          if git tag -a "${{ inputs.test_tag_name }}-git" "${{ steps.target.outputs.target_commit }}" -m "Test tag created via git commands"; then
+            echo "✅ Local tag creation: SUCCESS"
+            
+            # Try to push
+            if git push origin "${{ inputs.test_tag_name }}-git"; then
+              echo "git_success=true" >> $GITHUB_OUTPUT
+              echo "✅ Git tag creation and push: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "git_success=false" >> $GITHUB_OUTPUT
+              echo "❌ Git tag push: FAILED" >> $GITHUB_STEP_SUMMARY
+              echo "Local tag created but push failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "git_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Git tag creation: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧪 Test 3 - Create Release via API (API Tag)
+        id: api-release
+        if: steps.api-tag.outputs.api_success == 'true'
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Test 3: Release Creation (API Tag)" >> $GITHUB_STEP_SUMMARY
+          
+          API_RESPONSE=$(curl -s -w "%{http_code}" -o release_response.json \
+            -X POST \
+            -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" \
+            -d '{
+              "tag_name": "${{ inputs.test_tag_name }}-api",
+              "target_commitish": "${{ steps.target.outputs.target_commit }}",
+              "name": "Test Release (API Tag)",
+              "body": "Test release created for API-based tag",
+              "draft": false,
+              "prerelease": true
+            }')
+          
+          HTTP_CODE="${API_RESPONSE: -3}"
+          
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "api_release_success=true" >> $GITHUB_OUTPUT
+            echo "✅ API release creation: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "api_release_success=false" >> $GITHUB_OUTPUT
+            echo "❌ API release creation: FAILED (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧪 Test 4 - Create Release via API (Git Tag)
+        id: git-release
+        if: steps.git-tag.outputs.git_success == 'true'
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Test 4: Release Creation (Git Tag)" >> $GITHUB_STEP_SUMMARY
+          
+          API_RESPONSE=$(curl -s -w "%{http_code}" -o release_git_response.json \
+            -X POST \
+            -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" \
+            -d '{
+              "tag_name": "${{ inputs.test_tag_name }}-git",
+              "target_commitish": "${{ steps.target.outputs.target_commit }}",
+              "name": "Test Release (Git Tag)",
+              "body": "Test release created for git-based tag",
+              "draft": false,
+              "prerelease": true
+            }')
+          
+          HTTP_CODE="${API_RESPONSE: -3}"
+          
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "git_release_success=true" >> $GITHUB_OUTPUT
+            echo "✅ Git release creation: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "git_release_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Git release creation: FAILED (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔍 Post-Test Repository State
+        run: |
+          echo "## 🔍 Post-Test Repository State" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Tags:" >> $GITHUB_STEP_SUMMARY
+          git fetch --tags
+          if git tag -l "*${{ inputs.test_tag_name }}*"; then
+            git tag -l "*${{ inputs.test_tag_name }}*" | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No test tags found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Releases:" >> $GITHUB_STEP_SUMMARY
+          if curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+               "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+               jq -r '.[] | select(.tag_name | contains("${{ inputs.test_tag_name }}")) | "- " + .tag_name + " (" + .name + ")"' 2>/dev/null; then
+            curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+                 "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+                 jq -r '.[] | select(.tag_name | contains("${{ inputs.test_tag_name }}")) | "- " + .tag_name + " (" + .name + ")"' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No test releases found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧹 Cleanup Test Tags and Releases
+        if: inputs.cleanup_tag == true
+        continue-on-error: true
+        run: |
+          echo "## 🧹 Cleanup" >> $GITHUB_STEP_SUMMARY
+          
+          # Clean up releases first
+          for tag in "${{ inputs.test_tag_name }}-api" "${{ inputs.test_tag_name }}-git"; do
+            RELEASE_ID=$(curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+                         "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag" | \
+                         jq -r '.id // empty')
+            
+            if [ -n "$RELEASE_ID" ]; then
+              curl -s -X DELETE \
+                   -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+                   "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+              echo "- Deleted release: $tag" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          # Clean up tags
+          for tag in "${{ inputs.test_tag_name }}-api" "${{ inputs.test_tag_name }}-git"; do
+            curl -s -X DELETE \
+                 -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+                 "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" || true
+            echo "- Deleted tag: $tag" >> $GITHUB_STEP_SUMMARY
+          done
+
+  test-tag-creation-with-permissions:
+    name: "🧪 Test Tag Creation (With Explicit Permissions)"
+    if: inputs.set_permissions == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      issues: write
+      deployments: write
+      packages: write
+      pages: write
+      statuses: write
+      checks: write
+      security-events: write
+    steps:
+      - name: 📋 Test Configuration
+        run: |
+          echo "## 🧪 Tag Creation Test Configuration (With Permissions)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Package: ${{ inputs.package_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ Test Tag: ${{ inputs.test_tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Target Commit: ${{ inputs.target_commit || 'HEAD' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧹 Cleanup After: ${{ inputs.cleanup_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔐 Explicit Permissions: Yes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔑 Create App Token
+        id: app-token
+        uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+        with:
+          app_id: ${{ secrets.BOT_APP_ID }}
+          private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: 🔍 Debug Token Information
+        run: |
+          echo "🔍 Token Analysis (With Permissions):"
+          echo "  - Token length: ${#GITHUB_TOKEN}"
+          echo "  - Token prefix: ${GITHUB_TOKEN:0:7}..."
+          echo "  - Token type: $(if [[ "$GITHUB_TOKEN" == ghs_* ]]; then echo "GitHub App token"; elif [[ "$GITHUB_TOKEN" == ghp_* ]]; then echo "Personal Access Token"; else echo "Unknown/Default token"; fi)"
+          echo "  - Repository: $GITHUB_REPOSITORY"
+          echo "  - Actor: $GITHUB_ACTOR"
+          echo "  - Job Permissions: contents:write, actions:write, metadata:read, etc."
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: 🎯 Determine Target Commit
+        id: target
+        run: |
+          if [ -n "${{ inputs.target_commit }}" ]; then
+            TARGET_COMMIT="${{ inputs.target_commit }}"
+          else
+            TARGET_COMMIT=$(git rev-parse HEAD)
+          fi
+          echo "target_commit=$TARGET_COMMIT" >> $GITHUB_OUTPUT
+          echo "🎯 Target commit: $TARGET_COMMIT"
+
+      - name: 🧪 Test Git Commands (With Permissions)
+        id: git-tag-perms
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Git Command Test (With Permissions)" >> $GITHUB_STEP_SUMMARY
+          
+          # Setup git with app token
+          git remote set-url origin "https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/$GITHUB_REPOSITORY.git"
+          git config user.name "${{ secrets.TAGGER_NAME || 'CLDMV Bot' }}"
+          git config user.email "${{ secrets.TAGGER_EMAIL || 'cldmv-bot@users.noreply.github.com' }}"
+          
+          echo "🔄 Creating tag via git commands (with permissions)..."
+          
+          # Create annotated tag
+          if git tag -a "${{ inputs.test_tag_name }}-perms" "${{ steps.target.outputs.target_commit }}" -m "Test tag created with permissions"; then
+            echo "✅ Local tag creation: SUCCESS"
+            
+            # Try to push
+            if git push origin "${{ inputs.test_tag_name }}-perms"; then
+              echo "git_perms_success=true" >> $GITHUB_OUTPUT
+              echo "✅ Git tag creation and push (with permissions): SUCCESS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "git_perms_success=false" >> $GITHUB_OUTPUT
+              echo "❌ Git tag push (with permissions): FAILED" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "git_perms_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Git tag creation (with permissions): FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧹 Cleanup Test Tags
+        if: inputs.cleanup_tag == true
+        continue-on-error: true
+        run: |
+          echo "## 🧹 Cleanup (Permissions Test)" >> $GITHUB_STEP_SUMMARY
+          
+          # Clean up the permissions test tag
+          curl -s -X DELETE \
+               -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+               "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/${{ inputs.test_tag_name }}-perms" || true
+          echo "- Deleted tag: ${{ inputs.test_tag_name }}-perms" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Final Test Summary
+        run: |
+          echo "## 📊 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Method | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Git Commands (With Permissions) | ${{ steps.git-tag-perms.outputs.git_perms_success == 'true' && '✅ SUCCESS' || '❌ FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Note**: This job only tests the permissions-enabled scenario." >> $GITHUB_STEP_SUMMARY
+          echo "Compare with the no-permissions job results for full analysis." >> $GITHUB_STEP_SUMMARY
