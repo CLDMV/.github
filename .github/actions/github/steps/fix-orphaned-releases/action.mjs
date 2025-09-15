@@ -109,21 +109,6 @@ async function getAllReleases() {
  * Find the target commit for a missing tag
  */
 function findTargetCommit(tagName, targetCommitish) {
-	// First try the target_commitish from the release
-	if (targetCommitish && targetCommitish !== "null") {
-		try {
-			const commit = gitCommand(`git rev-parse ${targetCommitish}`, true);
-			if (commit) {
-				console.log(`✅ Found target commit from release: ${commit}`);
-				return commit;
-			}
-		} catch (error) {
-			if (DEBUG) {
-				console.log(`Target commitish ${targetCommitish} not found: ${error.message}`);
-			}
-		}
-	}
-
 	// Extract version from tag name (e.g., v2.0.0 -> 2.0.0)
 	const versionMatch = tagName.match(/^v?(.+)$/);
 	if (!versionMatch) {
@@ -142,35 +127,51 @@ function findTargetCommit(tagName, targetCommitish) {
 
 		const allCommits = gitCommand(`git log --format="%H|%s" HEAD`, true);
 		if (!allCommits) {
-			return null;
-		}
+			console.warn(`Could not retrieve git log`);
+		} else {
+			const lines = allCommits.split("\n").filter((line) => line.trim());
 
-		const lines = allCommits.split("\n").filter((line) => line.trim());
+			// Priority 1: Look for "release: v{version}" at start
+			for (const line of lines) {
+				const [sha, message] = line.split("|");
+				if (message && message.startsWith(`release: v${version}`)) {
+					console.log(`✅ Found commit by release pattern (v-prefix): ${sha} - "${message}"`);
+					return sha;
+				}
+			}
 
-		// Priority 1: Look for "release: v{version}" at start
-		for (const line of lines) {
-			const [sha, message] = line.split("|");
-			if (message && message.startsWith(`release: v${version}`)) {
-				console.log(`✅ Found commit by release pattern (v-prefix): ${sha} - "${message}"`);
-				return sha;
+			// Priority 2: Look for "release: {version}" at start
+			for (const line of lines) {
+				const [sha, message] = line.split("|");
+				if (message && message.startsWith(`release: ${version}`)) {
+					console.log(`✅ Found commit by release pattern (no v-prefix): ${sha} - "${message}"`);
+					return sha;
+				}
+			}
+
+			// Priority 3: Look for version anywhere in commit message
+			for (const line of lines) {
+				const [sha, message] = line.split("|");
+				if (message && (message.includes(version) || message.includes(`v${version}`))) {
+					console.log(`✅ Found commit by version mention: ${sha} - "${message}"`);
+					return sha;
+				}
 			}
 		}
 
-		// Priority 2: Look for "release: {version}" at start
-		for (const line of lines) {
-			const [sha, message] = line.split("|");
-			if (message && message.startsWith(`release: ${version}`)) {
-				console.log(`✅ Found commit by release pattern (no v-prefix): ${sha} - "${message}"`);
-				return sha;
-			}
-		}
-
-		// Priority 3: Look for version anywhere in commit message
-		for (const line of lines) {
-			const [sha, message] = line.split("|");
-			if (message && (message.includes(version) || message.includes(`v${version}`))) {
-				console.log(`✅ Found commit by version mention: ${sha} - "${message}"`);
-				return sha;
+		// Fallback: try the target_commitish from the release if no release commit found
+		if (targetCommitish && targetCommitish !== "null") {
+			try {
+				const commit = gitCommand(`git rev-parse ${targetCommitish}`, true);
+				if (commit && commit.trim()) {
+					console.log(`⚠️ Using target_commitish as fallback: ${commit.trim()}`);
+					console.log(`📝 Consider checking if this commit has the correct release content`);
+					return commit.trim();
+				}
+			} catch (error) {
+				if (DEBUG) {
+					console.log(`Target commitish ${targetCommitish} not found: ${error.message}`);
+				}
 			}
 		}
 
