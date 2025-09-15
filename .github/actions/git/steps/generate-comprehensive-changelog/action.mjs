@@ -6,7 +6,7 @@ import { api } from "../../../github/api/_api/core.mjs";
 // Get inputs from environment
 const COMMITS_INPUT = process.env.COMMITS_INPUT;
 const COMMIT_RANGE_INPUT = process.env.COMMIT_RANGE_INPUT;
-const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === 'true';
+const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "true";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 /**
@@ -124,17 +124,17 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		console.log(`📋 Categorized ${commits.length} commits from git history`);
 	}
 
-	// If only one commit AND flag is enabled (like a PR squash and merge for publish), 
+	// If only one commit AND flag is enabled (like a PR squash and merge for publish),
 	// use its message directly as it's usually more descriptive than auto-generated changelog
 	if (commits.length === 1 && useSingleCommitMessage) {
 		const commit = commits[0];
 		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
-		
+
 		let singleCommitChangelog = commit.subject;
 		if (commit.body && commit.body.trim()) {
-			singleCommitChangelog += '\n\n' + commit.body.trim();
+			singleCommitChangelog += "\n\n" + commit.body.trim();
 		}
-		
+
 		return singleCommitChangelog;
 	}
 
