@@ -100,6 +100,35 @@ async function convertAuthorToGitHubLink(author, email, token) {
  * @returns {Promise<string>} Generated changelog content
  */
 async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false) {
+	console.log(`🔍 DEBUG: generateComprehensiveChangelog called with:`);
+	console.log(`  - commitRange: ${commitRange}`);
+	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + ' commits' : 'provided but not array') : 'null'}`);
+	console.log(`  - useSingleCommitMessage: ${useSingleCommitMessage}`);
+	
+	if (commits && Array.isArray(commits)) {
+		console.log(`  - commits preview: ${commits.slice(0, 3).map(c => c.subject || c).join(', ')}${commits.length > 3 ? '...' : ''}`);
+	}
+
+	// Handle edge case: if no commits provided and single commit message requested,
+	// get the current commit message as release notes
+	if ((!commits || commits.length === 0) && useSingleCommitMessage) {
+		console.log(`📝 No commits in range but single commit message requested - using current commit`);
+		
+		try {
+			const currentCommitInfo = gitCommand(`git log -1 --pretty=format:"%s|%b"`, true);
+			if (currentCommitInfo) {
+				const [subject, body] = currentCommitInfo.split('|');
+				let releaseNotes = subject;
+				if (body && body.trim()) {
+					releaseNotes += "\n\n" + body.trim();
+				}
+				console.log(`📝 Using current commit message: ${subject}`);
+				return releaseNotes;
+			}
+		} catch (error) {
+			console.log(`⚠️ Failed to get current commit message: ${error.message}`);
+		}
+	}
 	let lastTag = "";
 	let range = "";
 
@@ -138,13 +167,33 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		return singleCommitChangelog;
 	}
 
+	// If single commit message is requested but there are multiple commits,
+	// look for the most recent release commit to use as the primary message
+	if (useSingleCommitMessage && commits.length > 1) {
+		const releaseCommit = commits.find((commit) => {
+			const subject = commit.subject.toLowerCase();
+			return /^release(\([^)]*\))?!?:/.test(subject);
+		});
+		
+		if (releaseCommit) {
+			console.log(`📝 Single commit message requested with multiple commits, using release commit: ${releaseCommit.subject}`);
+			
+			let singleCommitChangelog = releaseCommit.subject;
+			if (releaseCommit.body && releaseCommit.body.trim()) {
+				singleCommitChangelog += "\n\n" + releaseCommit.body.trim();
+			}
+			
+			return singleCommitChangelog;
+		}
+	}
+
 	let changelog = "## 🚀 What's Changed\n\n";
 
 	// Don't filter out release commits - they may contain useful information
 
-	// Breaking Changes - use proper categorization (exclude merge commits)
+	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
-	const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && c.category !== "merge");
+	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
 	if (breakingCommits.length > 0) {
 		breakingCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;
@@ -156,7 +205,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Features - use proper categorization (exclude merge commits)
 	changelog += "### ✨ Features\n";
-	const featureCommits = commits.filter((c) => c.category === "feature" && c.category !== "merge");
+	const featureCommits = commits.filter((c) => c.category === "feature");
 	if (featureCommits.length > 0) {
 		featureCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;
@@ -168,7 +217,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Bug Fixes - use proper categorization (exclude merge commits)
 	changelog += "### 🐛 Bug Fixes\n";
-	const fixCommits = commits.filter((c) => c.category === "fix" && c.category !== "merge");
+	const fixCommits = commits.filter((c) => c.category === "fix");
 	if (fixCommits.length > 0) {
 		fixCommits.forEach((c) => {
 			changelog += `- ${c.subject} (${c.hash})\n`;

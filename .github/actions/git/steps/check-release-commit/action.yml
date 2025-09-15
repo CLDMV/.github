@@ -1,6 +1,11 @@
 name: "Check Release Commit"
 description: "Check if the latest commit is a release commit and determine version bump type"
 
+inputs:
+  exclude-version:
+    description: "Version to exclude when finding latest tag (e.g., 'v2.0.1' to find previous version)"
+    required: false
+
 outputs:
   should-create-pr:
     description: "Whether a release PR should be created"
@@ -29,6 +34,7 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v1
       with:
         debug: "true"
+        exclude-version: ${{ inputs.exclude-version }}
 
     - name: Check for release commit and analyze version bump
       id: check

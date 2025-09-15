@@ -129,6 +129,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	// Get inputs from environment
 	const HEAD_REF = process.env.HEAD_REF || "HEAD";
 	const BASE_REF_OVERRIDE = process.env.BASE_REF_OVERRIDE;
+	const EXCLUDE_VERSION = process.env.EXCLUDE_VERSION;
 
 	debugLog(`Getting commit range for ${HEAD_REF}`);
 	debugLog(`head-ref=${HEAD_REF}`);
@@ -152,12 +153,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		baseRef = BASE_REF_OVERRIDE;
 		console.log(`🔍 Using override base ref: ${baseRef}`);
 	} else {
-		// Use the latest semantic version tag
+		// Use the latest semantic version tag (excluding specified version if provided)
 		console.log("🔍 DEBUG: Looking for latest semantic version tag...");
-		const allTags = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'", true);
-		console.log(`🔍 DEBUG: All semantic version tags found: ${allTags}`);
+		
+		let tagCommand = "git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'";
+		if (EXCLUDE_VERSION) {
+			console.log(`🔍 DEBUG: Excluding version ${EXCLUDE_VERSION} from tag search`);
+			tagCommand += ` | grep -v '^${EXCLUDE_VERSION}$'`;
+		}
+		
+		const allTags = gitCommand(tagCommand, true);
+		console.log(`🔍 DEBUG: All semantic version tags found${EXCLUDE_VERSION ? ` (excluding ${EXCLUDE_VERSION})` : ''}: ${allTags}`);
 
-		baseRef = gitCommand("git tag -l | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1", true);
+		baseRef = gitCommand(tagCommand + " | sort -V | tail -1", true);
 		console.log(`🔍 Latest semantic version tag found: ${baseRef || "(none)"}`);
 
 		// Debug: Check if the tag points to a commit that exists in current branch history

@@ -9,6 +9,9 @@ inputs:
     description: "The head ref to compare against"
     required: false
     default: "HEAD"
+  exclude-version:
+    description: "Version to exclude when finding latest tag (e.g., 'v2.0.1' to find previous version)"
+    required: false
   debug:
     description: "Enable debug logging"
     required: false
@@ -43,6 +46,7 @@ runs:
       run: |
         export HEAD_REF="${{ inputs.head-ref }}"
         export BASE_REF_OVERRIDE="${{ inputs.base-ref }}"
+        export EXCLUDE_VERSION="${{ inputs.exclude-version }}"
         export DEBUG="${{ inputs.debug }}"
 
         # Run the Node.js script

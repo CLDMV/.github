@@ -116,6 +116,8 @@ runs:
     - name: Get commits for changelog
       id: get-commits
       uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+      with:
+        exclude-version: v${{ steps.detect-version.outputs.version }}
 
     - name: Generate comprehensive changelog for release notes
       id: release-notes
