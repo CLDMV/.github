@@ -15,6 +15,7 @@ const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "CLDMV Bot";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "cldmv-bot@users.noreply.github.com";
 const GPG_PRIVATE_KEY = process.env.INPUT_GPG_PRIVATE_KEY || "";
 const GPG_PASSPHRASE = process.env.INPUT_GPG_PASSPHRASE || "";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 
 console.log("🔍 Checking for orphaned releases...");
 
@@ -23,6 +24,21 @@ console.log("🔍 Checking for orphaned releases...");
  */
 async function getAllReleases() {
 	try {
+		// Set GH_TOKEN for GitHub CLI if we have a token
+		if (GITHUB_TOKEN) {
+			process.env.GH_TOKEN = GITHUB_TOKEN;
+			if (DEBUG) {
+				console.log("🔑 GitHub token available for API access");
+			}
+		} else {
+			console.warn("⚠️ No GitHub token available for API access");
+			return [];
+		}
+
+		if (DEBUG) {
+			console.log("🔍 Fetching releases from GitHub API...");
+		}
+
 		const result = gitCommand(
 			`gh api repos/\${GITHUB_REPOSITORY}/releases --paginate --jq '.[] | {id: .id, tag_name: .tag_name, name: .name, draft: .draft, target_commitish: .target_commitish}'`,
 			true

@@ -320,6 +320,7 @@ jobs:
         uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v1
         env:
           GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+          GH_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
