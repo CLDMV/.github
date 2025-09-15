@@ -274,14 +274,13 @@ async function main() {
 		console.log(`🔍 Checking release: ${releaseName || tagName} (tag: ${tagName})`);
 
 		// Check if tag exists
-		try {
-			gitCommand(`git rev-parse refs/tags/${tagName}`, true);
+		const tagRef = gitCommand(`git rev-parse refs/tags/${tagName}`, true);
+		if (tagRef && tagRef.trim()) {
 			console.log(`✅ Tag ${tagName} exists`);
 			continue;
-		} catch (error) {
-			// Tag doesn't exist
 		}
 
+		// If we get here, the tag doesn't exist (either empty result or command failed)
 		console.log(`🚨 Found orphaned release: ${releaseName || tagName} (missing tag: ${tagName})`);
 
 		// Find the target commit
