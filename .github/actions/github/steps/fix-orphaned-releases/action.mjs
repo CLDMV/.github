@@ -39,10 +39,23 @@ async function getAllReleases() {
 			console.log("🔍 Fetching releases from GitHub API...");
 		}
 
-		const result = gitCommand(
-			`gh api repos/\${GITHUB_REPOSITORY}/releases --paginate --jq '.[] | {id: .id, tag_name: .tag_name, name: .name, draft: .draft, target_commitish: .target_commitish}'`,
-			true
-		);
+		const repository = process.env.GITHUB_REPOSITORY;
+		if (!repository) {
+			console.warn("⚠️ GITHUB_REPOSITORY environment variable not set");
+			return [];
+		}
+
+		const command = `gh api repos/${repository}/releases --paginate --jq '.[] | {id: .id, tag_name: .tag_name, name: .name, draft: .draft, target_commitish: .target_commitish}'`;
+		
+		if (DEBUG) {
+			console.log(`🔍 Executing command: ${command}`);
+		}
+
+		const result = gitCommand(command, DEBUG ? false : true);
+
+		if (DEBUG) {
+			console.log(`🔍 GitHub API result: ${result ? result.substring(0, 200) + '...' : 'empty'}`);
+		}
 
 		if (!result || result.trim() === "" || result === "null") {
 			console.log("ℹ️ No releases found in repository");
