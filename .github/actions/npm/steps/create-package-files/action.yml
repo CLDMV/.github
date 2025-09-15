@@ -40,6 +40,10 @@ runs:
         else
           # Fallback: extract from .tgz file
           echo "📦 Extracting from .tgz file as fallback..."
+          echo "🔍 Debug: Current directory contents:"
+          ls -la
+          echo "🔍 Debug: Looking for .tgz files..."
+          find . -name "*.tgz" -type f 2>/dev/null | head -5
           
           # Try multiple locations to find the .tgz file
           TGZ_FILE=""

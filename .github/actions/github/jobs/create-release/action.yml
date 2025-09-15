@@ -201,7 +201,7 @@ runs:
       id: package-files
       uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v1
       with:
-        package-path: "./artifacts/*.tgz"
+        package-path: ${{ steps.create-package.outputs.package-path }}
 
     - name: Create GitHub release
       if: inputs.dry-run != 'true'

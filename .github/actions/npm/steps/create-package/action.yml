@@ -64,4 +64,4 @@ runs:
 
         # Show package contents for debugging
         echo "📋 Package contents:"
-        tar -tzf "$PACKAGE_FILE" 2>/dev/null | head -10 || true
+        tar -tzf "$PACKAGE_FILE" 2>/dev/null || true
