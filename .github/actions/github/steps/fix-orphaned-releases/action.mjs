@@ -21,8 +21,20 @@ console.log("🔍 Checking for orphaned releases...");
 
 if (DEBUG) {
 	console.log("🐛 Debug mode enabled");
-	console.log(`🔑 Token available: ${GITHUB_TOKEN ? 'Yes' : 'No'}`);
-	console.log(`📦 Repository: ${process.env.GITHUB_REPOSITORY || 'Not set'}`);
+	console.log(`🔑 Token available: ${GITHUB_TOKEN && GITHUB_TOKEN.trim() ? "Yes" : "No"}`);
+	console.log(`📦 Repository: ${process.env.GITHUB_REPOSITORY || "Not set"}`);
+	console.log(`🔍 Environment variables check:`);
+	console.log(`  - INPUT_GITHUB_TOKEN: ${process.env.INPUT_GITHUB_TOKEN ? "Set" : "Not set"}`);
+	console.log(`  - GITHUB_TOKEN: ${process.env.GITHUB_TOKEN ? "Set" : "Not set"}`);
+	console.log(`  - GH_TOKEN: ${process.env.GH_TOKEN ? "Set" : "Not set"}`);
+	if (process.env.INPUT_GITHUB_TOKEN) {
+		console.log(`  - INPUT_GITHUB_TOKEN length: ${process.env.INPUT_GITHUB_TOKEN.length}`);
+		console.log(`  - INPUT_GITHUB_TOKEN starts with: ${process.env.INPUT_GITHUB_TOKEN.substring(0, 7)}...`);
+	}
+	if (process.env.GITHUB_TOKEN) {
+		console.log(`  - GITHUB_TOKEN length: ${process.env.GITHUB_TOKEN.length}`);
+		console.log(`  - GITHUB_TOKEN starts with: ${process.env.GITHUB_TOKEN.substring(0, 7)}...`);
+	}
 }
 
 /**
@@ -31,13 +43,17 @@ if (DEBUG) {
 async function getAllReleases() {
 	try {
 		// Set GH_TOKEN for GitHub CLI if we have a token
-		if (GITHUB_TOKEN) {
-			process.env.GH_TOKEN = GITHUB_TOKEN;
+		if (GITHUB_TOKEN && GITHUB_TOKEN.trim()) {
+			process.env.GH_TOKEN = GITHUB_TOKEN.trim();
 			if (DEBUG) {
 				console.log("🔑 GitHub token available for API access");
 			}
 		} else {
 			console.warn("⚠️ No GitHub token available for API access");
+			console.warn("📝 Token debug info:");
+			console.warn(`  - Raw GITHUB_TOKEN value: "${GITHUB_TOKEN}"`);
+			console.warn(`  - Token type: ${typeof GITHUB_TOKEN}`);
+			console.warn(`  - Token length: ${GITHUB_TOKEN ? GITHUB_TOKEN.length : "undefined"}`);
 			return [];
 		}
 
@@ -52,7 +68,7 @@ async function getAllReleases() {
 		}
 
 		const command = `gh api repos/${repository}/releases --paginate --jq '.[] | {id: .id, tag_name: .tag_name, name: .name, draft: .draft, target_commitish: .target_commitish}'`;
-		
+
 		if (DEBUG) {
 			console.log(`🔍 Executing command: ${command}`);
 		}
@@ -60,7 +76,7 @@ async function getAllReleases() {
 		const result = gitCommand(command, DEBUG ? false : true);
 
 		if (DEBUG) {
-			console.log(`🔍 GitHub API result: ${result ? result.substring(0, 200) + '...' : 'empty'}`);
+			console.log(`🔍 GitHub API result: ${result ? result.substring(0, 200) + "..." : "empty"}`);
 		}
 
 		if (!result || result.trim() === "" || result === "null") {

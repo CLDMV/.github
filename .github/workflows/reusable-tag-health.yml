@@ -319,12 +319,12 @@ jobs:
         id: fix-orphaned-releases
         uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v1
         env:
-          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
-          GH_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
+          GH_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
           CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
         with:
           debug: ${{ inputs.debug }}
-          github_token: ${{ needs.setup-shared.outputs.auth-token }}
+          github_token: ${{ needs.setup-shared.outputs.auth-token || github.token }}
           gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
           tagger_name: ${{ secrets.TAGGER_NAME }}
           tagger_email: ${{ secrets.TAGGER_EMAIL }}
