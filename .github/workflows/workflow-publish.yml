@@ -251,7 +251,7 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version**: \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: \`${{ needs.publish.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.publish.result }}" = "success" ]; then
