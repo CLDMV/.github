@@ -231,8 +231,15 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			gitCommand(`git tag -f ${tagName} ${targetCommit}`);
 		}
 
-		// Push using force push (same as working workflow)
-		gitCommand(`git push origin +refs/tags/${tagName}`);
+		// Push using force push (same as working workflow) - this must succeed
+		console.log(`🚀 Pushing tag to remote: git push origin +refs/tags/${tagName}`);
+		const pushResult = gitCommand(`git push origin +refs/tags/${tagName}`, false);
+		
+		// Check if push actually succeeded (gitCommand returns empty string on failure)
+		if (pushResult === "") {
+			throw new Error(`Failed to push tag ${tagName} to remote`);
+		}
+		
 		console.log(`✅ Successfully created and pushed tag ${tagName}`);
 		return true;
 	} catch (error) {
