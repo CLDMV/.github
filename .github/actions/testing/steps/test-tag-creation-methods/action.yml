@@ -40,6 +40,14 @@ inputs:
     description: "GPG passphrase for signing (optional)"
     required: false
     default: ""
+  cleanup_all_test_tags:
+    description: "Whether to clean up all test tags (not just current test)"
+    required: false
+    default: "false"
+  cleanup_only:
+    description: "Whether to only perform cleanup without creating new tags"
+    required: false
+    default: "false"
 
 outputs:
   overall_result:

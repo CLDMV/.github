@@ -396,7 +396,8 @@ async function run() {
 			test_tag_name: core.getInput("test_tag_name", { required: true }),
 			target_commit: core.getInput("target_commit") || "",
 			cleanup_tag: core.getInput("cleanup_tag") === "true",
-			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true",
+			cleanup_all_test_tags: core.getInput("cleanup_all_test_tags") === "true",
+			cleanup_only: core.getInput("cleanup_only") === "true",
 			use_github_token: core.getInput("use_github_token") === "true",
 			token: core.getInput("token", { required: true }),
 			tagger_name: core.getInput("tagger_name") || "CLDMV Bot",
@@ -434,6 +435,34 @@ async function run() {
 
 		console.log(`🎯 Target commit: ${targetCommit}`);
 		console.log(`🔐 GPG signing enabled: ${enableSign}`);
+
+		// Handle cleanup-only mode
+		if (inputs.cleanup_only) {
+			console.log("🧹 Running in cleanup-only mode...");
+
+			if (inputs.cleanup_all_test_tags) {
+				// Clean up all test artifacts with broader patterns
+				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "test-" });
+				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "a0" });
+				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "a1" });
+				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "gh0" });
+				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "gh1" });
+			} else {
+				await cleanup({ token: inputs.token, repo, tag: inputs.test_tag_name });
+			}
+
+			// Set minimal outputs for cleanup-only mode
+			core.setOutput("overall_result", "success");
+			core.setOutput("git_result", "skipped");
+			core.setOutput("api_result", "skipped");
+			core.setOutput("gpg_result", "skipped");
+			core.setOutput("api_gpg_result", "skipped");
+			core.setOutput("git_gpg_result", "skipped");
+			core.setOutput("details", JSON.stringify({ mode: "cleanup-only", completed: true }));
+
+			console.log("✅ Cleanup completed successfully");
+			return;
+		}
 
 		// Test API tag creation
 		const apiResult = await createTagViaAPI({

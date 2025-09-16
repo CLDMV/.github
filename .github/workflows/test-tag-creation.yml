@@ -71,9 +71,11 @@ jobs:
       - name: Cleanup old test artifacts
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_tag_name: "cleanup-all-tests"
+          test_tag_name: "cleanup-placeholder"
           target_commit: ${{ github.sha }}
           cleanup_tag: "false"
+          cleanup_all_test_tags: "true"
+          cleanup_only: "true"
           use_github_token: "false"
           token: ${{ steps.app-token.outputs.token }}
           tagger_name: "Cleanup Bot"
