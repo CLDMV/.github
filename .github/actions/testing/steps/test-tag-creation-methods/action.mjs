@@ -280,6 +280,66 @@ async function createRelease({ token, repo, tag, targetCommit, title, body, suff
 }
 
 /**
+ * Enhanced cleanup for all test artifacts matching a pattern
+ * @param {Object} params - Cleanup parameters
+ */
+async function cleanupAllTestArtifacts({ token, repo, pattern = "test-debug" }) {
+	console.log(`🧹 Cleaning up ALL test artifacts matching pattern: ${pattern}...`);
+	const { owner, repo: r } = parseRepo(repo);
+
+	try {
+		// Get all releases
+		const releases = await api("GET", "/releases", null, {
+			token,
+			owner,
+			repo: r
+		});
+
+		// Filter and delete test releases
+		for (const release of releases) {
+			if (release.tag_name.includes(pattern)) {
+				try {
+					await api("DELETE", `/releases/${release.id}`, null, {
+						token,
+						owner,
+						repo: r
+					});
+					console.log(`🗑️ Deleted release: ${release.tag_name}`);
+				} catch (error) {
+					console.log(`⚠️  Could not delete release ${release.tag_name}: ${error.message}`);
+				}
+			}
+		}
+
+		// Get all tags
+		const tags = await api("GET", "/git/refs/tags", null, {
+			token,
+			owner,
+			repo: r
+		});
+
+		// Filter and delete test tags
+		for (const tag of tags) {
+			const tagName = tag.ref.replace("refs/tags/", "");
+			if (tagName.includes(pattern)) {
+				try {
+					await api("DELETE", `/git/refs/tags/${tagName}`, null, {
+						token,
+						owner,
+						repo: r
+					});
+					console.log(`🗑️ Deleted tag: ${tagName}`);
+				} catch (error) {
+					console.log(`⚠️  Could not delete tag ${tagName}: ${error.message}`);
+				}
+			}
+		}
+	} catch (error) {
+		console.log(`⚠️  Cleanup error: ${error.message}`);
+	}
+}
+
+/**
  * Cleanup test tags and releases
  * @param {Object} params - Cleanup parameters
  */
@@ -336,6 +396,7 @@ async function run() {
 			test_tag_name: core.getInput("test_tag_name", { required: true }),
 			target_commit: core.getInput("target_commit") || "",
 			cleanup_tag: core.getInput("cleanup_tag") === "true",
+			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true",
 			use_github_token: core.getInput("use_github_token") === "true",
 			token: core.getInput("token", { required: true }),
 			tagger_name: core.getInput("tagger_name") || "CLDMV Bot",
@@ -409,7 +470,7 @@ async function run() {
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (API Tag)",
-				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${apiResult.isVerified}\n**GPG Signing**: ${enableSign}`,
+				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${apiResult.apiGpgVerified || false}\n**GPG Signing**: ${apiResult.apiGpgVerified ? "verified" : "not verified"}`,
 				suffix: "api"
 			});
 		}
@@ -421,7 +482,7 @@ async function run() {
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (Git Tag)",
-				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${gitResult.isVerified}\n**GPG Signing**: ${enableSign}`,
+				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${gitResult.gitGpgVerified || false}\n**GPG Signing**: ${gitResult.gitGpgVerified ? "verified" : "not verified"}`,
 				suffix: "git"
 			});
 		}
@@ -495,7 +556,13 @@ async function run() {
 		console.log("└─────────────────────────────────────────────────────────┘");
 
 		// Cleanup if requested
-		if (inputs.cleanup_tag) {
+		if (inputs.cleanup_all_test_artifacts) {
+			await cleanupAllTestArtifacts({
+				token: inputs.token,
+				repo,
+				pattern: "test-debug"
+			});
+		} else if (inputs.cleanup_tag) {
 			await cleanup({
 				token: inputs.token,
 				repo,

@@ -13,6 +13,10 @@ inputs:
     description: "Whether to clean up the test tag after testing"
     required: false
     default: "true"
+  cleanup_all_test_artifacts:
+    description: "Whether to clean up ALL test artifacts (releases and tags) matching test-debug pattern"
+    required: false
+    default: "false"
   use_github_token:
     description: "Whether to use GITHUB_TOKEN instead of app token"
     required: false
