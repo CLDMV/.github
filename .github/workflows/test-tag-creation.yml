@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: true
+      cleanup_old_artifacts:
+        description: "Whether to clean up old test artifacts before running tests"
+        required: false
+        type: boolean
+        default: false
     secrets:
       CLDMV_BOT_APP_ID:
         description: "GitHub App ID for creating app tokens"
@@ -48,9 +53,39 @@ on:
         required: false
 
 jobs:
+  # Cleanup old test artifacts before running new tests
+  cleanup-old-artifacts:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.cleanup_old_artifacts }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get CLDMV app token for cleanup
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+          private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Cleanup old test artifacts
+        uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+        with:
+          test_tag_name: "cleanup-all-tests"
+          target_commit: ${{ github.sha }}
+          cleanup_tag: "false"
+          use_github_token: "false"
+          token: ${{ steps.app-token.outputs.token }}
+          tagger_name: "Cleanup Bot"
+          tagger_email: "cleanup@example.com"
+          gpg_private_key: ""
+          gpg_passphrase: ""
+
   # Matrix Test 1: App Token + No App Permissions + No YAML Permissions
   test-app-no-app-perms-no-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     outputs:
       result: ${{ steps.test-tags.outputs.overall_result }}
       git_result: ${{ steps.test-tags.outputs.git_result }}
@@ -119,6 +154,8 @@ jobs:
   # Matrix Test 2: App Token + App Permissions + No YAML Permissions
   test-app-with-app-perms-no-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     outputs:
       result: ${{ steps.test-tags.outputs.overall_result }}
       git_result: ${{ steps.test-tags.outputs.git_result }}
@@ -207,6 +244,8 @@ jobs:
   # Matrix Test 3: App Token + No App Permissions + YAML Permissions
   test-app-no-app-perms-with-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     permissions:
       contents: write
       actions: write
@@ -266,6 +305,8 @@ jobs:
   # Matrix Test 4: App Token + App Permissions + YAML Permissions
   test-app-with-app-perms-with-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     permissions:
       contents: write
       actions: write
@@ -352,6 +393,8 @@ jobs:
   # Matrix Test 5: GITHUB_TOKEN + No YAML Permissions
   test-github-token-no-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     outputs:
       result: ${{ steps.test-tags.outputs.overall_result }}
       git_result: ${{ steps.test-tags.outputs.git_result }}
@@ -381,6 +424,8 @@ jobs:
   # Matrix Test 6: GITHUB_TOKEN + YAML Permissions
   test-github-token-with-yaml-perms:
     runs-on: ubuntu-latest
+    needs: [cleanup-old-artifacts]
+    if: ${{ !cancelled() && (success() || !inputs.cleanup_old_artifacts) }}
     permissions:
       contents: write
       actions: write
