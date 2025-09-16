@@ -1,49 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * @fileoverview Test tag creation methods using existing CLDMV infrastru	if (enableSign && gpg_private_key) {
-		console.log("🔐 Setting up complete GPG chain (matching production workflow)...");
-		try {
-			// Steps 1-2: Import GPG key and setup non-interactive GPG (like production)
-			// This calls exportGpgEnv internally and sets up the complete chain
-			console.log("📋 Steps 1-2: Importing GPG key and setting up non-interactive mode...");
-			keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
-			console.log(`✅ GPG key imported successfully: ${keyid}`);
-			
-			// Step 3: Set ultimate trust for the imported key (critical for verification)
-			console.log(`📋 Step 3: Setting ultimate trust for key ${keyid}...`);
-			try {
-				gitCommand(`echo "${keyid}:6:" | gpg --batch --import-ownertrust`, true);
-				console.log(`✅ Ultimate trust set successfully for key ${keyid}`);
-			} catch (trustError) {
-				console.log(`⚠️  Could not set trust for key ${keyid}: ${trustError.message}`);
-			}
-			
-			// Step 4: Verify GPG setup works
-			console.log("📋 Step 4: Verifying GPG setup...");
-			try {
-				const testSign = gitCommand(`echo "test" | gpg --batch --armor --detach-sign`, true);
-				console.log(`✅ GPG test signing successful (${testSign.length} chars)`);
-			} catch (testError) {
-				console.log(`⚠️  GPG test signing failed: ${testError.message}`);
-			}
-		} catch (error) {
-			console.log(`❌ GPG setup failed: ${error.message}`);
-			console.log(`📄 Error details: ${error.stack}`);
-		}
-	} else {
-		console.log(`⏭️  GPG signing skipped: enableSign=${enableSign}, hasKey=${Boolean(gpg_private_key)}`);
-	}ption Comprehensive testing of tag creation via API vs git commands with proper GPG signing
+ * @fileoverview Test tag creation methods using existing CLDMV infrastructure
+ * @description Comprehensive testing of tag creation via API vs git commands with proper GPG signing
  */
 
 import { getRefTag, createAnnotatedTag, createRefForTagObject, createRefToCommit } from "../../../github/api/_api/tag.mjs";
-import {
-	importGpgIfNeeded,
-	configureGitIdentity,
-	ensureGitAuthRemote,
-	shouldSign,
-	setupNonInteractiveGpg
-} from "../../../github/api/_api/gpg.mjs";
+import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote, shouldSign } from "../../../github/api/_api/gpg.mjs";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
 import * as fs from "fs";
@@ -97,28 +60,25 @@ function analyzeToken(token, useGitHubToken = false) {
 		? "personal_token"
 		: token.startsWith("github_pat_")
 		? "fine_grained_token"
-		: "default_github_token";
+		: "github_token";
 
 	return {
 		type: tokenType,
 		length: token.length,
 		prefix: token.substring(0, 7) + "...",
 		isAppToken: tokenType === "app_token",
-		isGitHubToken: tokenType === "default_github_token"
+		isGitHubToken: tokenType === "github_token"
 	};
 }
 
 /**
- * Setup Git configuration with authentication and signing
- * @param {Object} params - Configuration parameters
+ * Setup Git configuration for tagging
  */
-async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_private_key, gpg_passphrase }) {
-	console.log("🔧 Setting up Git configuration...");
-
+function setupGitConfig({ tagger_name, tagger_email, gpg_private_key, gpg_passphrase, token, repo }) {
 	// Setup authentication
 	ensureGitAuthRemote(repo, token);
 
-	// Setup GPG if provided - Match production workflow setup chain
+	// Setup GPG if provided
 	let keyid = "";
 	const enableSign = shouldSign({ sign: "auto", gpg_private_key });
 
@@ -128,43 +88,30 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 	console.log(`  - Should sign (auto): ${enableSign}`);
 
 	if (enableSign && gpg_private_key) {
-		console.log("🔐 Setting up complete GPG chain (matching production workflow)...");
+		console.log("🔐 Importing GPG key...");
 		try {
-			// Step 1: Set up GPG environment (like production)
-			console.log("📋 Step 1: Setting up GPG environment...");
-			exportGpgEnv({ gpg_passphrase });
-
-			// Step 2: Import GPG key and setup non-interactive GPG (like production)
-			console.log("� Step 2: Importing GPG key and setting up non-interactive mode...");
 			keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
 			console.log(`✅ GPG key imported successfully: ${keyid}`);
 
-			// Step 3: Set ultimate trust for the imported key (critical for verification)
-			console.log(`� Step 3: Setting ultimate trust for key ${keyid}...`);
-			try {
-				gitCommand(`echo "${keyid}:6:" | gpg --batch --import-ownertrust`, true);
-				console.log(`✅ Ultimate trust set successfully for key ${keyid}`);
-			} catch (trustError) {
-				console.log(`⚠️  Could not set trust for key ${keyid}: ${trustError.message}`);
-			}
-
-			// Step 4: Verify GPG setup works
-			console.log("📋 Step 4: Verifying GPG setup...");
-			try {
-				const testSign = gitCommand(`echo "test" | gpg --batch --armor --detach-sign`, true);
-				console.log(`✅ GPG test signing successful (${testSign.length} chars)`);
-			} catch (testError) {
-				console.log(`⚠️  GPG test signing failed: ${testError.message}`);
+			// Set ultimate trust for the imported key (critical for verification)
+			if (keyid) {
+				console.log(`🔑 Setting ultimate trust for key ${keyid}...`);
+				try {
+					gitCommand(`echo "${keyid}:6:" | gpg --batch --import-ownertrust`, true);
+					console.log(`✅ Trust set successfully for key ${keyid}`);
+				} catch (trustError) {
+					console.log(`⚠️  Could not set trust for key ${keyid}: ${trustError.message}`);
+				}
 			}
 		} catch (error) {
-			console.log(`❌ GPG setup failed: ${error.message}`);
+			console.log(`❌ GPG key import failed: ${error.message}`);
 			console.log(`📄 Error details: ${error.stack}`);
 		}
 	} else {
 		console.log(`⏭️  GPG signing skipped: enableSign=${enableSign}, hasKey=${Boolean(gpg_private_key)}`);
 	}
 
-	// Configure Git identity (matching production workflow)
+	// Configure Git identity
 	configureGitIdentity({
 		tagger_name,
 		tagger_email,
@@ -208,530 +155,413 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 		console.log(`⚠️  Could not read Git configuration: ${configError.message}`);
 	}
 
-	return { keyid, enableSign };
+	return { enableSign, keyid };
 }
 
 /**
- * Create tag via GitHub API
- * @param {Object} params - Tag creation parameters
- * @returns {Object} Result of API tag creation
+ * Verify GPG signature on a tag
+ * @param {string} tagName - Name of the tag to verify
+ * @returns {Object} Verification result
  */
-async function createTagViaAPI({ token, repo, tag, targetCommit, tagger_name, tagger_email, enableSign }) {
-	console.log("🧪 Testing API tag creation...");
-
+function verifyGpgSignature(tagName) {
 	try {
-		// Create annotated tag object
-		const tagObject = await createAnnotatedTag({
+		console.log(`🔍 Verifying GPG signature for tag ${tagName}...`);
+
+		// Try to get signature information using git show
+		const gitShowOutput = gitCommand(`git show --show-signature ${tagName}`, true);
+		console.log(`📄 Git show output for ${tagName}:`);
+		console.log(gitShowOutput);
+
+		// Check for actual signature verification
+		const hasGoodSignature = gitShowOutput.includes("Good signature from");
+		const hasValidSignature = gitShowOutput.includes("Signature made") && hasGoodSignature;
+		const hasSignatureBlock = gitShowOutput.includes("-----BEGIN PGP SIGNATURE-----");
+
+		let signatureStatus;
+		let gpgStatusText;
+
+		if (hasValidSignature) {
+			signatureStatus = "verified";
+			gpgStatusText = "verified and trusted";
+			console.log(`✅ GPG signature verified for tag ${tagName}`);
+		} else if (hasSignatureBlock) {
+			signatureStatus = "signed";
+			gpgStatusText = "signed but not verified (trust/key issues)";
+			console.log(`⚠️  GPG output present but signature not verified (trust/key issues)`);
+		} else {
+			signatureStatus = "unsigned";
+			gpgStatusText = "not signed";
+			console.log(`❌ No GPG signature found for tag ${tagName}`);
+		}
+
+		return {
+			verified: hasValidSignature,
+			signed: hasSignatureBlock,
+			status: signatureStatus,
+			statusText: gpgStatusText,
+			output: gitShowOutput
+		};
+	} catch (error) {
+		console.log(`❌ GPG verification failed for tag ${tagName}: ${error.message}`);
+		return {
+			verified: false,
+			signed: false,
+			status: "error",
+			statusText: `verification error: ${error.message}`,
+			output: ""
+		};
+	}
+}
+
+/**
+ * Test API-based tag creation
+ */
+async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_name, tagger_email }) {
+	try {
+		console.log(`🔗 Testing API-based tag creation for ${tagName}...`);
+
+		const response = await api({
 			token,
-			repo,
-			tag: `${tag}-api`,
-			message: `Test annotated tag created via API (signed: ${enableSign})`,
-			objectSha: targetCommit,
-			tagger: {
-				name: tagger_name,
-				email: tagger_email,
-				date: new Date().toISOString()
+			method: "POST",
+			endpoint: `/repos/${repo}/git/refs`,
+			data: {
+				ref: `refs/tags/${tagName}`,
+				sha: targetCommit
 			}
 		});
 
-		console.log(`✅ API tag object created: ${tagObject.sha}`);
+		if (response.status === 201) {
+			console.log(`✅ API tag creation successful for ${tagName}`);
 
-		// Create ref pointing to tag object
-		await createRefForTagObject({
-			token,
-			repo,
-			tag: `${tag}-api`,
-			tagObjectSha: tagObject.sha
-		});
-
-		console.log(`✅ API ref created: refs/tags/${tag}-api`);
-
-		// Verify the tag
-		const refInfo = await getRefTag({ token, repo, tag: `${tag}-api` });
-		const isAnnotated = refInfo.objectType === "tag";
-
-		// Check GPG signature verification via API
-		let apiGpgVerified = false;
-		try {
-			// Get the tag object details which include verification info
-			const { owner, repo: r } = parseRepo(repo);
-			const tagDetails = await api("GET", `/git/tags/${tagObject.sha}`, null, {
+			// Verify the tag was created
+			const verifyResponse = await api({
 				token,
-				owner,
-				repo: r
+				method: "GET",
+				endpoint: `/repos/${repo}/git/refs/tags/${tagName}`
 			});
 
-			// Check if there's verification info (GitHub Apps can create signed tags)
-			apiGpgVerified = tagDetails.verification?.verified === true;
-			console.log(`🔍 API GPG verification: ${apiGpgVerified ? "✅ verified" : "❌ not verified"}`);
-			if (tagDetails.verification) {
-				console.log(`   Verification reason: ${tagDetails.verification.reason || "none"}`);
+			if (verifyResponse.status === 200) {
+				console.log(`✅ API tag verification successful for ${tagName}`);
+				return { success: true, sha: response.data.object.sha };
+			} else {
+				throw new Error(`Tag verification failed: ${verifyResponse.status}`);
 			}
-		} catch (verifyError) {
-			console.log(`⚠️  Could not check API GPG verification: ${verifyError.message}`);
+		} else {
+			throw new Error(`API tag creation failed: ${response.status} - ${response.data?.message || "Unknown error"}`);
 		}
-
-		return {
-			success: true,
-			tagSha: tagObject.sha,
-			refSha: refInfo.refSha,
-			isAnnotated,
-			apiGpgVerified,
-			method: "api"
-		};
 	} catch (error) {
-		console.error(`❌ API tag creation failed: ${error.message}`);
-		return {
-			success: false,
-			error: error.message,
-			method: "api"
-		};
+		console.log(`❌ API tag creation failed for ${tagName}: ${error.message}`);
+		return { success: false, error: error.message };
 	}
 }
 
 /**
- * Create tag via git commands
- * @param {Object} params - Tag creation parameters
- * @returns {Object} Result of git tag creation
+ * Test Git-based tag creation
  */
-async function createTagViaGit({ tag, targetCommit, enableSign }) {
-	console.log("🧪 Testing git command tag creation...");
-
+function testGitTagCreation({ tagName, targetCommit, enableSign }) {
 	try {
-		// Create annotated tag with git
-		const tagName = `${tag}-git`;
-		const message = `Test annotated tag created via git commands (signed: ${enableSign})`;
+		console.log(`⚡ Testing Git-based tag creation for ${tagName}...`);
 
-		// Create annotated tag locally
-		const createCommand = `git tag -a "${tagName}" "${targetCommit}" -m "${message}"`;
-		const createResult = gitCommand(createCommand);
+		// Create the tag locally
+		const tagCommand = enableSign
+			? `git tag -a -s ${tagName} ${targetCommit} -m "Test tag ${tagName}"`
+			: `git tag -a ${tagName} ${targetCommit} -m "Test tag ${tagName}"`;
 
-		if (!createResult && createResult !== "") {
-			throw new Error("Local tag creation failed");
-		}
-
-		console.log(`✅ Git tag created locally: ${tagName}`);
+		console.log(`🔍 DEBUG: Executing tag command: ${tagCommand}`);
+		gitCommand(tagCommand);
+		console.log(`✅ Local tag created: ${tagName}`);
 
 		// Push the tag
-		const pushCommand = `git push origin "${tagName}"`;
-		const pushResult = gitCommand(pushCommand);
+		console.log(`📤 Pushing tag ${tagName} to remote...`);
+		gitCommand(`git push origin ${tagName}`);
+		console.log(`✅ Git tag creation successful for ${tagName}`);
 
-		// Check if push was successful by verifying tag exists on remote
-		const verifyCommand = `git ls-remote --tags origin "${tagName}"`;
-		const verifyResult = gitCommand(verifyCommand, true);
-
-		const pushSuccess = verifyResult.includes(tagName);
-
-		if (!pushSuccess) {
-			console.error(`❌ Git tag push failed - tag not found on remote`);
-			return {
-				success: false,
-				error: "Tag push failed - not found on remote",
-				localSuccess: true,
-				pushSuccess: false,
-				method: "git"
-			};
-		}
-
-		console.log(`✅ Git tag pushed successfully: ${tagName}`);
-
-		// Check if tag is GPG signed
-		const showCommand = `git show --show-signature "${tagName}"`;
-		const showResult = gitCommand(showCommand, true);
-
-		// Check for different levels of GPG status
-		const hasGoodSignature = showResult.includes("gpg: Good signature");
-		const hasBadSignature = showResult.includes("gpg: Bad signature");
-		const hasSignatureWarning = showResult.includes("gpg: WARNING") || showResult.includes("gpg: Can't check signature");
-		const hasSignatureBlock = showResult.includes("-----BEGIN PGP SIGNATURE-----");
-		const hasGpgOutput = showResult.includes("gpg:");
-
-		// Determine verification status
-		let gitGpgVerified = false;
-		let signatureStatus = "unsigned";
-
-		if (hasGoodSignature && !hasSignatureWarning) {
-			gitGpgVerified = true;
-			signatureStatus = "verified";
-		} else if (hasBadSignature) {
-			signatureStatus = "invalid";
-		} else if (hasSignatureBlock || hasGpgOutput) {
-			signatureStatus = "signed but unverified";
-		}
-
-		console.log(`🔍 Git GPG verification: ${gitGpgVerified ? "✅ verified" : "❌ not verified"}`);
-		console.log(`� Signature status: ${signatureStatus}`);
-		console.log(`�📄 Git show output preview: ${showResult.substring(0, 300)}...`);
-
-		if (hasSignatureBlock) {
-			console.log(`🔐 PGP signature block detected - tag is signed`);
-		}
-		if (hasGpgOutput && !hasGoodSignature) {
-			console.log(`⚠️  GPG output present but signature not verified (trust/key issues)`);
-		}
-
-		return {
-			success: true,
-			localSuccess: true,
-			pushSuccess: true,
-			isAnnotated: true,
-			gitGpgVerified,
-			signatureStatus,
-			method: "git"
-		};
+		// Get the tag SHA
+		const tagSha = gitCommand(`git rev-parse ${tagName}`, true);
+		return { success: true, sha: tagSha.trim() };
 	} catch (error) {
-		console.error(`❌ Git tag creation failed: ${error.message}`);
-		return {
-			success: false,
-			error: error.message,
-			method: "git"
-		};
+		console.log(`❌ Git tag creation failed for ${tagName}: ${error.message}`);
+		return { success: false, error: error.message };
 	}
 }
 
 /**
- * Create release for a tag
- * @param {Object} params - Release creation parameters
- * @returns {Object} Result of release creation
+ * Create a GitHub release
  */
 async function createRelease({ token, repo, tag, targetCommit, title, body, suffix }) {
-	const { owner, repo: r } = parseRepo(repo);
-	const releaseTag = `${tag}-${suffix}`;
-
 	try {
-		const release = await api(
-			"POST",
-			"/releases",
-			{
-				tag_name: releaseTag,
+		console.log(`🎁 Creating GitHub release for ${tag}...`);
+
+		const releaseResponse = await api({
+			token,
+			method: "POST",
+			endpoint: `/repos/${repo}/releases`,
+			data: {
+				tag_name: tag,
 				target_commitish: targetCommit,
-				name: title,
+				name: `${title} (${suffix})`,
 				body: body,
 				draft: false,
 				prerelease: true
-			},
-			{ token, owner, repo: r }
-		);
+			}
+		});
 
-		console.log(`✅ Release created: ${release.html_url}`);
-
-		return {
-			success: true,
-			releaseId: release.id,
-			releaseUrl: release.html_url,
-			author: release.author?.login || "unknown"
-		};
+		if (releaseResponse.status === 201) {
+			const releaseData = releaseResponse.data;
+			console.log(`✅ GitHub release created: ${releaseData.html_url}`);
+			return {
+				success: true,
+				id: releaseData.id,
+				url: releaseData.html_url,
+				author: releaseData.author?.login || "unknown"
+			};
+		} else {
+			throw new Error(`Release creation failed: ${releaseResponse.status} - ${releaseResponse.data?.message || "Unknown error"}`);
+		}
 	} catch (error) {
-		console.error(`❌ Release creation failed: ${error.message}`);
-		return {
-			success: false,
-			error: error.message
-		};
+		console.log(`❌ GitHub release creation failed for ${tag}: ${error.message}`);
+		return { success: false, error: error.message };
 	}
 }
 
 /**
- * Enhanced cleanup for all test artifacts matching a pattern
- * @param {Object} params - Cleanup parameters
- */
-async function cleanupAllTestArtifacts({ token, repo, pattern = "test-debug" }) {
-	console.log(`🧹 Cleaning up ALL test artifacts matching pattern: ${pattern}...`);
-	const { owner, repo: r } = parseRepo(repo);
-
-	try {
-		// Get all releases
-		const releases = await api("GET", "/releases", null, {
-			token,
-			owner,
-			repo: r
-		});
-
-		// Filter and delete test releases
-		for (const release of releases) {
-			if (release.tag_name.includes(pattern)) {
-				try {
-					await api("DELETE", `/releases/${release.id}`, null, {
-						token,
-						owner,
-						repo: r
-					});
-					console.log(`🗑️ Deleted release: ${release.tag_name}`);
-				} catch (error) {
-					console.log(`⚠️  Could not delete release ${release.tag_name}: ${error.message}`);
-				}
-			}
-		}
-
-		// Get all tags
-		const tags = await api("GET", "/git/refs/tags", null, {
-			token,
-			owner,
-			repo: r
-		});
-
-		// Filter and delete test tags
-		for (const tag of tags) {
-			const tagName = tag.ref.replace("refs/tags/", "");
-			if (tagName.includes(pattern)) {
-				try {
-					await api("DELETE", `/git/refs/tags/${tagName}`, null, {
-						token,
-						owner,
-						repo: r
-					});
-					console.log(`🗑️ Deleted tag: ${tagName}`);
-				} catch (error) {
-					console.log(`⚠️  Could not delete tag ${tagName}: ${error.message}`);
-				}
-			}
-		}
-	} catch (error) {
-		console.log(`⚠️  Cleanup error: ${error.message}`);
-	}
-}
-
-/**
- * Cleanup test tags and releases
- * @param {Object} params - Cleanup parameters
+ * Cleanup test artifacts
  */
 async function cleanup({ token, repo, tag }) {
-	console.log("🧹 Cleaning up test artifacts...");
-	const { owner, repo: r } = parseRepo(repo);
+	try {
+		console.log(`🧹 Cleaning up test tag: ${tag}`);
 
-	const suffixes = ["api", "git"];
-
-	for (const suffix of suffixes) {
-		const tagName = `${tag}-${suffix}`;
-
+		// Delete the tag locally
 		try {
-			// Delete release first
-			const release = await api("GET", `/releases/tags/${tagName}`, null, {
+			gitCommand(`git tag -d ${tag}`, true);
+			console.log(`✅ Local tag ${tag} deleted`);
+		} catch (error) {
+			console.log(`ℹ️  Local tag ${tag} not found or already deleted`);
+		}
+
+		// Delete the tag remotely
+		try {
+			gitCommand(`git push origin :refs/tags/${tag}`, true);
+			console.log(`✅ Remote tag ${tag} deleted`);
+		} catch (error) {
+			console.log(`ℹ️  Remote tag ${tag} not found or already deleted`);
+		}
+
+		// Delete any associated releases
+		try {
+			const releasesResponse = await api({
 				token,
-				owner,
-				repo: r
+				method: "GET",
+				endpoint: `/repos/${repo}/releases`
 			});
 
-			if (release?.id) {
-				await api("DELETE", `/releases/${release.id}`, null, {
-					token,
-					owner,
-					repo: r
-				});
-				console.log(`🗑️ Deleted release: ${tagName}`);
+			for (const release of releasesResponse.data) {
+				if (release.tag_name === tag) {
+					await api({
+						token,
+						method: "DELETE",
+						endpoint: `/repos/${repo}/releases/${release.id}`
+					});
+					console.log(`✅ Release for tag ${tag} deleted`);
+				}
 			}
 		} catch (error) {
-			// Release might not exist, continue
+			console.log(`ℹ️  No releases found for tag ${tag} or cleanup failed: ${error.message}`);
 		}
 
-		try {
-			// Delete tag ref
-			await api("DELETE", `/git/refs/tags/${tagName}`, null, {
-				token,
-				owner,
-				repo: r
-			});
-			console.log(`🗑️ Deleted tag: ${tagName}`);
-		} catch (error) {
-			// Tag might not exist, continue
-		}
+		return { success: true };
+	} catch (error) {
+		console.log(`⚠️  Cleanup failed for ${tag}: ${error.message}`);
+		return { success: false, error: error.message };
 	}
 }
 
 /**
- * Main action execution
+ * Cleanup all test artifacts matching a pattern
+ */
+async function cleanupAllTestArtifacts({ token, repo, pattern }) {
+	try {
+		console.log(`🧹 Cleaning up all test artifacts matching pattern: ${pattern}`);
+
+		// Get all tags
+		const tagsOutput = gitCommand("git tag --list", true);
+		const tags = tagsOutput.split("\n").filter((tag) => tag.trim() && tag.includes(pattern));
+
+		for (const tag of tags) {
+			await cleanup({ token, repo, tag: tag.trim() });
+		}
+
+		console.log(`✅ Cleanup completed for ${tags.length} test artifacts`);
+		return { success: true, cleaned: tags.length };
+	} catch (error) {
+		console.log(`⚠️  Test artifacts cleanup failed: ${error.message}`);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Main execution function
  */
 async function run() {
 	try {
 		// Get inputs
 		const inputs = {
 			test_tag_name: core.getInput("test_tag_name", { required: true }),
-			target_commit: core.getInput("target_commit") || "",
+			target_commit: core.getInput("target_commit") || process.env.GITHUB_SHA,
 			cleanup_tag: core.getInput("cleanup_tag") === "true",
 			cleanup_all_test_tags: core.getInput("cleanup_all_test_tags") === "true",
 			cleanup_only: core.getInput("cleanup_only") === "true",
 			use_github_token: core.getInput("use_github_token") === "true",
 			token: core.getInput("token", { required: true }),
-			tagger_name: core.getInput("tagger_name") || "CLDMV Bot",
-			tagger_email: core.getInput("tagger_email") || "cldmv-bot@users.noreply.github.com",
+			tagger_name: core.getInput("tagger_name") || "test-bot",
+			tagger_email: core.getInput("tagger_email") || "test-bot@example.com",
 			gpg_private_key: core.getInput("gpg_private_key"),
-			gpg_passphrase: core.getInput("gpg_passphrase")
+			gpg_passphrase: core.getInput("gpg_passphrase"),
+			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true"
 		};
 
-		// Get repository info
-		const repo = process.env.GITHUB_REPOSITORY;
-		if (!repo) throw new Error("GITHUB_REPOSITORY not set");
+		const repo = parseRepo(process.env.GITHUB_REPOSITORY);
+		const targetCommit = inputs.target_commit;
 
-		// Determine target commit
-		const targetCommit = inputs.target_commit || gitCommand("git rev-parse HEAD").trim();
+		console.log(`🎯 Target commit: ${targetCommit}`);
+		console.log(`🏷️  Test tag name: ${inputs.test_tag_name}`);
 
 		// Analyze token
 		const tokenAnalysis = analyzeToken(inputs.token, inputs.use_github_token);
-		console.log("🔍 Token Analysis:");
-		console.log(`  - Type: ${tokenAnalysis.type}`);
-		console.log(`  - Length: ${tokenAnalysis.length}`);
-		console.log(`  - Prefix: ${tokenAnalysis.prefix}`);
-		console.log(`  - Source: ${inputs.use_github_token ? "GITHUB_TOKEN" : "App Token"}`);
+		console.log(`🔐 Token analysis: ${JSON.stringify(tokenAnalysis, null, 2)}`);
 
-		// Use actual token analysis result instead of input parameter
-		core.setOutput("token_type", tokenAnalysis.type);
-
-		// Setup Git configuration
-		const { enableSign } = await setupGitConfig({
-			repo,
-			token: inputs.token,
-			tagger_name: inputs.tagger_name,
-			tagger_email: inputs.tagger_email,
-			gpg_private_key: inputs.gpg_private_key,
-			gpg_passphrase: inputs.gpg_passphrase
-		});
-
-		console.log(`🎯 Target commit: ${targetCommit}`);
-		console.log(`🔐 GPG signing enabled: ${enableSign}`);
-
-		// Handle cleanup-only mode
+		// If cleanup_only is true, just do cleanup and exit
 		if (inputs.cleanup_only) {
-			console.log("🧹 Running in cleanup-only mode...");
-
-			if (inputs.cleanup_all_test_tags) {
-				// Clean up all test artifacts with broader patterns
-				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "test-" });
-				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "a0" });
-				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "a1" });
-				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "gh0" });
-				await cleanupAllTestArtifacts({ token: inputs.token, repo, pattern: "gh1" });
-			} else {
-				await cleanup({ token: inputs.token, repo, tag: inputs.test_tag_name });
+			console.log("🧹 Cleanup-only mode enabled");
+			if (inputs.cleanup_all_test_artifacts) {
+				await cleanupAllTestArtifacts({
+					token: inputs.token,
+					repo,
+					pattern: "test-debug"
+				});
 			}
-
-			// Set minimal outputs for cleanup-only mode
-			core.setOutput("overall_result", "success");
-			core.setOutput("git_result", "skipped");
-			core.setOutput("api_result", "skipped");
-			core.setOutput("gpg_result", "skipped");
-			core.setOutput("api_gpg_result", "skipped");
-			core.setOutput("git_gpg_result", "skipped");
-			core.setOutput("details", JSON.stringify({ mode: "cleanup-only", completed: true }));
-
-			console.log("✅ Cleanup completed successfully");
 			return;
 		}
 
+		// Setup Git configuration
+		const { enableSign, keyid } = setupGitConfig({
+			tagger_name: inputs.tagger_name,
+			tagger_email: inputs.tagger_email,
+			gpg_private_key: inputs.gpg_private_key,
+			gpg_passphrase: inputs.gpg_passphrase,
+			token: inputs.token,
+			repo
+		});
+
+		console.log(`🔐 GPG signing enabled: ${enableSign}`);
+
 		// Test API tag creation
-		const apiResult = await createTagViaAPI({
+		console.log("\n🔗 Testing API-based tag creation...");
+		const apiResult = await testApiTagCreation({
+			token: inputs.token,
+			repo,
+			tagName: inputs.test_tag_name,
+			targetCommit,
+			tagger_name: inputs.tagger_name,
+			tagger_email: inputs.tagger_email
+		});
+
+		// Test API GPG verification if API tag was created
+		let apiGpgVerified = false;
+		if (apiResult.success) {
+			const apiGpgResult = verifyGpgSignature(inputs.test_tag_name);
+			apiGpgVerified = apiGpgResult.verified;
+			apiResult.apiGpgVerified = apiGpgVerified;
+			console.log(`🔍 API tag GPG verification: ${apiGpgResult.statusText}`);
+		}
+
+		// Test Git tag creation (will overwrite API tag if it exists)
+		console.log("\n⚡ Testing Git-based tag creation...");
+		const gitResult = await testGitTagCreation({
+			tagName: inputs.test_tag_name,
+			targetCommit,
+			enableSign
+		});
+
+		// Test Git GPG verification if Git tag was created
+		let gitGpgVerified = false;
+		if (gitResult.success) {
+			const gitGpgResult = verifyGpgSignature(inputs.test_tag_name);
+			gitGpgVerified = gitGpgResult.verified;
+			gitResult.gitGpgVerified = gitGpgVerified;
+
+			// Determine appropriate status text
+			let gpgStatusText;
+			let signatureStatus;
+
+			if (enableSign) {
+				if (gitGpgResult.verified) {
+					gpgStatusText = "verified and trusted";
+					signatureStatus = "✅ Verified";
+				} else if (gitGpgResult.signed) {
+					gpgStatusText = "signed but not verified (trust/key issues)";
+					signatureStatus = "⚠️  Signed but not verified";
+				} else {
+					gpgStatusText = "signing failed";
+					signatureStatus = "❌ Signing failed";
+				}
+			} else {
+				gpgStatusText = "signing disabled";
+				signatureStatus = "⏭️  Signing disabled";
+			}
+
+			console.log(`🔍 Git tag GPG verification: ${gpgStatusText}`);
+		}
+
+		// Create releases for both methods
+		console.log("\n🎁 Creating GitHub releases...");
+
+		const apiReleaseResult = await createRelease({
 			token: inputs.token,
 			repo,
 			tag: inputs.test_tag_name,
 			targetCommit,
-			tagger_name: inputs.tagger_name,
-			tagger_email: inputs.tagger_email,
-			enableSign
+			title: "Test Release (API Tag)",
+			body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
+				apiGpgVerified ? "✅ Verified" : "❌ Not verified"
+			}\n**GPG Signing**: API tags do not support GPG signing`,
+			suffix: "api"
 		});
 
-		// Test git tag creation
-		const gitResult = await createTagViaGit({
+		const gitReleaseResult = await createRelease({
+			token: inputs.token,
+			repo,
 			tag: inputs.test_tag_name,
 			targetCommit,
-			enableSign
+			title: "Test Release (Git Tag)",
+			body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
+				gitGpgVerified ? "✅ Verified" : "❌ Not verified"
+			}\n**GPG Signing**: ${enableSign ? (gitGpgVerified ? "✅ Verified" : "⚠️  Signed but not verified") : "⏭️  Disabled"}`,
+			suffix: "git"
 		});
 
 		// Set outputs
-		core.setOutput("api_success", apiResult.success);
-		core.setOutput("git_success", gitResult.success);
-		core.setOutput("api_tag_verified", apiResult.isVerified || false);
-		core.setOutput("git_tag_verified", gitResult.isVerified || false);
-
-		// Create releases if tags were successful
-		let apiReleaseResult = { success: false };
-		let gitReleaseResult = { success: false };
-
-		if (apiResult.success) {
-			const apiGpgExpected = enableSign;
-			const apiGpgActual = apiResult.apiGpgVerified || false;
-
-			let apiGpgStatusText;
-			if (!apiGpgExpected) {
-				apiGpgStatusText = "not expected";
-			} else if (apiGpgActual) {
-				apiGpgStatusText = "verified";
-			} else {
-				apiGpgStatusText = "expected but not supported (GitHub Apps cannot sign via API)";
-			}
-
-			apiReleaseResult = await createRelease({
-				token: inputs.token,
-				repo,
-				tag: inputs.test_tag_name,
-				targetCommit,
-				title: "Test Release (API Tag)",
-				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${apiGpgActual}\n**GPG Signing**: ${apiGpgStatusText}`,
-				suffix: "api"
-			});
-		}
-
-		if (gitResult.success) {
-			const gitGpgExpected = enableSign;
-			const gitGpgActual = gitResult.gitGpgVerified || false;
-			const signatureStatus = gitResult.signatureStatus || "unknown";
-
-			let gpgStatusText;
-			if (!gitGpgExpected) {
-				gpgStatusText = "not expected";
-			} else if (gitGpgActual) {
-				gpgStatusText = "verified";
-			} else {
-				// More detailed status based on signature detection
-				switch (signatureStatus) {
-					case "signed but unverified":
-						gpgStatusText = "signed but not verified (trust/key issues)";
-						break;
-					case "invalid":
-						gpgStatusText = "signed but invalid";
-						break;
-					case "unsigned":
-						gpgStatusText = "expected but not signed";
-						break;
-					default:
-						gpgStatusText = "expected but not verified";
-				}
-			}
-
-			gitReleaseResult = await createRelease({
-				token: inputs.token,
-				repo,
-				tag: inputs.test_tag_name,
-				targetCommit,
-				title: "Test Release (Git Tag)",
-				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${gitGpgActual}\n**GPG Signing**: ${gpgStatusText}\n**Signature Status**: ${signatureStatus}`,
-				suffix: "git"
-			});
-		}
-
 		core.setOutput("api_release_success", apiReleaseResult.success);
 		core.setOutput("git_release_success", gitReleaseResult.success);
-
-		// Set the outputs that the workflow expects
-		const overallSuccess = apiResult.success && gitResult.success && apiReleaseResult.success && gitReleaseResult.success;
-
-		core.setOutput("overall_result", overallSuccess ? "success" : "failure");
+		core.setOutput(
+			"overall_result",
+			apiResult.success && gitResult.success && apiReleaseResult.success && gitReleaseResult.success ? "success" : "failure"
+		);
 		core.setOutput("git_result", gitResult.success ? "success" : "failure");
 		core.setOutput("api_result", apiResult.success ? "success" : "failure");
-
-		// Separate GPG verification results for API and Git methods
-		const apiGpgSuccess = enableSign && apiResult.apiGpgVerified;
-		const gitGpgSuccess = enableSign && gitResult.gitGpgVerified;
-
-		core.setOutput("api_gpg_result", apiGpgSuccess ? "success" : "failure");
-		core.setOutput("git_gpg_result", gitGpgSuccess ? "success" : "failure");
-
-		// Combined GPG result for backward compatibility
-		core.setOutput("gpg_result", apiGpgSuccess || gitGpgSuccess ? "success" : "failure");
+		core.setOutput("api_gpg_result", enableSign && apiGpgVerified ? "success" : "failure");
+		core.setOutput("git_gpg_result", enableSign && gitGpgVerified ? "success" : "failure");
+		core.setOutput("gpg_result", enableSign && (apiGpgVerified || gitGpgVerified) ? "success" : "failure");
+		core.setOutput("token_type", tokenAnalysis.type);
+		core.setOutput("api_tag_verified", apiGpgVerified);
+		core.setOutput("git_tag_verified", gitGpgVerified);
 
 		const details = {
 			tokenType: tokenAnalysis.type,
 			apiSuccess: apiResult.success,
 			gitSuccess: gitResult.success,
-			apiGpgVerified: apiResult.apiGpgVerified || false,
-			gitGpgVerified: gitResult.gitGpgVerified || false,
+			apiGpgVerified: apiGpgVerified,
+			gitGpgVerified: gitGpgVerified,
 			apiReleaseSuccess: apiReleaseResult.success,
 			gitReleaseSuccess: gitReleaseResult.success,
 			gpgEnabled: enableSign,
@@ -755,12 +585,8 @@ async function run() {
 		console.log("├─────────────────────────────────────────────────────────┤");
 		console.log("│                    GPG Verification                     │");
 		console.log("├─────────────────────────────────────────────────────────┤");
-		console.log(
-			`│ API GPG Signed:    ${enableSign ? (apiResult.apiGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`
-		);
-		console.log(
-			`│ Git GPG Signed:    ${enableSign ? (gitResult.gitGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`
-		);
+		console.log(`│ API GPG Signed:    ${enableSign ? (apiGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`);
+		console.log(`│ Git GPG Signed:    ${enableSign ? (gitGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`);
 		console.log("├─────────────────────────────────────────────────────────┤");
 		console.log("│                    Release Creation                     │");
 		console.log("├─────────────────────────────────────────────────────────┤");
