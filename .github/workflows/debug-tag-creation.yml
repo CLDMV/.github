@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       test_tag_name:
-        description: "Tag name to create for testing (e.g., test-v1.0.0)"
+        description: "Base tag name for testing - will be prefixed with scenario codes (e.g., test-v1.0.0 becomes a00-test-v1.0.0, a10-test-v1.0.0, etc.)"
         required: true
         default: "test-debug-v1.0.0"
       target_commit:

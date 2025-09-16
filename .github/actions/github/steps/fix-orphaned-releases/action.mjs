@@ -32,12 +32,28 @@ if (DEBUG) {
 	if (process.env.INPUT_GITHUB_TOKEN) {
 		console.log(`  - INPUT_GITHUB_TOKEN length: ${process.env.INPUT_GITHUB_TOKEN.length}`);
 		console.log(`  - INPUT_GITHUB_TOKEN starts with: ${process.env.INPUT_GITHUB_TOKEN.substring(0, 7)}...`);
-		console.log(`  - INPUT_GITHUB_TOKEN type: ${process.env.INPUT_GITHUB_TOKEN.startsWith('ghs_') ? 'App token' : process.env.INPUT_GITHUB_TOKEN.startsWith('ghp_') ? 'Personal token' : 'Unknown type'}`);
+		console.log(
+			`  - INPUT_GITHUB_TOKEN type: ${
+				process.env.INPUT_GITHUB_TOKEN.startsWith("ghs_")
+					? "App token"
+					: process.env.INPUT_GITHUB_TOKEN.startsWith("ghp_")
+					? "Personal token"
+					: "Unknown type"
+			}`
+		);
 	}
 	if (process.env.GITHUB_TOKEN) {
 		console.log(`  - GITHUB_TOKEN length: ${process.env.GITHUB_TOKEN.length}`);
 		console.log(`  - GITHUB_TOKEN starts with: ${process.env.GITHUB_TOKEN.substring(0, 7)}...`);
-		console.log(`  - GITHUB_TOKEN type: ${process.env.GITHUB_TOKEN.startsWith('ghs_') ? 'App token' : process.env.GITHUB_TOKEN.startsWith('ghp_') ? 'Personal token' : 'Default workflow token'}`);
+		console.log(
+			`  - GITHUB_TOKEN type: ${
+				process.env.GITHUB_TOKEN.startsWith("ghs_")
+					? "App token"
+					: process.env.GITHUB_TOKEN.startsWith("ghp_")
+					? "Personal token"
+					: "Default workflow token"
+			}`
+		);
 	}
 }
 
@@ -237,12 +253,12 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		// Push using force push (same as working workflow) - this must succeed
 		console.log(`🚀 Pushing tag to remote: git push origin +refs/tags/${tagName}`);
 		const pushResult = gitCommand(`git push origin +refs/tags/${tagName}`, false);
-		
+
 		// Check if push actually succeeded (gitCommand returns empty string on failure)
 		if (pushResult === "") {
 			throw new Error(`Failed to push tag ${tagName} to remote`);
 		}
-		
+
 		console.log(`✅ Successfully created and pushed tag ${tagName}`);
 		return true;
 	} catch (error) {
