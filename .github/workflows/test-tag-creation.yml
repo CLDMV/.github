@@ -21,6 +21,25 @@ on:
         required: false
         type: boolean
         default: true
+    secrets:
+      CLDMV_APP_ID:
+        description: "GitHub App ID for creating app tokens"
+        required: true
+      CLDMV_APP_PRIVATE_KEY:
+        description: "GitHub App private key for creating app tokens"
+        required: true
+      CLDMV_BOT_NAME:
+        description: "Bot name for git operations (optional, defaults to app-slug based name)"
+        required: false
+      CLDMV_BOT_EMAIL:
+        description: "Bot email for git operations (optional, defaults to app-slug based email)"
+        required: false
+      CLDMV_GPG_PRIVATE_KEY:
+        description: "GPG private key for signing tags (optional)"
+        required: false
+      CLDMV_GPG_PASSPHRASE:
+        description: "GPG passphrase for signing tags (optional)"
+        required: false
 
 jobs:
   # Matrix Test 1: App Token + No App Permissions + No YAML Permissions
@@ -56,16 +75,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "app-no-app-perms-no-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "a00-${{ inputs.test_tag_name }}"
+          test_tag_name: "a00-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+          use_github_token: "false"
+          token: ${{ steps.app-token.outputs.token }}
           tagger_name: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
+          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
 
   # Matrix Test 2: App Token + App Permissions + No YAML Permissions
   test-app-with-app-perms-no-yaml-perms:
@@ -80,13 +98,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get CLDMV app token (with permissions)
+      - name: Get CLDMV app token (with specific permissions requested)
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
           repositories: ${{ github.repository }}
+          permission-contents: write
+          permission-metadata: read
+          permission-pull-requests: write
+          permission-actions: write
 
       - name: Get user ID for bot email
         id: get-user-id
@@ -176,13 +198,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get CLDMV app token (with app permissions)
+      - name: Get CLDMV app token (with specific permissions requested)
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
           repositories: ${{ github.repository }}
+          permission-contents: write
+          permission-metadata: read
+          permission-pull-requests: write
+          permission-actions: write
 
       - name: Get user ID for bot email
         id: get-user-id
