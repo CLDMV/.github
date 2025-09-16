@@ -421,6 +421,7 @@ async function run() {
 		};
 
 		const repo = parseRepo(process.env.GITHUB_REPOSITORY);
+		const repoString = `${repo.owner}/${repo.repo}`;
 		const targetCommit = inputs.target_commit;
 
 		console.log(`🎯 Target commit: ${targetCommit}`);
@@ -436,7 +437,7 @@ async function run() {
 			if (inputs.cleanup_all_test_artifacts) {
 				await cleanupAllTestArtifacts({
 					token: inputs.token,
-					repo,
+					repo: repoString,
 					pattern: "test-debug"
 				});
 			}
@@ -450,7 +451,7 @@ async function run() {
 			gpg_private_key: inputs.gpg_private_key,
 			gpg_passphrase: inputs.gpg_passphrase,
 			token: inputs.token,
-			repo
+			repo: repoString
 		});
 
 		console.log(`🔐 GPG signing enabled: ${enableSign}`);
@@ -459,7 +460,7 @@ async function run() {
 		console.log("\n🔗 Testing API-based tag creation...");
 		const apiResult = await testApiTagCreation({
 			token: inputs.token,
-			repo,
+			repo: repoString,
 			tagName: inputs.test_tag_name,
 			targetCommit,
 			tagger_name: inputs.tagger_name,
@@ -518,7 +519,7 @@ async function run() {
 
 		const apiReleaseResult = await createRelease({
 			token: inputs.token,
-			repo,
+			repo: repoString,
 			tag: inputs.test_tag_name,
 			targetCommit,
 			title: "Test Release (API Tag)",
@@ -530,7 +531,7 @@ async function run() {
 
 		const gitReleaseResult = await createRelease({
 			token: inputs.token,
-			repo,
+			repo: repoString,
 			tag: inputs.test_tag_name,
 			targetCommit,
 			title: "Test Release (Git Tag)",
@@ -604,13 +605,13 @@ async function run() {
 		if (inputs.cleanup_all_test_artifacts) {
 			await cleanupAllTestArtifacts({
 				token: inputs.token,
-				repo,
+				repo: repoString,
 				pattern: "test-debug"
 			});
 		} else if (inputs.cleanup_tag) {
 			await cleanup({
 				token: inputs.token,
-				repo,
+				repo: repoString,
 				tag: inputs.test_tag_name
 			});
 		}
