@@ -451,16 +451,32 @@ async function cleanup({ token, repo, tag }) {
 
 		// Delete the tag remotely (this is the important one)
 		try {
-			gitCommand(`git push origin :refs/tags/${tag}`, true);
-			console.log(`✅ Remote tag ${tag} deleted`);
+			console.log(`🔍 Attempting to delete remote tag: ${tag}`);
+			const gitPushResult = gitCommand(`git push origin :refs/tags/${tag}`, true);
+			console.log(`✅ Remote tag ${tag} deleted successfully`);
+			console.log(`📄 Git push output: ${gitPushResult}`);
 		} catch (error) {
-			console.log(`ℹ️  Remote tag ${tag} not found: ${error.message}`);
+			console.log(`ℹ️  Remote tag ${tag} deletion failed: ${error.message}`);
+			console.log(`📄 This might be because the tag doesn't exist remotely or permission issues`);
+
+			// Try alternative method via GitHub API
+			try {
+				console.log(`🔄 Trying to delete tag via GitHub API...`);
+				const { owner, repo: repoName } = parseRepo(repo);
+				await api("DELETE", `/git/refs/tags/${tag}`, null, { token, owner, repo: repoName });
+				console.log(`✅ Remote tag ${tag} deleted via API`);
+			} catch (apiError) {
+				console.log(`⚠️  API tag deletion also failed: ${apiError.message}`);
+			}
 		}
 
 		// Delete any associated releases (most important for cleanup)
 		try {
 			const { owner, repo: repoName } = parseRepo(repo);
+			console.log(`🔍 Fetching releases for ${owner}/${repoName}...`);
 			const releasesResponse = await api("GET", `/releases`, null, { token, owner, repo: repoName });
+
+			console.log(`📋 Total releases found: ${releasesResponse?.length || 0}`);
 
 			// Look for releases with matching tag name
 			const matchingReleases = releasesResponse.filter((release) => release.tag_name === tag);
@@ -468,13 +484,16 @@ async function cleanup({ token, repo, tag }) {
 			if (matchingReleases.length === 0) {
 				console.log(`ℹ️  No releases found for tag ${tag}`);
 			} else {
+				console.log(`🎯 Found ${matchingReleases.length} releases to delete for tag ${tag}`);
 				for (const release of matchingReleases) {
-					await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
-					console.log(`✅ Release "${release.name}" (${tag}) deleted`);
+					console.log(`🗑️  Deleting release: "${release.name}" (ID: ${release.id}, Tag: ${release.tag_name})`);
+					const deleteResult = await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
+					console.log(`✅ Release "${release.name}" (${tag}) deleted successfully`);
 				}
 			}
 		} catch (error) {
 			console.log(`⚠️  Release cleanup failed for tag ${tag}: ${error.message}`);
+			console.log(`📄 Error details:`, error);
 		}
 
 		return { success: true };
@@ -505,7 +524,10 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 		let testReleases = [];
 		try {
 			const { owner, repo: repoName } = parseRepo(repo);
+			console.log(`🔍 Fetching all releases from ${owner}/${repoName}...`);
 			const releasesResponse = await api("GET", `/releases`, null, { token, owner, repo: repoName });
+
+			console.log(`📋 Total releases in repository: ${releasesResponse?.length || 0}`);
 
 			// Look for releases with test patterns (covers more cases than just local tags)
 			const testPatterns = [
@@ -518,9 +540,18 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 				"gh1-"
 			];
 
+			// Show all release tag names for debugging
+			console.log(
+				`🔍 All release tags:`,
+				releasesResponse.map((r) => r.tag_name)
+			);
+
 			testReleases = releasesResponse.filter((release) => testPatterns.some((pattern) => release.tag_name.includes(pattern)));
 
-			console.log(`📋 Found ${testReleases.length} test releases to clean up`);
+			console.log(`📋 Found ${testReleases.length} test releases to clean up:`);
+			testReleases.forEach((release) => {
+				console.log(`  - "${release.name}" (tag: ${release.tag_name}, id: ${release.id})`);
+			});
 
 			// Add release tags to our cleanup list if they're not already there
 			for (const release of testReleases) {
@@ -530,11 +561,28 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 			}
 		} catch (error) {
 			console.log(`ℹ️  Could not get releases for cleanup: ${error.message}`);
+			console.log(`📄 Error details:`, error);
 		}
 
 		console.log(`🎯 Total items to clean up: ${tags.length}`);
 
-		// Clean up each tag and its associated release
+		// First, delete all test releases directly (don't rely on tag-based cleanup)
+		if (testReleases.length > 0) {
+			console.log(`🗑️  Deleting ${testReleases.length} test releases directly...`);
+			const { owner, repo: repoName } = parseRepo(repo);
+
+			for (const release of testReleases) {
+				try {
+					console.log(`🗑️  Deleting release: "${release.name}" (ID: ${release.id}, Tag: ${release.tag_name})`);
+					await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
+					console.log(`✅ Release "${release.name}" deleted successfully`);
+				} catch (error) {
+					console.log(`⚠️  Failed to delete release "${release.name}": ${error.message}`);
+				}
+			}
+		}
+
+		// Then clean up each tag (this will also attempt release cleanup as backup)
 		for (const tag of tags) {
 			await cleanup({ token, repo, tag: tag.trim() });
 		}
@@ -543,6 +591,99 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 		return { success: true, cleaned: tags.length };
 	} catch (error) {
 		console.log(`⚠️  Test artifacts cleanup failed: ${error.message}`);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Nuclear cleanup - delete ALL test releases and tags, regardless of local tag state
+ */
+async function nuclearCleanupTestArtifacts({ token, repo }) {
+	try {
+		console.log(`☢️  NUCLEAR CLEANUP: Removing ALL test artifacts from repository...`);
+
+		const { owner, repo: repoName } = parseRepo(repo);
+
+		// Get ALL releases
+		console.log(`🔍 Fetching all releases from ${owner}/${repoName}...`);
+		const allReleases = await api("GET", `/releases`, null, { token, owner, repo: repoName });
+		console.log(`📋 Total releases found: ${allReleases?.length || 0}`);
+
+		// Define comprehensive test patterns
+		const testPatterns = [
+			"test-debug", // main pattern
+			"test-v", // test version pattern
+			"a00-", // test matrix patterns
+			"a01-",
+			"a10-",
+			"a11-",
+			"gh0-",
+			"gh1-",
+			"-api", // API tag suffix
+			"-git" // Git tag suffix
+		];
+
+		// Find ALL test releases
+		const testReleases = allReleases.filter((release) => testPatterns.some((pattern) => release.tag_name.includes(pattern)));
+
+		console.log(`🎯 Found ${testReleases.length} test releases to DELETE:`);
+		testReleases.forEach((release) => {
+			console.log(`  💣 "${release.name}" (tag: ${release.tag_name}, id: ${release.id})`);
+		});
+
+		// Delete ALL test releases
+		let deletedReleases = 0;
+		for (const release of testReleases) {
+			try {
+				console.log(`🗑️  DELETING: "${release.name}" (${release.tag_name})`);
+				await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
+				deletedReleases++;
+				console.log(`✅ DELETED: "${release.name}"`);
+			} catch (error) {
+				console.log(`❌ FAILED to delete "${release.name}": ${error.message}`);
+			}
+		}
+
+		// Get ALL tags from GitHub API (not local git)
+		console.log(`🔍 Fetching all tags from GitHub API...`);
+		const allTagRefs = await api("GET", `/git/refs/tags`, null, { token, owner, repo: repoName });
+		console.log(`📋 Total tag refs found: ${allTagRefs?.length || 0}`);
+
+		// Find test tags
+		const testTagRefs = allTagRefs.filter((tagRef) => testPatterns.some((pattern) => tagRef.ref.includes(pattern)));
+
+		console.log(`🎯 Found ${testTagRefs.length} test tag refs to DELETE:`);
+		testTagRefs.forEach((tagRef) => {
+			console.log(`  💣 ${tagRef.ref}`);
+		});
+
+		// Delete ALL test tags via API
+		let deletedTags = 0;
+		for (const tagRef of testTagRefs) {
+			try {
+				const tagName = tagRef.ref.replace("refs/tags/", "");
+				console.log(`🗑️  DELETING TAG: ${tagName}`);
+				await api("DELETE", tagRef.ref.replace("refs/", "/git/refs/"), null, { token, owner, repo: repoName });
+				deletedTags++;
+				console.log(`✅ DELETED TAG: ${tagName}`);
+			} catch (error) {
+				console.log(`❌ FAILED to delete tag ${tagRef.ref}: ${error.message}`);
+			}
+		}
+
+		console.log(`☢️  NUCLEAR CLEANUP COMPLETE:`);
+		console.log(`   💥 Releases deleted: ${deletedReleases}/${testReleases.length}`);
+		console.log(`   💥 Tags deleted: ${deletedTags}/${testTagRefs.length}`);
+
+		return {
+			success: true,
+			releasesDeleted: deletedReleases,
+			tagsDeleted: deletedTags,
+			totalFound: testReleases.length + testTagRefs.length
+		};
+	} catch (error) {
+		console.log(`☢️  NUCLEAR CLEANUP FAILED: ${error.message}`);
+		console.log(`📄 Error details:`, error);
 		return { success: false, error: error.message };
 	}
 }
@@ -567,7 +708,8 @@ async function run() {
 			gpg_passphrase: core.getInput("gpg_passphrase"),
 			gpg_tagger_name: core.getInput("gpg_tagger_name"),
 			gpg_tagger_email: core.getInput("gpg_tagger_email"),
-			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true"
+			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true",
+			nuclear_cleanup: core.getInput("nuclear_cleanup") === "true"
 		};
 
 		const repo = parseRepo(process.env.GITHUB_REPOSITORY);
@@ -584,12 +726,26 @@ async function run() {
 		// If cleanup_only is true, just do cleanup and exit
 		if (inputs.cleanup_only) {
 			console.log("🧹 Cleanup-only mode enabled");
-			if (inputs.cleanup_all_test_tags || inputs.cleanup_all_test_artifacts) {
+			console.log(`🔍 Cleanup inputs check:`);
+			console.log(`  - cleanup_all_test_tags: ${inputs.cleanup_all_test_tags}`);
+			console.log(`  - cleanup_all_test_artifacts: ${inputs.cleanup_all_test_artifacts}`);
+			console.log(`  - nuclear_cleanup: ${inputs.nuclear_cleanup}`);
+
+			if (inputs.nuclear_cleanup) {
+				console.log("☢️  STARTING NUCLEAR CLEANUP (DELETE ALL TEST ARTIFACTS)...");
+				await nuclearCleanupTestArtifacts({
+					token: inputs.token,
+					repo: repoString
+				});
+			} else if (inputs.cleanup_all_test_tags || inputs.cleanup_all_test_artifacts) {
+				console.log("✅ Starting comprehensive cleanup...");
 				await cleanupAllTestArtifacts({
 					token: inputs.token,
 					repo: repoString,
 					pattern: "test-debug"
 				});
+			} else {
+				console.log("⚠️  No cleanup flags enabled, skipping cleanup");
 			}
 			return;
 		}
