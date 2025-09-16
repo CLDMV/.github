@@ -426,46 +426,22 @@ jobs:
           echo "|---------------|-------|-----------|------------|-----|-----|-----|---------|" >> $GITHUB_STEP_SUMMARY
 
           # App Token + No App Perms + No YAML Perms
-          a00_git="${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          a00_api="${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          a00_gpg="${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          a00_overall="${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| App + No App + No YAML | App | ❌ | ❌ | $a00_git | $a00_api | $a00_gpg | $a00_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| App + No App + No YAML | App | ❌ | ❌ | ${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           # App Token + App Perms + No YAML Perms
-          a10_git="${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          a10_api="${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          a10_gpg="${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          a10_overall="${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| App + App Perms + No YAML | App | ✅ | ❌ | $a10_git | $a10_api | $a10_gpg | $a10_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| App + App Perms + No YAML | App | ✅ | ❌ | ${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           # App Token + No App Perms + YAML Perms
-          a01_git="${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          a01_api="${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          a01_gpg="${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          a01_overall="${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| App + No App + YAML Perms | App | ❌ | ✅ | $a01_git | $a01_api | $a01_gpg | $a01_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| App + No App + YAML Perms | App | ❌ | ✅ | ${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           # App Token + App Perms + YAML Perms
-          a11_git="${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          a11_api="${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          a11_gpg="${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          a11_overall="${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| App + App Perms + YAML Perms | App | ✅ | ✅ | $a11_git | $a11_api | $a11_gpg | $a11_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| App + App Perms + YAML Perms | App | ✅ | ✅ | ${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           # GITHUB_TOKEN + No YAML Perms  
-          gh0_git="${{ needs.test-github-token-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          gh0_api="${{ needs.test-github-token-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          gh0_gpg="${{ needs.test-github-token-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          gh0_overall="${{ needs.test-github-token-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| GitHub + No YAML | GitHub | N/A | ❌ | $gh0_git | $gh0_api | $gh0_gpg | $gh0_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub + No YAML | GitHub | N/A | ❌ | ${{ needs.test-github-token-no-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-no-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-no-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-no-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           # GITHUB_TOKEN + YAML Perms
-          gh1_git="${{ needs.test-github-token-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }}"
-          gh1_api="${{ needs.test-github-token-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }}"
-          gh1_gpg="${{ needs.test-github-token-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }}"
-          gh1_overall="${{ needs.test-github-token-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }}"
-          echo "| GitHub + YAML Perms | GitHub | N/A | ✅ | $gh1_git | $gh1_api | $gh1_gpg | $gh1_overall |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub + YAML Perms | GitHub | N/A | ✅ | ${{ needs.test-github-token-with-yaml-perms.outputs.git_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-with-yaml-perms.outputs.api_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-with-yaml-perms.outputs.gpg_result == 'success' && '✅' || '❌' }} | ${{ needs.test-github-token-with-yaml-perms.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Matrix Analysis" >> $GITHUB_STEP_SUMMARY
@@ -483,3 +459,11 @@ jobs:
           echo "2. **Token type differences** in authentication behavior" >> $GITHUB_STEP_SUMMARY
           echo "3. **API vs Git command consistency** across permission combinations" >> $GITHUB_STEP_SUMMARY
           echo "4. **GPG signing compatibility** with different permission setups" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Raw Output Values (for debugging)" >> $GITHUB_STEP_SUMMARY
+          echo "- A00 (No App + No YAML): git='${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.git_result }}' api='${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-app-no-app-perms-no-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- A10 (App Perms + No YAML): git='${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.git_result }}' api='${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-app-with-app-perms-no-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- A01 (No App + YAML Perms): git='${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.git_result }}' api='${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-app-no-app-perms-with-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- A11 (App Perms + YAML Perms): git='${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.git_result }}' api='${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-app-with-app-perms-with-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- GH0 (GitHub + No YAML): git='${{ needs.test-github-token-no-yaml-perms.outputs.git_result }}' api='${{ needs.test-github-token-no-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-github-token-no-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-github-token-no-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
+          echo "- GH1 (GitHub + YAML Perms): git='${{ needs.test-github-token-with-yaml-perms.outputs.git_result }}' api='${{ needs.test-github-token-with-yaml-perms.outputs.api_result }}' gpg='${{ needs.test-github-token-with-yaml-perms.outputs.gpg_result }}' overall='${{ needs.test-github-token-with-yaml-perms.outputs.result }}'" >> $GITHUB_STEP_SUMMARY
