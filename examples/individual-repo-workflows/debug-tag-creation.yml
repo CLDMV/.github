@@ -79,19 +79,25 @@ jobs:
 # │ GitHub + YAML Perms       │ GitHub │ N/A       │ ✅         │ ✅  │ ✅  │ ❌      │ ❌      │
 # └──────────────────────────────────────────────────────────────────────────────────────┘
 #
-# If you see App Token git commands failing consistently while API succeeds,
-# this indicates a GitHub platform bug with App token permissions for
-# repositories containing workflow files.
+# Notes on Expected Results:
+# - API GPG: GitHub Apps currently cannot create GPG-signed tags via API (❌)
+# - Git GPG: Local Git with GPG keys can create signed tags when pushed (✅ for App tokens, ❌ for GITHUB_TOKEN)
+# - Git vs API: Both methods should succeed for tag creation, but Git method provides GPG signing capability
+#
+# If you see unexpected failures, this may indicate permission configuration issues.
 #
 # Setup Instructions:
 # 1. Copy this file to your repo's .github/workflows/
 # 2. Update package_name above to match your project
-# 3. Ensure you have CLDMV_APP_ID and CLDMV_APP_PRIVATE_KEY secrets
-# 4. Run the workflow and examine the results in the Summary tab
-# 5. Compare results across different scenarios to identify patterns
+# 3. Ensure you have CLDMV_BOT_APP_ID and CLDMV_BOT_APP_PRIVATE_KEY secrets
+# 4. Optionally add GPG secrets for signing testing
+# 5. Run the workflow and examine the results in the Summary tab
+# 6. Use cleanup_old_artifacts: true to clean up previous test runs
 #
 # Features:
 # - Automatically tests all 6 scenarios (comprehensive permission matrix)
+# - Cleanup functionality to remove old test artifacts before/after testing
+# - Separate API GPG and Git GPG verification tracking
 # - Uses production-style app-slug based tagger identity derivation
 # - Tests app-level vs workflow-level permission interactions
 # - Professional MJS action using existing CLDMV infrastructure
