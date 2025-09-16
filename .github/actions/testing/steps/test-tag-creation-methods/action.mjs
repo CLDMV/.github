@@ -127,14 +127,35 @@ async function createTagViaAPI({ token, repo, tag, targetCommit, tagger_name, ta
 
 		// Verify the tag
 		const refInfo = await getRefTag({ token, repo, tag: `${tag}-api` });
-		const isVerified = refInfo.objectType === "tag"; // annotated tags are verified
+		const isAnnotated = refInfo.objectType === "tag";
+
+		// Check GPG signature verification via API
+		let apiGpgVerified = false;
+		try {
+			// Get the tag object details which include verification info
+			const { owner, repo: r } = parseRepo(repo);
+			const tagDetails = await api("GET", `/git/tags/${tagObject.sha}`, null, {
+				token,
+				owner,
+				repo: r
+			});
+
+			// Check if there's verification info (GitHub Apps can create signed tags)
+			apiGpgVerified = tagDetails.verification?.verified === true;
+			console.log(`🔍 API GPG verification: ${apiGpgVerified ? "✅ verified" : "❌ not verified"}`);
+			if (tagDetails.verification) {
+				console.log(`   Verification reason: ${tagDetails.verification.reason || "none"}`);
+			}
+		} catch (verifyError) {
+			console.log(`⚠️  Could not check API GPG verification: ${verifyError.message}`);
+		}
 
 		return {
 			success: true,
 			tagSha: tagObject.sha,
 			refSha: refInfo.refSha,
-			isAnnotated: true,
-			isVerified,
+			isAnnotated,
+			apiGpgVerified,
 			method: "api"
 		};
 	} catch (error) {
@@ -193,17 +214,18 @@ async function createTagViaGit({ tag, targetCommit, enableSign }) {
 
 		console.log(`✅ Git tag pushed successfully: ${tagName}`);
 
-		// Check if tag is signed
+		// Check if tag is GPG signed
 		const showCommand = `git show --show-signature "${tagName}"`;
 		const showResult = gitCommand(showCommand, true);
-		const isVerified = showResult.includes("gpg: Good signature") || showResult.includes("Signature made");
+		const gitGpgVerified = showResult.includes("gpg: Good signature") || showResult.includes("Signature made");
+		console.log(`🔍 Git GPG verification: ${gitGpgVerified ? "✅ verified" : "❌ not verified"}`);
 
 		return {
 			success: true,
 			localSuccess: true,
 			pushSuccess: true,
 			isAnnotated: true,
-			isVerified,
+			gitGpgVerified,
 			method: "git"
 		};
 	} catch (error) {
@@ -409,18 +431,27 @@ async function run() {
 
 		// Set the outputs that the workflow expects
 		const overallSuccess = apiResult.success && gitResult.success && apiReleaseResult.success && gitReleaseResult.success;
-		
+
 		core.setOutput("overall_result", overallSuccess ? "success" : "failure");
 		core.setOutput("git_result", gitResult.success ? "success" : "failure");
 		core.setOutput("api_result", apiResult.success ? "success" : "failure");
-		core.setOutput("gpg_result", (enableSign && (apiResult.isVerified || gitResult.isVerified)) ? "success" : "failure");
-		
+
+		// Separate GPG verification results for API and Git methods
+		const apiGpgSuccess = enableSign && apiResult.apiGpgVerified;
+		const gitGpgSuccess = enableSign && gitResult.gitGpgVerified;
+
+		core.setOutput("api_gpg_result", apiGpgSuccess ? "success" : "failure");
+		core.setOutput("git_gpg_result", gitGpgSuccess ? "success" : "failure");
+
+		// Combined GPG result for backward compatibility
+		core.setOutput("gpg_result", apiGpgSuccess || gitGpgSuccess ? "success" : "failure");
+
 		const details = {
 			tokenType: tokenAnalysis.type,
 			apiSuccess: apiResult.success,
 			gitSuccess: gitResult.success,
-			apiVerified: apiResult.isVerified || false,
-			gitVerified: gitResult.isVerified || false,
+			apiGpgVerified: apiResult.apiGpgVerified || false,
+			gitGpgVerified: gitResult.gitGpgVerified || false,
 			apiReleaseSuccess: apiReleaseResult.success,
 			gitReleaseSuccess: gitReleaseResult.success,
 			gpgEnabled: enableSign,
@@ -431,7 +462,7 @@ async function run() {
 				...(gitReleaseResult.error ? [`Git Release: ${gitReleaseResult.error}`] : [])
 			]
 		};
-		
+
 		core.setOutput("details", JSON.stringify(details));
 
 		// Summary
@@ -439,8 +470,17 @@ async function run() {
 		console.log("┌─────────────────────────────────────────────────────────┐");
 		console.log("│                      Tag Creation                       │");
 		console.log("├─────────────────────────────────────────────────────────┤");
-		console.log(`│ API Method:        ${apiResult.success ? "✅ SUCCESS" : "❌ FAILED"} (verified: ${apiResult.isVerified || false})  │`);
-		console.log(`│ Git Method:        ${gitResult.success ? "✅ SUCCESS" : "❌ FAILED"} (verified: ${gitResult.isVerified || false})  │`);
+		console.log(`│ API Method:        ${apiResult.success ? "✅ SUCCESS" : "❌ FAILED"}                            │`);
+		console.log(`│ Git Method:        ${gitResult.success ? "✅ SUCCESS" : "❌ FAILED"}                            │`);
+		console.log("├─────────────────────────────────────────────────────────┤");
+		console.log("│                    GPG Verification                     │");
+		console.log("├─────────────────────────────────────────────────────────┤");
+		console.log(
+			`│ API GPG Signed:    ${enableSign ? (apiResult.apiGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`
+		);
+		console.log(
+			`│ Git GPG Signed:    ${enableSign ? (gitResult.gitGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`
+		);
 		console.log("├─────────────────────────────────────────────────────────┤");
 		console.log("│                    Release Creation                     │");
 		console.log("├─────────────────────────────────────────────────────────┤");

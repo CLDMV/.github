@@ -45,7 +45,11 @@ outputs:
   api_result:
     description: "API-based tag creation result"
   gpg_result:
-    description: "GPG signature verification result"
+    description: "Combined GPG signature verification result (for backward compatibility)"
+  api_gpg_result:
+    description: "API-based GPG signature verification result"
+  git_gpg_result:
+    description: "Git-based GPG signature verification result"
   details:
     description: "Detailed test results and error messages"
   api_success:
