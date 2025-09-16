@@ -19,6 +19,11 @@ on:
         required: false
         default: true
         type: boolean
+      cleanup_old_artifacts:
+        description: "Clean up old test artifacts before running new tests"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   debug-tag-creation:
@@ -30,6 +35,7 @@ jobs:
       test_tag_name: ${{ inputs.test_tag_name }}
       target_commit: ${{ inputs.target_commit }}
       cleanup_tag: ${{ inputs.cleanup_tag }}
+      cleanup_old_artifacts: ${{ inputs.cleanup_old_artifacts }}
     secrets:
       # REQUIRED: GitHub App and GPG credentials for your organization
       CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
