@@ -407,6 +407,33 @@ async function run() {
 		core.setOutput("api_release_success", apiReleaseResult.success);
 		core.setOutput("git_release_success", gitReleaseResult.success);
 
+		// Set the outputs that the workflow expects
+		const overallSuccess = apiResult.success && gitResult.success && apiReleaseResult.success && gitReleaseResult.success;
+		
+		core.setOutput("overall_result", overallSuccess ? "success" : "failure");
+		core.setOutput("git_result", gitResult.success ? "success" : "failure");
+		core.setOutput("api_result", apiResult.success ? "success" : "failure");
+		core.setOutput("gpg_result", (enableSign && (apiResult.isVerified || gitResult.isVerified)) ? "success" : "failure");
+		
+		const details = {
+			tokenType: tokenAnalysis.type,
+			apiSuccess: apiResult.success,
+			gitSuccess: gitResult.success,
+			apiVerified: apiResult.isVerified || false,
+			gitVerified: gitResult.isVerified || false,
+			apiReleaseSuccess: apiReleaseResult.success,
+			gitReleaseSuccess: gitReleaseResult.success,
+			gpgEnabled: enableSign,
+			errors: [
+				...(apiResult.error ? [`API: ${apiResult.error}`] : []),
+				...(gitResult.error ? [`Git: ${gitResult.error}`] : []),
+				...(apiReleaseResult.error ? [`API Release: ${apiReleaseResult.error}`] : []),
+				...(gitReleaseResult.error ? [`Git Release: ${gitReleaseResult.error}`] : [])
+			]
+		};
+		
+		core.setOutput("details", JSON.stringify(details));
+
 		// Summary
 		console.log("\n📊 Test Results Summary:");
 		console.log("┌─────────────────────────────────────────────────────────┐");
