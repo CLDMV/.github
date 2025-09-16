@@ -13,10 +13,10 @@ jobs:
   cleanup-test:
     runs-on: ubuntu-latest
     if: github.event.inputs.cleanup_all == 'true'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Cleanup all test artifacts
         uses: ./.github/actions/testing/steps/test-tag-creation-methods
         with:
@@ -28,10 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [cleanup-test]
     if: always()
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Get CLDMV app token
         id: app-token
         uses: actions/create-github-app-token@v2
@@ -42,7 +42,7 @@ jobs:
           permissions: >-
             contents: write
             metadata: read
-      
+
       - name: Debug token identity
         run: |
           echo "Getting bot user ID..."
@@ -52,7 +52,7 @@ jobs:
           echo "Bot Login: $BOT_LOGIN"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-      
+
       - name: Quick GPG verification test
         uses: ./.github/actions/testing/steps/test-tag-creation-methods
         with:

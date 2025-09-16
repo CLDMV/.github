@@ -470,7 +470,9 @@ async function run() {
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (API Tag)",
-				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${apiResult.apiGpgVerified || false}\n**GPG Signing**: ${apiResult.apiGpgVerified ? "verified" : "not verified"}`,
+				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
+					apiResult.apiGpgVerified || false
+				}\n**GPG Signing**: ${apiResult.apiGpgVerified ? "verified" : "not verified"}`,
 				suffix: "api"
 			});
 		}
@@ -482,7 +484,9 @@ async function run() {
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (Git Tag)",
-				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${gitResult.gitGpgVerified || false}\n**GPG Signing**: ${gitResult.gitGpgVerified ? "verified" : "not verified"}`,
+				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
+					gitResult.gitGpgVerified || false
+				}\n**GPG Signing**: ${gitResult.gitGpgVerified ? "verified" : "not verified"}`,
 				suffix: "git"
 			});
 		}
