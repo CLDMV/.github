@@ -55,31 +55,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug secrets availability
-        run: |
-          echo "App ID length: ${#CLDMV_APP_ID}"
-          echo "Private key length: ${#CLDMV_APP_PRIVATE_KEY}"
-          if [ -z "$CLDMV_APP_ID" ]; then
-            echo "❌ CLDMV_APP_ID is empty"
-          else
-            echo "✅ CLDMV_APP_ID is available"
-          fi
-          if [ -z "$CLDMV_APP_PRIVATE_KEY" ]; then
-            echo "❌ CLDMV_APP_PRIVATE_KEY is empty"
-          else
-            echo "✅ CLDMV_APP_PRIVATE_KEY is available"
-          fi
-        env:
-          CLDMV_APP_ID: ${{ secrets.CLDMV_APP_ID }}
-          CLDMV_APP_PRIVATE_KEY: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
-
       - name: Get CLDMV app token (no permissions)
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
-          # No repositories or permissions specified
+          owner: ${{ github.repository_owner }}
+          # No permission-* specified = minimal permissions
 
       - name: Get user ID for bot email
         id: get-user-id
@@ -124,7 +107,7 @@ jobs:
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
-          repositories: ${{ github.repository }}
+          owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-metadata: read
           permission-pull-requests: write
@@ -175,7 +158,8 @@ jobs:
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
-          # No repositories or permissions specified
+          owner: ${{ github.repository_owner }}
+          # No permission-* specified = minimal permissions
 
       - name: Get user ID for bot email
         id: get-user-id
@@ -222,7 +206,7 @@ jobs:
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
           private-key: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
-          repositories: ${{ github.repository }}
+          owner: ${{ github.repository_owner }}
           permission-contents: write
           permission-metadata: read
           permission-pull-requests: write
