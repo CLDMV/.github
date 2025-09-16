@@ -55,8 +55,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug - Check if App ID secret is available
+        id: check-secret
+        run: |
+          if [ -n "$CLDMV_APP_ID" ] && [ "$CLDMV_APP_ID" != "" ]; then
+            echo "✅ CLDMV_APP_ID secret is available (length: ${#CLDMV_APP_ID})"
+            echo "secret_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ CLDMV_APP_ID secret is empty or not available"
+            echo "secret_available=false" >> $GITHUB_OUTPUT
+            echo "CLDMV_APP_ID value: '$CLDMV_APP_ID'"
+          fi
+        env:
+          CLDMV_APP_ID: ${{ secrets.CLDMV_APP_ID }}
+
       - name: Get CLDMV app token (no permissions)
         id: app-token
+        if: ${{ steps.check-secret.outputs.secret_available == 'true' }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.CLDMV_APP_ID }}
@@ -64,13 +79,20 @@ jobs:
           owner: ${{ github.repository_owner }}
           # No permission-* specified = minimal permissions
 
+      - name: Fallback to GITHUB_TOKEN if app secret not available
+        id: fallback-token
+        if: ${{ steps.check-secret.outputs.secret_available == 'false' }}
+        run: |
+          echo "Using GITHUB_TOKEN as fallback"
+          echo "token=${{ github.token }}" >> $GITHUB_OUTPUT
+
       - name: Get user ID for bot email
         id: get-user-id
         run: |
           user_id=$(gh api user --jq '.id')
           echo "user-id=$user_id" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || steps.fallback-token.outputs.token }}
 
       - name: Test tag creation
         id: test-tags
@@ -79,8 +101,8 @@ jobs:
           test_tag_name: "a00-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          use_github_token: "false"
-          token: ${{ steps.app-token.outputs.token }}
+          use_github_token: ${{ steps.check-secret.outputs.secret_available == 'false' && 'true' || 'false' }}
+          token: ${{ steps.app-token.outputs.token || steps.fallback-token.outputs.token }}
           tagger_name: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
           gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
