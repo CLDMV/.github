@@ -32,16 +32,16 @@ jobs:
       cleanup_tag: ${{ inputs.cleanup_tag }}
     secrets:
       # REQUIRED: GitHub App and GPG credentials for your organization
-      CLDMV_APP_ID: ${{ secrets.CLDMV_APP_ID }}
-      CLDMV_APP_PRIVATE_KEY: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
+      CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
       # OPTIONAL: Fallback bot identity (defaults to app-slug based identity)
       CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
 
       # OPTIONAL: GPG signing (recommended for production)
-      CLDMV_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
-      CLDMV_GPG_PASSPHRASE: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+      CLDMV_BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+      CLDMV_BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
 # This workflow will automatically run all 6 test scenarios to help you identify:
 #
 # 1. **App Token vs GITHUB_TOKEN differences**
