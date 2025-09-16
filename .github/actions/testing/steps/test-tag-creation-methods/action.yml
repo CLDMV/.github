@@ -1,9 +1,9 @@
 name: "Test Tag Creation Methods"
-description: "Tests tag creation via API and git commands using existing CLDMV infrastructure"
+description: "Test tag creation using both Git commands and GitHub API with comprehensive permission validation"
 
 inputs:
   test_tag_name:
-    description: "Tag name to create for testing (e.g., test-v1.0.0)"
+    description: "Name of the test tag to create"
     required: true
   target_commit:
     description: "Commit SHA to tag (defaults to HEAD)"
@@ -18,38 +18,50 @@ inputs:
     required: false
     default: "false"
   token:
-    description: "Token to use for authentication"
+    description: "Authentication token (app token or GITHUB_TOKEN)"
     required: true
   tagger_name:
-    description: "GPG tagger name for signing"
+    description: "Name for git tagger"
     required: false
-    default: "CLDMV Bot"
+    default: "Test Bot"
   tagger_email:
-    description: "GPG tagger email for signing"
+    description: "Email for git tagger"
     required: false
-    default: "cldmv-bot@users.noreply.github.com"
+    default: "test-bot@example.com"
   gpg_private_key:
-    description: "ASCII-armored private key for signing"
+    description: "GPG private key for signing (optional)"
     required: false
+    default: ""
   gpg_passphrase:
-    description: "Passphrase for the private key (if protected)"
+    description: "GPG passphrase for signing (optional)"
     required: false
+    default: ""
 
 outputs:
+  overall_result:
+    description: "Overall test result (success/failure)"
+  git_result:
+    description: "Git-based tag creation result"
+  api_result:
+    description: "API-based tag creation result"
+  gpg_result:
+    description: "GPG signature verification result"
+  details:
+    description: "Detailed test results and error messages"
   api_success:
     description: "Whether API tag creation succeeded"
   git_success:
-    description: "Whether git tag creation succeeded"
+    description: "Whether Git tag creation succeeded"
   api_release_success:
     description: "Whether API release creation succeeded"
   git_release_success:
-    description: "Whether git release creation succeeded"
+    description: "Whether Git release creation succeeded"
   token_type:
-    description: "Type of token used (github_token or app_token)"
+    description: "Type of token used (app/github)"
   api_tag_verified:
-    description: "Whether API-created tag is verified"
+    description: "Whether API-created tag was verified"
   git_tag_verified:
-    description: "Whether git-created tag is verified"
+    description: "Whether Git-created tag was verified"
 
 runs:
   using: "node20"

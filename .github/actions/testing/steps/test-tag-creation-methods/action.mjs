@@ -5,11 +5,35 @@
  * @description Comprehensive testing of tag creation via API vs git commands with proper GPG signing
  */
 
-import * as core from "@actions/core";
 import { getRefTag, createAnnotatedTag, createRefForTagObject, createRefToCommit } from "../../../github/api/_api/tag.mjs";
 import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote, shouldSign } from "../../../github/api/_api/gpg.mjs";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
+import * as fs from "fs";
+
+/**
+ * Simple @actions/core replacement
+ */
+const core = {
+	getInput: (name, options = {}) => {
+		const val = process.env[`INPUT_${name.replace(/ /g, "_").toUpperCase()}`] || "";
+		if (options.required && !val) {
+			throw new Error(`Input required and not supplied: ${name}`);
+		}
+		return val;
+	},
+	setOutput: (name, value) => {
+		const filePath = process.env.GITHUB_OUTPUT;
+		if (filePath) {
+			fs.appendFileSync(filePath, `${name}=${value}\n`);
+		}
+		console.log(`::set-output name=${name}::${value}`);
+	},
+	setFailed: (message) => {
+		console.log(`::error::${message}`);
+		process.exit(1);
+	}
+};
 
 /**
  * Analyze token type and source
