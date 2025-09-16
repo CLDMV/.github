@@ -159,7 +159,16 @@ function verifyGitTagGpgSignature(tagName) {
 		// Try to get signature information using git show
 		const gitShowOutput = gitCommand(`git show --show-signature ${tagName}`, true);
 		console.log(`📄 Git show output for ${tagName}:`);
-		console.log(gitShowOutput);
+		
+		// Truncate output to 50 lines to avoid log overflow
+		const outputLines = gitShowOutput.split('\n');
+		const truncatedOutput = outputLines.slice(0, 50).join('\n');
+		if (outputLines.length > 50) {
+			console.log(truncatedOutput);
+			console.log(`... (truncated ${outputLines.length - 50} additional lines)`);
+		} else {
+			console.log(truncatedOutput);
+		}
 
 		// Check for actual signature verification
 		const hasGoodSignature = gitShowOutput.includes("Good signature from");
@@ -513,10 +522,11 @@ async function run() {
 
 		// Test API tag creation (no Git setup needed - uses app token)
 		console.log("\n🔗 Testing API-based tag creation...");
+		const apiTagName = `${inputs.test_tag_name}-api`;
 		const apiResult = await testApiTagCreation({
 			token: inputs.token,
 			repo: repoString,
-			tagName: inputs.test_tag_name,
+			tagName: apiTagName,
 			targetCommit,
 			tagger_name: inputs.tagger_name,
 			tagger_email: inputs.tagger_email
@@ -530,10 +540,11 @@ async function run() {
 			console.log(`🔍 API tag verification: ${apiResult.verification.statusText}`);
 		}
 
-		// Test Git tag creation (will overwrite API tag if it exists)
+		// Test Git tag creation (separate tag name to avoid conflicts)
 		console.log("\n⚡ Testing Git-based tag creation...");
+		const gitTagName = `${inputs.test_tag_name}-git`;
 		const gitResult = await testGitTagCreation({
-			tagName: inputs.test_tag_name,
+			tagName: gitTagName,
 			targetCommit,
 			enableSign
 		});
@@ -541,7 +552,7 @@ async function run() {
 		// Test Git GPG verification if Git tag was created
 		let gitGpgVerified = false;
 		if (gitResult.success) {
-			const gitGpgResult = verifyGitTagGpgSignature(inputs.test_tag_name);
+			const gitGpgResult = verifyGitTagGpgSignature(gitTagName);
 			gitGpgVerified = gitGpgResult.verified;
 			gitResult.gitGpgVerified = gitGpgVerified;
 
@@ -574,7 +585,7 @@ async function run() {
 		const apiReleaseResult = await createRelease({
 			token: inputs.token,
 			repo: repoString,
-			tag: inputs.test_tag_name,
+			tag: apiTagName,
 			targetCommit,
 			title: "Test Release (API Tag)",
 			body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
@@ -586,7 +597,7 @@ async function run() {
 		const gitReleaseResult = await createRelease({
 			token: inputs.token,
 			repo: repoString,
-			tag: inputs.test_tag_name,
+			tag: gitTagName,
 			targetCommit,
 			title: "Test Release (Git Tag)",
 			body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
@@ -663,10 +674,16 @@ async function run() {
 				pattern: "test-debug"
 			});
 		} else if (inputs.cleanup_tag) {
+			// Cleanup both API and Git tags
 			await cleanup({
 				token: inputs.token,
 				repo: repoString,
-				tag: inputs.test_tag_name
+				tag: apiTagName
+			});
+			await cleanup({
+				token: inputs.token,
+				repo: repoString,
+				tag: gitTagName
 			});
 		}
 	} catch (error) {
