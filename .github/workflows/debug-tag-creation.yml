@@ -1,0 +1,90 @@
+name: 🧪 Debug Tag Creation Methods
+
+# This workflow helps diagnose GitHub App permission issues with tag creation
+# Copy this file to your repository's .github/workflows/ directory to test
+# tag creation methods and identify permission problems.
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_tag_name:
+        description: "Tag name to create for testing (e.g., test-v1.0.0)"
+        required: true
+        default: "test-debug-v1.0.0"
+      target_commit:
+        description: "Commit SHA to tag (leave empty for HEAD)"
+        required: false
+      cleanup_tag:
+        description: "Clean up test tags after testing"
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  debug-tag-creation:
+    name: "🧪 Debug Tag Creation Issues"
+    uses: CLDMV/.github/.github/workflows/test-tag-creation.yml@v1
+    with:
+      # CHANGE THIS: Replace with your package name
+      package_name: "@your-org/your-package"
+      test_tag_name: ${{ inputs.test_tag_name }}
+      target_commit: ${{ inputs.target_commit }}
+      cleanup_tag: ${{ inputs.cleanup_tag }}
+    secrets:
+      # REQUIRED: GitHub App and GPG credentials for your organization
+      CLDMV_APP_ID: ${{ secrets.CLDMV_APP_ID }}
+      CLDMV_APP_PRIVATE_KEY: ${{ secrets.CLDMV_APP_PRIVATE_KEY }}
+
+      # OPTIONAL: Fallback bot identity (defaults to app-slug based identity)
+      CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+      CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+
+      # OPTIONAL: GPG signing (recommended for production)
+      CLDMV_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
+      CLDMV_GPG_PASSPHRASE: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+# This workflow will automatically run all 6 test scenarios to help you identify:
+#
+# 1. **App Token vs GITHUB_TOKEN differences**
+#    - Does your GitHub App token work differently than GITHUB_TOKEN?
+#    - Are there permission differences between token types?
+#
+# 2. **App permission vs workflow permission interactions**
+#    - Do app-level repository permissions affect authentication?
+#    - Do workflow-level YAML permissions override app permissions?
+#
+# 3. **API vs Git command consistency**
+#    - Does the GitHub API work when git commands fail?
+#    - Are there authentication differences between methods?
+#
+# 4. **GPG signature verification**
+#    - Are your tags properly signed and verified?
+#    - Do different creation methods affect signature verification?
+#
+# Expected Results Matrix:
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ Scenario                  │ Token  │ App Perms │ YAML Perms │ Git │ API │ GPG │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ App + No App + No YAML    │ App    │ ❌        │ ❌         │ ❌  │ ✅  │ ✅  │
+# │ App + App Perms + No YAML │ App    │ ✅        │ ❌         │ ❌  │ ✅  │ ✅  │
+# │ App + No App + YAML Perms │ App    │ ❌        │ ✅         │ ❌  │ ✅  │ ✅  │
+# │ App + App Perms + YAML    │ App    │ ✅        │ ✅         │ ❌  │ ✅  │ ✅  │
+# │ GitHub + No YAML          │ GitHub │ N/A       │ ❌         │ ✅  │ ✅  │ ✅  │
+# │ GitHub + YAML Perms       │ GitHub │ N/A       │ ✅         │ ✅  │ ✅  │ ✅  │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# If you see App Token git commands failing consistently while API succeeds,
+# this indicates a GitHub platform bug with App token permissions for
+# repositories containing workflow files.
+#
+# Setup Instructions:
+# 1. Copy this file to your repo's .github/workflows/
+# 2. Update package_name above to match your project
+# 3. Ensure you have CLDMV_APP_ID and CLDMV_APP_PRIVATE_KEY secrets
+# 4. Run the workflow and examine the results in the Summary tab
+# 5. Compare results across different scenarios to identify patterns
+#
+# Features:
+# - Automatically tests all 6 scenarios (comprehensive permission matrix)
+# - Uses production-style app-slug based tagger identity derivation
+# - Tests app-level vs workflow-level permission interactions
+# - Professional MJS action using existing CLDMV infrastructure

@@ -2,14 +2,25 @@
 
 This directory contains comprehensive testing workflows to debug GitHub App permissions issues with tag creation.
 
-## 📋 Overview
+## 🧪 Test Scenarios
 
-The test workflows help diagnose the GitHub App permission issue where tags cannot be pushed despite having the correct permissions. They test multiple approaches:
+The test workflows help diagnose the GitHub App permission issue by testing **4 distinct permission scenarios**:
 
-1. **GitHub API Tag Creation** - Creating tags via REST API
-2. **Git Command Tag Creation** - Creating tags via git commands with App token
-3. **Release Creation** - Creating releases tied to the tags
-4. **Permission Variants** - Testing with and without explicit workflow permissions
+1. **No Explicit Permissions** - Default workflow and app token permissions
+2. **Workflow Permissions Only** - Explicit workflow permissions, default app token 
+3. **App Token Focus** - Tests app token behavior without workflow permissions
+4. **Full Permissions** - Both explicit workflow and app token permissions
+
+### Permission Matrix
+
+| Scenario | Workflow Permissions | App Token | Expected Behavior |
+|----------|---------------------|-----------|-------------------|
+| **Baseline** | Default (none) | Default | ❌ Should fail |
+| **Workflow Only** | Explicit (contents:write, etc.) | Default | 🤔 May still fail |
+| **App Token Focus** | Default (none) | Default* | 🤔 Test app token behavior |
+| **Full Stack** | Explicit (contents:write, etc.) | Default* | 🎯 Ultimate test |
+
+*App tokens inherit all permissions granted to the GitHub App installation
 
 ## 🚀 Quick Start
 
@@ -34,22 +45,31 @@ package_name: "@your-org/your-package"  # Replace with your actual package name
 1. Go to your repository's Actions tab
 2. Select "🧪 Test Tag Creation Debug" workflow  
 3. Click "Run workflow"
+3. Run via Actions tab → "🧪 Test Tag Creation Debug"
 4. Configure the test parameters:
    - **test_tag_name**: Unique tag name for testing (e.g., `test-debug-v1.0.0`)
    - **target_commit**: Leave empty to use HEAD, or specify a commit SHA
    - **cleanup_tag**: Whether to clean up test tags afterward (recommended: true)
-   - **set_permissions**: Whether to also test with explicit permissions (recommended: true)
+   - **set_permissions**: Whether to test workflow permission scenarios (recommended: true)
+   - **test_app_permissions**: Whether to test app token scenarios (recommended: true)
 
 ## 📊 What the Tests Show
 
-### Test Results Matrix
+### Comprehensive Test Matrix
 
-| Test Scenario | Expected Behavior | What to Look For |
-|---------------|-------------------|------------------|
-| **API Tag Creation** | ✅ Should succeed | HTTP 201 response |
-| **Git Tag Creation (No Perms)** | ❌ Should fail | Permission denied error |
-| **Git Tag Creation (With Perms)** | 🤔 Test behavior | May still fail due to GitHub bug |
-| **Release Creation** | ✅ Should succeed | HTTP 201 response |
+| Test Job | Workflow Permissions | App Token | Git Push Test | API Test |
+|----------|---------------------|-----------|---------------|----------|
+| **No Permissions** | None | Default | ❌ Expected fail | ✅ Should work |
+| **Workflow Permissions** | Explicit | Default | 🤔 Test behavior | ✅ Should work |
+| **App Token Focus** | None | Default | 🤔 Test behavior | ✅ Should work |
+| **Full Permissions** | Explicit | Default | 🎯 Ultimate test | ✅ Should work |
+
+### 🔍 Key Insights to Look For
+
+- **API vs Git Behavior**: API operations should work, git push should fail
+- **Permission Layer Impact**: Whether workflow permissions affect app token behavior
+- **Error Message Consistency**: Same "workflows permission" error across scenarios
+- **Token Type Verification**: Confirms using GitHub App tokens (starts with `ghs_`)
 
 ### 🔍 Debugging Information
 

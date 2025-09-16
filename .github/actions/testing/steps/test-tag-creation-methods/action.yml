@@ -1,0 +1,56 @@
+name: "Test Tag Creation Methods"
+description: "Tests tag creation via API and git commands using existing CLDMV infrastructure"
+
+inputs:
+  test_tag_name:
+    description: "Tag name to create for testing (e.g., test-v1.0.0)"
+    required: true
+  target_commit:
+    description: "Commit SHA to tag (defaults to HEAD)"
+    required: false
+    default: ""
+  cleanup_tag:
+    description: "Whether to clean up the test tag after testing"
+    required: false
+    default: "true"
+  use_github_token:
+    description: "Whether to use GITHUB_TOKEN instead of app token"
+    required: false
+    default: "false"
+  token:
+    description: "Token to use for authentication"
+    required: true
+  tagger_name:
+    description: "GPG tagger name for signing"
+    required: false
+    default: "CLDMV Bot"
+  tagger_email:
+    description: "GPG tagger email for signing"
+    required: false
+    default: "cldmv-bot@users.noreply.github.com"
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+
+outputs:
+  api_success:
+    description: "Whether API tag creation succeeded"
+  git_success:
+    description: "Whether git tag creation succeeded"
+  api_release_success:
+    description: "Whether API release creation succeeded"
+  git_release_success:
+    description: "Whether git release creation succeeded"
+  token_type:
+    description: "Type of token used (github_token or app_token)"
+  api_tag_verified:
+    description: "Whether API-created tag is verified"
+  git_tag_verified:
+    description: "Whether git-created tag is verified"
+
+runs:
+  using: "node20"
+  main: "action.mjs"
