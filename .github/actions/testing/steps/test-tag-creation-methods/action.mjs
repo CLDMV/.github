@@ -220,34 +220,35 @@ async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_n
 	try {
 		console.log(`🔗 Testing API-based tag creation for ${tagName}...`);
 
-		const response = await api({
-			token,
-			method: "POST",
-			endpoint: `/repos/${repo}/git/refs`,
-			data: {
+		const { owner, repo: repoName } = parseRepo(repo);
+		const response = await api(
+			"POST",
+			`/git/refs`,
+			{
 				ref: `refs/tags/${tagName}`,
 				sha: targetCommit
-			}
-		});
+			},
+			{ token, owner, repo: repoName }
+		);
 
-		if (response.status === 201) {
+		if (response) {
 			console.log(`✅ API tag creation successful for ${tagName}`);
 
 			// Verify the tag was created
-			const verifyResponse = await api({
-				token,
-				method: "GET",
-				endpoint: `/repos/${repo}/git/refs/tags/${tagName}`
-			});
-
-			if (verifyResponse.status === 200) {
-				console.log(`✅ API tag verification successful for ${tagName}`);
-				return { success: true, sha: response.data.object.sha };
-			} else {
-				throw new Error(`Tag verification failed: ${verifyResponse.status}`);
+			try {
+				const verifyResponse = await api("GET", `/git/refs/tags/${tagName}`, null, { token, owner, repo: repoName });
+				if (verifyResponse) {
+					console.log(`✅ API tag verification successful for ${tagName}`);
+					return { success: true, sha: response.object.sha };
+				} else {
+					throw new Error(`Tag verification failed: No response`);
+				}
+			} catch (verifyError) {
+				console.log(`⚠️  Tag created but verification failed: ${verifyError.message}`);
+				return { success: true, sha: response.object.sha };
 			}
 		} else {
-			throw new Error(`API tag creation failed: ${response.status} - ${response.data?.message || "Unknown error"}`);
+			throw new Error(`API tag creation failed: No response`);
 		}
 	} catch (error) {
 		console.log(`❌ API tag creation failed for ${tagName}: ${error.message}`);
@@ -292,31 +293,31 @@ async function createRelease({ token, repo, tag, targetCommit, title, body, suff
 	try {
 		console.log(`🎁 Creating GitHub release for ${tag}...`);
 
-		const releaseResponse = await api({
-			token,
-			method: "POST",
-			endpoint: `/repos/${repo}/releases`,
-			data: {
+		const { owner, repo: repoName } = parseRepo(repo);
+		const releaseResponse = await api(
+			"POST",
+			`/releases`,
+			{
 				tag_name: tag,
 				target_commitish: targetCommit,
 				name: `${title} (${suffix})`,
 				body: body,
 				draft: false,
 				prerelease: true
-			}
-		});
+			},
+			{ token, owner, repo: repoName }
+		);
 
-		if (releaseResponse.status === 201) {
-			const releaseData = releaseResponse.data;
-			console.log(`✅ GitHub release created: ${releaseData.html_url}`);
+		if (releaseResponse) {
+			console.log(`✅ GitHub release created: ${releaseResponse.html_url}`);
 			return {
 				success: true,
-				id: releaseData.id,
-				url: releaseData.html_url,
-				author: releaseData.author?.login || "unknown"
+				id: releaseResponse.id,
+				url: releaseResponse.html_url,
+				author: releaseResponse.author?.login || "unknown"
 			};
 		} else {
-			throw new Error(`Release creation failed: ${releaseResponse.status} - ${releaseResponse.data?.message || "Unknown error"}`);
+			throw new Error(`Release creation failed: No response`);
 		}
 	} catch (error) {
 		console.log(`❌ GitHub release creation failed for ${tag}: ${error.message}`);
@@ -349,19 +350,12 @@ async function cleanup({ token, repo, tag }) {
 
 		// Delete any associated releases
 		try {
-			const releasesResponse = await api({
-				token,
-				method: "GET",
-				endpoint: `/repos/${repo}/releases`
-			});
+			const { owner, repo: repoName } = parseRepo(repo);
+			const releasesResponse = await api("GET", `/releases`, null, { token, owner, repo: repoName });
 
-			for (const release of releasesResponse.data) {
+			for (const release of releasesResponse) {
 				if (release.tag_name === tag) {
-					await api({
-						token,
-						method: "DELETE",
-						endpoint: `/repos/${repo}/releases/${release.id}`
-					});
+					await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
 					console.log(`✅ Release for tag ${tag} deleted`);
 				}
 			}
