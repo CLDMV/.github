@@ -89,11 +89,13 @@ jobs:
   test-app-with-app-perms-no-yaml-perms:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.test-tags.outputs.overall_result }}
-      git_result: ${{ steps.test-tags.outputs.git_result }}
-      api_result: ${{ steps.test-tags.outputs.api_result }}
-      gpg_result: ${{ steps.test-tags.outputs.gpg_result }}
-      details: ${{ steps.test-tags.outputs.details }}
+      api_success: ${{ steps.test-tags.outputs.api_success }}
+      git_success: ${{ steps.test-tags.outputs.git_success }}
+      api_release_success: ${{ steps.test-tags.outputs.api_release_success }}
+      git_release_success: ${{ steps.test-tags.outputs.git_release_success }}
+      token_type: ${{ steps.test-tags.outputs.token_type }}
+      api_tag_verified: ${{ steps.test-tags.outputs.api_tag_verified }}
+      git_tag_verified: ${{ steps.test-tags.outputs.git_tag_verified }}
 
     steps:
       - uses: actions/checkout@v4
@@ -122,16 +124,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "app-with-app-perms-no-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "a10-${{ inputs.test_tag_name }}"
+          test_tag_name: "a10-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+          use_github_token: "false"
+          token: ${{ steps.app-token.outputs.token }}
           tagger_name: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
+          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
 
   # Matrix Test 3: App Token + No App Permissions + YAML Permissions
   test-app-no-app-perms-with-yaml-perms:
@@ -170,16 +171,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "app-no-app-perms-with-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "a01-${{ inputs.test_tag_name }}"
+          test_tag_name: "a01-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+          use_github_token: "false"
+          token: ${{ steps.app-token.outputs.token }}
           tagger_name: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
+          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
 
   # Matrix Test 4: App Token + App Permissions + YAML Permissions
   test-app-with-app-perms-with-yaml-perms:
@@ -222,16 +222,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "app-with-app-perms-with-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "a11-${{ inputs.test_tag_name }}"
+          test_tag_name: "a11-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
+          use_github_token: "false"
+          token: ${{ steps.app-token.outputs.token }}
           tagger_name: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
+          gpg_private_key: ${{ secrets.CLDMV_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.CLDMV_GPG_PASSPHRASE }}
 
   # Matrix Test 5: GITHUB_TOKEN + No YAML Permissions
   test-github-token-no-yaml-perms:
@@ -250,16 +249,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "github-token-no-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "gh0-${{ inputs.test_tag_name }}"
+          test_tag_name: "gh0-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gpg_private_key: ""
-          gpg_passphrase: ""
+          use_github_token: "true"
+          token: ${{ secrets.GITHUB_TOKEN }}
           tagger_name: "github-actions[bot]"
           tagger_email: "github-actions[bot]@users.noreply.github.com"
+          gpg_private_key: ""
+          gpg_passphrase: ""
 
   # Matrix Test 6: GITHUB_TOKEN + YAML Permissions
   test-github-token-with-yaml-perms:
@@ -282,16 +280,15 @@ jobs:
         id: test-tags
         uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
         with:
-          test_name: "github-token-with-yaml-perms"
-          package_name: ${{ inputs.package_name }}
-          tag_name: "gh1-${{ inputs.test_tag_name }}"
+          test_tag_name: "gh1-${{ inputs.test_tag_name }}"
           target_commit: ${{ inputs.target_commit }}
           cleanup_tag: ${{ inputs.cleanup_tag }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gpg_private_key: ""
-          gpg_passphrase: ""
+          use_github_token: "true"
+          token: ${{ secrets.GITHUB_TOKEN }}
           tagger_name: "github-actions[bot]"
           tagger_email: "github-actions[bot]@users.noreply.github.com"
+          gpg_private_key: ""
+          gpg_passphrase: ""
 
   # Summary job to display comprehensive results
   summary:
