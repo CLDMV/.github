@@ -159,10 +159,10 @@ function verifyGitTagGpgSignature(tagName) {
 		// Try to get signature information using git show
 		const gitShowOutput = gitCommand(`git show --show-signature ${tagName}`, true);
 		console.log(`📄 Git show output for ${tagName}:`);
-		
+
 		// Truncate output to 50 lines to avoid log overflow
-		const outputLines = gitShowOutput.split('\n');
-		const truncatedOutput = outputLines.slice(0, 50).join('\n');
+		const outputLines = gitShowOutput.split("\n");
+		const truncatedOutput = outputLines.slice(0, 50).join("\n");
 		if (outputLines.length > 50) {
 			console.log(truncatedOutput);
 			console.log(`... (truncated ${outputLines.length - 50} additional lines)`);
@@ -214,7 +214,7 @@ function verifyGitTagGpgSignature(tagName) {
 /**
  * Verify tag via GitHub API (for API-created tags)
  * @param {string} token - Authentication token
- * @param {string} repo - Repository in owner/repo format  
+ * @param {string} repo - Repository in owner/repo format
  * @param {string} tagName - Name of the tag to verify
  * @returns {Object} Verification result
  */
@@ -223,26 +223,66 @@ async function verifyApiTagSignature(token, repo, tagName) {
 		console.log(`🔍 Verifying tag via GitHub API for ${tagName}...`);
 
 		const { owner, repo: repoName } = parseRepo(repo);
-		
-		// Get tag information from GitHub API
-		const tagResponse = await api("GET", `/git/refs/tags/${tagName}`, null, { token, owner, repo: repoName });
-		
-		if (!tagResponse) {
-			throw new Error(`Tag ${tagName} not found via API`);
+
+		// First get the tag reference
+		const tagRefResponse = await api("GET", `/git/refs/tags/${tagName}`, null, { token, owner, repo: repoName });
+
+		if (!tagRefResponse) {
+			throw new Error(`Tag reference ${tagName} not found via API`);
 		}
 
-		console.log(`✅ API tag verification successful for ${tagName}`);
-		console.log(`🔍 Tag SHA: ${tagResponse.object.sha}`);
-		
-		// For API-created tags, signature verification would require additional API calls
-		// to check if the commit/tag object contains signature information
-		// This is a simplified verification that confirms the tag exists
+		console.log(`✅ Tag reference found: ${tagRefResponse.object.sha} (type: ${tagRefResponse.object.type})`);
+
+		// If it's a tag object (not a commit), get the actual tag object details
+		let tagObjectResponse = null;
+		if (tagRefResponse.object.type === "tag") {
+			tagObjectResponse = await api("GET", `/git/tags/${tagRefResponse.object.sha}`, null, { token, owner, repo: repoName });
+
+			if (tagObjectResponse) {
+				console.log(`� Tag object details:`, {
+					sha: tagObjectResponse.sha,
+					tag: tagObjectResponse.tag,
+					message: tagObjectResponse.message,
+					tagger: tagObjectResponse.tagger,
+					object: tagObjectResponse.object,
+					verification: tagObjectResponse.verification
+				});
+
+				// Check if verification information is present
+				const verification = tagObjectResponse.verification;
+				if (verification) {
+					console.log(`🔍 GitHub verification status:`, verification);
+					return {
+						verified: verification.verified || false,
+						signed: verification.signature !== null,
+						status: verification.verified ? "verified" : verification.signature ? "signed_unverified" : "unsigned",
+						statusText: verification.reason || "No verification information",
+						sha: tagObjectResponse.sha,
+						verification: verification
+					};
+				} else {
+					console.log(`ℹ️  No verification information in tag object`);
+					return {
+						verified: false,
+						signed: false,
+						status: "no_verification_info",
+						statusText: "Tag object exists but no verification information available",
+						sha: tagObjectResponse.sha,
+						verification: null
+					};
+				}
+			}
+		}
+
+		// If it's a lightweight tag (points directly to commit) or we couldn't get tag object
+		console.log(`ℹ️  Tag ${tagName} is a lightweight tag or tag object unavailable`);
 		return {
-			verified: true, // API confirmed tag exists
-			signed: false,  // Would need deeper API inspection for signature info
-			status: "verified_via_api",
-			statusText: "API verification successful",
-			sha: tagResponse.object.sha
+			verified: false, // Lightweight tags aren't signed
+			signed: false,
+			status: "lightweight_tag",
+			statusText: "Lightweight tag - no signature information",
+			sha: tagRefResponse.object.sha,
+			verification: null
 		};
 	} catch (error) {
 		console.log(`❌ API tag verification failed for ${tagName}: ${error.message}`);
@@ -251,7 +291,8 @@ async function verifyApiTagSignature(token, repo, tagName) {
 			signed: false,
 			status: "error",
 			statusText: `API verification error: ${error.message}`,
-			sha: null
+			sha: null,
+			verification: null
 		};
 	}
 }
@@ -264,7 +305,7 @@ async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_n
 		console.log(`🏷️ Creating tag ${tagName} via GitHub API...`);
 
 		const { owner, repo: repoName } = parseRepo(repo);
-		
+
 		// Use app-derived identity for API operations (not bot secrets)
 		// The app token already contains the app's identity context
 		const tagData = {
@@ -276,7 +317,7 @@ async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_n
 		};
 
 		const tagResponse = await api("POST", "/git/tags", tagData, { token, owner, repo: repoName });
-		
+
 		if (!tagResponse) {
 			throw new Error("Failed to create tag object via API");
 		}
@@ -290,7 +331,7 @@ async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_n
 		};
 
 		const refResponse = await api("POST", "/git/refs", refData, { token, owner, repo: repoName });
-		
+
 		if (!refResponse) {
 			throw new Error("Failed to create tag reference via API");
 		}
@@ -299,7 +340,7 @@ async function testApiTagCreation({ token, repo, tagName, targetCommit, tagger_n
 
 		// Verify the tag using API verification (not git commands)
 		const verification = await verifyApiTagSignature(token, repo, tagName);
-		
+
 		console.log(`🔍 API Tag verification result:`, {
 			verified: verification.verified,
 			signed: verification.signed,
@@ -399,35 +440,41 @@ async function cleanup({ token, repo, tag }) {
 	try {
 		console.log(`🧹 Cleaning up test tag: ${tag}`);
 
-		// Delete the tag locally
+		// Delete the tag locally (may not exist in CI environment)
 		try {
 			gitCommand(`git tag -d ${tag}`, true);
 			console.log(`✅ Local tag ${tag} deleted`);
 		} catch (error) {
-			console.log(`ℹ️  Local tag ${tag} not found or already deleted`);
+			// This is normal in CI - tags may not exist locally
+			console.log(`ℹ️  Local tag ${tag} not found (normal in CI)`);
 		}
 
-		// Delete the tag remotely
+		// Delete the tag remotely (this is the important one)
 		try {
 			gitCommand(`git push origin :refs/tags/${tag}`, true);
 			console.log(`✅ Remote tag ${tag} deleted`);
 		} catch (error) {
-			console.log(`ℹ️  Remote tag ${tag} not found or already deleted`);
+			console.log(`ℹ️  Remote tag ${tag} not found: ${error.message}`);
 		}
 
-		// Delete any associated releases
+		// Delete any associated releases (most important for cleanup)
 		try {
 			const { owner, repo: repoName } = parseRepo(repo);
 			const releasesResponse = await api("GET", `/releases`, null, { token, owner, repo: repoName });
 
-			for (const release of releasesResponse) {
-				if (release.tag_name === tag) {
+			// Look for releases with matching tag name
+			const matchingReleases = releasesResponse.filter((release) => release.tag_name === tag);
+
+			if (matchingReleases.length === 0) {
+				console.log(`ℹ️  No releases found for tag ${tag}`);
+			} else {
+				for (const release of matchingReleases) {
 					await api("DELETE", `/releases/${release.id}`, null, { token, owner, repo: repoName });
-					console.log(`✅ Release for tag ${tag} deleted`);
+					console.log(`✅ Release "${release.name}" (${tag}) deleted`);
 				}
 			}
 		} catch (error) {
-			console.log(`ℹ️  No releases found for tag ${tag} or cleanup failed: ${error.message}`);
+			console.log(`⚠️  Release cleanup failed for tag ${tag}: ${error.message}`);
 		}
 
 		return { success: true };
@@ -444,10 +491,50 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 	try {
 		console.log(`🧹 Cleaning up all test artifacts matching pattern: ${pattern}`);
 
-		// Get all tags
-		const tagsOutput = gitCommand("git tag --list", true);
-		const tags = tagsOutput.split("\n").filter((tag) => tag.trim() && tag.includes(pattern));
+		// Get all local tags
+		let tags = [];
+		try {
+			const tagsOutput = gitCommand("git tag --list", true);
+			tags = tagsOutput.split("\n").filter((tag) => tag.trim() && tag.includes(pattern));
+			console.log(`📋 Found ${tags.length} local tags matching pattern`);
+		} catch (error) {
+			console.log(`ℹ️  Could not get local tags: ${error.message}`);
+		}
 
+		// Also get all GitHub releases and find test releases
+		let testReleases = [];
+		try {
+			const { owner, repo: repoName } = parseRepo(repo);
+			const releasesResponse = await api("GET", `/releases`, null, { token, owner, repo: repoName });
+
+			// Look for releases with test patterns (covers more cases than just local tags)
+			const testPatterns = [
+				"test-debug", // main pattern
+				"a00-", // test matrix patterns
+				"a01-",
+				"a10-",
+				"a11-",
+				"gh0-",
+				"gh1-"
+			];
+
+			testReleases = releasesResponse.filter((release) => testPatterns.some((pattern) => release.tag_name.includes(pattern)));
+
+			console.log(`📋 Found ${testReleases.length} test releases to clean up`);
+
+			// Add release tags to our cleanup list if they're not already there
+			for (const release of testReleases) {
+				if (!tags.includes(release.tag_name)) {
+					tags.push(release.tag_name);
+				}
+			}
+		} catch (error) {
+			console.log(`ℹ️  Could not get releases for cleanup: ${error.message}`);
+		}
+
+		console.log(`🎯 Total items to clean up: ${tags.length}`);
+
+		// Clean up each tag and its associated release
 		for (const tag of tags) {
 			await cleanup({ token, repo, tag: tag.trim() });
 		}
@@ -497,7 +584,7 @@ async function run() {
 		// If cleanup_only is true, just do cleanup and exit
 		if (inputs.cleanup_only) {
 			console.log("🧹 Cleanup-only mode enabled");
-			if (inputs.cleanup_all_test_artifacts) {
+			if (inputs.cleanup_all_test_tags || inputs.cleanup_all_test_artifacts) {
 				await cleanupAllTestArtifacts({
 					token: inputs.token,
 					repo: repoString,
@@ -510,8 +597,8 @@ async function run() {
 		// Setup Git configuration using bot secrets (not app-derived identity)
 		console.log("\n🔧 Setting up Git configuration with bot secrets...");
 		const { enableSign, keyid } = setupGitConfig({
-			tagger_name: inputs.gpg_tagger_name || inputs.tagger_name,     // Use GPG-specific name if provided, fallback to regular
-			tagger_email: inputs.gpg_tagger_email || inputs.tagger_email,   // Use GPG-specific email if provided, fallback to regular
+			tagger_name: inputs.gpg_tagger_name || inputs.tagger_name, // Use GPG-specific name if provided, fallback to regular
+			tagger_email: inputs.gpg_tagger_email || inputs.tagger_email, // Use GPG-specific email if provided, fallback to regular
 			gpg_private_key: inputs.gpg_private_key,
 			gpg_passphrase: inputs.gpg_passphrase,
 			token: inputs.token,
@@ -615,11 +702,11 @@ async function run() {
 		);
 		core.setOutput("git_result", gitResult.success ? "success" : "failure");
 		core.setOutput("api_result", apiResult.success ? "success" : "failure");
-		core.setOutput("api_gpg_result", enableSign && apiGpgVerified ? "success" : "failure");
+		core.setOutput("api_gpg_result", "not_supported"); // API tags cannot be GPG signed
 		core.setOutput("git_gpg_result", enableSign && gitGpgVerified ? "success" : "failure");
-		core.setOutput("gpg_result", enableSign && (apiGpgVerified || gitGpgVerified) ? "success" : "failure");
+		core.setOutput("gpg_result", enableSign && gitGpgVerified ? "success" : "failure"); // Only Git supports GPG
 		core.setOutput("token_type", tokenAnalysis.type);
-		core.setOutput("api_tag_verified", apiGpgVerified);
+		core.setOutput("api_tag_verified", apiGpgVerified); // This is verification, not signing
 		core.setOutput("git_tag_verified", gitGpgVerified);
 
 		const details = {
@@ -651,7 +738,7 @@ async function run() {
 		console.log("├─────────────────────────────────────────────────────────┤");
 		console.log("│                    GPG Verification                     │");
 		console.log("├─────────────────────────────────────────────────────────┤");
-		console.log(`│ API GPG Signed:    ${enableSign ? (apiGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`);
+		console.log(`│ API GPG Signed:    ${"❌ NOT SUPPORTED".padEnd(29)} │`);
 		console.log(`│ Git GPG Signed:    ${enableSign ? (gitGpgVerified ? "✅ VERIFIED" : "❌ NOT SIGNED") : "⏭️  SKIPPED"}        │`);
 		console.log("├─────────────────────────────────────────────────────────┤");
 		console.log("│                    Release Creation                     │");
@@ -667,7 +754,7 @@ async function run() {
 		console.log("└─────────────────────────────────────────────────────────┘");
 
 		// Cleanup if requested
-		if (inputs.cleanup_all_test_artifacts) {
+		if (inputs.cleanup_all_test_tags || inputs.cleanup_all_test_artifacts) {
 			await cleanupAllTestArtifacts({
 				token: inputs.token,
 				repo: repoString,
