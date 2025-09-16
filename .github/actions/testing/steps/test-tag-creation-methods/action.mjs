@@ -26,8 +26,9 @@ const core = {
 		const filePath = process.env.GITHUB_OUTPUT;
 		if (filePath) {
 			fs.appendFileSync(filePath, `${name}=${value}\n`);
+		} else {
+			console.warn(`GITHUB_OUTPUT not set, output ${name}=${value} not saved`);
 		}
-		console.log(`::set-output name=${name}::${value}`);
 	},
 	setFailed: (message) => {
 		console.log(`::error::${message}`);

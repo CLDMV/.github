@@ -86,8 +86,17 @@ jobs:
       - name: Get user ID for bot email
         id: get-user-id
         run: |
-          user_id=$(gh api user --jq '.id')
-          echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          # Try the app-specific endpoint first (recommended approach)
+          if user_id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via bot-specific endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          elif user_id=$(gh api user --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via /user endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Both endpoints failed - this indicates a GitHub App configuration issue"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
@@ -109,13 +118,11 @@ jobs:
   test-app-with-app-perms-no-yaml-perms:
     runs-on: ubuntu-latest
     outputs:
-      api_success: ${{ steps.test-tags.outputs.api_success }}
-      git_success: ${{ steps.test-tags.outputs.git_success }}
-      api_release_success: ${{ steps.test-tags.outputs.api_release_success }}
-      git_release_success: ${{ steps.test-tags.outputs.git_release_success }}
-      token_type: ${{ steps.test-tags.outputs.token_type }}
-      api_tag_verified: ${{ steps.test-tags.outputs.api_tag_verified }}
-      git_tag_verified: ${{ steps.test-tags.outputs.git_tag_verified }}
+      result: ${{ steps.test-tags.outputs.overall_result }}
+      git_result: ${{ steps.test-tags.outputs.git_result }}
+      api_result: ${{ steps.test-tags.outputs.api_result }}
+      gpg_result: ${{ steps.test-tags.outputs.gpg_result }}
+      details: ${{ steps.test-tags.outputs.details }}
 
     steps:
       - uses: actions/checkout@v4
@@ -132,13 +139,52 @@ jobs:
           permission-pull-requests: write
           permission-actions: write
 
+      - name: Debug - Test GitHub App token authentication
+        run: |
+          echo "🔍 Testing GitHub App token authentication..."
+          echo "App slug: ${{ steps.app-token.outputs.app-slug }}"
+          echo "Token length: ${#GH_TOKEN}"
+          echo "Token prefix: ${GH_TOKEN:0:10}..."
+
+          echo "📝 Testing /user endpoint (authenticated user):"
+          if gh api user --jq '.login, .id, .type'; then
+            echo "✅ /user endpoint works correctly"
+          else
+            echo "❌ /user endpoint failed with exit code: $?"
+            echo "This indicates the app token doesn't work with /user endpoint"
+          fi
+
+          echo "📝 Testing /users/{app-slug}[bot] endpoint (specific bot user):"
+          if gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.login, .id, .type'; then
+            echo "✅ Bot-specific endpoint works correctly"
+          else
+            echo "❌ Bot-specific endpoint failed with exit code: $?"
+          fi
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Get user ID for bot email
         id: get-user-id
         run: |
-          user_id=$(gh api user --jq '.id')
-          echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          # Try the app-specific endpoint first (recommended approach)
+          if user_id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via bot-specific endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          elif user_id=$(gh api user --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via /user endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Both endpoints failed - this indicates a GitHub App configuration issue"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Show Git configuration for bot user
+        run: |
+          echo "🔧 Git Configuration that would be used:"
+          echo "git config user.name: '${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_NAME }}'"
+          echo "git config user.email: '${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}'"
 
       - name: Test tag creation
         id: test-tags
@@ -183,8 +229,17 @@ jobs:
       - name: Get user ID for bot email
         id: get-user-id
         run: |
-          user_id=$(gh api user --jq '.id')
-          echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          # Try the app-specific endpoint first (recommended approach)
+          if user_id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via bot-specific endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          elif user_id=$(gh api user --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via /user endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Both endpoints failed - this indicates a GitHub App configuration issue"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
@@ -231,11 +286,44 @@ jobs:
           permission-pull-requests: write
           permission-actions: write
 
+      - name: Debug - Test GitHub App token authentication
+        run: |
+          echo "🔍 Testing GitHub App token authentication..."
+          echo "App slug: ${{ steps.app-token.outputs.app-slug }}"
+          echo "Token length: ${#GH_TOKEN}"
+          echo "Token prefix: ${GH_TOKEN:0:10}..."
+
+          echo "📝 Testing /user endpoint (authenticated user):"
+          if gh api user --jq '.login, .id, .type'; then
+            echo "✅ /user endpoint works correctly"
+          else
+            echo "❌ /user endpoint failed with exit code: $?"
+            echo "This indicates the app token doesn't work with /user endpoint"
+          fi
+
+          echo "📝 Testing /users/{app-slug}[bot] endpoint (specific bot user):"
+          if gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.login, .id, .type'; then
+            echo "✅ Bot-specific endpoint works correctly"
+          else
+            echo "❌ Bot-specific endpoint failed with exit code: $?"
+          fi
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Get user ID for bot email
         id: get-user-id
         run: |
-          user_id=$(gh api user --jq '.id')
-          echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          # Try the app-specific endpoint first (recommended approach)
+          if user_id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via bot-specific endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          elif user_id=$(gh api user --jq '.id' 2>/dev/null); then
+            echo "✅ Got user ID via /user endpoint: $user_id"
+            echo "user-id=$user_id" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Both endpoints failed - this indicates a GitHub App configuration issue"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
