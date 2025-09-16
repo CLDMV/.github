@@ -1,12 +1,49 @@
 #!/usr/bin/env node
 
 /**
- * @fileoverview Test tag creation methods using existing CLDMV infrastructure
- * @description Comprehensive testing of tag creation via API vs git commands with proper GPG signing
+ * @fileoverview Test tag creation methods using existing CLDMV infrastru	if (enableSign && gpg_private_key) {
+		console.log("🔐 Setting up complete GPG chain (matching production workflow)...");
+		try {
+			// Steps 1-2: Import GPG key and setup non-interactive GPG (like production)
+			// This calls exportGpgEnv internally and sets up the complete chain
+			console.log("📋 Steps 1-2: Importing GPG key and setting up non-interactive mode...");
+			keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
+			console.log(`✅ GPG key imported successfully: ${keyid}`);
+			
+			// Step 3: Set ultimate trust for the imported key (critical for verification)
+			console.log(`📋 Step 3: Setting ultimate trust for key ${keyid}...`);
+			try {
+				gitCommand(`echo "${keyid}:6:" | gpg --batch --import-ownertrust`, true);
+				console.log(`✅ Ultimate trust set successfully for key ${keyid}`);
+			} catch (trustError) {
+				console.log(`⚠️  Could not set trust for key ${keyid}: ${trustError.message}`);
+			}
+			
+			// Step 4: Verify GPG setup works
+			console.log("📋 Step 4: Verifying GPG setup...");
+			try {
+				const testSign = gitCommand(`echo "test" | gpg --batch --armor --detach-sign`, true);
+				console.log(`✅ GPG test signing successful (${testSign.length} chars)`);
+			} catch (testError) {
+				console.log(`⚠️  GPG test signing failed: ${testError.message}`);
+			}
+		} catch (error) {
+			console.log(`❌ GPG setup failed: ${error.message}`);
+			console.log(`📄 Error details: ${error.stack}`);
+		}
+	} else {
+		console.log(`⏭️  GPG signing skipped: enableSign=${enableSign}, hasKey=${Boolean(gpg_private_key)}`);
+	}ption Comprehensive testing of tag creation via API vs git commands with proper GPG signing
  */
 
 import { getRefTag, createAnnotatedTag, createRefForTagObject, createRefToCommit } from "../../../github/api/_api/tag.mjs";
-import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote, shouldSign } from "../../../github/api/_api/gpg.mjs";
+import {
+	importGpgIfNeeded,
+	configureGitIdentity,
+	ensureGitAuthRemote,
+	shouldSign,
+	setupNonInteractiveGpg
+} from "../../../github/api/_api/gpg.mjs";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
 import * as fs from "fs";
@@ -81,7 +118,7 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 	// Setup authentication
 	ensureGitAuthRemote(repo, token);
 
-	// Setup GPG if provided
+	// Setup GPG if provided - Match production workflow setup chain
 	let keyid = "";
 	const enableSign = shouldSign({ sign: "auto", gpg_private_key });
 
@@ -91,19 +128,43 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 	console.log(`  - Should sign (auto): ${enableSign}`);
 
 	if (enableSign && gpg_private_key) {
-		console.log("🔐 Importing GPG key...");
+		console.log("🔐 Setting up complete GPG chain (matching production workflow)...");
 		try {
+			// Step 1: Set up GPG environment (like production)
+			console.log("📋 Step 1: Setting up GPG environment...");
+			exportGpgEnv({ gpg_passphrase });
+
+			// Step 2: Import GPG key and setup non-interactive GPG (like production)
+			console.log("� Step 2: Importing GPG key and setting up non-interactive mode...");
 			keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
 			console.log(`✅ GPG key imported successfully: ${keyid}`);
+
+			// Step 3: Set ultimate trust for the imported key (critical for verification)
+			console.log(`� Step 3: Setting ultimate trust for key ${keyid}...`);
+			try {
+				gitCommand(`echo "${keyid}:6:" | gpg --batch --import-ownertrust`, true);
+				console.log(`✅ Ultimate trust set successfully for key ${keyid}`);
+			} catch (trustError) {
+				console.log(`⚠️  Could not set trust for key ${keyid}: ${trustError.message}`);
+			}
+
+			// Step 4: Verify GPG setup works
+			console.log("📋 Step 4: Verifying GPG setup...");
+			try {
+				const testSign = gitCommand(`echo "test" | gpg --batch --armor --detach-sign`, true);
+				console.log(`✅ GPG test signing successful (${testSign.length} chars)`);
+			} catch (testError) {
+				console.log(`⚠️  GPG test signing failed: ${testError.message}`);
+			}
 		} catch (error) {
-			console.log(`❌ GPG key import failed: ${error.message}`);
+			console.log(`❌ GPG setup failed: ${error.message}`);
 			console.log(`📄 Error details: ${error.stack}`);
 		}
 	} else {
 		console.log(`⏭️  GPG signing skipped: enableSign=${enableSign}, hasKey=${Boolean(gpg_private_key)}`);
 	}
 
-	// Configure Git identity
+	// Configure Git identity (matching production workflow)
 	configureGitIdentity({
 		tagger_name,
 		tagger_email,
@@ -120,6 +181,7 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 		const gitSigningKey = gitCommand("git config user.signingkey", true) || "not set";
 		const gitTagGpgSign = gitCommand("git config tag.gpgsign", true) || "not set";
 		const gitCommitGpgSign = gitCommand("git config commit.gpgsign", true) || "not set";
+		const gitGpgProgram = gitCommand("git config gpg.program", true) || "not set";
 
 		console.log(`📋 Final Git Configuration:`);
 		console.log(`  - user.name: ${gitUserName}`);
@@ -127,6 +189,21 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 		console.log(`  - user.signingkey: ${gitSigningKey}`);
 		console.log(`  - tag.gpgsign: ${gitTagGpgSign}`);
 		console.log(`  - commit.gpgsign: ${gitCommitGpgSign}`);
+		console.log(`  - gpg.program: ${gitGpgProgram}`);
+
+		// Debug GPG key info
+		if (keyid) {
+			try {
+				const gpgKeyInfo = gitCommand(`gpg --list-secret-keys --keyid-format LONG ${keyid}`, true);
+				console.log(`🔑 GPG Key Info for ${keyid}:`);
+				console.log(gpgKeyInfo);
+
+				const trustInfo = gitCommand(`gpg --list-keys --with-colons ${keyid} | grep "^pub" | cut -d: -f2`, true);
+				console.log(`🔐 Trust level: ${trustInfo || "unknown"}`);
+			} catch (keyInfoError) {
+				console.log(`⚠️  Could not get GPG key info: ${keyInfoError.message}`);
+			}
+		}
 	} catch (configError) {
 		console.log(`⚠️  Could not read Git configuration: ${configError.message}`);
 	}
@@ -262,16 +339,35 @@ async function createTagViaGit({ tag, targetCommit, enableSign }) {
 		const showCommand = `git show --show-signature "${tagName}"`;
 		const showResult = gitCommand(showCommand, true);
 
-		// More accurate GPG verification - only trust "Good signature"
-		// "Signature made" can appear even for invalid/unverified signatures
+		// Check for different levels of GPG status
 		const hasGoodSignature = showResult.includes("gpg: Good signature");
+		const hasBadSignature = showResult.includes("gpg: Bad signature");
 		const hasSignatureWarning = showResult.includes("gpg: WARNING") || showResult.includes("gpg: Can't check signature");
-		const gitGpgVerified = hasGoodSignature && !hasSignatureWarning;
+		const hasSignatureBlock = showResult.includes("-----BEGIN PGP SIGNATURE-----");
+		const hasGpgOutput = showResult.includes("gpg:");
+
+		// Determine verification status
+		let gitGpgVerified = false;
+		let signatureStatus = "unsigned";
+
+		if (hasGoodSignature && !hasSignatureWarning) {
+			gitGpgVerified = true;
+			signatureStatus = "verified";
+		} else if (hasBadSignature) {
+			signatureStatus = "invalid";
+		} else if (hasSignatureBlock || hasGpgOutput) {
+			signatureStatus = "signed but unverified";
+		}
 
 		console.log(`🔍 Git GPG verification: ${gitGpgVerified ? "✅ verified" : "❌ not verified"}`);
-		console.log(`📄 Git show output preview: ${showResult.substring(0, 300)}...`);
-		if (showResult.includes("gpg:")) {
-			console.log(`🔐 GPG-related output detected in verification`);
+		console.log(`� Signature status: ${signatureStatus}`);
+		console.log(`�📄 Git show output preview: ${showResult.substring(0, 300)}...`);
+
+		if (hasSignatureBlock) {
+			console.log(`🔐 PGP signature block detected - tag is signed`);
+		}
+		if (hasGpgOutput && !hasGoodSignature) {
+			console.log(`⚠️  GPG output present but signature not verified (trust/key issues)`);
 		}
 
 		return {
@@ -280,6 +376,7 @@ async function createTagViaGit({ tag, targetCommit, enableSign }) {
 			pushSuccess: true,
 			isAnnotated: true,
 			gitGpgVerified,
+			signatureStatus,
 			method: "git"
 		};
 	} catch (error) {
@@ -550,17 +647,23 @@ async function run() {
 		if (apiResult.success) {
 			const apiGpgExpected = enableSign;
 			const apiGpgActual = apiResult.apiGpgVerified || false;
+
+			let apiGpgStatusText;
+			if (!apiGpgExpected) {
+				apiGpgStatusText = "not expected";
+			} else if (apiGpgActual) {
+				apiGpgStatusText = "verified";
+			} else {
+				apiGpgStatusText = "expected but not supported (GitHub Apps cannot sign via API)";
+			}
+
 			apiReleaseResult = await createRelease({
 				token: inputs.token,
 				repo,
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (API Tag)",
-				body: `Test release created for API-based tag.\n\n**Token Type**: ${
-					tokenAnalysis.type
-				}\n**Tag Verified**: ${apiGpgActual}\n**GPG Signing**: ${
-					apiGpgExpected ? (apiGpgActual ? "verified" : "expected but not verified") : "not expected"
-				}`,
+				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${apiGpgActual}\n**GPG Signing**: ${apiGpgStatusText}`,
 				suffix: "api"
 			});
 		}
@@ -568,17 +671,37 @@ async function run() {
 		if (gitResult.success) {
 			const gitGpgExpected = enableSign;
 			const gitGpgActual = gitResult.gitGpgVerified || false;
+			const signatureStatus = gitResult.signatureStatus || "unknown";
+
+			let gpgStatusText;
+			if (!gitGpgExpected) {
+				gpgStatusText = "not expected";
+			} else if (gitGpgActual) {
+				gpgStatusText = "verified";
+			} else {
+				// More detailed status based on signature detection
+				switch (signatureStatus) {
+					case "signed but unverified":
+						gpgStatusText = "signed but not verified (trust/key issues)";
+						break;
+					case "invalid":
+						gpgStatusText = "signed but invalid";
+						break;
+					case "unsigned":
+						gpgStatusText = "expected but not signed";
+						break;
+					default:
+						gpgStatusText = "expected but not verified";
+				}
+			}
+
 			gitReleaseResult = await createRelease({
 				token: inputs.token,
 				repo,
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (Git Tag)",
-				body: `Test release created for git-based tag.\n\n**Token Type**: ${
-					tokenAnalysis.type
-				}\n**Tag Verified**: ${gitGpgActual}\n**GPG Signing**: ${
-					gitGpgExpected ? (gitGpgActual ? "verified" : "expected but not verified") : "not expected"
-				}`,
+				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${gitGpgActual}\n**GPG Signing**: ${gpgStatusText}\n**Signature Status**: ${signatureStatus}`,
 				suffix: "git"
 			});
 		}
