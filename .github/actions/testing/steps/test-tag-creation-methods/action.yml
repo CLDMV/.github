@@ -40,6 +40,14 @@ inputs:
     description: "GPG passphrase for signing (optional)"
     required: false
     default: ""
+  gpg_tagger_name:
+    description: "Name for GPG signing (bot secret name)"
+    required: false
+    default: ""
+  gpg_tagger_email:
+    description: "Email for GPG signing (bot secret email)"
+    required: false
+    default: ""
   cleanup_all_test_tags:
     description: "Whether to clean up all test tags (not just current test)"
     required: false

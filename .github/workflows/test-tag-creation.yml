@@ -25,7 +25,7 @@ on:
         description: "Whether to clean up old test artifacts before running tests"
         required: false
         type: boolean
-        default: false
+        default: true
     secrets:
       CLDMV_BOT_APP_ID:
         description: "GitHub App ID for creating app tokens"
@@ -152,6 +152,8 @@ jobs:
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
           gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+          gpg_tagger_name: ${{ secrets.CLDMV_BOT_NAME }}
+          gpg_tagger_email: ${{ secrets.CLDMV_BOT_EMAIL }}
 
   # Matrix Test 2: App Token + App Permissions + No YAML Permissions
   test-app-with-app-perms-no-yaml-perms:
@@ -242,6 +244,8 @@ jobs:
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
           gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+          gpg_tagger_name: ${{ secrets.CLDMV_BOT_NAME }}
+          gpg_tagger_email: ${{ secrets.CLDMV_BOT_EMAIL }}
 
   # Matrix Test 3: App Token + No App Permissions + YAML Permissions
   test-app-no-app-perms-with-yaml-perms:
@@ -303,6 +307,8 @@ jobs:
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
           gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+          gpg_tagger_name: ${{ secrets.CLDMV_BOT_NAME }}
+          gpg_tagger_email: ${{ secrets.CLDMV_BOT_EMAIL }}
 
   # Matrix Test 4: App Token + App Permissions + YAML Permissions
   test-app-with-app-perms-with-yaml-perms:
@@ -391,6 +397,8 @@ jobs:
           tagger_email: ${{ steps.app-token.outputs.app-slug && format('{0}+{1}[bot]@users.noreply.github.com', steps.get-user-id.outputs.user-id, steps.app-token.outputs.app-slug) || secrets.CLDMV_BOT_EMAIL }}
           gpg_private_key: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+          gpg_tagger_name: ${{ secrets.CLDMV_BOT_NAME }}
+          gpg_tagger_email: ${{ secrets.CLDMV_BOT_EMAIL }}
 
   # Matrix Test 5: GITHUB_TOKEN + No YAML Permissions
   test-github-token-no-yaml-perms:
@@ -422,6 +430,8 @@ jobs:
           tagger_email: "github-actions[bot]@users.noreply.github.com"
           gpg_private_key: ""
           gpg_passphrase: ""
+          gpg_tagger_name: ""
+          gpg_tagger_email: ""
 
   # Matrix Test 6: GITHUB_TOKEN + YAML Permissions
   test-github-token-with-yaml-perms:
@@ -457,6 +467,8 @@ jobs:
           tagger_email: "github-actions[bot]@users.noreply.github.com"
           gpg_private_key: ""
           gpg_passphrase: ""
+          gpg_tagger_name: ""
+          gpg_tagger_email: ""
 
   # Summary job to display comprehensive results
   summary:

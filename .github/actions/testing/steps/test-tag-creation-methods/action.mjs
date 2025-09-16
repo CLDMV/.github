@@ -469,6 +469,8 @@ async function run() {
 			tagger_email: core.getInput("tagger_email") || "test-bot@example.com",
 			gpg_private_key: core.getInput("gpg_private_key"),
 			gpg_passphrase: core.getInput("gpg_passphrase"),
+			gpg_tagger_name: core.getInput("gpg_tagger_name"),
+			gpg_tagger_email: core.getInput("gpg_tagger_email"),
 			cleanup_all_test_artifacts: core.getInput("cleanup_all_test_artifacts") === "true"
 		};
 
@@ -496,10 +498,11 @@ async function run() {
 			return;
 		}
 
-		// Setup Git configuration
+		// Setup Git configuration using bot secrets (not app-derived identity)
+		console.log("\n🔧 Setting up Git configuration with bot secrets...");
 		const { enableSign, keyid } = setupGitConfig({
-			tagger_name: inputs.tagger_name,
-			tagger_email: inputs.tagger_email,
+			tagger_name: inputs.gpg_tagger_name || inputs.tagger_name,     // Use GPG-specific name if provided, fallback to regular
+			tagger_email: inputs.gpg_tagger_email || inputs.tagger_email,   // Use GPG-specific email if provided, fallback to regular
 			gpg_private_key: inputs.gpg_private_key,
 			gpg_passphrase: inputs.gpg_passphrase,
 			token: inputs.token,
@@ -508,7 +511,7 @@ async function run() {
 
 		console.log(`🔐 GPG signing enabled: ${enableSign}`);
 
-		// Test API tag creation
+		// Test API tag creation (no Git setup needed - uses app token)
 		console.log("\n🔗 Testing API-based tag creation...");
 		const apiResult = await testApiTagCreation({
 			token: inputs.token,
