@@ -239,7 +239,7 @@ async function verifyApiTagSignature(token, repo, tagName) {
 			tagObjectResponse = await api("GET", `/git/tags/${tagRefResponse.object.sha}`, null, { token, owner, repo: repoName });
 
 			if (tagObjectResponse) {
-				console.log(`� Tag object details:`, {
+				console.log(`📋 Tag object details:`, {
 					sha: tagObjectResponse.sha,
 					tag: tagObjectResponse.tag,
 					message: tagObjectResponse.message,
@@ -512,6 +512,8 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 
 		// Get all local tags
 		let tags = [];
+		let testReleases = []; // Move declaration outside try block
+
 		try {
 			const tagsOutput = gitCommand("git tag --list", true);
 			tags = tagsOutput.split("\n").filter((tag) => tag.trim() && tag.includes(pattern));
@@ -521,7 +523,6 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 		}
 
 		// Also get all GitHub releases and find test releases
-		let testReleases = [];
 		try {
 			const { owner, repo: repoName } = parseRepo(repo);
 			console.log(`🔍 Fetching all releases from ${owner}/${repoName}...`);
@@ -546,16 +547,41 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 				releasesResponse.map((r) => r.tag_name)
 			);
 
-			testReleases = releasesResponse.filter((release) => testPatterns.some((pattern) => release.tag_name.includes(pattern)));
+			// Find test releases by TWO criteria:
+			// 1. Tag name patterns (for releases with tags)
+			// 2. Release title patterns (for orphaned releases without tags)
+			const testReleasesByTag = releasesResponse.filter(
+				(release) => release.tag_name && testPatterns.some((pattern) => release.tag_name.includes(pattern))
+			);
+
+			const testReleasesByTitle = releasesResponse.filter((release) => release.name && release.name.startsWith("Test Release ("));
+
+			// Combine both lists, avoiding duplicates
+			const allTestReleaseIds = new Set();
+			testReleases = [];
+
+			for (const release of [...testReleasesByTag, ...testReleasesByTitle]) {
+				if (!allTestReleaseIds.has(release.id)) {
+					allTestReleaseIds.add(release.id);
+					testReleases.push(release);
+				}
+			}
+
+			console.log(`📋 DEBUG: Pattern matching results:`);
+			console.log(`  - Test patterns: ${JSON.stringify(testPatterns)}`);
+			console.log(`  - Total releases: ${releasesResponse.length}`);
+			console.log(`  - Releases by tag pattern: ${testReleasesByTag.length}`);
+			console.log(`  - Releases by title pattern: ${testReleasesByTitle.length}`);
+			console.log(`  - Combined unique test releases: ${testReleases.length}`);
 
 			console.log(`📋 Found ${testReleases.length} test releases to clean up:`);
 			testReleases.forEach((release) => {
-				console.log(`  - "${release.name}" (tag: ${release.tag_name}, id: ${release.id})`);
+				console.log(`  - "${release.name}" (tag: ${release.tag_name || "NO TAG"}, id: ${release.id})`);
 			});
 
 			// Add release tags to our cleanup list if they're not already there
 			for (const release of testReleases) {
-				if (!tags.includes(release.tag_name)) {
+				if (release.tag_name && !tags.includes(release.tag_name)) {
 					tags.push(release.tag_name);
 				}
 			}
@@ -565,6 +591,8 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 		}
 
 		console.log(`🎯 Total items to clean up: ${tags.length}`);
+		console.log(`🔍 DEBUG: testReleases array length: ${testReleases.length}`);
+		console.log(`🔍 DEBUG: About to check if testReleases.length > 0: ${testReleases.length > 0}`);
 
 		// First, delete all test releases directly (don't rely on tag-based cleanup)
 		if (testReleases.length > 0) {
@@ -580,6 +608,54 @@ async function cleanupAllTestArtifacts({ token, repo, pattern }) {
 					console.log(`⚠️  Failed to delete release "${release.name}": ${error.message}`);
 				}
 			}
+		}
+
+		// Now check for orphaned tags (tags that exist but don't have releases)
+		console.log(`🔍 Checking for orphaned tags...`);
+		const { owner, repo: repoName } = parseRepo(repo);
+
+		try {
+			// Get all remote tags
+			const allTagsResponse = await api("GET", `/git/refs/tags`, null, { token, owner, repo: repoName });
+			console.log(`📋 Total remote tags found: ${allTagsResponse?.length || 0}`);
+
+			if (allTagsResponse && allTagsResponse.length > 0) {
+				// Test patterns for orphaned tag cleanup
+				const testPatterns = [
+					"test-debug", // main pattern
+					"a00-", // test matrix patterns
+					"a01-",
+					"a10-",
+					"a11-",
+					"gh0-",
+					"gh1-"
+				];
+
+				const orphanedTestTags = allTagsResponse.filter((tagRef) => {
+					const tagName = tagRef.ref.replace("refs/tags/", "");
+					return testPatterns.some((pattern) => tagName.includes(pattern));
+				});
+
+				console.log(`📋 Found ${orphanedTestTags.length} orphaned test tags to clean up:`);
+				orphanedTestTags.forEach((tagRef) => {
+					const tagName = tagRef.ref.replace("refs/tags/", "");
+					console.log(`  - ${tagName} (ref: ${tagRef.ref})`);
+				});
+
+				// Delete orphaned test tags
+				for (const tagRef of orphanedTestTags) {
+					const tagName = tagRef.ref.replace("refs/tags/", "");
+					try {
+						console.log(`🗑️  Deleting orphaned tag: ${tagName}`);
+						await api("DELETE", `/git/${tagRef.ref}`, null, { token, owner, repo: repoName });
+						console.log(`✅ Orphaned tag "${tagName}" deleted successfully`);
+					} catch (error) {
+						console.log(`⚠️  Failed to delete orphaned tag "${tagName}": ${error.message}`);
+					}
+				}
+			}
+		} catch (error) {
+			console.log(`ℹ️  Could not check for orphaned tags: ${error.message}`);
 		}
 
 		// Then clean up each tag (this will also attempt release cleanup as backup)
