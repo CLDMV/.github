@@ -41,7 +41,13 @@ jobs:
       CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
-      # OPTIONAL: Fallback bot identity (defaults to app-slug based identity)
+      # IMPORTANT: GPG Identity for signing 
+      # The app token generates emails like "230771808+cldmv-bot[bot]@users.noreply.github.com"
+      # which CANNOT be verified for GPG signatures. For proper GPG signing, you need:
+      # 1. A real email address that can be verified (CLDMV_BOT_EMAIL)
+      # 2. A GPG key generated for that email address
+      # 3. The GPG key uploaded to GitHub and verified for that email
+      # If GPG signing is critical, consider using these bot identity secrets consistently
       CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
 
