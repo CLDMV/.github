@@ -39,9 +39,21 @@ const core = {
 /**
  * Analyze token type and source
  * @param {string} token - Authentication token
+ * @param {boolean} useGitHubToken - Whether this is explicitly the GITHUB_TOKEN
  * @returns {Object} Token analysis
  */
-function analyzeToken(token) {
+function analyzeToken(token, useGitHubToken = false) {
+	// If explicitly marked as GITHUB_TOKEN, classify it as such regardless of prefix
+	if (useGitHubToken) {
+		return {
+			type: "github_token",
+			length: token.length,
+			prefix: token.substring(0, 7) + "...",
+			isAppToken: false,
+			isGitHubToken: true
+		};
+	}
+
 	const tokenType = token.startsWith("ghs_")
 		? "app_token"
 		: token.startsWith("ghp_")
@@ -73,10 +85,22 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 	let keyid = "";
 	const enableSign = shouldSign({ sign: "auto", gpg_private_key });
 
+	console.log(`🔍 GPG Configuration Check:`);
+	console.log(`  - GPG Private Key provided: ${gpg_private_key ? `Yes (${gpg_private_key.length} chars)` : "No"}`);
+	console.log(`  - GPG Passphrase provided: ${gpg_passphrase ? `Yes (${gpg_passphrase.length} chars)` : "No"}`);
+	console.log(`  - Should sign (auto): ${enableSign}`);
+
 	if (enableSign && gpg_private_key) {
 		console.log("🔐 Importing GPG key...");
-		keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
-		console.log(`✅ GPG key imported: ${keyid}`);
+		try {
+			keyid = importGpgIfNeeded({ gpg_private_key, gpg_passphrase });
+			console.log(`✅ GPG key imported successfully: ${keyid}`);
+		} catch (error) {
+			console.log(`❌ GPG key import failed: ${error.message}`);
+			console.log(`📄 Error details: ${error.stack}`);
+		}
+	} else {
+		console.log(`⏭️  GPG signing skipped: enableSign=${enableSign}, hasKey=${Boolean(gpg_private_key)}`);
 	}
 
 	// Configure Git identity
@@ -86,6 +110,26 @@ async function setupGitConfig({ repo, token, tagger_name, tagger_email, gpg_priv
 		keyid,
 		enableSign
 	});
+
+	console.log(`🔐 GPG signing setup: enabled=${enableSign}, keyid=${keyid || "none"}`);
+
+	// Debug: Check final Git configuration
+	try {
+		const gitUserName = gitCommand("git config user.name", true) || "not set";
+		const gitUserEmail = gitCommand("git config user.email", true) || "not set";
+		const gitSigningKey = gitCommand("git config user.signingkey", true) || "not set";
+		const gitTagGpgSign = gitCommand("git config tag.gpgsign", true) || "not set";
+		const gitCommitGpgSign = gitCommand("git config commit.gpgsign", true) || "not set";
+
+		console.log(`📋 Final Git Configuration:`);
+		console.log(`  - user.name: ${gitUserName}`);
+		console.log(`  - user.email: ${gitUserEmail}`);
+		console.log(`  - user.signingkey: ${gitSigningKey}`);
+		console.log(`  - tag.gpgsign: ${gitTagGpgSign}`);
+		console.log(`  - commit.gpgsign: ${gitCommitGpgSign}`);
+	} catch (configError) {
+		console.log(`⚠️  Could not read Git configuration: ${configError.message}`);
+	}
 
 	return { keyid, enableSign };
 }
@@ -217,8 +261,18 @@ async function createTagViaGit({ tag, targetCommit, enableSign }) {
 		// Check if tag is GPG signed
 		const showCommand = `git show --show-signature "${tagName}"`;
 		const showResult = gitCommand(showCommand, true);
-		const gitGpgVerified = showResult.includes("gpg: Good signature") || showResult.includes("Signature made");
+
+		// More accurate GPG verification - only trust "Good signature"
+		// "Signature made" can appear even for invalid/unverified signatures
+		const hasGoodSignature = showResult.includes("gpg: Good signature");
+		const hasSignatureWarning = showResult.includes("gpg: WARNING") || showResult.includes("gpg: Can't check signature");
+		const gitGpgVerified = hasGoodSignature && !hasSignatureWarning;
+
 		console.log(`🔍 Git GPG verification: ${gitGpgVerified ? "✅ verified" : "❌ not verified"}`);
+		console.log(`📄 Git show output preview: ${showResult.substring(0, 300)}...`);
+		if (showResult.includes("gpg:")) {
+			console.log(`🔐 GPG-related output detected in verification`);
+		}
 
 		return {
 			success: true,
@@ -414,14 +468,15 @@ async function run() {
 		const targetCommit = inputs.target_commit || gitCommand("git rev-parse HEAD").trim();
 
 		// Analyze token
-		const tokenAnalysis = analyzeToken(inputs.token);
+		const tokenAnalysis = analyzeToken(inputs.token, inputs.use_github_token);
 		console.log("🔍 Token Analysis:");
 		console.log(`  - Type: ${tokenAnalysis.type}`);
 		console.log(`  - Length: ${tokenAnalysis.length}`);
 		console.log(`  - Prefix: ${tokenAnalysis.prefix}`);
 		console.log(`  - Source: ${inputs.use_github_token ? "GITHUB_TOKEN" : "App Token"}`);
 
-		core.setOutput("token_type", inputs.use_github_token ? "github_token" : "app_token");
+		// Use actual token analysis result instead of input parameter
+		core.setOutput("token_type", tokenAnalysis.type);
 
 		// Setup Git configuration
 		const { enableSign } = await setupGitConfig({
@@ -493,29 +548,37 @@ async function run() {
 		let gitReleaseResult = { success: false };
 
 		if (apiResult.success) {
+			const apiGpgExpected = enableSign;
+			const apiGpgActual = apiResult.apiGpgVerified || false;
 			apiReleaseResult = await createRelease({
 				token: inputs.token,
 				repo,
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (API Tag)",
-				body: `Test release created for API-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
-					apiResult.apiGpgVerified || false
-				}\n**GPG Signing**: ${apiResult.apiGpgVerified ? "verified" : "not verified"}`,
+				body: `Test release created for API-based tag.\n\n**Token Type**: ${
+					tokenAnalysis.type
+				}\n**Tag Verified**: ${apiGpgActual}\n**GPG Signing**: ${
+					apiGpgExpected ? (apiGpgActual ? "verified" : "expected but not verified") : "not expected"
+				}`,
 				suffix: "api"
 			});
 		}
 
 		if (gitResult.success) {
+			const gitGpgExpected = enableSign;
+			const gitGpgActual = gitResult.gitGpgVerified || false;
 			gitReleaseResult = await createRelease({
 				token: inputs.token,
 				repo,
 				tag: inputs.test_tag_name,
 				targetCommit,
 				title: "Test Release (Git Tag)",
-				body: `Test release created for git-based tag.\n\n**Token Type**: ${tokenAnalysis.type}\n**Tag Verified**: ${
-					gitResult.gitGpgVerified || false
-				}\n**GPG Signing**: ${gitResult.gitGpgVerified ? "verified" : "not verified"}`,
+				body: `Test release created for git-based tag.\n\n**Token Type**: ${
+					tokenAnalysis.type
+				}\n**Tag Verified**: ${gitGpgActual}\n**GPG Signing**: ${
+					gitGpgExpected ? (gitGpgActual ? "verified" : "expected but not verified") : "not expected"
+				}`,
 				suffix: "git"
 			});
 		}
