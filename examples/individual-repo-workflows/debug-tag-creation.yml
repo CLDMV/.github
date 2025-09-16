@@ -22,7 +22,7 @@ on:
       cleanup_old_artifacts:
         description: "Clean up old test artifacts before running new tests"
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:

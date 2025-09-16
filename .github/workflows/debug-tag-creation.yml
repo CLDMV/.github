@@ -22,7 +22,7 @@ on:
       cleanup_old_artifacts:
         description: "Clean up old test artifacts before running new tests"
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
       CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
-      # IMPORTANT: GPG Identity for signing 
+      # IMPORTANT: GPG Identity for signing
       # The app token generates emails like "230771808+cldmv-bot[bot]@users.noreply.github.com"
       # which CANNOT be verified for GPG signatures. For proper GPG signing, you need:
       # 1. A real email address that can be verified (CLDMV_BOT_EMAIL)
