@@ -34,7 +34,7 @@ import { sh, debugLog } from "../../common/common/core.mjs";
 export function gitCommand(command, silent = false) {
 	try {
 		const result = sh(command);
-		debugLog(`Git command executed: ${command}`, { result: result.substring(0, 100) });
+		debugLog(`Git command executed: ${command}`, { result: result.substring(0, 100) + (result.length > 100 ? "..." : "") });
 		return result;
 	} catch (error) {
 		if (!silent) {
@@ -42,7 +42,7 @@ export function gitCommand(command, silent = false) {
 			console.error(error.message);
 		}
 		debugLog(`Git command failed: ${command}`, { error: error.message });
-		return "";
+		throw error; // Re-throw instead of returning empty string to handle errors properly
 	}
 }
 

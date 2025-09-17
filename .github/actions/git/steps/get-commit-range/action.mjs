@@ -26,89 +26,119 @@ export function categorizeCommits(commitRange, allCommits = null) {
 			console.log(`🔍 DEBUG: Using provided commit data for range: ${commitRange}`);
 		}
 
-		const commits = allCommits.split("\n").map((line) => {
-			const [hash, subject, body, author, email, date] = line.split("|");
-			const lower = subject.toLowerCase();
+		const commits = allCommits
+			.split("\n")
+			.map((line) => {
+				if (!line.trim()) return null; // Skip empty lines
 
-			let category = "other";
-			let type = null;
-			let scope = null;
-			let isBreaking = false;
+				// Debug each line being processed
+				if (DEBUG) console.log(`🔍 DEBUG: Processing commit line: "${line}"`);
 
-			// Skip merge commits - they shouldn't be in changelogs
-			if (
-				subject.startsWith("Merge ") ||
-				subject.includes("merge conflict") ||
-				subject.toLowerCase().includes("resolve conflict") ||
-				/^Merge branch '.+' into .+$/.test(subject) ||
-				/^Merge pull request #\d+/.test(subject)
-			) {
-				category = "merge";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → merge (skipped from changelog)`);
-			}
-
-			// Parse conventional commit format
-			const conventionalMatch = subject.match(/^(\w+)(\([^)]+\))?(!)?:\s*(.+)/);
-			if (conventionalMatch) {
-				type = conventionalMatch[1];
-				scope = conventionalMatch[2] ? conventionalMatch[2].slice(1, -1) : null; // Remove parentheses
-				isBreaking = !!conventionalMatch[3];
-
-				if (DEBUG) {
-					console.log(`🔍 REGEX DEBUG: "${subject}" → type: "${type}", scope: "${scope}", isBreaking: ${isBreaking}`);
+				const parts = line.split("|");
+				if (parts.length < 6) {
+					console.log(`🔍 DEBUG: Skipping malformed commit line (${parts.length} parts): "${line}"`);
+					return null;
 				}
-			} else {
-				if (DEBUG) {
-					console.log(`🔍 REGEX DEBUG: "${subject}" → NO MATCH`);
+
+				const [hash, subject, body, author, email, date] = parts;
+
+				// Debug the parsed parts
+				if (DEBUG) console.log(`🔍 DEBUG: Parsed parts - hash: "${hash}", subject: "${subject}", body: "${body}"`);
+
+				// Validate required fields
+				if (!hash || !subject) {
+					console.log(`🔍 DEBUG: Skipping commit with missing hash or subject: "${line}"`);
+					return null;
 				}
-			}
 
-			// Determine category - order matters!
-			// First check for release commits - these should be excluded entirely
-			if (type === "release" || lower.startsWith("release:") || lower.startsWith("release!:")) {
-				category = "maintenance";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (release commit)`);
-			}
-			// Then check for breaking changes (but not release commits)
-			else if ((isBreaking || lower.includes("breaking change") || lower.includes("break")) && type !== "release") {
-				category = "breaking";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → breaking`);
-			}
-			// Then check for content-based categorization (takes precedence over type)
-			else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
-				category = "fix";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (content-based)`);
-			} else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
-				category = "feature";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (content-based)`);
-			}
-			// Then check conventional commit types
-			else if (type === "feat") {
-				category = "feature";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (conventional)`);
-			} else if (type === "fix") {
-				category = "fix";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (conventional)`);
-			} else if (type === "chore" || type === "docs" || type === "style" || type === "refactor" || type === "test" || type === "ci") {
-				category = "maintenance";
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (conventional)`);
-			} else {
-				if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → other (default)`);
-			}
+				// Extra safety check before toLowerCase
+				if (typeof subject !== "string") {
+					console.log(`🔍 DEBUG: Subject is not a string: ${typeof subject}, value:`, subject);
+					return null;
+				}
 
-			return {
-				hash: hash.substring(0, 7), // Short hash
-				subject,
-				body: body || "", // Body may be empty
-				author,
-				email,
-				date,
-				category,
-				type,
-				scope,
-				isBreaking
-			};
-		});
+				const lower = subject.toLowerCase();
+
+				let category = "other";
+				let type = null;
+				let scope = null;
+				let isBreaking = false;
+
+				// Skip merge commits - they shouldn't be in changelogs
+				if (
+					subject.startsWith("Merge ") ||
+					subject.includes("merge conflict") ||
+					subject.toLowerCase().includes("resolve conflict") ||
+					/^Merge branch '.+' into .+$/.test(subject) ||
+					/^Merge pull request #\d+/.test(subject)
+				) {
+					category = "merge";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → merge (skipped from changelog)`);
+				}
+
+				// Parse conventional commit format
+				const conventionalMatch = subject.match(/^(\w+)(\([^)]+\))?(!)?:\s*(.+)/);
+				if (conventionalMatch) {
+					type = conventionalMatch[1];
+					scope = conventionalMatch[2] ? conventionalMatch[2].slice(1, -1) : null; // Remove parentheses
+					isBreaking = !!conventionalMatch[3];
+
+					if (DEBUG) {
+						console.log(`🔍 REGEX DEBUG: "${subject}" → type: "${type}", scope: "${scope}", isBreaking: ${isBreaking}`);
+					}
+				} else {
+					if (DEBUG) {
+						console.log(`🔍 REGEX DEBUG: "${subject}" → NO MATCH`);
+					}
+				}
+
+				// Determine category - order matters!
+				// First check for release commits - these should be excluded entirely
+				if (type === "release" || lower.startsWith("release:") || lower.startsWith("release!:")) {
+					category = "maintenance";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (release commit)`);
+				}
+				// Then check for breaking changes (but not release commits)
+				else if ((isBreaking || lower.includes("breaking change") || lower.includes("break")) && type !== "release") {
+					category = "breaking";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → breaking`);
+				}
+				// Then check for content-based categorization (takes precedence over type)
+				else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
+					category = "fix";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (content-based)`);
+				} else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
+					category = "feature";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (content-based)`);
+				}
+				// Then check conventional commit types
+				else if (type === "feat") {
+					category = "feature";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (conventional)`);
+				} else if (type === "fix") {
+					category = "fix";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (conventional)`);
+				} else if (type === "chore" || type === "docs" || type === "style" || type === "refactor" || type === "test" || type === "ci") {
+					category = "maintenance";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (conventional)`);
+				} else {
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → other (default)`);
+				}
+
+				return {
+					hash: hash.substring(0, 7), // Short hash
+					subject,
+					body: body || "", // Body may be empty
+					author,
+					email,
+					date,
+					category,
+					type,
+					scope,
+					isBreaking
+				};
+			})
+			.filter((commit) => commit !== null); // Remove null entries from malformed lines
 
 		// Debug logging for each commit's categorization
 		if (DEBUG) {
