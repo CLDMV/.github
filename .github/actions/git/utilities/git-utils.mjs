@@ -42,7 +42,14 @@ export function gitCommand(command, silent = false) {
 			console.error(error.message);
 		}
 		debugLog(`Git command failed: ${command}`, { error: error.message });
-		throw error; // Re-throw instead of returning empty string to handle errors properly
+
+		// For silent calls, return empty string to maintain backward compatibility
+		// For non-silent calls, throw the error to properly handle failures
+		if (silent) {
+			return "";
+		} else {
+			throw error;
+		}
 	}
 }
 

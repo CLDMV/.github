@@ -170,6 +170,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	console.log("🔍 Fetching all tags from remote...");
 	gitCommand("git fetch --tags --force", true);
 	gitCommand("git fetch origin master --tags", true);
+	// Only try main if master fails (some repos use main as default)
 	gitCommand("git fetch origin main --tags", true);
 
 	if (DEBUG) {
