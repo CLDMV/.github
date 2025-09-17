@@ -15,7 +15,9 @@ export function categorizeCommits(commitRange, allCommits = null) {
 	try {
 		if (!allCommits) {
 			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
-			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H|%s|%b|%an|%ae|%ad" --date=iso`, true);
+			// Use NULL separators for reliable parsing - much cleaner than custom separators
+			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H%x00%s%x00%B%x00%an%x00%ae%x00%ad%x00" --date=iso`, true);
+
 			if (!allCommits) {
 				return [];
 			}
@@ -27,27 +29,30 @@ export function categorizeCommits(commitRange, allCommits = null) {
 		}
 
 		const commits = allCommits
-			.split("\n")
-			.map((line) => {
-				if (!line.trim()) return null; // Skip empty lines
+			.split("\x00\x00") // Split by double NULL to separate commits
+			.map((commitBlock) => {
+				if (!commitBlock.trim()) return null; // Skip empty blocks
 
-				// Debug each line being processed
-				if (DEBUG) console.log(`🔍 DEBUG: Processing commit line: "${line}"`);
+				// Debug each commit block being processed
+				if (DEBUG) console.log(`🔍 DEBUG: Processing commit block: "${commitBlock.substring(0, 100)}..."`);
 
-				const parts = line.split("|");
+				const parts = commitBlock.split("\x00"); // Split by single NULL for fields
 				if (parts.length < 6) {
-					console.log(`🔍 DEBUG: Skipping malformed commit line (${parts.length} parts): "${line}"`);
+					console.log(`🔍 DEBUG: Skipping malformed commit block (${parts.length} parts): "${commitBlock.substring(0, 100)}..."`);
 					return null;
 				}
 
 				const [hash, subject, body, author, email, date] = parts;
 
 				// Debug the parsed parts
-				if (DEBUG) console.log(`🔍 DEBUG: Parsed parts - hash: "${hash}", subject: "${subject}", body: "${body}"`);
+				if (DEBUG)
+					console.log(
+						`🔍 DEBUG: Parsed parts - hash: "${hash}", subject: "${subject}", body: "${body ? body.substring(0, 50) + "..." : "empty"}"`
+					);
 
 				// Validate required fields
 				if (!hash || !subject) {
-					console.log(`🔍 DEBUG: Skipping commit with missing hash or subject: "${line}"`);
+					console.log(`🔍 DEBUG: Skipping commit with missing hash or subject: "${commitBlock.substring(0, 100)}..."`);
 					return null;
 				}
 
