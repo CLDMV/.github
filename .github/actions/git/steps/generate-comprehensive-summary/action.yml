@@ -18,6 +18,10 @@ inputs:
     description: "Number of unsigned tag fixes"
     required: false
     default: "0"
+  misaligned_fixed:
+    description: "Number of misaligned major/minor tag fixes"
+    required: false
+    default: "0"
   orphaned_fixed:
     description: "Number of orphaned tag fixes"
     required: false
@@ -39,6 +43,10 @@ inputs:
     default: "{}"
   unsigned_summary-json:
     description: "JSON summary from unsigned tag fixes"
+    required: false
+    default: "{}"
+  misaligned_summary-json:
+    description: "JSON summary from misaligned tag fixes"
     required: false
     default: "{}"
   orphaned_summary-json:
@@ -79,12 +87,14 @@ runs:
         FINAL_COUNT: ${{ inputs.final_count }}
         BOT_FIXED: ${{ inputs.bot_fixed }}
         UNSIGNED_FIXED: ${{ inputs.unsigned_fixed }}
+        MISALIGNED_FIXED: ${{ inputs.misaligned_fixed }}
         ORPHANED_FIXED: ${{ inputs.orphaned_fixed }}
         ORPHANED_RELEASES_FIXED: ${{ inputs.orphaned_releases_fixed }}
         MAJOR_UPDATED: ${{ inputs.major_updated }}
         REPO_NAME: ${{ inputs.repository_name }}
         BOT_SUMMARY_JSON: ${{ inputs.bot_summary-json }}
         UNSIGNED_SUMMARY_JSON: ${{ inputs.unsigned_summary-json }}
+        MISALIGNED_SUMMARY_JSON: ${{ inputs.misaligned_summary-json }}
         ORPHANED_SUMMARY_JSON: ${{ inputs.orphaned_summary-json }}
         MAJOR_MINOR_SUMMARY_JSON: ${{ inputs.major_minor_summary-json }}
         ORPHANED_RELEASES_SUMMARY_JSON: ${{ inputs.orphaned_releases_summary-json }}

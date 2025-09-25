@@ -541,10 +541,56 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+  unified-fix-misaligned-major-tags:
+    name: "🎯 Fix Misaligned Major/Minor Tags"
+    if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
+    needs: [detect-gpg, setup-shared, unified-fix-unsigned-tags]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      fixed_count: ${{ steps.fix-misaligned.outputs.fixed-count }}
+      summary-json: ${{ steps.fix-misaligned.outputs.summary-json }}
+    steps:
+      - name: Debug job start
+        run: echo "🔍 DEBUG - Misaligned major/minor tags job is starting..."
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tags to process
+        id: get-tags
+        uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+        with:
+          debug: ${{ inputs.debug }}
+          max_tags: ${{ inputs.max_tags }}
+          max_major_versions: ${{ inputs.max_major_versions }}
+          max_minor_versions: ${{ inputs.max_minor_versions }}
+          bot_patterns: ${{ inputs.bot_patterns }}
+          include_patterns: ${{ inputs.include_patterns }}
+          exclude_patterns: ${{ inputs.exclude_patterns }}
+
+      - name: Fix misaligned major/minor version tags
+        id: fix-misaligned
+        uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v1
+        env:
+          GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+          CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
+        with:
+          debug: ${{ inputs.debug }}
+          tags_detailed: ${{ steps.get-tags.outputs.tags_detailed }}
+          gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
+          tagger_name: ${{ secrets.TAGGER_NAME }}
+          tagger_email: ${{ secrets.TAGGER_EMAIL }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
   unified-fix-orphaned-tags:
     name: "🔗 Fix Orphaned Tags"
     if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
-    needs: [detect-gpg, setup-shared, unified-fix-unsigned-tags]
+    needs: [detect-gpg, setup-shared, unified-fix-misaligned-major-tags]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -598,6 +644,7 @@ jobs:
         unified-fix-orphaned-releases,
         unified-fix-bot-signatures,
         unified-fix-unsigned-tags,
+        unified-fix-misaligned-major-tags,
         unified-fix-orphaned-tags
       ]
     runs-on: ubuntu-latest

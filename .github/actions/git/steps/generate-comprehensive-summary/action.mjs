@@ -12,6 +12,7 @@ const repository = process.env.REPO_NAME || "unknown/repo";
 const finalCount = parseInt(process.env.FINAL_COUNT || "0");
 const botFixed = parseInt(process.env.BOT_FIXED || "0");
 const unsignedFixed = parseInt(process.env.UNSIGNED_FIXED || "0");
+const misalignedFixed = parseInt(process.env.MISALIGNED_FIXED || "0");
 const orphanedFixed = parseInt(process.env.ORPHANED_FIXED || "0");
 const orphanedReleasesFixed = parseInt(process.env.ORPHANED_RELEASES_FIXED || "0");
 const majorUpdated = parseInt(process.env.MAJOR_UPDATED || "0");
@@ -19,6 +20,7 @@ const majorUpdated = parseInt(process.env.MAJOR_UPDATED || "0");
 // Get individual job summaries
 const botSummaryJson = process.env.BOT_SUMMARY_JSON || "{}";
 const unsignedSummaryJson = process.env.UNSIGNED_SUMMARY_JSON || "{}";
+const misalignedSummaryJson = process.env.MISALIGNED_SUMMARY_JSON || "{}";
 const orphanedSummaryJson = process.env.ORPHANED_SUMMARY_JSON || "{}";
 const orphanedReleasesSummaryJson = process.env.ORPHANED_RELEASES_SUMMARY_JSON || "{}";
 const majorMinorSummaryJson = process.env.MAJOR_MINOR_SUMMARY_JSON || "{}";
@@ -45,6 +47,7 @@ function buildComprehensiveSummary() {
 	// Parse all individual summaries
 	const botSummary = safeJsonParse(botSummaryJson);
 	const unsignedSummary = safeJsonParse(unsignedSummaryJson);
+	const misalignedSummary = safeJsonParse(misalignedSummaryJson);
 	const orphanedSummary = safeJsonParse(orphanedSummaryJson);
 	const orphanedReleasesSummary = safeJsonParse(orphanedReleasesSummaryJson);
 	const majorMinorSummary = safeJsonParse(majorMinorSummaryJson);
@@ -55,7 +58,7 @@ function buildComprehensiveSummary() {
 		repository: repository,
 		statistics: {
 			total_processed: finalCount,
-			total_operations: botFixed + unsignedFixed + orphanedFixed + orphanedReleasesFixed + majorUpdated,
+			total_operations: botFixed + unsignedFixed + misalignedFixed + orphanedFixed + orphanedReleasesFixed + majorUpdated,
 			by_operation: {
 				major_minor_updates: majorUpdated,
 				bot_signature_fixes: botFixed,
@@ -83,6 +86,10 @@ function buildComprehensiveSummary() {
 		comprehensiveSummary.unsigned_tag_fixes = unsignedSummary;
 	}
 
+	if (misalignedSummary && Object.keys(misalignedSummary).length > 0) {
+		comprehensiveSummary.misaligned_tag_fixes = misalignedSummary;
+	}
+
 	if (orphanedSummary && Object.keys(orphanedSummary).length > 0) {
 		comprehensiveSummary.orphaned_tag_fixes = orphanedSummary;
 	}
@@ -99,7 +106,7 @@ function setGitHubOutputs(summaryData) {
 	const summaryJson = JSON.stringify(summaryData);
 
 	// Create legacy summary for backwards compatibility
-	const legacySummary = `Processed tags for ${repository}. Updated ${majorUpdated} major/minor tags, then fixed: ${botFixed} bot signatures, ${unsignedFixed} unsigned tags, ${orphanedFixed} orphaned tags. Final count: ${totalProcessed}. Total operations: ${totalOperations}`;
+	const legacySummary = `Processed tags for ${repository}. Updated ${majorUpdated} major/minor tags, then fixed: ${botFixed} bot signatures, ${unsignedFixed} unsigned tags, ${misalignedFixed} misaligned tags, ${orphanedFixed} orphaned tags. Final count: ${totalProcessed}. Total operations: ${totalOperations}`;
 
 	// Output to console (for GitHub Actions log)
 	console.log(`total-processed=${totalProcessed}`);
@@ -265,7 +272,7 @@ try {
 	console.error("❌ Node.js action failed:", error.message);
 
 	// Fallback outputs
-	const totalOperations = botFixed + unsignedFixed + orphanedFixed + majorUpdated;
+	const totalOperations = botFixed + unsignedFixed + misalignedFixed + orphanedFixed + majorUpdated;
 	const fallbackOutputs =
 		`total-processed=${finalCount}\n` +
 		`total-fixed=${totalOperations}\n` +

@@ -1,0 +1,37 @@
+name: "Fix Misaligned Major/Minor Version Tags"
+description: "Detect and fix major/minor version tags that don't point to their latest semantic version"
+
+inputs:
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+  tags_detailed:
+    description: "JSON array of detailed tag information from get-detailed-tags"
+    required: true
+  gpg_enabled:
+    description: "Whether GPG signing should be used"
+    required: false
+    default: "false"
+  tagger_name:
+    description: "Name for tag creation/signing"
+    required: false
+  tagger_email:
+    description: "Email for tag creation/signing"
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing"
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key (if protected)"
+    required: false
+
+outputs:
+  fixed-count:
+    description: "Number of tags that were fixed"
+  summary-json:
+    description: "Complete summary JSON with title, description, and detailed results"
+
+runs:
+  using: node20
+  main: action.mjs
