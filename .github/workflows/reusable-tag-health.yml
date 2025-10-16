@@ -304,9 +304,9 @@ jobs:
     if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
     needs: [detect-gpg, setup-shared]
     runs-on: ubuntu-latest
-    # permissions:
-    #   contents: write
-    #   actions: write
+    permissions:
+      contents: write
+      actions: write
     outputs:
       fixed_count: ${{ steps.fix-orphaned-releases.outputs.fixed-count }}
       summary-json: ${{ steps.fix-orphaned-releases.outputs.summary-json }}
