@@ -30,11 +30,11 @@ runs:
     - name: Extract version
       id: extract
       shell: bash
+      env:
+        PACKAGE_NAME: ${{ inputs.package-name }}
+        VERSION_OVERRIDE: ${{ inputs.version-override }}
       run: |
         set -e
-
-        PACKAGE_NAME="${{ inputs.package-name }}"
-        VERSION_OVERRIDE="${{ inputs.version-override }}"
 
         echo "📋 Extracting version for package: $PACKAGE_NAME"
 

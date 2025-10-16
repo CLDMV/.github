@@ -15,15 +15,13 @@ runs:
   steps:
     - name: Update package version
       shell: bash
+      env:
+        NEW_VERSION: ${{ inputs.new-version }}
+        PACKAGE_MANAGER: ${{ inputs.package-manager }}
       run: |
-        NEW_VERSION="${{ inputs.new-version }}"
-        if [ "${{ inputs.package-manager }}" = "yarn" ]; then
-          yarn version --new-version $NEW_VERSION --no-git-tag-version
+        if [ "$PACKAGE_MANAGER" = "yarn" ]; then
+          yarn version --new-version "$NEW_VERSION" --no-git-tag-version
         else
-          npm version $NEW_VERSION --no-git-tag-version
+          npm version "$NEW_VERSION" --no-git-tag-version
         fi
         echo "📝 Updated package.json to version $NEW_VERSION"
-
-
-
-

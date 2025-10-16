@@ -21,17 +21,21 @@ runs:
     - name: Check commit message against prefixes
       id: check
       shell: bash
+      env:
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        INPUT_PREFIXES: ${{ inputs.prefixes }}
       run: |
         # Get commit message - use input or default to github context
-        COMMIT_MSG="${{ inputs.commit_message }}"
+        COMMIT_MSG="$INPUT_COMMIT_MESSAGE"
         if [ -z "$COMMIT_MSG" ]; then
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          COMMIT_MSG="$GITHUB_COMMIT_MESSAGE"
         fi
 
-        echo "Checking commit message: $COMMIT_MSG"
+        echo "Checking commit message: ${COMMIT_MSG}"
 
         # Split prefixes by comma and check each one
-        IFS=',' read -ra PREFIXES <<< "${{ inputs.prefixes }}"
+        IFS=',' read -ra PREFIXES <<< "$INPUT_PREFIXES"
         SHOULD_SKIP="false"
         MATCHED_PREFIX=""
 

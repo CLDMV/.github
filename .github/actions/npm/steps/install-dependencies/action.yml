@@ -12,13 +12,11 @@ runs:
   steps:
     - name: Install dependencies
       shell: bash
+      env:
+        PACKAGE_MANAGER: ${{ inputs.package-manager }}
       run: |
-        if [ "${{ inputs.package-manager }}" = "yarn" ]; then
+        if [ "$PACKAGE_MANAGER" = "yarn" ]; then
           yarn install --frozen-lockfile
         else
           npm ci
         fi
-
-
-
-
