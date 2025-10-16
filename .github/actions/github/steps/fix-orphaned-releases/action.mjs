@@ -287,26 +287,26 @@ async function main() {
 	const allReleases = await getAllReleases();
 
 	// Filter out test/debug releases
-	const releases = allReleases.filter(release => {
+	const releases = allReleases.filter((release) => {
 		const tagName = release.tag_name;
 		if (!tagName) return true; // Include releases without tag names for error handling
-		
+
 		// Skip test/debug releases that match common test patterns
 		const testPatterns = [
-			/^(a\d+-test-debug-|gh\d+-test-debug-)/,  // a00-test-debug-, gh1-test-debug-, etc.
-			/^(cleanup-.*-test|test-.*)/,             // cleanup test tags
-			/-test(-|$)/,                             // anything with -test
-			/-debug(-|$)/                             // anything with -debug
+			/^(a\d+-test-debug-|gh\d+-test-debug-)/, // a00-test-debug-, gh1-test-debug-, etc.
+			/^(cleanup-.*-test|test-.*)/, // cleanup test tags
+			/-test(-|$)/, // anything with -test
+			/-debug(-|$)/ // anything with -debug
 		];
-		
-		const isTestRelease = testPatterns.some(pattern => pattern.test(tagName));
+
+		const isTestRelease = testPatterns.some((pattern) => pattern.test(tagName));
 		if (isTestRelease) {
 			if (DEBUG) {
 				console.log(`🧪 Skipping test/debug release: ${release.name || tagName} (tag: ${tagName})`);
 			}
 			return false;
 		}
-		
+
 		return true;
 	});
 
