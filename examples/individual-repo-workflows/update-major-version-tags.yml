@@ -57,6 +57,7 @@ jobs:
     uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1
     permissions:
       contents: write
+      actions: write
     with:
       debug: ${{ github.event.inputs.debug == 'true' }}
       create_documentation: ${{ github.event.inputs.create_documentation == 'true' }}

@@ -54,6 +54,9 @@ jobs:
     if: >
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') ||
       startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      actions: write
     uses: ./.github/workflows/workflow-update-major-version-tags.yml
     with:
       debug: ${{ github.event.inputs.debug == 'true' }}
