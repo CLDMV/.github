@@ -172,25 +172,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		return singleCommitChangelog;
 	}
 
-	// If single commit message is requested but there are multiple commits,
-	// look for the most recent release commit to use as the primary message
-	if (useSingleCommitMessage && commits.length > 1) {
-		const releaseCommit = commits.find((commit) => {
-			const subject = commit.subject.toLowerCase();
-			return /^release(\([^)]*\))?!?:/.test(subject);
-		});
-
-		if (releaseCommit) {
-			console.log(`📝 Single commit message requested with multiple commits, using release commit: ${releaseCommit.subject}`);
-
-			let singleCommitChangelog = releaseCommit.subject;
-			if (releaseCommit.body && releaseCommit.body.trim()) {
-				singleCommitChangelog += "\n\n" + releaseCommit.body.trim();
-			}
-
-			return singleCommitChangelog;
-		}
-	}
+	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive 
+	// categorized changelog regardless of the useSingleCommitMessage flag, because users
+	// need to see all the changes (fixes, features, etc.) in the PR/release notes.
 
 	let changelog = "## 🚀 What's Changed\n\n";
 
