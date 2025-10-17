@@ -2,283 +2,363 @@
 name: 🚀 Release Workflow (Org-Level)
 
 on:
-  workflow_call:
-    inputs:
-      package_name:
-        required: true
-        type: string
-        description: "NPM package name (e.g., @cldmv/slothlet)"
-      debug:
-        required: false
-        type: boolean
-        default: false
-        description: "Enable debug logging for troubleshooting"
-      dry_run:
-        required: false
-        type: boolean
-        default: false
-        description: "Dry run mode - validate everything but don't create PR or make changes"
-      node_version:
-        required: false
-        type: string
-        default: "lts/*"
-        description: "Node.js version to use (default: lts/*)"
-      min_node_version:
-        required: false
-        type: string
-        default: "20"
-        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
-      max_node_major:
-        required: false
-        type: string
-        default: "22"
-        description: "Override max Node.js major version (default: 22)"
-      package_manager:
-        required: false
-        type: string
-        default: "npm"
-        description: "Package manager (npm or yarn)"
-      test_command:
-        required: false
-        type: string
-        default: "npm test"
-        description: "Command to run tests"
-      build_command:
-        required: false
-        type: string
-        default: "npm run build:ci"
-        description: "Command to build package"
-      version_bump:
-        required: false
-        type: string
-        default: ""
-        description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
-      # Optional release parameters
-      version:
-        required: false
-        type: string
-        default: ""
-        description: "Specific version for release (auto-calculated if not provided)"
-      is_prerelease:
-        required: false
-        type: boolean
-        default: false
-        description: "Whether this is a prerelease"
-      release_source_only:
-        required: false
-        type: boolean
-        default: false
-        description: "Whether to create source-only release (no package assets)"
-      create_documentation:
-        required: false
-        type: boolean
-        default: true
-        description: "Whether to create/update VERSION_TAGS.md"
-      # Test control options
-      skip_performance_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip performance tests during CI"
-      skip_matrix_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip matrix testing (use single node version only)"
-      # Bot signing parameters
-      use_gpg:
-        required: false
-        type: boolean
-        default: false
-        description: "If true, forward provided secrets to enable GPG signing"
-    outputs:
-      release-pr-created:
-        description: "Whether a release PR was created"
-        value: ${{ jobs.release.outputs.pr-created }}
-      release-pr-number:
-        description: "The release PR number if created"
-        value: ${{ jobs.release.outputs.pr-number }}
-      new-version:
-        description: "The new version that was set"
-        value: ${{ jobs.release.outputs.new-version }}
+    workflow_call:
+        inputs:
+            package_name:
+                required: true
+                type: string
+                description: "NPM package name (e.g., @cldmv/slothlet)"
+            debug:
+                required: false
+                type: boolean
+                default: false
+                description: "Enable debug logging for troubleshooting"
+            dry_run:
+                required: false
+                type: boolean
+                default: false
+                description: "Dry run mode - validate everything but don't create PR or make changes"
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+                description: "Node.js version to use (default: lts/*)"
+            min_node_version:
+                required: false
+                type: string
+                default: "20"
+                description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+            max_node_major:
+                required: false
+                type: string
+                default: "22"
+                description: "Override max Node.js major version (default: 22)"
+            package_manager:
+                required: false
+                type: string
+                default: "npm"
+                description: "Package manager (npm or yarn)"
+            test_command:
+                required: false
+                type: string
+                default: "npm test"
+                description: "Command to run tests"
+            build_command:
+                required: false
+                type: string
+                default: "npm run build:ci"
+                description: "Command to build package"
+            version_bump:
+                required: false
+                type: string
+                default: ""
+                description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
+            # Optional release parameters
+            version:
+                required: false
+                type: string
+                default: ""
+                description: "Specific version for release (auto-calculated if not provided)"
+            is_prerelease:
+                required: false
+                type: boolean
+                default: false
+                description: "Whether this is a prerelease"
+            release_source_only:
+                required: false
+                type: boolean
+                default: false
+                description: "Whether to create source-only release (no package assets)"
+            create_documentation:
+                required: false
+                type: boolean
+                default: true
+                description: "Whether to create/update VERSION_TAGS.md"
+            # Test control options
+            skip_performance_tests:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip performance tests during CI"
+            skip_matrix_tests:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip matrix testing (use single node version only)"
+            # Bot signing parameters
+            use_gpg:
+                required: false
+                type: boolean
+                default: false
+                description: "If true, forward provided secrets to enable GPG signing"
+        outputs:
+            release-pr-created:
+                description: "Whether a release PR was created"
+                value: ${{ jobs.release.outputs.pr-created }}
+            release-pr-number:
+                description: "The release PR number if created"
+                value: ${{ jobs.release.outputs.pr-number }}
+            new-version:
+                description: "The new version that was set"
+                value: ${{ jobs.release.outputs.new-version }}
 
-    secrets:
-      NPM_TOKEN:
-        description: "NPM token for publishing packages"
-        required: false
-      BOT_APP_ID:
-        description: "GitHub App ID for CLDMV bot"
-        required: false
-      BOT_APP_PRIVATE_KEY:
-        description: "GitHub App private key for CLDMV bot"
-        required: false
-      TAGGER_NAME:
-        description: "GPG tagger name for signing"
-        required: false
-      TAGGER_EMAIL:
-        description: "GPG tagger email for signing"
-        required: false
-      GPG_PRIVATE_KEY:
-        description: "ASCII-armored private key for signing"
-        required: false
-      GPG_PASSPHRASE:
-        description: "Passphrase for the private key (if protected)"
-        required: false
+        secrets:
+            NPM_TOKEN:
+                description: "NPM token for publishing packages"
+                required: false
+            BOT_APP_ID:
+                description: "GitHub App ID for CLDMV bot"
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                description: "GitHub App private key for CLDMV bot"
+                required: false
+            TAGGER_NAME:
+                description: "GPG tagger name for signing"
+                required: false
+            TAGGER_EMAIL:
+                description: "GPG tagger email for signing"
+                required: false
+            GPG_PRIVATE_KEY:
+                description: "ASCII-armored private key for signing"
+                required: false
+            GPG_PASSPHRASE:
+                description: "Passphrase for the private key (if protected)"
+                required: false
 
 jobs:
-  check-existing-pr:
-    name: "🔍 Check for Existing PR"
-    runs-on: ubuntu-latest
-    outputs:
-      pr-exists: ${{ steps.check.outputs.pr-exists }}
-      pr-number: ${{ steps.check.outputs.pr-number }}
-      should-skip: ${{ steps.check.outputs.should-skip }}
-    steps:
-      - name: Check for existing release PR
-        id: check
-        uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v1
+    check-existing-pr:
+        name: "🔍 Check for Existing PR"
+        runs-on: ubuntu-latest
+        outputs:
+            pr-exists: ${{ steps.check.outputs.pr-exists }}
+            pr-number: ${{ steps.check.outputs.pr-number }}
+            should-skip: ${{ steps.check.outputs.should-skip }}
+        steps:
+            - name: Check for existing release PR
+              id: check
+              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v1
+              with:
+                  github-token: ${{ github.token }}
+                  head-branch: ${{ github.ref_name }}
+                  base-branch: ${{ github.event.repository.default_branch }}
+
+    detect-release:
+        name: "🔍 Detect Release"
+        if: needs.check-existing-pr.outputs.should-skip == 'false'
+        needs: check-existing-pr
+        runs-on: ubuntu-latest
+        outputs:
+            should-release: ${{ steps.check.outputs.should-create-pr }}
+            version-bump: ${{ steps.check.outputs.version-bump }}
+            has-breaking: ${{ steps.check.outputs.has-breaking }}
+        steps:
+            - name: Checkout code
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+              with:
+                  fetch-depth: 0
+
+            - name: Check Release Commit
+              id: check
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+
+    update-existing-pr:
+        name: "📝 Update Existing PR"
+        if: needs.check-existing-pr.outputs.should-skip == 'true'
+        needs: check-existing-pr
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+
+            - name: Update PR description
+              shell: bash
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
+              run: |
+                  echo "📝 Updating PR #$PR_NUMBER description with latest changes..."
+
+                  # Get the repository info
+                  REPO_OWNER="${{ github.repository_owner }}"
+                  REPO_NAME="${{ github.event.repository.name }}"
+
+                  # Get current PR details
+                  CURRENT_PR=$(gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER)
+
+                  # Get the base branch and commit from the PR
+                  BASE_BRANCH=$(echo "$CURRENT_PR" | jq -r '.base.ref')
+                  BASE_SHA=$(echo "$CURRENT_PR" | jq -r '.base.sha')
+                  HEAD_BRANCH=$(echo "$CURRENT_PR" | jq -r '.head.ref')
+                  HEAD_SHA=$(echo "$CURRENT_PR" | jq -r '.head.sha')
+
+                  echo "🔍 PR details: base=$BASE_BRANCH ($BASE_SHA), head=$HEAD_BRANCH ($HEAD_SHA)"
+
+                  # Generate updated changelog using the PR's actual commit range
+                  echo "📋 Generating updated changelog for PR commits..."
+
+                  # Create a temporary script to generate changelog using PR range
+                  cat > update_pr_changelog.mjs << 'EOF'
+                  import { categorizeCommits } from "./.github/actions/git/steps/get-commit-range/action.mjs";
+                  import { generateComprehensiveChangelog } from "./.github/actions/git/steps/generate-comprehensive-changelog/action.mjs";
+
+                  // Use the exact commit range from the PR
+                  const baseSha = process.env.BASE_SHA;
+                  const headSha = process.env.HEAD_SHA;
+                  const commitRange = `${baseSha}..${headSha}`;
+
+                  console.log(`Using PR commit range: ${commitRange}`);
+
+                  try {
+                    // Generate changelog for the PR's commits
+                    const changelog = await generateComprehensiveChangelog(commitRange, null, process.env.GITHUB_TOKEN, false);
+                    console.log("CHANGELOG_START");
+                    console.log(changelog);
+                    console.log("CHANGELOG_END");
+                  } catch (error) {
+                    console.error("Error generating changelog:", error);
+                    // Fallback: try with HEAD range
+                    try {
+                      console.log("Falling back to HEAD range...");
+                      const changelog = await generateComprehensiveChangelog("HEAD~10..HEAD", null, process.env.GITHUB_TOKEN, false);
+                      console.log("CHANGELOG_START");
+                      console.log(changelog);
+                      console.log("CHANGELOG_END");
+                    } catch (fallbackError) {
+                      console.error("Fallback also failed:", fallbackError);
+                      process.exit(1);
+                    }
+                  }
+                  EOF
+
+                  # Set environment variables for the script
+                  export BASE_SHA="$BASE_SHA"
+                  export HEAD_SHA="$HEAD_SHA"
+
+                  # Run the changelog generation and capture output
+                  CHANGELOG_OUTPUT=$(node update_pr_changelog.mjs 2>&1)
+
+                  # Extract just the changelog content between markers
+                  CHANGELOG=$(echo "$CHANGELOG_OUTPUT" | sed -n '/CHANGELOG_START/,/CHANGELOG_END/p' | sed '1d;$d')
+
+                  if [ -z "$CHANGELOG" ]; then
+                    echo "⚠️ Failed to generate changelog, using fallback message"
+                    CHANGELOG="## 🚀 What's Changed
+
+                  _Changelog generation in progress. The PR has been updated with the latest commits._
+
+                  Please check the commit history for details of the changes included in this release."
+                  fi
+
+                  # Update the PR description with the new changelog
+                  echo "📝 Updating PR description..."
+                  gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
+                    --method PATCH \
+                    --field body="$CHANGELOG"
+
+                  # Clean up temporary file
+                  rm -f update_pr_changelog.mjs
+
+                  echo "✅ PR #$PR_NUMBER has been updated with the latest changelog"
+                  echo "ℹ️ Skipped full release workflow since PR already exists"
+
+    build-and-test:
+        name: "🏗️ Build and Test"
+        if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
+        needs: [check-existing-pr, detect-release]
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
         with:
-          github-token: ${{ github.token }}
-          head-branch: ${{ github.ref_name }}
-          base-branch: ${{ github.event.repository.default_branch }}
+            package_name: ${{ inputs.package_name }}
+            debug: ${{ inputs.debug }}
+            run_build_and_test: true
+            node_version: ${{ inputs.node_version }}
+            min_node_version: ${{ inputs.min_node_version }}
+            max_node_major: ${{ inputs.max_node_major }}
+            package_manager: ${{ inputs.package_manager }}
+            test_command: ${{ inputs.test_command }}
+            build_command: ${{ inputs.build_command }}
+            skip_performance_tests: ${{ inputs.skip_performance_tests }}
+            skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
 
-  detect-release:
-    name: "🔍 Detect Release"
-    if: needs.check-existing-pr.outputs.should-skip == 'false'
-    needs: check-existing-pr
-    runs-on: ubuntu-latest
-    outputs:
-      should-release: ${{ steps.check.outputs.should-create-pr }}
-      version-bump: ${{ steps.check.outputs.version-bump }}
-      has-breaking: ${{ steps.check.outputs.has-breaking }}
-    steps:
-      - name: Checkout code
-        uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+    release:
+        name: "🚀 Release Management"
+        if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
+        needs: [check-existing-pr, detect-release, build-and-test]
+        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
         with:
-          fetch-depth: 0
+            package_name: ${{ inputs.package_name }}
+            debug: ${{ inputs.debug }}
+            dry_run: ${{ inputs.dry_run }}
+            # Job control flags - only run create release PR since we already detected
+            run_detect_release: false
+            run_create_release_pr: true
+            # Build parameters
+            node_version: ${{ inputs.node_version }}
+            package_manager: ${{ inputs.package_manager }}
+            version_bump: ${{ needs.detect-release.outputs.version-bump }}
+            version: ${{ inputs.version }}
+        secrets:
+            BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      - name: Check Release Commit
-        id: check
-        uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+    summary:
+        name: "📋 Release Summary"
+        needs: [detect-release, build-and-test, release]
+        if: always()
+        runs-on: ubuntu-latest
+        steps:
+            - name: Generate Release Summary
+              run: |
+                  if [ "${{ inputs.dry_run }}" = "true" ]; then
+                    echo "## 🧪 Dry Run - Release Workflow Validation" >> $GITHUB_STEP_SUMMARY
+                  else
+                    echo "## 🚀 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
+                  fi
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
 
-  update-existing-pr:
-    name: "📝 Update Existing PR"
-    if: needs.check-existing-pr.outputs.should-skip == 'true'
-    needs: check-existing-pr
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
-        with:
-          fetch-depth: 0
-
-      - name: Update PR description
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-        run: |
-          echo "📝 Updating PR #$PR_NUMBER description with latest changes..."
-
-          # Generate updated changelog for just this push
-          # This could call the changelog action but limit it to recent commits
-
-          echo "✅ PR #$PR_NUMBER has been updated with the latest changes"
-          echo "ℹ️ Skipped full release workflow since PR already exists"
-
-  build-and-test:
-    name: "🏗️ Build and Test"
-    if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
-    needs: [check-existing-pr, detect-release]
-    uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
-    with:
-      package_name: ${{ inputs.package_name }}
-      debug: ${{ inputs.debug }}
-      run_build_and_test: true
-      node_version: ${{ inputs.node_version }}
-      min_node_version: ${{ inputs.min_node_version }}
-      max_node_major: ${{ inputs.max_node_major }}
-      package_manager: ${{ inputs.package_manager }}
-      test_command: ${{ inputs.test_command }}
-      build_command: ${{ inputs.build_command }}
-      skip_performance_tests: ${{ inputs.skip_performance_tests }}
-      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
-
-  release:
-    name: "🚀 Release Management"
-    if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
-    needs: [check-existing-pr, detect-release, build-and-test]
-    uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
-    with:
-      package_name: ${{ inputs.package_name }}
-      debug: ${{ inputs.debug }}
-      dry_run: ${{ inputs.dry_run }}
-      # Job control flags - only run create release PR since we already detected
-      run_detect_release: false
-      run_create_release_pr: true
-      # Build parameters
-      node_version: ${{ inputs.node_version }}
-      package_manager: ${{ inputs.package_manager }}
-      version_bump: ${{ needs.detect-release.outputs.version-bump }}
-      version: ${{ inputs.version }}
-    secrets:
-      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-  summary:
-    name: "📋 Release Summary"
-    needs: [detect-release, build-and-test, release]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate Release Summary
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "## 🧪 Dry Run - Release Workflow Validation" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## 🚀 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Check if release was detected
-          if [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
-            echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ needs.release.result }}" = "success" ]; then
-            if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
-              if [ "${{ inputs.dry_run }}" = "true" ]; then
-                echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "🧪 **Dry Run Complete**: All validations passed! No changes were made." >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
-                echo "- Release commit detected successfully" >> $GITHUB_STEP_SUMMARY
-                echo "- Version calculation completed" >> $GITHUB_STEP_SUMMARY
-                echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
-                echo "- Changelog generation successful" >> $GITHUB_STEP_SUMMARY
-                echo "- All prerequisites met for release PR creation" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "🚀 **Ready to Release**: Re-run with \`dry_run: false\` to create the actual release PR." >> $GITHUB_STEP_SUMMARY
-              else
-                echo "✅ **Overall Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                echo "**PR Number**: [#${{ needs.release.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.release.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "🔄 **Next Steps**: Review and merge the release PR to publish the package." >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "ℹ️ **Overall Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Release was detected but no PR was created." >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "❌ **Overall Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-          fi
+                  # Check if release was detected
+                  if [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
+                    echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
+                  elif [ "${{ needs.release.result }}" = "success" ]; then
+                    if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
+                      if [ "${{ inputs.dry_run }}" = "true" ]; then
+                        echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "🧪 **Dry Run Complete**: All validations passed! No changes were made." >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
+                        echo "- Release commit detected successfully" >> $GITHUB_STEP_SUMMARY
+                        echo "- Version calculation completed" >> $GITHUB_STEP_SUMMARY
+                        echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
+                        echo "- Changelog generation successful" >> $GITHUB_STEP_SUMMARY
+                        echo "- All prerequisites met for release PR creation" >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "🚀 **Ready to Release**: Re-run with \`dry_run: false\` to create the actual release PR." >> $GITHUB_STEP_SUMMARY
+                      else
+                        echo "✅ **Overall Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
+                        echo "**PR Number**: [#${{ needs.release.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.release.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
+                        echo "" >> $GITHUB_STEP_SUMMARY
+                        echo "🔄 **Next Steps**: Review and merge the release PR to publish the package." >> $GITHUB_STEP_SUMMARY
+                      fi
+                    else
+                      echo "ℹ️ **Overall Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
+                      echo "" >> $GITHUB_STEP_SUMMARY
+                      echo "Release was detected but no PR was created." >> $GITHUB_STEP_SUMMARY
+                    fi
+                  else
+                    echo "❌ **Overall Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
+                  fi

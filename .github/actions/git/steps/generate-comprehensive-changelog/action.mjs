@@ -172,7 +172,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		return singleCommitChangelog;
 	}
 
-	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive 
+	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive
 	// categorized changelog regardless of the useSingleCommitMessage flag, because users
 	// need to see all the changes (fixes, features, etc.) in the PR/release notes.
 
