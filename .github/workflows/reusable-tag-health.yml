@@ -369,9 +369,10 @@ jobs:
             - name: Find latest semantic version tag
               id: find-latest
               shell: bash
+              env:
+                  TAGS_JSON: ${{ steps.get-tags.outputs.tags_detailed }}
               run: |
                   # Extract tags from detailed output and find latest semantic version
-                  TAGS_JSON='${{ steps.get-tags.outputs.tags_detailed }}'
                   echo "Processing tags from detailed output..."
 
                   # Use jq to extract semantic version tags and find the latest

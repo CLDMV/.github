@@ -39,9 +39,9 @@ runs:
     - name: Check for release commit and analyze version bump
       id: check
       shell: bash
+      env:
+        COMMITS: ${{ steps.commit-range.outputs.commits }}
+        HAS_COMMITS: ${{ steps.commit-range.outputs.has-commits }}
       run: |
-        export COMMITS='${{ steps.commit-range.outputs.commits }}'
-        export HAS_COMMITS="${{ steps.commit-range.outputs.has-commits }}"
-
         # Run the Node.js script
         node "${{ github.action_path }}/action.mjs"

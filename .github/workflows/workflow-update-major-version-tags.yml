@@ -2,100 +2,100 @@
 name: 📌 Update Major Version Tags (Org-Level)
 
 on:
-  workflow_call:
-    inputs:
-      debug:
-        description: "Enable debug logging for troubleshooting"
-        required: false
-        type: boolean
-        default: false
-      create_documentation:
-        description: "Whether to create/update VERSION_TAGS.md documentation"
-        required: false
-        type: boolean
-        default: true
-      # Bot signing parameters
-      use_gpg:
-        description: "Enable GPG signing (if GPG secrets provided)"
-        required: false
-        type: boolean
-        default: false
-      # Tag health configuration
-      max_tags:
-        description: "Maximum number of tags to process (safety limit)"
-        required: false
-        type: string
-        default: "100"
-      max_major_versions:
-        description: "Maximum number of major versions to process"
-        required: false
-        type: string
-        default: "10"
-      max_minor_versions:
-        description: "Maximum number of minor versions per major to process"
-        required: false
-        type: string
-        default: "10"
-      bot_patterns:
-        description: "JSON array of bot name patterns to identify bot signatures"
-        required: false
-        type: string
-        default: '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]'
-      include_patterns:
-        description: "JSON array of tag patterns to include (e.g. ['v*', 'release-*'])"
-        required: false
-        type: string
-        default: '["v*"]'
-      exclude_patterns:
-        description: "JSON array of tag patterns to exclude"
-        required: false
-        type: string
-        default: "[]"
-    secrets:
-      TAGGER_NAME:
-        required: false
-      TAGGER_EMAIL:
-        required: false
-      GPG_PRIVATE_KEY:
-        required: false
-      GPG_PASSPHRASE:
-        required: false
-      BOT_APP_ID:
-        required: false
-      BOT_APP_PRIVATE_KEY:
-        required: false
+    workflow_call:
+        inputs:
+            debug:
+                description: "Enable debug logging for troubleshooting"
+                required: false
+                type: boolean
+                default: false
+            create_documentation:
+                description: "Whether to create/update VERSION_TAGS.md documentation"
+                required: false
+                type: boolean
+                default: true
+            # Bot signing parameters
+            use_gpg:
+                description: "Enable GPG signing (if GPG secrets provided)"
+                required: false
+                type: boolean
+                default: false
+            # Tag health configuration
+            max_tags:
+                description: "Maximum number of tags to process (safety limit)"
+                required: false
+                type: string
+                default: "100"
+            max_major_versions:
+                description: "Maximum number of major versions to process"
+                required: false
+                type: string
+                default: "10"
+            max_minor_versions:
+                description: "Maximum number of minor versions per major to process"
+                required: false
+                type: string
+                default: "10"
+            bot_patterns:
+                description: "JSON array of bot name patterns to identify bot signatures"
+                required: false
+                type: string
+                default: '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]'
+            include_patterns:
+                description: "JSON array of tag patterns to include (e.g. ['v*', 'release-*'])"
+                required: false
+                type: string
+                default: '["v*"]'
+            exclude_patterns:
+                description: "JSON array of tag patterns to exclude"
+                required: false
+                type: string
+                default: "[]"
+        secrets:
+            TAGGER_NAME:
+                required: false
+            TAGGER_EMAIL:
+                required: false
+            GPG_PRIVATE_KEY:
+                required: false
+            GPG_PASSPHRASE:
+                required: false
+            BOT_APP_ID:
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                required: false
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  version-tag-operations:
-    name: Version Tag Operations
-    uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1
-    permissions:
-      contents: write
-      actions: write
-    with:
-      debug: ${{ inputs.debug }}
-      run_unified_tag_health: true
-      create_documentation: ${{ inputs.create_documentation }}
-      use_gpg: ${{ inputs.use_gpg }}
-      # Tag health configuration
-      max_tags: ${{ inputs.max_tags }}
-      max_major_versions: ${{ inputs.max_major_versions }}
-      max_minor_versions: ${{ inputs.max_minor_versions }}
-      bot_patterns: ${{ inputs.bot_patterns }}
-      include_patterns: ${{ inputs.include_patterns }}
-      exclude_patterns: ${{ inputs.exclude_patterns }}
-    secrets:
-      TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
-      TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+    version-tag-operations:
+        name: Version Tag Operations
+        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1
+        permissions:
+            contents: write
+            actions: write
+        with:
+            debug: ${{ inputs.debug }}
+            run_unified_tag_health: true
+            create_documentation: ${{ inputs.create_documentation }}
+            use_gpg: ${{ inputs.use_gpg }}
+            # Tag health configuration
+            max_tags: ${{ inputs.max_tags }}
+            max_major_versions: ${{ inputs.max_major_versions }}
+            max_minor_versions: ${{ inputs.max_minor_versions }}
+            bot_patterns: ${{ inputs.bot_patterns }}
+            include_patterns: ${{ inputs.include_patterns }}
+            exclude_patterns: ${{ inputs.exclude_patterns }}
+        secrets:
+            TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
+            TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+            BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-  # Summary job that runs after the main operations
+    # Summary job that runs after the main operations
 #   summary:
 #     name: "📋 Version Tag Update Summary"
 #     needs: version-tag-operations
