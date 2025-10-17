@@ -175,6 +175,35 @@ jobs:
             - name: Setup Node.js
               uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
 
+            - name: Get PR commit range
+              id: get-pr-range
+              shell: bash
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
+              run: |
+                  # Get the repository info
+                  REPO_OWNER="${{ github.repository_owner }}"
+                  REPO_NAME="${{ github.event.repository.name }}"
+
+                  # Get current PR details
+                  CURRENT_PR=$(gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER)
+
+                  # Get the base branch and commit from the PR
+                  BASE_SHA=$(echo "$CURRENT_PR" | jq -r '.base.sha')
+                  HEAD_SHA=$(echo "$CURRENT_PR" | jq -r '.head.sha')
+
+                  # Create commit range
+                  COMMIT_RANGE="${BASE_SHA}..${HEAD_SHA}"
+                  echo "commit-range=${COMMIT_RANGE}" >> $GITHUB_OUTPUT
+                  echo "🔍 Using commit range: ${COMMIT_RANGE}"
+
+            - name: Generate updated changelog
+              id: changelog
+              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
+              with:
+                  commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
+
             - name: Update PR description
               shell: bash
               env:
@@ -187,66 +216,11 @@ jobs:
                   REPO_OWNER="${{ github.repository_owner }}"
                   REPO_NAME="${{ github.event.repository.name }}"
 
-                  # Get current PR details
-                  CURRENT_PR=$(gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER)
-
-                  # Get the base branch and commit from the PR
-                  BASE_BRANCH=$(echo "$CURRENT_PR" | jq -r '.base.ref')
-                  BASE_SHA=$(echo "$CURRENT_PR" | jq -r '.base.sha')
-                  HEAD_BRANCH=$(echo "$CURRENT_PR" | jq -r '.head.ref')
-                  HEAD_SHA=$(echo "$CURRENT_PR" | jq -r '.head.sha')
-
-                  echo "🔍 PR details: base=$BASE_BRANCH ($BASE_SHA), head=$HEAD_BRANCH ($HEAD_SHA)"
-
-                  # Generate updated changelog using the PR's actual commit range
-                  echo "📋 Generating updated changelog for PR commits..."
-
-                  # Create a temporary script to generate changelog using PR range
-                  cat > update_pr_changelog.mjs << 'EOF'
-                  import { categorizeCommits } from "./.github/actions/git/steps/get-commit-range/action.mjs";
-                  import { generateComprehensiveChangelog } from "./.github/actions/git/steps/generate-comprehensive-changelog/action.mjs";
-
-                  // Use the exact commit range from the PR
-                  const baseSha = process.env.BASE_SHA;
-                  const headSha = process.env.HEAD_SHA;
-                  const commitRange = `${baseSha}..${headSha}`;
-
-                  console.log(`Using PR commit range: ${commitRange}`);
-
-                  try {
-                    // Generate changelog for the PR's commits
-                    const changelog = await generateComprehensiveChangelog(commitRange, null, process.env.GITHUB_TOKEN, false);
-                    console.log("CHANGELOG_START");
-                    console.log(changelog);
-                    console.log("CHANGELOG_END");
-                  } catch (error) {
-                    console.error("Error generating changelog:", error);
-                    // Fallback: try with HEAD range
-                    try {
-                      console.log("Falling back to HEAD range...");
-                      const changelog = await generateComprehensiveChangelog("HEAD~10..HEAD", null, process.env.GITHUB_TOKEN, false);
-                      console.log("CHANGELOG_START");
-                      console.log(changelog);
-                      console.log("CHANGELOG_END");
-                    } catch (fallbackError) {
-                      console.error("Fallback also failed:", fallbackError);
-                      process.exit(1);
-                    }
-                  }
-                  EOF
-
-                  # Set environment variables for the script
-                  export BASE_SHA="$BASE_SHA"
-                  export HEAD_SHA="$HEAD_SHA"
-
-                  # Run the changelog generation and capture output
-                  CHANGELOG_OUTPUT=$(node update_pr_changelog.mjs 2>&1)
-
-                  # Extract just the changelog content between markers
-                  CHANGELOG=$(echo "$CHANGELOG_OUTPUT" | sed -n '/CHANGELOG_START/,/CHANGELOG_END/p' | sed '1d;$d')
+                  # Get the generated changelog
+                  CHANGELOG="${{ steps.changelog.outputs.changelog-content }}"
 
                   if [ -z "$CHANGELOG" ]; then
-                    echo "⚠️ Failed to generate changelog, using fallback message"
+                    echo "⚠️ No changelog generated, using fallback message"
                     CHANGELOG="## 🚀 What's Changed
 
                   _Changelog generation in progress. The PR has been updated with the latest commits._
@@ -259,9 +233,6 @@ jobs:
                   gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
                     --method PATCH \
                     --field body="$CHANGELOG"
-
-                  # Clean up temporary file
-                  rm -f update_pr_changelog.mjs
 
                   echo "✅ PR #$PR_NUMBER has been updated with the latest changelog"
                   echo "ℹ️ Skipped full release workflow since PR already exists"
