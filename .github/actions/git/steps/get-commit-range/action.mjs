@@ -15,8 +15,11 @@ export function categorizeCommits(commitRange, allCommits = null) {
 	try {
 		if (!allCommits) {
 			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
-			// Use NULL separators for reliable parsing - much cleaner than custom separators
-			allCommits = gitCommand(`git log ${commitRange} --pretty=format:"%H%x00%s%x00%B%x00%an%x00%ae%x00%ad%x00" --date=iso`, true);
+			// Use a more reliable separator pattern - newline + special marker
+			allCommits = gitCommand(
+				`git log ${commitRange} --pretty=format:"COMMIT_START%n%H%n%s%n%B%nAUTHOR:%an%nEMAIL:%ae%nDATE:%ad%nCOMMIT_END" --date=iso`,
+				true
+			);
 
 			if (!allCommits) {
 				return [];
@@ -29,20 +32,31 @@ export function categorizeCommits(commitRange, allCommits = null) {
 		}
 
 		const commits = allCommits
-			.split("\x00\x00") // Split by double NULL to separate commits
+			.split("COMMIT_START\n") // Split by our custom marker
+			.filter((block) => block.trim()) // Remove empty blocks
 			.map((commitBlock) => {
 				if (!commitBlock.trim()) return null; // Skip empty blocks
 
 				// Debug each commit block being processed
 				if (DEBUG) console.log(`🔍 DEBUG: Processing commit block: "${commitBlock.substring(0, 100)}..."`);
 
-				const parts = commitBlock.split("\x00"); // Split by single NULL for fields
-				if (parts.length < 6) {
-					console.log(`🔍 DEBUG: Skipping malformed commit block (${parts.length} parts): "${commitBlock.substring(0, 100)}..."`);
+				const lines = commitBlock.split("\n");
+				if (lines.length < 6) {
+					console.log(`🔍 DEBUG: Skipping malformed commit block (${lines.length} lines): "${commitBlock.substring(0, 100)}..."`);
 					return null;
 				}
 
-				const [hash, subject, body, author, email, date] = parts;
+				// Parse the structured format
+				const hash = lines[0];
+				const subject = lines[1];
+
+				// Find the body (everything between subject and AUTHOR: line)
+				const authorIndex = lines.findIndex((line) => line.startsWith("AUTHOR:"));
+				const body = authorIndex > 2 ? lines.slice(2, authorIndex).join("\n").trim() : "";
+
+				const author = lines[authorIndex]?.replace("AUTHOR:", "") || "";
+				const email = lines[authorIndex + 1]?.replace("EMAIL:", "") || "";
+				const date = lines[authorIndex + 2]?.replace("DATE:", "") || "";
 
 				// Debug the parsed parts
 				if (DEBUG)
@@ -216,15 +230,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
 				console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);
 				console.log(`⚠️ Trying to find merge base with master/main branch...`);
-				
+
 				// Try to find a better base by looking at the merge-base with master/main
-				const masterBase = gitCommand(`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`, true);
+				const masterBase = gitCommand(
+					`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`,
+					true
+				);
 				if (masterBase) {
 					console.log(`🔍 DEBUG: Found merge base with master/main: ${masterBase}`);
 					// If the tag is older than the merge base, use the merge base
 					const tagCommitTime = gitCommand(`git log -1 --format=%at ${tagCommit}`, true);
 					const mergeBaseTime = gitCommand(`git log -1 --format=%at ${masterBase}`, true);
-					
+
 					if (parseInt(tagCommitTime) < parseInt(mergeBaseTime)) {
 						console.log(`🔍 DEBUG: Tag is older than merge base, using merge base instead`);
 						baseRef = masterBase;
@@ -270,23 +287,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		console.log(`🔍 DEBUG: - The base tag ${baseRef} is equal to or ahead of HEAD`);
 		console.log(`🔍 DEBUG: - The tag was created on the current commit`);
 		console.log(`🔍 DEBUG: - There's a branch/tag reference issue`);
-		
+
 		// Fallback: try using merge-base with master/main
 		console.log("🔍 DEBUG: Trying fallback strategy with merge-base...");
-		const fallbackBase = gitCommand(`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`, true);
-		
+		const fallbackBase = gitCommand(
+			`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`,
+			true
+		);
+
 		if (fallbackBase && fallbackBase !== baseRef) {
 			console.log(`🔍 DEBUG: Found merge-base fallback: ${fallbackBase}`);
 			const fallbackRange = `${fallbackBase}..${HEAD_REF}`;
 			const fallbackCount = parseInt(gitCommand(`git rev-list --count ${fallbackRange}`, true) || "0");
-			
+
 			if (fallbackCount > 0) {
 				console.log(`🔍 DEBUG: Fallback range ${fallbackRange} has ${fallbackCount} commits`);
 				console.log(`🔍 DEBUG: Using fallback range instead`);
 				baseRef = fallbackBase;
 				commitRange = fallbackRange;
 				hasCommits = true;
-				
+
 				console.log("🔍 DEBUG: First few commits in fallback range:");
 				const fallbackSummary = gitCommand(`git log ${fallbackRange} --oneline -5`, true);
 				console.log(fallbackSummary);

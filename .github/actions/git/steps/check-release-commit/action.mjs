@@ -143,8 +143,8 @@ function analyzeVersionBump(commits) {
 // Main logic - only run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
 	console.log(`🔍 DEBUG: HAS_COMMITS = ${HAS_COMMITS}`);
-	console.log(`🔍 DEBUG: COMMITS_JSON length = ${COMMITS_JSON ? COMMITS_JSON.length : 'null'}`);
-	
+	console.log(`🔍 DEBUG: COMMITS_JSON length = ${COMMITS_JSON ? COMMITS_JSON.length : "null"}`);
+
 	if (!HAS_COMMITS) {
 		console.log("ℹ️ No commits in range - not triggering release");
 		console.log("🔍 DEBUG: This suggests the commit range calculation found no commits");
@@ -155,7 +155,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 	const commits = getCommits();
 	console.log(`🔍 Analyzing ${commits.length} commits`);
-	console.log(`🔍 DEBUG: First few commits:`, commits.slice(0, 3).map(c => `${c.hash?.substring(0, 7)}: ${c.subject}`));
+	console.log(
+		`🔍 DEBUG: First few commits:`,
+		commits.slice(0, 3).map((c) => `${c.hash?.substring(0, 7)}: ${c.subject}`)
+	);
 
 	const releaseAnalysis = findReleaseCommits(commits);
 	console.log(`🔍 DEBUG: Release analysis result:`, {
