@@ -122,16 +122,8 @@ export function categorizeCommits(commitRange, allCommits = null) {
 					category = "breaking";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → breaking`);
 				}
-				// Then check for content-based categorization (takes precedence over type)
-				else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
-					category = "fix";
-					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (content-based)`);
-				} else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
-					category = "feature";
-					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (content-based)`);
-				}
-				// Then check conventional commit types
-				else if (type === "feat") {
+				// Check conventional commit types FIRST (they take precedence over content-based)
+				else if (type === "feat" || type === "feature") {
 					category = "feature";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (conventional)`);
 				} else if (type === "fix") {
@@ -140,7 +132,16 @@ export function categorizeCommits(commitRange, allCommits = null) {
 				} else if (type === "chore" || type === "docs" || type === "style" || type === "refactor" || type === "test" || type === "ci") {
 					category = "maintenance";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (conventional)`);
+				}
+				// Then check for content-based categorization (only if no conventional type matched)
+				else if (lower.includes("fix") || lower.includes("bug") || lower.includes("patch")) {
+					category = "fix";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → fix (content-based)`);
+				} else if (lower.includes("add") || lower.includes("new") || lower.includes("feature")) {
+					category = "feature";
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → feature (content-based)`);
 				} else {
+					category = "other";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → other (default)`);
 				}
 
