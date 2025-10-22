@@ -160,6 +160,8 @@ jobs:
             - name: Check Release Commit
               id: check
               uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+              env:
+                  DEBUG: ${{ inputs.debug || 'true' }}
 
     update-existing-pr:
         name: "📝 Update Existing PR"

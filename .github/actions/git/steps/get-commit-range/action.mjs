@@ -215,6 +215,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			if (tagInHistory === "no") {
 				console.log(`⚠️ WARNING: Tag ${baseRef} points to orphaned commit ${tagCommit} (not in current branch history)`);
 				console.log(`⚠️ This likely happened due to squash-and-merge after tagging`);
+				console.log(`⚠️ Trying to find merge base with master/main branch...`);
+				
+				// Try to find a better base by looking at the merge-base with master/main
+				const masterBase = gitCommand(`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`, true);
+				if (masterBase) {
+					console.log(`🔍 DEBUG: Found merge base with master/main: ${masterBase}`);
+					// If the tag is older than the merge base, use the merge base
+					const tagCommitTime = gitCommand(`git log -1 --format=%at ${tagCommit}`, true);
+					const mergeBaseTime = gitCommand(`git log -1 --format=%at ${masterBase}`, true);
+					
+					if (parseInt(tagCommitTime) < parseInt(mergeBaseTime)) {
+						console.log(`🔍 DEBUG: Tag is older than merge base, using merge base instead`);
+						baseRef = masterBase;
+					}
+				}
 			}
 		}
 	}
@@ -230,10 +245,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	}
 
 	console.log(`📋 Commit range: ${commitRange}`);
+	console.log(`🔍 DEBUG: Base ref: ${baseRef}`);
+	console.log(`🔍 DEBUG: Head ref: ${HEAD_REF}`);
 
 	// Check if there are commits in the range
 	const commitCount = parseInt(gitCommand(`git rev-list --count ${commitRange}`, true) || "0");
-	const hasCommits = commitCount > 0;
+	let hasCommits = commitCount > 0;
 
 	if (hasCommits) {
 		console.log(`✅ Found ${commitCount} commits in range`);
@@ -242,8 +259,39 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			const commits = gitCommand(`git log ${commitRange} --oneline | head -10`, true);
 			console.log(commits);
 		}
+		// Always show first few commits for debugging
+		console.log("🔍 DEBUG: First few commits in range:");
+		const commitSummary = gitCommand(`git log ${commitRange} --oneline -5`, true);
+		console.log(commitSummary);
 	} else {
 		console.log("ℹ️ No commits found in range");
+		console.log(`🔍 DEBUG: This means the range ${commitRange} contains no commits`);
+		console.log(`🔍 DEBUG: This could indicate:`);
+		console.log(`🔍 DEBUG: - The base tag ${baseRef} is equal to or ahead of HEAD`);
+		console.log(`🔍 DEBUG: - The tag was created on the current commit`);
+		console.log(`🔍 DEBUG: - There's a branch/tag reference issue`);
+		
+		// Fallback: try using merge-base with master/main
+		console.log("🔍 DEBUG: Trying fallback strategy with merge-base...");
+		const fallbackBase = gitCommand(`git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo ""`, true);
+		
+		if (fallbackBase && fallbackBase !== baseRef) {
+			console.log(`🔍 DEBUG: Found merge-base fallback: ${fallbackBase}`);
+			const fallbackRange = `${fallbackBase}..${HEAD_REF}`;
+			const fallbackCount = parseInt(gitCommand(`git rev-list --count ${fallbackRange}`, true) || "0");
+			
+			if (fallbackCount > 0) {
+				console.log(`🔍 DEBUG: Fallback range ${fallbackRange} has ${fallbackCount} commits`);
+				console.log(`🔍 DEBUG: Using fallback range instead`);
+				baseRef = fallbackBase;
+				commitRange = fallbackRange;
+				hasCommits = true;
+				
+				console.log("🔍 DEBUG: First few commits in fallback range:");
+				const fallbackSummary = gitCommand(`git log ${fallbackRange} --oneline -5`, true);
+				console.log(fallbackSummary);
+			}
+		}
 	}
 
 	// Categorize commits for potential future use
@@ -260,13 +308,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		});
 	}
 
+	// Recalculate commit count after potential fallback
+	const finalCommitCount = parseInt(gitCommand(`git rev-list --count ${commitRange}`, true) || "0");
+	const finalHasCommits = finalCommitCount > 0;
+
+	console.log(`🔍 DEBUG: Final commit count: ${finalCommitCount}`);
+	console.log(`🔍 DEBUG: Final has commits: ${finalHasCommits}`);
+
 	// Set outputs for GitHub Actions
 	const outputs = [
 		`last-tag=${baseRef}`,
 		`commit-range=${commitRange}`,
-		`has-commits=${hasCommits}`,
+		`has-commits=${finalHasCommits}`,
 		`base-ref=${baseRef}`,
-		`commit-count=${commitCount}`,
+		`commit-count=${finalCommitCount}`,
 		// Single JSON array of all commits with categorization
 		`commits=${JSON.stringify(categorizedCommits)}`
 	];

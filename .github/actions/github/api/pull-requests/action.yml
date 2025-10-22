@@ -71,6 +71,7 @@ runs:
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ inputs.head-branch }}&base=${{ inputs.base-branch }}&state=open")
 
+        echo "🔍 Existing PR check response: $EXISTING_PR_RESPONSE"
         EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
 
         if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
@@ -107,11 +108,37 @@ runs:
             "https://api.github.com/repos/${{ github.repository }}/pulls" \
             -d "$PR_JSON")
 
-          # Extract PR number
-          PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number')
-          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url')
+          echo "🔍 PR creation response: $PR_RESPONSE"
 
-          if [ "$PR_NUMBER" != "null" ] && [ -n "$PR_NUMBER" ]; then
+          # Extract PR number and check for errors
+          PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number // empty')
+          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
+          
+          # Check for validation error indicating PR already exists
+          ERROR_MESSAGE=$(echo "$PR_RESPONSE" | jq -r '.message // empty')
+          VALIDATION_ERRORS=$(echo "$PR_RESPONSE" | jq -r '.errors[0].message // empty')
+
+          if [ "$ERROR_MESSAGE" = "Validation Failed" ] && echo "$VALIDATION_ERRORS" | grep -qi "pull request already exists"; then
+            echo "⚠️ PR already exists (detected during creation attempt)"
+            echo "🔍 Re-checking for existing PR to get the number..."
+            
+            # Re-check for existing PR to get the number
+            EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ inputs.head-branch }}&base=${{ inputs.base-branch }}&state=open")
+            
+            EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
+            
+            if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
+              echo "📋 Found existing PR: #$EXISTING_PR_NUMBER"
+              echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
+              echo "pr-created=false" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Could not find existing PR after creation failed"
+              echo "Response: $PR_RESPONSE"
+              exit 1
+            fi
+          elif [ "$PR_NUMBER" != "null" ] && [ -n "$PR_NUMBER" ]; then
             echo "✅ Created PR: #$PR_NUMBER"
             echo "🔗 URL: $PR_URL"
             
@@ -134,7 +161,7 @@ runs:
             echo "❌ Failed to create PR"
             echo "Response: $PR_RESPONSE"
             echo ""
-            echo "🔍 This indicates the GitHub App needs 'Pull requests: Write' permission."
+            echo "🔍 This may indicate a permissions issue or GitHub App configuration problem."
             echo "🔍 Check the app permissions at: https://github.com/settings/apps"
             exit 1
           fi

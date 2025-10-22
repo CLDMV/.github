@@ -142,16 +142,28 @@ function analyzeVersionBump(commits) {
 
 // Main logic - only run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
+	console.log(`🔍 DEBUG: HAS_COMMITS = ${HAS_COMMITS}`);
+	console.log(`🔍 DEBUG: COMMITS_JSON length = ${COMMITS_JSON ? COMMITS_JSON.length : 'null'}`);
+	
 	if (!HAS_COMMITS) {
 		console.log("ℹ️ No commits in range - not triggering release");
+		console.log("🔍 DEBUG: This suggests the commit range calculation found no commits");
+		console.log("🔍 DEBUG: This could happen if the latest tag is ahead of or equal to HEAD");
 		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
 		process.exit(0);
 	}
 
 	const commits = getCommits();
 	console.log(`🔍 Analyzing ${commits.length} commits`);
+	console.log(`🔍 DEBUG: First few commits:`, commits.slice(0, 3).map(c => `${c.hash?.substring(0, 7)}: ${c.subject}`));
 
 	const releaseAnalysis = findReleaseCommits(commits);
+	console.log(`🔍 DEBUG: Release analysis result:`, {
+		hasRelease: releaseAnalysis.hasRelease,
+		breakingRelease: releaseAnalysis.breakingRelease?.subject || null,
+		normalRelease: releaseAnalysis.normalRelease?.subject || null,
+		mostRecent: releaseAnalysis.mostRecent?.subject || null
+	});
 
 	if (releaseAnalysis.hasRelease) {
 		const releaseCommit = releaseAnalysis.mostRecent;

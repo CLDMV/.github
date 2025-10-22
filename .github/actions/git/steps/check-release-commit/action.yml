@@ -35,6 +35,8 @@ runs:
       with:
         debug: "true"
         exclude-version: ${{ inputs.exclude-version }}
+      env:
+        DEBUG: "true"
 
     - name: Check for release commit and analyze version bump
       id: check
