@@ -1,5 +1,6 @@
 import { appendFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
+import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
@@ -244,12 +245,13 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Contributors - with GitHub user links based on email via API lookup
 	changelog += "### 👥 Contributors\n";
-	const contributorData = [...new Set(commits.map((c) => `${c.author}|${c.email || ""}`))];
+	
+	// Get human contributors using the bot detection utility
+	const contributors = getHumanContributors(commits);
 
 	// Process contributors with API lookups
-	for (const contributorStr of contributorData) {
-		const [author, email] = contributorStr.split("|");
-		const linkedAuthor = await convertAuthorToGitHubLink(author, email, token);
+	for (const contributor of contributors) {
+		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
 		changelog += `- ${linkedAuthor}\n`;
 	}
 
