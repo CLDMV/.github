@@ -142,6 +142,10 @@ on:
                 description: "Detailed JSON summary of all operations"
                 value: ${{ jobs.unified-summarize-results.outputs.summary-json }}
 
+permissions:
+    contents: write
+    actions: write
+
 jobs:
     # Validate that tag commits are reachable from main/master
     validate-tag-source:
