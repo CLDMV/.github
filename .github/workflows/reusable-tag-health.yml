@@ -144,7 +144,6 @@ on:
 
 permissions:
     contents: write
-    actions: write
 
 jobs:
     # Validate that tag commits are reachable from main/master
@@ -310,7 +309,6 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: write
-            actions: write
         outputs:
             fixed_count: ${{ steps.fix-orphaned-releases.outputs.fixed-count }}
             summary-json: ${{ steps.fix-orphaned-releases.outputs.summary-json }}

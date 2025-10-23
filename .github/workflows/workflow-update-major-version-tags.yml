@@ -67,7 +67,6 @@ on:
 
 permissions:
     contents: write
-    actions: write
 
 jobs:
     version-tag-operations:
@@ -75,7 +74,6 @@ jobs:
         uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1
         permissions:
             contents: write
-            actions: write
         with:
             debug: ${{ inputs.debug }}
             run_unified_tag_health: true
