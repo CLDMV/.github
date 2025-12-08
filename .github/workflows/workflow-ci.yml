@@ -2,122 +2,128 @@
 name: 🧪 CI Workflow (Org-Level)
 
 on:
-  workflow_call:
-    inputs:
-      package_name:
-        required: true
-        type: string
-        description: "NPM package name (e.g., @cldmv/slothlet)"
-      debug:
-        required: false
-        type: boolean
-        default: false
-        description: "Enable debug logging for troubleshooting"
-      node_version:
-        required: false
-        type: string
-        default: "lts/*"
-        description: "Node.js version to use (default: lts/*)"
-      min_node_version:
-        required: false
-        type: string
-        default: "20"
-        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
-      max_node_major:
-        required: false
-        type: string
-        default: "22"
-        description: "Override max Node.js major version (default: 22)"
-      package_manager:
-        required: false
-        type: string
-        default: "npm"
-        description: "Package manager (npm or yarn)"
-      test_command:
-        required: false
-        type: string
-        default: "npm test"
-        description: "Command to run tests"
-      build_command:
-        required: false
-        type: string
-        default: "npm run build:ci"
-        description: "Command to build package"
-      # Test control options
-      skip_performance_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip performance tests during CI"
-      skip_matrix_tests:
-        required: false
-        type: boolean
-        default: false
-        description: "Skip matrix testing (use single node version only)"
+    workflow_call:
+        inputs:
+            package_name:
+                required: true
+                type: string
+                description: "NPM package name (e.g., @cldmv/slothlet)"
+            debug:
+                required: false
+                type: boolean
+                default: false
+                description: "Enable debug logging for troubleshooting"
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+                description: "Node.js version to use (default: lts/*)"
+            min_node_version:
+                required: false
+                type: string
+                default: "20"
+                description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+            max_node_major:
+                required: false
+                type: string
+                default: "22"
+                description: "Override max Node.js major version (default: 22)"
+            package_manager:
+                required: false
+                type: string
+                default: "npm"
+                description: "Package manager (npm or yarn)"
+            test_command:
+                required: false
+                type: string
+                default: "npm test"
+                description: "Command to run tests"
+            build_command:
+                required: false
+                type: string
+                default: "npm run build:ci"
+                description: "Command to build package"
+            # Test control options
+            skip_performance_tests:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip performance tests during CI"
+            skip_matrix_tests:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip matrix testing (use single node version only)"
+            test_environment:
+                required: false
+                type: string
+                default: "development"
+                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
 
-    secrets:
-      NPM_TOKEN:
-        description: "NPM token for publishing packages"
-        required: false
-      BOT_APP_ID:
-        description: "GitHub App ID for CLDMV bot"
-        required: false
-      BOT_APP_PRIVATE_KEY:
-        description: "GitHub App private key for CLDMV bot"
-        required: false
+        secrets:
+            NPM_TOKEN:
+                description: "NPM token for publishing packages"
+                required: false
+            BOT_APP_ID:
+                description: "GitHub App ID for CLDMV bot"
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                description: "GitHub App private key for CLDMV bot"
+                required: false
 
 jobs:
-  # Check if we should skip CI based on commit message
-  commit-gate:
-    name: "🚪 Commit Gate"
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.gate.outputs.should_skip }}
-      matched_prefix: ${{ steps.gate.outputs.matched_prefix }}
-    steps:
-      - name: Check commit message
-        id: gate
-        uses: CLDMV/.github/.github/actions/common/steps/commit-gate@v1
+    # Check if we should skip CI based on commit message
+    commit-gate:
+        name: "🚪 Commit Gate"
+        runs-on: ubuntu-latest
+        outputs:
+            should_skip: ${{ steps.gate.outputs.should_skip }}
+            matched_prefix: ${{ steps.gate.outputs.matched_prefix }}
+        steps:
+            - name: Check commit message
+              id: gate
+              uses: CLDMV/.github/.github/actions/common/steps/commit-gate@v1
+              with:
+                  prefixes: "chore: bump version"
+
+    ci:
+        name: "🏗️ Continuous Integration"
+        needs: commit-gate
+        if: needs.commit-gate.outputs.should_skip != 'true'
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
         with:
-          prefixes: "chore: bump version"
+            package_name: ${{ inputs.package_name }}
+            debug: ${{ inputs.debug }}
+            run_build_and_test: true
+            node_version: ${{ inputs.node_version }}
+            min_node_version: ${{ inputs.min_node_version }}
+            max_node_major: ${{ inputs.max_node_major }}
+            package_manager: ${{ inputs.package_manager }}
+            test_command: ${{ inputs.test_command }}
+            build_command: ${{ inputs.build_command }}
+            skip_performance_tests: ${{ inputs.skip_performance_tests }}
+            skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+            test_environment: ${{ inputs.test_environment }}
 
-  ci:
-    name: "🏗️ Continuous Integration"
-    needs: commit-gate
-    if: needs.commit-gate.outputs.should_skip != 'true'
-    uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
-    with:
-      package_name: ${{ inputs.package_name }}
-      debug: ${{ inputs.debug }}
-      run_build_and_test: true
-      node_version: ${{ inputs.node_version }}
-      min_node_version: ${{ inputs.min_node_version }}
-      max_node_major: ${{ inputs.max_node_major }}
-      package_manager: ${{ inputs.package_manager }}
-      test_command: ${{ inputs.test_command }}
-      build_command: ${{ inputs.build_command }}
-      skip_performance_tests: ${{ inputs.skip_performance_tests }}
-      skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+    summary:
+        name: "📊 CI Summary"
+        needs: [commit-gate, ci]
+        if: always() && needs.commit-gate.outputs.should_skip != 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Generate CI Summary
+              run: |
+                  echo "## 🏗️ Continuous Integration Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "**Node Version**: \`${{ inputs.node_version }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "**Package Manager**: \`${{ inputs.package_manager }}\`" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
 
-  summary:
-    name: "📊 CI Summary"
-    needs: [commit-gate, ci]
-    if: always() && needs.commit-gate.outputs.should_skip != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate CI Summary
-        run: |
-          echo "## 🏗️ Continuous Integration Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Node Version**: \`${{ inputs.node_version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Package Manager**: \`${{ inputs.package_manager }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ needs.ci.result }}" = "success" ]; then
-            echo "✅ **Overall Status**: All CI checks passed successfully" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ **Overall Status**: CI workflow failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-          fi
+                  if [ "${{ needs.ci.result }}" = "success" ]; then
+                    echo "✅ **Overall Status**: All CI checks passed successfully" >> $GITHUB_STEP_SUMMARY
+                  else
+                    echo "❌ **Overall Status**: CI workflow failed" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
+                  fi

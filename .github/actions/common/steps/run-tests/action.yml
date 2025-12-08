@@ -9,17 +9,21 @@ inputs:
     description: "Environment to run tests in (development, production, test)"
     required: false
     default: "development"
-  
+
 runs:
   using: "composite"
   steps:
     - name: Run tests
       shell: bash
-      run: ${{ inputs.test-command }}
-      env:
-        NODE_ENV: ${{ inputs.environment }}
-        NODE_OPTIONS: --conditions=${{ inputs.environment }}
+      run: |
+        # Check if NODE_ENV or NODE_OPTIONS are already set in the test command
+        HAS_NODE_ENV=$(echo "${{ inputs.test-command }}" | grep -q "NODE_ENV=" && echo "true" || echo "false")
+        HAS_NODE_OPTIONS=$(echo "${{ inputs.test-command }}" | grep -q "NODE_OPTIONS=" && echo "true" || echo "false")
 
-
-
-
+        if [[ "$HAS_NODE_ENV" == "true" || "$HAS_NODE_OPTIONS" == "true" ]]; then
+          # If either NODE_ENV or NODE_OPTIONS is in the command, run as-is to preserve user's settings
+          ${{ inputs.test-command }}
+        else
+          # If no NODE environment variables in command, set our defaults
+          NODE_ENV="${{ inputs.environment }}" NODE_OPTIONS="--conditions=${{ inputs.environment }}" ${{ inputs.test-command }}
+        fi

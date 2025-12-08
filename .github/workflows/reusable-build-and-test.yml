@@ -2,141 +2,147 @@
 name: 🏗️ Build and Test Jobs
 
 on:
-  workflow_call:
-    inputs:
-      # Package information
-      package_name:
-        description: "NPM package name (e.g., @cldmv/slothlet)"
-        required: true
-        type: string
+    workflow_call:
+        inputs:
+            # Package information
+            package_name:
+                description: "NPM package name (e.g., @cldmv/slothlet)"
+                required: true
+                type: string
 
-      # Debug control
-      debug:
-        description: "Enable debug logging for troubleshooting"
-        required: false
-        type: boolean
-        default: false
+            # Debug control
+            debug:
+                description: "Enable debug logging for troubleshooting"
+                required: false
+                type: boolean
+                default: false
 
-      # Job control flags
-      run_build_and_test:
-        description: "Run build and test job"
-        required: false
-        type: boolean
-        default: false
+            # Job control flags
+            run_build_and_test:
+                description: "Run build and test job"
+                required: false
+                type: boolean
+                default: false
 
-      # Build and test parameters
-      node_version:
-        description: "Node.js version to use (default: lts/*)"
-        required: false
-        type: string
-        default: "lts/*"
-      min_node_version:
-        description: "Minimum Node.js version to test (e.g., 16.4)"
-        required: false
-        type: string
-        default: "20"
-      max_node_major:
-        description: "Override max Node.js major version (default: 22)"
-        required: false
-        type: string
-        default: "22"
-      package_manager:
-        description: "Package manager (npm or yarn)"
-        required: false
-        type: string
-        default: "npm"
-      test_command:
-        description: "Command to run tests"
-        required: false
-        type: string
-        default: "npm test"
-      build_command:
-        description: "Command to build package"
-        required: false
-        type: string
-        default: "npm run build:ci"
+            # Build and test parameters
+            node_version:
+                description: "Node.js version to use (default: lts/*)"
+                required: false
+                type: string
+                default: "lts/*"
+            min_node_version:
+                description: "Minimum Node.js version to test (e.g., 16.4)"
+                required: false
+                type: string
+                default: "20"
+            max_node_major:
+                description: "Override max Node.js major version (default: 22)"
+                required: false
+                type: string
+                default: "22"
+            package_manager:
+                description: "Package manager (npm or yarn)"
+                required: false
+                type: string
+                default: "npm"
+            test_command:
+                description: "Command to run tests"
+                required: false
+                type: string
+                default: "npm test"
+            build_command:
+                description: "Command to build package"
+                required: false
+                type: string
+                default: "npm run build:ci"
 
-      # Test control options
-      skip_performance_tests:
-        description: "Skip performance tests during CI"
-        required: false
-        type: boolean
-        default: false
-      skip_matrix_tests:
-        description: "Skip matrix testing (use single node version only)"
-        required: false
-        type: boolean
-        default: false
+            # Test control options
+            skip_performance_tests:
+                description: "Skip performance tests during CI"
+                required: false
+                type: boolean
+                default: false
+            skip_matrix_tests:
+                description: "Skip matrix testing (use single node version only)"
+                required: false
+                type: boolean
+                default: false
+            test_environment:
+                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
+                required: false
+                type: string
+                default: "development"
 
 jobs:
-  set-matrix:
-    name: "Set Node.js Matrix"
-    runs-on: ubuntu-latest
-    if: inputs.run_build_and_test == true
-    outputs:
-      node-matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          # Check if matrix testing is skipped
-          if [[ "${{ inputs.skip_matrix_tests }}" == "true" ]]; then
-            # Use single node version
-            SINGLE_VERSION="${{ inputs.node_version }}"
-            echo "📍 Matrix testing skipped, using single version: $SINGLE_VERSION"
-            echo "matrix=[\"$SINGLE_VERSION\"]" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+    set-matrix:
+        name: "Set Node.js Matrix"
+        runs-on: ubuntu-latest
+        if: inputs.run_build_and_test == true
+        outputs:
+            node-matrix: ${{ steps.set-matrix.outputs.matrix }}
+        steps:
+            - id: set-matrix
+              run: |
+                  # Check if matrix testing is skipped
+                  if [[ "${{ inputs.skip_matrix_tests }}" == "true" ]]; then
+                    # Use single node version
+                    SINGLE_VERSION="${{ inputs.node_version }}"
+                    echo "📍 Matrix testing skipped, using single version: $SINGLE_VERSION"
+                    echo "matrix=[\"$SINGLE_VERSION\"]" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
 
-          # Build matrix from min to max versions
-          MIN="${{ inputs.min_node_version }}"
-          MAX_INPUT="${{ inputs.max_node_major }}"
-          DEFAULT_MAX=22
+                  # Build matrix from min to max versions
+                  MIN="${{ inputs.min_node_version }}"
+                  MAX_INPUT="${{ inputs.max_node_major }}"
+                  DEFAULT_MAX=22
 
-          echo "🔍 DEBUG (build-and-test): min_node_version = '$MIN'"
-          echo "🔍 DEBUG (build-and-test): max_node_major = '$MAX_INPUT'"
+                  echo "🔍 DEBUG (build-and-test): min_node_version = '$MIN'"
+                  echo "🔍 DEBUG (build-and-test): max_node_major = '$MAX_INPUT'"
 
-          if [[ -n "$MAX_INPUT" ]]; then
-            MAX=$MAX_INPUT
-          else
-            MAX=$DEFAULT_MAX
-          fi
+                  if [[ -n "$MAX_INPUT" ]]; then
+                    MAX=$MAX_INPUT
+                  else
+                    MAX=$DEFAULT_MAX
+                  fi
 
-          # Parse major and minor from min version
-          MAJOR=$(echo $MIN | cut -d. -f1)
-          MINOR=$(echo $MIN | cut -d. -f2)
+                  # Parse major and minor from min version
+                  MAJOR=$(echo $MIN | cut -d. -f1)
+                  MINOR=$(echo $MIN | cut -d. -f2)
 
-          # Build versions array
-          VERSIONS=()
-          if [[ "$MIN" == *"."* ]]; then
-            VERSIONS+=("\"${MAJOR}.${MINOR}\"")
-            ((MAJOR++))
-          fi
-          while [ $MAJOR -le $MAX ]; do
-            VERSIONS+=("\"${MAJOR}\"")
-            ((MAJOR++))
-          done
-          VERSIONS+=("\"lts/*\"")
+                  # Build versions array
+                  VERSIONS=()
+                  if [[ "$MIN" == *"."* ]]; then
+                    VERSIONS+=("\"${MAJOR}.${MINOR}\"")
+                    ((MAJOR++))
+                  fi
+                  while [ $MAJOR -le $MAX ]; do
+                    VERSIONS+=("\"${MAJOR}\"")
+                    ((MAJOR++))
+                  done
+                  VERSIONS+=("\"lts/*\"")
 
-          # Join with commas and create JSON array
-          printf -v joined '%s,' "${VERSIONS[@]}"
-          joined="[${joined%,}]"
-          echo "📊 Matrix testing enabled with versions: $joined"
-          echo "matrix=$joined" >> $GITHUB_OUTPUT
+                  # Join with commas and create JSON array
+                  printf -v joined '%s,' "${VERSIONS[@]}"
+                  joined="[${joined%,}]"
+                  echo "📊 Matrix testing enabled with versions: $joined"
+                  echo "matrix=$joined" >> $GITHUB_OUTPUT
 
-  build-and-test:
-    name: "🏗️ Build & Test"
-    if: inputs.run_build_and_test == true
-    runs-on: ubuntu-latest
-    needs: set-matrix
-    strategy:
-      matrix:
-        node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
-    steps:
-      - name: Build and Test
-        uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v1
-        with:
-          node-version: ${{ matrix.node-version }}
-          package-manager: ${{ inputs.package_manager }}
-          test-command: ${{ inputs.test_command }}
-          build-command: ${{ inputs.build_command }}
-          skip-performance-tests: ${{ inputs.skip_performance_tests }}
+    build-and-test:
+        name: "🏗️ Build & Test"
+        if: inputs.run_build_and_test == true
+        runs-on: ubuntu-latest
+        needs: set-matrix
+        strategy:
+            matrix:
+                node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
+        steps:
+            - name: Build and Test
+              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v1
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  package-manager: ${{ inputs.package_manager }}
+                  test-command: ${{ inputs.test_command }}
+                  build-command: ${{ inputs.build_command }}
+                  skip-performance-tests: ${{ inputs.skip_performance_tests }}
+                  test-environment: ${{ inputs.test_environment }}
