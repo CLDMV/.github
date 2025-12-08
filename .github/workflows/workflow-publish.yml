@@ -101,6 +101,11 @@ on:
         type: boolean
         default: false
         description: "Skip matrix testing (use single node version only)"
+      test_environment:
+        required: false
+        type: string
+        default: "development"
+        description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
       # Bot signing parameters
       use_gpg:
         required: false
@@ -202,6 +207,7 @@ jobs:
       build_command: ${{ inputs.build_command }}
       skip_performance_tests: ${{ inputs.skip_performance_tests }}
       skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
+      test_environment: ${{ inputs.test_environment }}
 
   publish:
     name: "📦 Publish Package"
