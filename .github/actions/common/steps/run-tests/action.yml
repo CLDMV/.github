@@ -33,5 +33,11 @@ runs:
         else
           # If no NODE environment variables in command, set our defaults
           echo "🔍 DEBUG: Setting environment variables - NODE_ENV='${{ inputs.environment }}' NODE_OPTIONS='--conditions=${{ inputs.environment }}'"
-          NODE_ENV="${{ inputs.environment }}" NODE_OPTIONS="--conditions=${{ inputs.environment }}" ${{ inputs.test-command }}
+          export NODE_ENV="${{ inputs.environment }}"
+          export NODE_OPTIONS="--conditions=${{ inputs.environment }}"
+          echo "🔍 DEBUG: Verifying environment variables are set:"
+          echo "🔍 DEBUG: NODE_ENV=$NODE_ENV"
+          echo "🔍 DEBUG: NODE_OPTIONS=$NODE_OPTIONS"
+          echo "🔍 DEBUG: About to run: ${{ inputs.test-command }}"
+          ${{ inputs.test-command }}
         fi
