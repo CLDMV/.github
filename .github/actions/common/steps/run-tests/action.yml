@@ -17,13 +17,21 @@ runs:
       shell: bash
       run: |
         # Check if NODE_ENV or NODE_OPTIONS are already set in the test command
+        echo "🔍 DEBUG: test-command input = '${{ inputs.test-command }}'"
+        echo "🔍 DEBUG: environment input = '${{ inputs.environment }}'"
+
         HAS_NODE_ENV=$(echo "${{ inputs.test-command }}" | grep -q "NODE_ENV=" && echo "true" || echo "false")
         HAS_NODE_OPTIONS=$(echo "${{ inputs.test-command }}" | grep -q "NODE_OPTIONS=" && echo "true" || echo "false")
 
+        echo "🔍 DEBUG: HAS_NODE_ENV = $HAS_NODE_ENV"
+        echo "🔍 DEBUG: HAS_NODE_OPTIONS = $HAS_NODE_OPTIONS"
+
         if [[ "$HAS_NODE_ENV" == "true" || "$HAS_NODE_OPTIONS" == "true" ]]; then
           # If either NODE_ENV or NODE_OPTIONS is in the command, run as-is to preserve user's settings
+          echo "🔍 DEBUG: Using command as-is (user provided env vars)"
           ${{ inputs.test-command }}
         else
           # If no NODE environment variables in command, set our defaults
+          echo "🔍 DEBUG: Setting environment variables - NODE_ENV='${{ inputs.environment }}' NODE_OPTIONS='--conditions=${{ inputs.environment }}'"
           NODE_ENV="${{ inputs.environment }}" NODE_OPTIONS="--conditions=${{ inputs.environment }}" ${{ inputs.test-command }}
         fi
