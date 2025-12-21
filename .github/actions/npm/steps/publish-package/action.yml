@@ -111,8 +111,14 @@ runs:
           echo "🔑 Using token-based authentication"
         else
           echo "🔓 Using OIDC authentication (trusted publishers)"
+          # Remove .npmrc created by setup-node which includes token auth config
+          # For OIDC, we need a clean .npmrc without any auth token references
+          if [ -f ".npmrc" ]; then
+            echo "🗑️ Removing .npmrc token configuration for OIDC authentication"
+            rm -f .npmrc
+          fi
         fi
-        
+
         echo "🚀 Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION} to ${REGISTRY_NAME}"
         echo "📂 Publishing from package-contents directory"
 
