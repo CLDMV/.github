@@ -30,8 +30,8 @@ inputs:
     required: false
     default: "false"
   auth-token:
-    description: "Authentication token for the registry"
-    required: true
+    description: "Authentication token for the registry (optional when using trusted publishers)"
+    required: false
   artifact-name:
     description: "Name of the build artifact to download"
     required: false
@@ -97,7 +97,6 @@ runs:
       shell: bash
       working-directory: package-contents
       env:
-        NODE_AUTH_TOKEN: ${{ inputs.auth-token }}
         PACKAGE_NAME: ${{ inputs.package-name }}
         PACKAGE_VERSION: ${{ inputs.version }}
         REGISTRY_NAME: ${{ inputs.registry-name }}
@@ -105,6 +104,14 @@ runs:
         PUBLISH_COMMAND: ${{ inputs.publish-command }}
         DRY_RUN: ${{ inputs.dry-run }}
       run: |
+        # Conditionally set NODE_AUTH_TOKEN only if a token was provided
+        if [ -n "${{ inputs.auth-token }}" ]; then
+          export NODE_AUTH_TOKEN="${{ inputs.auth-token }}"
+          echo "🔑 Using provided authentication token"
+        else
+          echo "🔓 No authentication token provided - using trusted publisher authentication"
+        fi
+        
         echo "🚀 Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION} to ${REGISTRY_NAME}"
         echo "📂 Publishing from package-contents directory"
 

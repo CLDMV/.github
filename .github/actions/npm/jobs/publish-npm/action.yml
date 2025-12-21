@@ -24,8 +24,8 @@ inputs:
     required: false
     default: "false"
   npm-token:
-    description: "NPM token for authentication"
-    required: true
+    description: "NPM token for authentication (optional when using trusted publishers)"
+    required: false
   artifact-name:
     description: "Name of the build artifact to download"
     required: false

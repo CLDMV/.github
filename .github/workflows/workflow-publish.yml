@@ -114,8 +114,8 @@ on:
         description: "If true, forward provided secrets to enable GPG signing"
     secrets:
       NPM_TOKEN:
-        description: "NPM token for publishing packages"
-        required: true
+        description: "NPM token for publishing packages (optional when using trusted publishers)"
+        required: false
       BOT_APP_ID:
         description: "GitHub App ID for CLDMV bot"
         required: false
