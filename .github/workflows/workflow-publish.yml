@@ -214,7 +214,7 @@ jobs:
         needs: build-and-test
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
-            contents: write # Required for creating releases and updating tags
+            contents: read
         uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v1
         with:
             package_name: ${{ inputs.package_name }}
