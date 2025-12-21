@@ -104,12 +104,13 @@ runs:
         PUBLISH_COMMAND: ${{ inputs.publish-command }}
         DRY_RUN: ${{ inputs.dry-run }}
       run: |
-        # Conditionally set NODE_AUTH_TOKEN only if a token was provided
+        # Only set NODE_AUTH_TOKEN if a token was provided
+        # If not set, NPM will use OIDC authentication (trusted publishers)
         if [ -n "${{ inputs.auth-token }}" ]; then
           export NODE_AUTH_TOKEN="${{ inputs.auth-token }}"
-          echo "🔑 Using provided authentication token"
+          echo "🔑 Using token-based authentication"
         else
-          echo "🔓 No authentication token provided - using trusted publisher authentication"
+          echo "🔓 Using OIDC authentication (trusted publishers)"
         fi
         
         echo "🚀 Publishing ${PACKAGE_NAME}@${PACKAGE_VERSION} to ${REGISTRY_NAME}"
