@@ -215,6 +215,7 @@ jobs:
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: read
+            packages: write # Required to publish to GitHub Packages
         uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v1
         with:
             package_name: ${{ inputs.package_name }}
