@@ -6,7 +6,7 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2025-12-26 23:17:20 -08:00 (1766819840)
+# @Last modified time: 2025-12-27 00:28:06 -08:00 (1766824086)
 # -----
 # @Copyright: Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.
 #
@@ -249,15 +249,15 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
-              with:
-                  app_id: ${{ secrets.BOT_APP_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+            # - name: Create App token
+            #   id: app-token
+            #   uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+            #   with:
+            #       app_id: ${{ secrets.BOT_APP_ID }}
+            #       private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+            #   env:
+            #       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+            #       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Calculate artifact names
               id: names
@@ -277,7 +277,8 @@ jobs:
                   package-manager: ${{ inputs.package_manager }}
                   publish-command: ${{ needs.detect-repo-config.outputs.github-packages-command }}
                   dry-run: ${{ inputs.dry_run }}
-                  github-token: ${{ steps.app-token.outputs.token }}
+                  #   github-token: ${{ steps.app-token.outputs.token }}
+                  github-token: ${{ github.token }}
                   artifact-name: ${{ steps.names.outputs.artifact-name }}
 
     download-artifacts:
