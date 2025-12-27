@@ -1,3 +1,16 @@
+#
+# @Project: workflows
+# @Filename: /reusable-publishing.yml
+# @Date: 2025-09-09 20:39:34 -07:00 (1757475574)
+# @Author: Nate Hyson <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2025-12-26 23:17:20 -08:00 (1766819840)
+# -----
+# @Copyright: Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.
+#
+
 # Publishing Workflow Package
 name: 📦 Publishing Jobs
 
@@ -227,6 +240,9 @@ jobs:
         if: inputs.run_publish_github_packages == true
         runs-on: ubuntu-latest
         needs: [detect-version, detect-repo-config]
+        permissions:
+            contents: read
+            packages: write # Required to publish to GitHub Packages
         outputs:
             published: ${{ steps.publish.outputs.published }}
         steps:
