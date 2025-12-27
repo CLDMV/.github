@@ -249,6 +249,16 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              with:
+                  app_id: ${{ secrets.BOT_APP_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Calculate artifact names
               id: names
               uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
@@ -267,7 +277,7 @@ jobs:
                   package-manager: ${{ inputs.package_manager }}
                   publish-command: ${{ needs.detect-repo-config.outputs.github-packages-command }}
                   dry-run: ${{ inputs.dry_run }}
-                  github-token: ${{ github.token }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   artifact-name: ${{ steps.names.outputs.artifact-name }}
 
     download-artifacts:
