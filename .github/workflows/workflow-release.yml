@@ -286,7 +286,7 @@ jobs:
 
     summary:
         name: "📋 Release Summary"
-        needs: [detect-release, build-and-test, release]
+        needs: [check-existing-pr, detect-release, update-existing-pr, build-and-test, release]
         if: always()
         runs-on: ubuntu-latest
         steps:
@@ -301,8 +301,17 @@ jobs:
                   echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
 
+                  # Check if PR was updated (existing PR path)
+                  if [ "${{ needs.update-existing-pr.result }}" = "success" ]; then
+                    echo "✅ **Overall Status**: Existing release PR updated successfully" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "**PR Number**: [#${{ needs.check-existing-pr.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.check-existing-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "📝 **Updated**: The PR description has been updated with the latest commits and changelog." >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "🔄 **Next Steps**: Review the updated PR and merge when ready to publish the package." >> $GITHUB_STEP_SUMMARY
                   # Check if release was detected
-                  if [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
+                  elif [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
                     echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
                     echo "" >> $GITHUB_STEP_SUMMARY
                     echo "This commit was not detected as a release trigger." >> $GITHUB_STEP_SUMMARY
