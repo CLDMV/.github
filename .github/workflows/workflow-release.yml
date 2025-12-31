@@ -305,7 +305,11 @@ jobs:
                   if [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
                     echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
                     echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "This commit was not detected as a release commit. Use \`release:\` or \`release!:\` prefix to trigger releases." >> $GITHUB_STEP_SUMMARY
+                    echo "This commit was not detected as a release trigger." >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "**Automatic release detection:** The workflow detects conventional commits (\`feat:\`, \`fix:\`, breaking changes) and creates release PRs automatically." >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "**Manual release:** Use \`release:\` or \`release!:\` prefix to explicitly trigger releases with custom versioning." >> $GITHUB_STEP_SUMMARY
                   elif [ "${{ needs.release.result }}" = "success" ]; then
                     if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
                       if [ "${{ inputs.dry_run }}" = "true" ]; then
