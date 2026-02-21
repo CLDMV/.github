@@ -1,11 +1,23 @@
-import { appendFileSync } from "fs";
+import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
-// Get inputs from environment
-const COMMITS_INPUT = process.env.COMMITS_INPUT;
+// Get inputs from environment.
+// COMMITS_FILE is preferred over COMMITS_INPUT to avoid "Argument list too long" errors
+// when the JSON payload is large (many commits).
+const COMMITS_FILE = process.env.COMMITS_FILE;
+const COMMITS_INPUT = (() => {
+	if (COMMITS_FILE) {
+		try {
+			return readFileSync(COMMITS_FILE, "utf8");
+		} catch (err) {
+			console.log(`⚠️ Failed to read commits file '${COMMITS_FILE}': ${err.message}. Falling back to COMMITS_INPUT env var.`);
+		}
+	}
+	return process.env.COMMITS_INPUT;
+})();
 const COMMIT_RANGE_INPUT = process.env.COMMIT_RANGE_INPUT;
 const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "true";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -245,7 +257,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Contributors - with GitHub user links based on email via API lookup
 	changelog += "### 👥 Contributors\n";
-	
+
 	// Get human contributors using the bot detection utility
 	const contributors = getHumanContributors(commits);
 

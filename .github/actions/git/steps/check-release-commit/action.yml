@@ -25,6 +25,9 @@ outputs:
   commits:
     description: "JSON array of categorized commits"
     value: ${{ steps.commit-range.outputs.commits }}
+  commits-file:
+    description: "Path to JSON file containing the commits array (preferred over commits to avoid env-var size limits)"
+    value: ${{ steps.commit-range.outputs.commits-file }}
 
 runs:
   using: "composite"
@@ -42,7 +45,8 @@ runs:
       id: check
       shell: bash
       env:
-        COMMITS: ${{ steps.commit-range.outputs.commits }}
+        # Pass the file path rather than the full JSON to avoid "Argument list too long" errors
+        COMMITS_FILE: ${{ steps.commit-range.outputs.commits-file }}
         HAS_COMMITS: ${{ steps.commit-range.outputs.has-commits }}
       run: |
         # Run the Node.js script

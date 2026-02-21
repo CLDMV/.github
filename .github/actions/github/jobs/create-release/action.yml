@@ -123,7 +123,8 @@ runs:
       id: release-notes
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
       with:
-        commits: ${{ steps.get-commits.outputs.commits }}
+        # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
+        commits-file: ${{ steps.get-commits.outputs.commits-file }}
         use-single-commit-message: "true"
 
     - name: Get current commit SHA

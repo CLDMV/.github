@@ -1,6 +1,19 @@
 #
 # @Project: create-release-pr
 # @Filename: /action.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Hyson <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-02-21 13:05:07 -08:00 (1771707907)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+#
+# @Project: create-release-pr
+# @Filename: /action.yml
 # @Date: 2025-09-08 13:34:30 -07:00 (1757363670)
 # @Author: Nate Hyson <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
@@ -125,7 +138,8 @@ runs:
       id: changelog
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
       with:
-        commits: ${{ steps.commit-check.outputs.commits }}
+        # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
+        commits-file: ${{ steps.commit-check.outputs.commits-file }}
 
     - name: Update Summary - Changelog Generated
       shell: bash

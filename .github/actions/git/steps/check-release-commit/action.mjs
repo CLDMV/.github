@@ -11,10 +11,22 @@
  *	@Copyright: Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.
  */
 
-import { appendFileSync } from "fs";
+import { appendFileSync, readFileSync } from "fs";
 
-// Get inputs from environment
-const COMMITS_JSON = process.env.COMMITS;
+// Get inputs from environment.
+// COMMITS_FILE is preferred over COMMITS to avoid shell "Argument list too long" errors
+// when the JSON payload is large (many commits). Fall back to COMMITS for backward compat.
+const COMMITS_FILE = process.env.COMMITS_FILE;
+const COMMITS_JSON = (() => {
+	if (COMMITS_FILE) {
+		try {
+			return readFileSync(COMMITS_FILE, "utf8");
+		} catch (err) {
+			console.log(`⚠️ Failed to read commits file '${COMMITS_FILE}': ${err.message}. Falling back to COMMITS env var.`);
+		}
+	}
+	return process.env.COMMITS;
+})();
 const HAS_COMMITS = process.env.HAS_COMMITS === "true";
 
 console.log("🔍 Checking for release commits...");

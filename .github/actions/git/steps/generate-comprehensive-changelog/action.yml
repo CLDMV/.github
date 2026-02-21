@@ -5,6 +5,9 @@ inputs:
   commits:
     description: "JSON array of categorized commits from get-commit-range"
     required: false
+  commits-file:
+    description: "Path to JSON file containing commits array (preferred over commits to avoid env-var size limits)"
+    required: false
   commit-range:
     description: "Git commit range (fallback if commits not provided)"
     required: false
@@ -25,6 +28,8 @@ runs:
       id: changelog
       shell: bash
       env:
+        # Pass the file path rather than the full JSON to avoid "Argument list too long" errors
+        COMMITS_FILE: ${{ inputs.commits-file }}
         COMMITS_INPUT: ${{ inputs.commits }}
         COMMIT_RANGE_INPUT: ${{ inputs.commit-range }}
         USE_SINGLE_COMMIT_MESSAGE: ${{ inputs.use-single-commit-message }}

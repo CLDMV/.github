@@ -1,3 +1,16 @@
+#
+# @Project: get-commit-range
+# @Filename: /action.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Hyson <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-02-21 13:05:07 -08:00 (1771707907)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
 name: "Get Commit Range"
 description: "Get the commit range for analysis based on the latest semantic version tag"
 
@@ -36,6 +49,9 @@ outputs:
   commits:
     description: "JSON array of commits with categorization metadata (hash, subject, author, date, category, type, scope, isBreaking)"
     value: ${{ steps.range.outputs.commits }}
+  commits-file:
+    description: "Path to JSON file containing the commits array (preferred over commits to avoid env-var size limits)"
+    value: ${{ steps.range.outputs.commits-file }}
 
 runs:
   using: "composite"

@@ -1,4 +1,4 @@
-import { appendFileSync } from "fs";
+import { appendFileSync, writeFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 
@@ -336,6 +336,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	console.log(`🔍 DEBUG: Final commit count: ${finalCommitCount}`);
 	console.log(`🔍 DEBUG: Final has commits: ${finalHasCommits}`);
 
+	// Write commits to a temp file to avoid "Argument list too long" errors
+	// when the JSON is passed as an environment variable in subsequent steps.
+	const commitsFilePath = process.env.RUNNER_TEMP ? `${process.env.RUNNER_TEMP}/gh-commits.json` : "/tmp/gh-commits.json";
+	writeFileSync(commitsFilePath, JSON.stringify(categorizedCommits));
+	console.log(`✅ Wrote ${categorizedCommits.length} commits to ${commitsFilePath}`);
+
 	// Set outputs for GitHub Actions
 	const outputs = [
 		`last-tag=${baseRef}`,
@@ -343,7 +349,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		`has-commits=${finalHasCommits}`,
 		`base-ref=${baseRef}`,
 		`commit-count=${finalCommitCount}`,
-		// Single JSON array of all commits with categorization
+		// File path to the commits JSON (preferred over inline JSON to avoid env-var size limits)
+		`commits-file=${commitsFilePath}`,
+		// Single JSON array of all commits with categorization (kept for backward compat)
 		`commits=${JSON.stringify(categorizedCommits)}`
 	];
 
