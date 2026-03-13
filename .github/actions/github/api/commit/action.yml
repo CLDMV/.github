@@ -36,6 +36,8 @@ runs:
         # Get current branch and commit info
         CURRENT_BRANCH="${{ github.ref_name }}"
         BASE_SHA=$(git rev-parse HEAD)
+        TMP_DIR="tmp/commit-api"
+        mkdir -p "$TMP_DIR"
 
         # Create tree with all changes using GitHub API
         echo "📦 Creating tree with version bump and build artifacts..."
@@ -43,55 +45,80 @@ runs:
         # Refresh the local git index
         git update-index --refresh || true
 
-        # Create tree SHA locally and verify it exists
-        TREE_SHA=$(git write-tree)
-        echo "Local tree SHA: $TREE_SHA"
+        # Build tree entries from staged changes so GitHub can create a remote tree SHA
+        echo "📄 Building API tree items from staged changes..."
+        : > "$TMP_DIR/tree-items.ndjson"
 
-        # Verify the tree exists locally
-        if ! git cat-file -e "$TREE_SHA"; then
-          echo "❌ Tree SHA $TREE_SHA does not exist locally"
+        git diff --cached --name-status | while IFS=$'\t' read -r status path extra; do
+          [ -z "$status" ] && continue
+
+          case "$status" in
+            D*)
+              echo "Queue delete: $path"
+              jq -n --arg path "$path" '{path: $path, mode: "100644", type: "blob", sha: null}' >> "$TMP_DIR/tree-items.ndjson"
+              ;;
+            R*)
+              echo "Queue rename: $path -> $extra"
+              # Delete old path
+              jq -n --arg path "$path" '{path: $path, mode: "100644", type: "blob", sha: null}' >> "$TMP_DIR/tree-items.ndjson"
+
+              # Add new path from staged blob content
+              MODE=$(git ls-files --stage -- "$extra" | awk '{print $1}' | head -n1)
+              [ -z "$MODE" ] && MODE="100644"
+              CONTENT=$(git show ":$extra" | base64 -w 0)
+              BLOB_RESPONSE=$(printf '{"content":"%s","encoding":"base64"}' "$CONTENT" | \
+                curl -s -X POST \
+                  -H "Authorization: token ${{ inputs.github-token }}" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Content-Type: application/json" \
+                  --data-binary @- \
+                  "https://api.github.com/repos/${{ github.repository }}/git/blobs")
+              BLOB_SHA=$(echo "$BLOB_RESPONSE" | jq -r '.sha')
+              if [ -z "$BLOB_SHA" ] || [ "$BLOB_SHA" = "null" ]; then
+                echo "❌ Failed creating blob for renamed path: $extra"
+                echo "Blob response: $BLOB_RESPONSE"
+                exit 1
+              fi
+              jq -n --arg path "$extra" --arg mode "$MODE" --arg sha "$BLOB_SHA" '{path: $path, mode: $mode, type: "blob", sha: $sha}' >> "$TMP_DIR/tree-items.ndjson"
+              ;;
+            *)
+              TARGET_PATH="$path"
+              MODE=$(git ls-files --stage -- "$TARGET_PATH" | awk '{print $1}' | head -n1)
+              [ -z "$MODE" ] && MODE="100644"
+
+              echo "Queue upsert: $TARGET_PATH"
+              CONTENT=$(git show ":$TARGET_PATH" | base64 -w 0)
+              BLOB_RESPONSE=$(printf '{"content":"%s","encoding":"base64"}' "$CONTENT" | \
+                curl -s -X POST \
+                  -H "Authorization: token ${{ inputs.github-token }}" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Content-Type: application/json" \
+                  --data-binary @- \
+                  "https://api.github.com/repos/${{ github.repository }}/git/blobs")
+              BLOB_SHA=$(echo "$BLOB_RESPONSE" | jq -r '.sha')
+              if [ -z "$BLOB_SHA" ] || [ "$BLOB_SHA" = "null" ]; then
+                echo "❌ Failed creating blob for path: $TARGET_PATH"
+                echo "Blob response: $BLOB_RESPONSE"
+                exit 1
+              fi
+
+              jq -n --arg path "$TARGET_PATH" --arg mode "$MODE" --arg sha "$BLOB_SHA" '{path: $path, mode: $mode, type: "blob", sha: $sha}' >> "$TMP_DIR/tree-items.ndjson"
+              ;;
+          esac
+        done
+
+        TREE_ITEMS_JSON=$(jq -s . "$TMP_DIR/tree-items.ndjson")
+        ITEM_COUNT=$(echo "$TREE_ITEMS_JSON" | jq 'length')
+
+        if [ "$ITEM_COUNT" -eq 0 ]; then
+          echo "❌ No staged tree items were generated for API commit"
           exit 1
         fi
 
-        # Create all blob objects via GitHub API first
-        echo "📄 Creating blob objects via GitHub API..."
-
-        # Get all staged files and create blobs
-        git diff --cached --name-only | while read file; do
-          if [ -f "$file" ]; then
-            echo "Creating blob for: $file"
-            
-            # Read file content as base64
-            CONTENT=$(base64 -w 0 "$file")
-            
-            # Create blob via API using printf to avoid argument length issues
-            printf '{"content":"%s","encoding":"base64"}' "$CONTENT" | \
-            curl -s -X POST \
-              -H "Authorization: token ${{ inputs.github-token }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Content-Type: application/json" \
-              --data-binary @- \
-              "https://api.github.com/repos/${{ github.repository }}/git/blobs" > /dev/null
-          fi
-        done
-
-        echo "✅ All blob objects created"
+        echo "✅ Prepared $ITEM_COUNT tree items"
 
         # Now create the tree via API
         echo "🌳 Creating tree via GitHub API..."
-
-        # Build tree JSON array properly
-        TREE_ITEMS_JSON=$(git diff --cached --name-only | while read file; do
-          if [ -f "$file" ]; then
-            BLOB_SHA=$(git hash-object "$file")
-            jq -n --arg path "$file" --arg sha "$BLOB_SHA" '{
-              path: $path,
-              mode: "100644",
-              type: "blob",
-              sha: $sha
-            }'
-          fi
-        done | jq -s .)
 
         # Create the full tree JSON
         BASE_TREE=$(git rev-parse HEAD^{tree})
@@ -108,18 +135,18 @@ runs:
           -H "Accept: application/vnd.github.v3+json" \
           -H "Content-Type: application/json" \
           --data-binary @- \
-          "https://api.github.com/repos/${{ github.repository }}/git/trees" > /tmp/tree_response.json
+          "https://api.github.com/repos/${{ github.repository }}/git/trees" > "$TMP_DIR/tree_response.json"
 
-        API_TREE_SHA=$(cat /tmp/tree_response.json | jq -r '.sha')
+        API_TREE_SHA=$(cat "$TMP_DIR/tree_response.json" | jq -r '.sha')
 
-        if [ "$API_TREE_SHA" != "null" ] && [ -n "$API_TREE_SHA" ]; then
-          echo "✅ Created tree via API: $API_TREE_SHA"
-          FINAL_TREE_SHA="$API_TREE_SHA"
-        else
-          echo "⚠️ Failed to create tree via API, using local tree"
-          echo "Response: $(cat /tmp/tree_response.json)"
-          FINAL_TREE_SHA="$TREE_SHA"
+        if [ "$API_TREE_SHA" = "null" ] || [ -z "$API_TREE_SHA" ]; then
+          echo "❌ Failed to create tree via API"
+          echo "Response: $(cat "$TMP_DIR/tree_response.json")"
+          exit 1
         fi
+
+        echo "✅ Created tree via API: $API_TREE_SHA"
+        FINAL_TREE_SHA="$API_TREE_SHA"
 
         # Create commit using GitHub API (automatically signed)
         echo "✍️ Creating signed commit via GitHub API..."
