@@ -260,10 +260,16 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Get human contributors using the bot detection utility
 	const contributors = getHumanContributors(commits);
+	const uniqueLinkedContributors = new Set();
 
 	// Process contributors with API lookups
 	for (const contributor of contributors) {
 		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
+		if (!linkedAuthor || uniqueLinkedContributors.has(linkedAuthor)) {
+			continue;
+		}
+
+		uniqueLinkedContributors.add(linkedAuthor);
 		changelog += `- ${linkedAuthor}\n`;
 	}
 

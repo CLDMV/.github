@@ -143,13 +143,17 @@ runs:
 
     - name: Update Summary - Changelog Generated
       shell: bash
+      env:
+        CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
       run: |
         echo "- ✅ Changelog generated successfully" >> $GITHUB_STEP_SUMMARY
         if [ "${{ inputs.dry-run }}" = "true" ]; then
           echo "- 🧪 **DRY RUN**: Changelog content preview:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.changelog.outputs.changelog-content }}" | head -20 >> $GITHUB_STEP_SUMMARY
+          mkdir -p tmp
+          printf "%s\n" "$CHANGELOG_CONTENT" > tmp/changelog-preview.md
+          head -20 tmp/changelog-preview.md >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
         fi

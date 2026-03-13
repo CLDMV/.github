@@ -3,6 +3,7 @@
 .backup/
 
 # Development/Testing Directories
+tmp/
 .github/actions/core/
 .github/actions/core2/
 
