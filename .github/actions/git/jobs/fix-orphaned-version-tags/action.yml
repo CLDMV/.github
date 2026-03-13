@@ -13,7 +13,7 @@ runs:
   using: composite
   steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
@@ -166,7 +166,8 @@ runs:
 
     - name: Fix orphaned tags using modular GitHub API action
       if: steps.fix-orphans.outputs.orphans-found == 'true'
-      uses: CLDMV/.github/.github/actions/github/api/update-tag@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
       with:
-        tag_data: ${{ steps.fix-orphans.outputs.orphaned-tags-json }}
-        github_token: ${{ github.token }}
+        payload: ${{ steps.fix-orphans.outputs.orphaned-tags-json }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

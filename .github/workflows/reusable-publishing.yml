@@ -5,10 +5,10 @@
 # @Author: Nate Hyson <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
-# @Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2025-12-27 00:28:06 -08:00 (1766824086)
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-03-13 15:58:33 -07:00 (1773442713)
 # -----
-# @Copyright: Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
 # Publishing Workflow Package
@@ -173,7 +173,7 @@ jobs:
             version: ${{ steps.extract.outputs.version }}
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Extract and validate version
               id: extract
@@ -212,7 +212,7 @@ jobs:
             published: ${{ steps.publish.outputs.published }}
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Calculate artifact names
               id: names
@@ -247,7 +247,7 @@ jobs:
             published: ${{ steps.publish.outputs.published }}
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             # - name: Create App token
             #   id: app-token

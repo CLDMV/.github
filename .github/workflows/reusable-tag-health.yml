@@ -1,3 +1,17 @@
+#
+# @Project: workflows
+# @Filename: /reusable-tag-health.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-03-13 16:01:42 -07:00 (1773442902)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+
 # Tag Health Workflow Package
 name: 🏷️ Tag Health Management Jobs
 
@@ -155,7 +169,7 @@ jobs:
             validation-message: ${{ steps.validate.outputs.message }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0 # Need full history to check commit ancestry
 
@@ -254,7 +268,7 @@ jobs:
             user-email: ${{ steps.setup-git.outputs.user-email }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -314,7 +328,7 @@ jobs:
             summary-json: ${{ steps.fix-orphaned-releases.outputs.summary-json }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -352,7 +366,7 @@ jobs:
             summary-json: ${{ steps.generate-summary.outputs.summary-json }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -467,7 +481,7 @@ jobs:
             summary-json: ${{ steps.fix-bot-sigs.outputs.summary-json }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -513,7 +527,7 @@ jobs:
               run: echo "🔍 DEBUG - Unsigned tags job is starting..."
 
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -559,7 +573,7 @@ jobs:
               run: echo "🔍 DEBUG - Misaligned major/minor tags job is starting..."
 
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -605,7 +619,7 @@ jobs:
               run: echo "🔍 DEBUG - Orphaned tags job is starting..."
 
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -670,7 +684,7 @@ jobs:
             orphans-found: ${{ needs.unified-update-major-minor.outputs.orphans-found }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
