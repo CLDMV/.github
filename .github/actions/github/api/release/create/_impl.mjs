@@ -1,12 +1,52 @@
 import { debugLog } from "../../../../common/common/core.mjs";
 
+/**
+ * Remove duplicated title lines from the beginning of release body.
+ * This handles cases where the commit message subject is also present
+ * as the first line of the body.
+ * @param {string} body - Raw release body markdown.
+ * @param {string} title - Release title/name.
+ * @returns {string} Normalized release body.
+ */
+function normalizeReleaseBody(body, title) {
+	if (!body) {
+		return "";
+	}
+
+	const normalizedBody = String(body).replace(/\r\n/g, "\n");
+	const normalizedTitle = (title || "").trim();
+
+	if (!normalizedTitle) {
+		return normalizedBody;
+	}
+
+	const lines = normalizedBody.split("\n");
+	const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
+
+	if (firstNonEmptyIndex === -1) {
+		return normalizedBody;
+	}
+
+	const firstLine = lines[firstNonEmptyIndex].trim();
+	if (firstLine.toLowerCase() === normalizedTitle.toLowerCase()) {
+		lines.splice(firstNonEmptyIndex, 1);
+		while (lines.length > 0 && lines[0].trim() === "") {
+			lines.shift();
+		}
+	}
+
+	return lines.join("\n");
+}
+
 export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
+	const finalBody = normalizeReleaseBody(body, name);
+
 	debugLog(`Creating release for ${repo}:`);
 	debugLog(`  tag_name: ${tag_name}`);
 	debugLog(`  name: ${name}`);
 	debugLog(`  is_prerelease: ${is_prerelease}`);
 	debugLog(`  is_draft: ${is_draft}`);
-	debugLog(`  body length: ${body.length}`);
+	debugLog(`  body length: ${finalBody.length}`);
 	debugLog(`  assets: ${assets}`);
 
 	// Check if release already exists
@@ -28,7 +68,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		// Update the existing release
 		const updatePayload = {
 			name,
-			body,
+			body: finalBody,
 			draft: is_draft,
 			prerelease: is_prerelease
 		};
@@ -58,7 +98,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		const releasePayload = {
 			tag_name,
 			name,
-			body,
+			body: finalBody,
 			draft: is_draft,
 			prerelease: is_prerelease
 		};
@@ -87,6 +127,27 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		// Some other error checking for existing release
 		const errorText = await existingReleaseResponse.text();
 		throw new Error(`Failed to check for existing release: ${existingReleaseResponse.status} ${errorText}`);
+	}
+
+	// Safety net: if caller requested non-draft but release is still draft, force publish.
+	if (releaseData?.id && releaseData.draft === true && is_draft === false) {
+		debugLog(`Release ${releaseData.id} is still draft unexpectedly; forcing draft=false update...`);
+		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+			method: "PATCH",
+			headers: {
+				"Authorization": `token ${token}`,
+				"Accept": "application/vnd.github.v3+json",
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify({ draft: false })
+		});
+
+		if (!publishResponse.ok) {
+			const errorText = await publishResponse.text();
+			throw new Error(`Failed to publish non-draft release: ${publishResponse.status} ${errorText}`);
+		}
+
+		releaseData = await publishResponse.json();
 	}
 
 	const result = {

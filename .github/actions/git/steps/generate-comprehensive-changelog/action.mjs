@@ -23,6 +23,33 @@ const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "tru
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 /**
+ * Remove a duplicated leading subject line from a commit body.
+ * @param {string} subject - Commit subject line.
+ * @param {string} body - Commit body text.
+ * @returns {string} Body with duplicated leading subject removed.
+ */
+function removeDuplicatedLeadingSubject(subject, body) {
+	if (!body || !subject) {
+		return body || "";
+	}
+
+	const normalizedBody = body.replace(/\r\n/g, "\n");
+	const lines = normalizedBody.split("\n");
+	const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
+
+	if (firstNonEmptyIndex === -1) {
+		return "";
+	}
+
+	if (lines[firstNonEmptyIndex].trim().toLowerCase() !== subject.trim().toLowerCase()) {
+		return body;
+	}
+
+	lines.splice(firstNonEmptyIndex, 1);
+	return lines.join("\n").trim();
+}
+
+/**
  * Look up GitHub username from email address using GitHub API
  * @param {string} email - Email address to look up
  * @param {string} token - GitHub API token
@@ -136,9 +163,10 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			const currentCommitInfo = gitCommand(`git log -1 --pretty=format:"%s|%b"`, true);
 			if (currentCommitInfo) {
 				const [subject, body] = currentCommitInfo.split("|");
+				const cleanedBody = removeDuplicatedLeadingSubject(subject, body);
 				let releaseNotes = subject;
-				if (body && body.trim()) {
-					releaseNotes += "\n\n" + body.trim();
+				if (cleanedBody && cleanedBody.trim()) {
+					releaseNotes += "\n\n" + cleanedBody.trim();
 				}
 				console.log(`📝 Using current commit message: ${subject}`);
 				return releaseNotes;
@@ -176,10 +204,11 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	if (commits.length === 1 && useSingleCommitMessage) {
 		const commit = commits[0];
 		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
+		const cleanedBody = removeDuplicatedLeadingSubject(commit.subject, commit.body);
 
 		let singleCommitChangelog = commit.subject;
-		if (commit.body && commit.body.trim()) {
-			singleCommitChangelog += "\n\n" + commit.body.trim();
+		if (cleanedBody && cleanedBody.trim()) {
+			singleCommitChangelog += "\n\n" + cleanedBody.trim();
 		}
 
 		return singleCommitChangelog;
@@ -265,12 +294,18 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// Process contributors with API lookups
 	for (const contributor of contributors) {
 		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
-		if (!linkedAuthor || uniqueLinkedContributors.has(linkedAuthor)) {
+		const normalizedLinkedAuthor = linkedAuthor ? linkedAuthor.trim() : "";
+		const lowerAuthor = normalizedLinkedAuthor.toLowerCase();
+		if (!normalizedLinkedAuthor || lowerAuthor === "internal" || lowerAuthor === "@internal") {
 			continue;
 		}
 
-		uniqueLinkedContributors.add(linkedAuthor);
-		changelog += `- ${linkedAuthor}\n`;
+		if (lowerAuthor.includes("[@internal](") || uniqueLinkedContributors.has(normalizedLinkedAuthor)) {
+			continue;
+		}
+
+		uniqueLinkedContributors.add(normalizedLinkedAuthor);
+		changelog += `- ${normalizedLinkedAuthor}\n`;
 	}
 
 	return changelog;

@@ -62,7 +62,7 @@ jobs:
 
             - name: Get CLDMV app token for cleanup
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -115,7 +115,7 @@ jobs:
 
             - name: Get CLDMV app token (no permissions)
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -174,7 +174,7 @@ jobs:
 
             - name: Get CLDMV app token (with specific permissions requested)
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -270,7 +270,7 @@ jobs:
 
             - name: Get CLDMV app token (no app permissions)
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -333,7 +333,7 @@ jobs:
 
             - name: Get CLDMV app token (with specific permissions requested)
               id: app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
