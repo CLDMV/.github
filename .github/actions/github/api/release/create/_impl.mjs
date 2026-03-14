@@ -93,6 +93,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		releaseData = await updateResponse.json();
 
 		debugLog(`Updated existing release: ${releaseData.id}`);
+		debugLog(`Release flags after update -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
 	} else if (existingReleaseResponse.status === 404) {
 		// Release doesn't exist, create new one
 		const releasePayload = {
@@ -123,15 +124,18 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		releaseData = await releaseResponse.json();
 
 		debugLog(`Created new release: ${releaseData.id}`);
+		debugLog(`Release flags after create -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
 	} else {
 		// Some other error checking for existing release
 		const errorText = await existingReleaseResponse.text();
 		throw new Error(`Failed to check for existing release: ${existingReleaseResponse.status} ${errorText}`);
 	}
 
-	// Safety net: if caller requested non-draft but release is still draft, force publish.
-	if (releaseData?.id && releaseData.draft === true && is_draft === false) {
-		debugLog(`Release ${releaseData.id} is still draft unexpectedly; forcing draft=false update...`);
+	// Respect caller intent: if non-draft was requested but GitHub still returns draft=true,
+	// publish it explicitly. If draft was requested, keep it as draft.
+	if (releaseData?.id && is_draft === false && releaseData.draft === true) {
+		debugLog(`Release ${releaseData.id} came back as draft=true while is_draft=false; publishing it...`);
+
 		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
 			headers: {
@@ -144,10 +148,11 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		if (!publishResponse.ok) {
 			const errorText = await publishResponse.text();
-			throw new Error(`Failed to publish non-draft release: ${publishResponse.status} ${errorText}`);
+			throw new Error(`Failed to publish release: ${publishResponse.status} ${errorText}`);
 		}
 
 		releaseData = await publishResponse.json();
+		debugLog(`Release ${releaseData.id} published successfully`);
 	}
 
 	const result = {

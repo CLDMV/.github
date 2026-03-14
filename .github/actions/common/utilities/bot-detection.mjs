@@ -113,6 +113,33 @@ export function isBotCommit(commit) {
 }
 
 /**
+ * Check if a contributor identity is an internal placeholder label.
+ * @param {string} author - Commit author name
+ * @param {string} email - Commit author email
+ * @returns {boolean} True when identity is an internal placeholder
+ */
+export function isInternalPlaceholder(author, email) {
+	const authorLower = (author || "").trim().toLowerCase();
+	const emailLower = (email || "").trim().toLowerCase();
+
+	if (!authorLower && !emailLower) {
+		return false;
+	}
+
+	const internalPatterns = ["internal", "@internal", "internal[bot]"];
+
+	if (internalPatterns.includes(authorLower) || internalPatterns.includes(emailLower)) {
+		return true;
+	}
+
+	if (authorLower.startsWith("internal (") || emailLower.startsWith("internal@")) {
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * Filter out bot commits from an array of commits
  * @param {Array} commits - Array of commit objects
  * @returns {Array} Array of commits with bot commits filtered out
@@ -131,6 +158,10 @@ export function getHumanContributors(commits) {
 	const contributorMap = new Map();
 
 	humanCommits.forEach((commit) => {
+		if (isInternalPlaceholder(commit.author, commit.email)) {
+			return;
+		}
+
 		const key = `${commit.author}|${commit.email || ""}`;
 		if (!contributorMap.has(key)) {
 			contributorMap.set(key, {

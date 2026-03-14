@@ -50,6 +50,25 @@ function removeDuplicatedLeadingSubject(subject, body) {
 }
 
 /**
+ * Remove internal placeholder contributor lines from markdown release notes.
+ * @param {string} content - Markdown release notes content.
+ * @returns {string} Sanitized content.
+ */
+function stripInternalContributorLines(content) {
+	if (!content) {
+		return "";
+	}
+
+	const internalLinePattern = /^\s*(?:[-*]\s*)?(?:\[@?internal\]\([^)]*\)|@?internal)(?:\s*\([^)]*\))?\s*$/i;
+	return content
+		.replace(/\r\n/g, "\n")
+		.split("\n")
+		.filter((line) => !internalLinePattern.test(line))
+		.join("\n")
+		.trim();
+}
+
+/**
  * Look up GitHub username from email address using GitHub API
  * @param {string} email - Email address to look up
  * @param {string} token - GitHub API token
@@ -169,7 +188,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 					releaseNotes += "\n\n" + cleanedBody.trim();
 				}
 				console.log(`📝 Using current commit message: ${subject}`);
-				return releaseNotes;
+				return stripInternalContributorLines(releaseNotes);
 			}
 		} catch (error) {
 			console.log(`⚠️ Failed to get current commit message: ${error.message}`);
@@ -211,7 +230,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			singleCommitChangelog += "\n\n" + cleanedBody.trim();
 		}
 
-		return singleCommitChangelog;
+		return stripInternalContributorLines(singleCommitChangelog);
 	}
 
 	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive
@@ -296,11 +315,18 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
 		const normalizedLinkedAuthor = linkedAuthor ? linkedAuthor.trim() : "";
 		const lowerAuthor = normalizedLinkedAuthor.toLowerCase();
-		if (!normalizedLinkedAuthor || lowerAuthor === "internal" || lowerAuthor === "@internal") {
+		if (
+			!normalizedLinkedAuthor ||
+			lowerAuthor === "internal" ||
+			lowerAuthor === "@internal" ||
+			lowerAuthor.startsWith("internal (") ||
+			lowerAuthor.includes("[@internal](") ||
+			lowerAuthor.includes("/internal)")
+		) {
 			continue;
 		}
 
-		if (lowerAuthor.includes("[@internal](") || uniqueLinkedContributors.has(normalizedLinkedAuthor)) {
+		if (uniqueLinkedContributors.has(normalizedLinkedAuthor)) {
 			continue;
 		}
 

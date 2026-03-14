@@ -13,6 +13,10 @@ inputs:
     description: "Whether this is a prerelease"
     required: false
     default: "false"
+  is-draft:
+    description: "Whether this release should remain a draft"
+    required: false
+    default: "false"
   package-manager:
     description: "Package manager (npm or yarn)"
     required: false
@@ -220,7 +224,7 @@ runs:
         name: ${{ steps.names.outputs.release-name }}
         body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
-        is_draft: false
+        is_draft: ${{ inputs.is-draft }}
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
 
     - name: Dry Run - GitHub Release Validation
