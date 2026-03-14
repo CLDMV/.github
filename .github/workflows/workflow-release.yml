@@ -6,11 +6,10 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-03-13 17:07:41 -07:00 (1773446861)
+# @Last modified time: 2026-03-13 17:14:07 -07:00 (1773447247)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
-
 
 # CLDMV/.github/.github/workflows/release.yml
 name: 🚀 Release Workflow (Org-Level)
@@ -244,14 +243,14 @@ jobs:
                                     printf "%s\n" "$CHANGELOG_CONTENT" > "$TMP_DIR/changelog.md"
 
                                     if [ ! -s "$TMP_DIR/changelog.md" ]; then
-                    echo "⚠️ No changelog generated, using fallback message"
-                                        cat > "$TMP_DIR/changelog.md" <<'EOF'
-                                    ## 🚀 What's Changed
-
-                                    _Changelog generation in progress. The PR has been updated with the latest commits._
-
-                                    Please check the commit history for details of the changes included in this release.
-                                    EOF
+                                        echo "⚠️ No changelog generated, using fallback message"
+                                        printf "%s\n" \
+                                            "## 🚀 What's Changed" \
+                                            "" \
+                                            "_Changelog generation in progress. The PR has been updated with the latest commits._" \
+                                            "" \
+                                            "Please check the commit history for details of the changes included in this release." \
+                                            > "$TMP_DIR/changelog.md"
                   fi
 
                   # Update the PR description with the new changelog
