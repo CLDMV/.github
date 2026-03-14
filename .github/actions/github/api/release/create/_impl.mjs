@@ -153,7 +153,7 @@ function neutralizeJsdocTagMentions(content) {
 	];
 
 	const tagPattern = new RegExp(`@(${jsdocTags.join("|")})(?=$|[\\s.,;:!?()[\\]{}])`, "gi");
-	return String(content).replace(tagPattern, "\\@$1");
+	return String(content).replace(tagPattern, "@​$1");
 }
 
 export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
@@ -251,10 +251,10 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		throw new Error(`Failed to check for existing release: ${existingReleaseResponse.status} ${errorText}`);
 	}
 
-	// Respect caller intent: if non-draft was requested but GitHub still returns draft=true,
-	// publish it explicitly. If draft was requested, keep it as draft.
-	if (releaseData?.id && !wantsDraft && releaseData.draft === true) {
-		debugLog(`Release ${releaseData.id} came back as draft=true while draft=false was requested; publishing it...`);
+	// Respect caller intent: when draft=false is requested, always perform a final
+	// publish pass and verify persisted state from a fresh API read.
+	if (releaseData?.id && !wantsDraft) {
+		debugLog(`Finalizing release ${releaseData.id} as non-draft (enforced publish pass)...`);
 
 		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
@@ -272,7 +272,27 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		}
 
 		releaseData = await publishResponse.json();
-		debugLog(`Release ${releaseData.id} published successfully`);
+		debugLog(`Release ${releaseData.id} publish PATCH applied (draft=${releaseData.draft})`);
+
+		const verifyResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+			method: "GET",
+			headers: {
+				"Authorization": `token ${token}`,
+				"Accept": "application/vnd.github.v3+json"
+			}
+		});
+
+		if (!verifyResponse.ok) {
+			const errorText = await verifyResponse.text();
+			throw new Error(`Failed to verify release publish state: ${verifyResponse.status} ${errorText}`);
+		}
+
+		releaseData = await verifyResponse.json();
+		debugLog(`Release ${releaseData.id} verification -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
+
+		if (releaseData.draft === true) {
+			throw new Error(`Release ${releaseData.id} is still draft after publish enforcement`);
+		}
 	}
 
 	const result = {

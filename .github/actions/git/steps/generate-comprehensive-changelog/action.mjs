@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
-import { getHumanContributors, isBotAuthor } from "../../../common/utilities/bot-detection.mjs";
+import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
@@ -157,63 +157,44 @@ function neutralizeJsdocTagMentions(content) {
 }
 
 /**
- * Rewrite co-author trailers to include GitHub @mentions and dedupe by mention.
- * Output format: Co-authored-by: @username (Name <email>)
+ * Remove co-author trailers from rendered markdown body.
+ * Contributor attribution is handled in the deduped details section.
  * @param {string} content - Markdown content that may include trailers.
- * @param {string} token - GitHub token for optional lookup.
- * @returns {Promise<string>} Content with normalized Co-authored-by lines.
+ * @returns {string} Content without Co-authored-by trailer lines.
  */
-async function normalizeCoAuthorTrailers(content, token) {
+function stripCoAuthorTrailers(content) {
 	if (!content) {
 		return "";
 	}
 
 	const lines = content.replace(/\r\n/g, "\n").split("\n");
 	const normalizedLines = [];
-	const seenMentions = new Set();
-	const seenRawIdentities = new Set();
 
 	for (const line of lines) {
-		const match = line.match(/^\s*co-authored-by\s*:\s*(.+?)\s*<([^>]+)>\s*$/i);
-		if (!match) {
+		if (!/^\s*co-authored-by\s*:/i.test(line)) {
 			normalizedLines.push(line);
-			continue;
 		}
-
-		const author = (match[1] || "").trim();
-		const email = (match[2] || "").trim();
-		if (isBotAuthor(author, email)) {
-			continue;
-		}
-		const linkedAuthor = await convertAuthorToGitHubLink(author, email, token);
-		const mention = toGitHubMention(linkedAuthor, author);
-
-		if (mention) {
-			const normalizedMention = mention.toLowerCase();
-			if (normalizedMention === "@internal" || normalizedMention.includes("internal") || normalizedMention.includes("[bot]")) {
-				continue;
-			}
-
-			if (seenMentions.has(normalizedMention)) {
-				continue;
-			}
-
-			seenMentions.add(normalizedMention);
-			normalizedLines.push(`Co-authored-by: ${mention} (${author} <${email}>)`);
-			continue;
-		}
-
-		const rawIdentityKey = `${author.toLowerCase()}|${email.toLowerCase()}`;
-		if (seenRawIdentities.has(rawIdentityKey)) {
-			continue;
-		}
-
-		seenRawIdentities.add(rawIdentityKey);
-		normalizedLines.push(`Co-authored-by: ${author} <${email}>`);
 	}
 
 	return normalizedLines
 		.join("\n")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
+/**
+ * Remove existing contributor details sections from markdown.
+ * This prevents duplicated contributor blocks when regenerating notes.
+ * @param {string} content - Markdown content that may include contributor details blocks.
+ * @returns {string} Content without contributor details sections.
+ */
+function stripContributorDetailsSections(content) {
+	if (!content) {
+		return "";
+	}
+
+	return content
+		.replace(/\n?<details>\s*\n<summary>\s*👥\s*Contributors\s*<\/summary>[\s\S]*?<\/details>\s*/gi, "\n")
 		.replace(/\n{3,}/g, "\n\n")
 		.trim();
 }
@@ -347,6 +328,55 @@ function extractCoAuthorIdentitiesFromBody(body) {
 }
 
 /**
+ * Extract @mentions from existing contributor details sections in markdown text.
+ * @param {string} body - Markdown body content.
+ * @returns {Set<string>} Set of @mention strings found in contributor details blocks.
+ */
+function extractMentionsFromContributorDetailsSections(body) {
+	const mentions = new Set();
+
+	if (!body) {
+		return mentions;
+	}
+
+	const detailsPattern = /<details>\s*\n<summary>\s*👥\s*Contributors\s*<\/summary>([\s\S]*?)<\/details>/gi;
+	let detailsMatch = detailsPattern.exec(body);
+
+	while (detailsMatch) {
+		const sectionBody = detailsMatch[1] || "";
+		const mentionPattern = /(^|[^\w])@([a-z\d](?:[a-z\d-]{0,38}))/gim;
+		let mentionMatch = mentionPattern.exec(sectionBody);
+
+		while (mentionMatch) {
+			mentions.add(`@${mentionMatch[2]}`);
+			mentionMatch = mentionPattern.exec(sectionBody);
+		}
+
+		detailsMatch = detailsPattern.exec(body);
+	}
+
+	return mentions;
+}
+
+/**
+ * Collect contributor @mentions from existing contributor details sections in commits.
+ * @param {Array} commits - Commit objects.
+ * @returns {Set<string>} Set of @mention strings.
+ */
+function getExistingDetailsMentionsFromCommits(commits) {
+	const mentions = new Set();
+
+	for (const commit of commits) {
+		const existingMentions = extractMentionsFromContributorDetailsSections(commit?.body || "");
+		for (const mention of existingMentions) {
+			mentions.add(mention);
+		}
+	}
+
+	return mentions;
+}
+
+/**
  * Convert co-author commit trailers into GitHub @mentions.
  * @param {Array} commits - Commit objects.
  * @param {string} token - GitHub token for optional user lookup.
@@ -389,6 +419,7 @@ async function buildContributorMentionsDetails(commits, token, enablePullRequest
 	const uniqueMentions = new Set();
 	let prMentions = new Set();
 	const coAuthorMentions = await getCoAuthorMentionsFromCommits(commits, token);
+	const existingDetailsMentions = getExistingDetailsMentionsFromCommits(commits);
 
 	if (enablePullRequestLookup) {
 		const releaseCommitWithPr = commits.find((commit) => commit?.subject && /\(#\d+\)/.test(commit.subject));
@@ -408,6 +439,15 @@ async function buildContributorMentionsDetails(commits, token, enablePullRequest
 	for (const mention of coAuthorMentions) {
 		const normalizedMention = mention.toLowerCase();
 		if (normalizedMention === "@internal" || normalizedMention.includes("internal")) {
+			continue;
+		}
+
+		uniqueMentions.add(mention);
+	}
+
+	for (const mention of existingDetailsMentions) {
+		const normalizedMention = mention.toLowerCase();
+		if (normalizedMention === "@internal" || normalizedMention.includes("internal") || normalizedMention.includes("[bot]")) {
 			continue;
 		}
 
@@ -556,11 +596,18 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			const currentCommitInfo = gitCommand(`git log -1 --pretty=format:"%s|%b"`, true);
 			if (currentCommitInfo) {
 				const [subject, body] = currentCommitInfo.split("|");
-				const cleanedBody = await normalizeCoAuthorTrailers(removeDuplicatedLeadingSubject(subject, body), token);
+				const cleanedBody = stripContributorDetailsSections(stripCoAuthorTrailers(removeDuplicatedLeadingSubject(subject, body)));
 				let releaseNotes = subject;
 				if (cleanedBody && cleanedBody.trim()) {
 					releaseNotes += "\n\n" + cleanedBody.trim();
 				}
+
+				const syntheticCommit = [{ subject, body: body || "", author: "", email: "" }];
+				const contributorDetails = await buildContributorMentionsDetails(syntheticCommit, token, true);
+				if (contributorDetails) {
+					releaseNotes += contributorDetails;
+				}
+
 				console.log(`📝 Using current commit message: ${subject}`);
 				return neutralizeJsdocTagMentions(stripInternalContributorLines(releaseNotes));
 			}
@@ -597,7 +644,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	if (commits.length === 1 && useSingleCommitMessage) {
 		const commit = commits[0];
 		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
-		const cleanedBody = await normalizeCoAuthorTrailers(removeDuplicatedLeadingSubject(commit.subject, commit.body), token);
+		const cleanedBody = stripContributorDetailsSections(stripCoAuthorTrailers(removeDuplicatedLeadingSubject(commit.subject, commit.body)));
 
 		let singleCommitChangelog = commit.subject;
 		if (cleanedBody && cleanedBody.trim()) {
