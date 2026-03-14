@@ -1,3 +1,17 @@
+#
+# @Project: workflows
+# @Filename: /workflow-release.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-03-13 17:07:41 -07:00 (1773446861)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+
 # CLDMV/.github/.github/workflows/release.yml
 name: 🚀 Release Workflow (Org-Level)
 
@@ -216,30 +230,37 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
               run: |
                   echo "📝 Updating PR #$PR_NUMBER description with latest changes..."
 
                   # Get the repository info
                   REPO_OWNER="${{ github.repository_owner }}"
                   REPO_NAME="${{ github.event.repository.name }}"
+                                    TMP_DIR="tmp/pr-update"
+                                    mkdir -p "$TMP_DIR"
 
-                  # Get the generated changelog
-                  CHANGELOG="${{ steps.changelog.outputs.changelog-content }}"
+                                    # Get the generated changelog from env and write to file safely
+                                    printf "%s\n" "$CHANGELOG_CONTENT" > "$TMP_DIR/changelog.md"
 
-                  if [ -z "$CHANGELOG" ]; then
+                                    if [ ! -s "$TMP_DIR/changelog.md" ]; then
                     echo "⚠️ No changelog generated, using fallback message"
-                    CHANGELOG="## 🚀 What's Changed
+                                        cat > "$TMP_DIR/changelog.md" <<'EOF'
+                                    ## 🚀 What's Changed
 
-                  _Changelog generation in progress. The PR has been updated with the latest commits._
+                                    _Changelog generation in progress. The PR has been updated with the latest commits._
 
-                  Please check the commit history for details of the changes included in this release."
+                                    Please check the commit history for details of the changes included in this release.
+                                    EOF
                   fi
 
                   # Update the PR description with the new changelog
                   echo "📝 Updating PR description..."
+                                    jq -n --rawfile body "$TMP_DIR/changelog.md" '{body: $body}' > "$TMP_DIR/pr-body.json"
+
                   gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
                     --method PATCH \
-                    --field body="$CHANGELOG"
+                                        --input "$TMP_DIR/pr-body.json"
 
                   echo "✅ PR #$PR_NUMBER has been updated with the latest changelog"
                   echo "ℹ️ Skipped full release workflow since PR already exists"
@@ -286,7 +307,14 @@ jobs:
 
     summary:
         name: "📋 Release Summary"
-        needs: [check-existing-pr, detect-release, update-existing-pr, build-and-test, release]
+        needs:
+            [
+                check-existing-pr,
+                detect-release,
+                update-existing-pr,
+                build-and-test,
+                release,
+            ]
         if: always()
         runs-on: ubuntu-latest
         steps:
