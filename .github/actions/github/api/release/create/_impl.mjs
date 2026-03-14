@@ -1,6 +1,37 @@
 import { debugLog } from "../../../../common/common/core.mjs";
 
 /**
+ * Normalize arbitrary values to boolean.
+ * @param {unknown} value - Input value.
+ * @param {boolean} fallback - Fallback when value is undefined/null/empty.
+ * @returns {boolean} Normalized boolean.
+ */
+function toBoolean(value, fallback = false) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+
+	if (value === null || value === undefined) {
+		return fallback;
+	}
+
+	const normalized = String(value).trim().toLowerCase();
+	if (!normalized) {
+		return fallback;
+	}
+
+	if (["true", "1", "yes", "on"].includes(normalized)) {
+		return true;
+	}
+
+	if (["false", "0", "no", "off"].includes(normalized)) {
+		return false;
+	}
+
+	return fallback;
+}
+
+/**
  * Remove duplicated title lines from the beginning of release body.
  * This handles cases where the commit message subject is also present
  * as the first line of the body.
@@ -38,14 +69,103 @@ function normalizeReleaseBody(body, title) {
 	return lines.join("\n");
 }
 
+/**
+ * Escape JSDoc-style tags in release body so they are not interpreted as GitHub mentions.
+ * @param {string} content - Release body markdown.
+ * @returns {string} Sanitized release body.
+ */
+function neutralizeJsdocTagMentions(content) {
+	if (!content) {
+		return "";
+	}
+
+	const jsdocTags = [
+		"abstract",
+		"access",
+		"alias",
+		"async",
+		"augments",
+		"author",
+		"borrows",
+		"callback",
+		"class",
+		"classdesc",
+		"constant",
+		"constructs",
+		"default",
+		"deprecated",
+		"description",
+		"enum",
+		"event",
+		"example",
+		"exports",
+		"extends",
+		"external",
+		"file",
+		"fires",
+		"function",
+		"generator",
+		"global",
+		"hideconstructor",
+		"ignore",
+		"implements",
+		"inheritdoc",
+		"inner",
+		"instance",
+		"interface",
+		"kind",
+		"lends",
+		"license",
+		"listens",
+		"member",
+		"memberof",
+		"mixes",
+		"mixin",
+		"module",
+		"name",
+		"namespace",
+		"override",
+		"package",
+		"param",
+		"private",
+		"property",
+		"protected",
+		"public",
+		"readonly",
+		"returns",
+		"return",
+		"see",
+		"since",
+		"static",
+		"summary",
+		"template",
+		"this",
+		"throws",
+		"todo",
+		"tutorial",
+		"type",
+		"typedef",
+		"variation",
+		"version",
+		"yields",
+		"yield",
+		"internal"
+	];
+
+	const tagPattern = new RegExp(`@(${jsdocTags.join("|")})(?=$|[\\s.,;:!?()[\\]{}])`, "gi");
+	return String(content).replace(tagPattern, "\\@$1");
+}
+
 export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
-	const finalBody = normalizeReleaseBody(body, name);
+	const wantsDraft = toBoolean(is_draft, false);
+	const wantsPrerelease = toBoolean(is_prerelease, false);
+	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
 
 	debugLog(`Creating release for ${repo}:`);
 	debugLog(`  tag_name: ${tag_name}`);
 	debugLog(`  name: ${name}`);
-	debugLog(`  is_prerelease: ${is_prerelease}`);
-	debugLog(`  is_draft: ${is_draft}`);
+	debugLog(`  is_prerelease: ${wantsPrerelease}`);
+	debugLog(`  is_draft: ${wantsDraft}`);
 	debugLog(`  body length: ${finalBody.length}`);
 	debugLog(`  assets: ${assets}`);
 
@@ -69,8 +189,8 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		const updatePayload = {
 			name,
 			body: finalBody,
-			draft: is_draft,
-			prerelease: is_prerelease
+			draft: wantsDraft,
+			prerelease: wantsPrerelease
 		};
 
 		debugLog(`Update payload:`, JSON.stringify(updatePayload, null, 2));
@@ -100,8 +220,8 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 			tag_name,
 			name,
 			body: finalBody,
-			draft: is_draft,
-			prerelease: is_prerelease
+			draft: wantsDraft,
+			prerelease: wantsPrerelease
 		};
 
 		debugLog(`Release payload:`, JSON.stringify(releasePayload, null, 2));
@@ -133,8 +253,8 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 	// Respect caller intent: if non-draft was requested but GitHub still returns draft=true,
 	// publish it explicitly. If draft was requested, keep it as draft.
-	if (releaseData?.id && is_draft === false && releaseData.draft === true) {
-		debugLog(`Release ${releaseData.id} came back as draft=true while is_draft=false; publishing it...`);
+	if (releaseData?.id && !wantsDraft && releaseData.draft === true) {
+		debugLog(`Release ${releaseData.id} came back as draft=true while draft=false was requested; publishing it...`);
 
 		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
