@@ -69,6 +69,70 @@ function stripInternalContributorLines(content) {
 }
 
 /**
+ * Convert a contributor identity to a GitHub @mention where possible.
+ * @param {string} linkedAuthor - Normalized linked author string.
+ * @param {string} fallbackAuthor - Raw author fallback.
+ * @returns {string|null} GitHub mention (e.g. @user) or null.
+ */
+function toGitHubMention(linkedAuthor, fallbackAuthor) {
+	const normalizedLinkedAuthor = (linkedAuthor || "").trim();
+	const normalizedFallbackAuthor = (fallbackAuthor || "").trim();
+
+	const linkMatch = normalizedLinkedAuthor.match(/^\[@([^\]]+)\]\(https:\/\/github\.com\/(?:apps\/)?[^)]+\)$/i);
+	if (linkMatch) {
+		return `@${linkMatch[1]}`;
+	}
+
+	if (normalizedLinkedAuthor.startsWith("@")) {
+		return normalizedLinkedAuthor.split(/\s+/)[0];
+	}
+
+	if (normalizedFallbackAuthor.startsWith("@")) {
+		return normalizedFallbackAuthor.split(/\s+/)[0];
+	}
+
+	return null;
+}
+
+/**
+ * Build a collapsible contributors section with @mentions.
+ * @param {Array} commits - Commit objects.
+ * @param {string} token - GitHub token for user lookups.
+ * @returns {Promise<string>} Markdown details section or empty string.
+ */
+async function buildContributorMentionsDetails(commits, token) {
+	const contributors = getHumanContributors(commits);
+	const uniqueMentions = new Set();
+
+	for (const contributor of contributors) {
+		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
+		const mention = toGitHubMention(linkedAuthor, contributor.author);
+
+		if (!mention) {
+			continue;
+		}
+
+		const normalizedMention = mention.toLowerCase();
+		if (normalizedMention === "@internal" || normalizedMention.includes("internal")) {
+			continue;
+		}
+
+		uniqueMentions.add(mention);
+	}
+
+	if (uniqueMentions.size === 0) {
+		return "";
+	}
+
+	const mentionLines = Array.from(uniqueMentions)
+		.sort((a, b) => a.localeCompare(b))
+		.map((mention) => `- ${mention}`)
+		.join("\n");
+
+	return `\n\n<details>\n<summary>👥 Contributors</summary>\n\n${mentionLines}\n\n</details>`;
+}
+
+/**
  * Look up GitHub username from email address using GitHub API
  * @param {string} email - Email address to look up
  * @param {string} token - GitHub API token
@@ -230,7 +294,13 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			singleCommitChangelog += "\n\n" + cleanedBody.trim();
 		}
 
-		return stripInternalContributorLines(singleCommitChangelog);
+		singleCommitChangelog = stripInternalContributorLines(singleCommitChangelog);
+		const contributorDetails = await buildContributorMentionsDetails(commits, token);
+		if (contributorDetails) {
+			singleCommitChangelog += contributorDetails;
+		}
+
+		return singleCommitChangelog;
 	}
 
 	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive
@@ -303,35 +373,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		changelog += "\n";
 	}
 
-	// Contributors - with GitHub user links based on email via API lookup
-	changelog += "### 👥 Contributors\n";
-
-	// Get human contributors using the bot detection utility
-	const contributors = getHumanContributors(commits);
-	const uniqueLinkedContributors = new Set();
-
-	// Process contributors with API lookups
-	for (const contributor of contributors) {
-		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
-		const normalizedLinkedAuthor = linkedAuthor ? linkedAuthor.trim() : "";
-		const lowerAuthor = normalizedLinkedAuthor.toLowerCase();
-		if (
-			!normalizedLinkedAuthor ||
-			lowerAuthor === "internal" ||
-			lowerAuthor === "@internal" ||
-			lowerAuthor.startsWith("internal (") ||
-			lowerAuthor.includes("[@internal](") ||
-			lowerAuthor.includes("/internal)")
-		) {
-			continue;
-		}
-
-		if (uniqueLinkedContributors.has(normalizedLinkedAuthor)) {
-			continue;
-		}
-
-		uniqueLinkedContributors.add(normalizedLinkedAuthor);
-		changelog += `- ${normalizedLinkedAuthor}\n`;
+	const contributorDetails = await buildContributorMentionsDetails(commits, token);
+	if (contributorDetails) {
+		changelog += contributorDetails + "\n";
 	}
 
 	return changelog;

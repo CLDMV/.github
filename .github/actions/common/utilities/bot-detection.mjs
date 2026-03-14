@@ -154,7 +154,7 @@ export function filterBotCommits(commits) {
  * @returns {Array} Array of unique contributor objects with author and email
  */
 export function getHumanContributors(commits) {
-	const humanCommits = filterBotCommits(commits);
+	const humanCommits = commits.filter((commit) => !isBotAuthor(commit.author, commit.email));
 	const contributorMap = new Map();
 
 	humanCommits.forEach((commit) => {
