@@ -70,6 +70,93 @@ function stripInternalContributorLines(content) {
 }
 
 /**
+ * Neutralize JSDoc-style @tags so markdown doesn't treat them as GitHub mentions.
+ * @param {string} content - Markdown content.
+ * @returns {string} Content with JSDoc tags escaped.
+ */
+function neutralizeJsdocTagMentions(content) {
+	if (!content) {
+		return "";
+	}
+
+	const jsdocTags = [
+		"abstract",
+		"access",
+		"alias",
+		"async",
+		"augments",
+		"author",
+		"borrows",
+		"callback",
+		"class",
+		"classdesc",
+		"constant",
+		"constructs",
+		"default",
+		"deprecated",
+		"description",
+		"enum",
+		"event",
+		"example",
+		"exports",
+		"extends",
+		"external",
+		"file",
+		"fires",
+		"function",
+		"generator",
+		"global",
+		"hideconstructor",
+		"ignore",
+		"implements",
+		"inheritdoc",
+		"inner",
+		"instance",
+		"interface",
+		"kind",
+		"lends",
+		"license",
+		"listens",
+		"member",
+		"memberof",
+		"mixes",
+		"mixin",
+		"module",
+		"name",
+		"namespace",
+		"override",
+		"package",
+		"param",
+		"private",
+		"property",
+		"protected",
+		"public",
+		"readonly",
+		"returns",
+		"return",
+		"see",
+		"since",
+		"static",
+		"summary",
+		"template",
+		"this",
+		"throws",
+		"todo",
+		"tutorial",
+		"type",
+		"typedef",
+		"variation",
+		"version",
+		"yields",
+		"yield",
+		"internal"
+	];
+
+	const tagPattern = new RegExp(`@(${jsdocTags.join("|")})(?=$|[\\s.,;:!?()[\\]{}])`, "gi");
+	return content.replace(tagPattern, "\\@$1");
+}
+
+/**
  * Rewrite co-author trailers to include GitHub @mentions and dedupe by mention.
  * Output format: Co-authored-by: @username (Name <email>)
  * @param {string} content - Markdown content that may include trailers.
@@ -475,7 +562,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 					releaseNotes += "\n\n" + cleanedBody.trim();
 				}
 				console.log(`📝 Using current commit message: ${subject}`);
-				return stripInternalContributorLines(releaseNotes);
+				return neutralizeJsdocTagMentions(stripInternalContributorLines(releaseNotes));
 			}
 		} catch (error) {
 			console.log(`⚠️ Failed to get current commit message: ${error.message}`);
@@ -518,6 +605,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		}
 
 		singleCommitChangelog = stripInternalContributorLines(singleCommitChangelog);
+		singleCommitChangelog = neutralizeJsdocTagMentions(singleCommitChangelog);
 		const contributorDetails = await buildContributorMentionsDetails(commits, token, true);
 		if (contributorDetails) {
 			singleCommitChangelog += contributorDetails;
@@ -601,7 +689,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		changelog += contributorDetails + "\n";
 	}
 
-	return changelog;
+	return neutralizeJsdocTagMentions(changelog);
 }
 
 // Main logic - only run if this script is executed directly
