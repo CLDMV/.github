@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
-import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
+import { getHumanContributors, isBotAuthor } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
@@ -21,6 +21,7 @@ const COMMITS_INPUT = (() => {
 const COMMIT_RANGE_INPUT = process.env.COMMIT_RANGE_INPUT;
 const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "true";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY;
 
 /**
  * Remove a duplicated leading subject line from a commit body.
@@ -69,6 +70,68 @@ function stripInternalContributorLines(content) {
 }
 
 /**
+ * Rewrite co-author trailers to include GitHub @mentions and dedupe by mention.
+ * Output format: Co-authored-by: @username (Name <email>)
+ * @param {string} content - Markdown content that may include trailers.
+ * @param {string} token - GitHub token for optional lookup.
+ * @returns {Promise<string>} Content with normalized Co-authored-by lines.
+ */
+async function normalizeCoAuthorTrailers(content, token) {
+	if (!content) {
+		return "";
+	}
+
+	const lines = content.replace(/\r\n/g, "\n").split("\n");
+	const normalizedLines = [];
+	const seenMentions = new Set();
+	const seenRawIdentities = new Set();
+
+	for (const line of lines) {
+		const match = line.match(/^\s*co-authored-by\s*:\s*(.+?)\s*<([^>]+)>\s*$/i);
+		if (!match) {
+			normalizedLines.push(line);
+			continue;
+		}
+
+		const author = (match[1] || "").trim();
+		const email = (match[2] || "").trim();
+		if (isBotAuthor(author, email)) {
+			continue;
+		}
+		const linkedAuthor = await convertAuthorToGitHubLink(author, email, token);
+		const mention = toGitHubMention(linkedAuthor, author);
+
+		if (mention) {
+			const normalizedMention = mention.toLowerCase();
+			if (normalizedMention === "@internal" || normalizedMention.includes("internal") || normalizedMention.includes("[bot]")) {
+				continue;
+			}
+
+			if (seenMentions.has(normalizedMention)) {
+				continue;
+			}
+
+			seenMentions.add(normalizedMention);
+			normalizedLines.push(`Co-authored-by: ${mention} (${author} <${email}>)`);
+			continue;
+		}
+
+		const rawIdentityKey = `${author.toLowerCase()}|${email.toLowerCase()}`;
+		if (seenRawIdentities.has(rawIdentityKey)) {
+			continue;
+		}
+
+		seenRawIdentities.add(rawIdentityKey);
+		normalizedLines.push(`Co-authored-by: ${author} <${email}>`);
+	}
+
+	return normalizedLines
+		.join("\n")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
+/**
  * Convert a contributor identity to a GitHub @mention where possible.
  * @param {string} linkedAuthor - Normalized linked author string.
  * @param {string} fallbackAuthor - Raw author fallback.
@@ -95,14 +158,174 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
 }
 
 /**
+ * Extract a pull request number from release text.
+ * @param {string} text - Subject/body text potentially containing PR reference.
+ * @returns {number|null} Parsed PR number.
+ */
+function extractPullRequestNumber(text) {
+	if (!text) {
+		return null;
+	}
+
+	const parenMatch = text.match(/\(#(\d+)\)/);
+	if (parenMatch) {
+		return Number(parenMatch[1]);
+	}
+
+	const hashMatch = text.match(/(?:^|\s)#(\d+)(?:\s|$)/);
+	if (hashMatch) {
+		return Number(hashMatch[1]);
+	}
+
+	return null;
+}
+
+/**
+ * Get contributor @mentions from a pull request's commits.
+ * @param {number|null} pullNumber - Pull request number.
+ * @param {string} token - GitHub API token.
+ * @param {string} repository - Repository in owner/repo format.
+ * @returns {Promise<Set<string>>} Set of @mention strings.
+ */
+async function getContributorMentionsFromPullRequest(pullNumber, token, repository) {
+	const mentions = new Set();
+
+	if (!pullNumber || !token || !repository) {
+		return mentions;
+	}
+
+	try {
+		let page = 1;
+		const perPage = 100;
+
+		while (true) {
+			const prCommits = await api("GET", `/repos/${repository}/pulls/${pullNumber}/commits?per_page=${perPage}&page=${page}`, null, {
+				token
+			});
+
+			if (!Array.isArray(prCommits) || prCommits.length === 0) {
+				break;
+			}
+
+			for (const prCommit of prCommits) {
+				const login = prCommit?.author?.login;
+				if (!login) {
+					continue;
+				}
+
+				const lowerLogin = login.toLowerCase();
+				if (lowerLogin === "internal" || lowerLogin.includes("[bot]")) {
+					continue;
+				}
+
+				mentions.add(`@${login}`);
+			}
+
+			if (prCommits.length < perPage) {
+				break;
+			}
+
+			page += 1;
+		}
+	} catch (error) {
+		console.warn(`Failed to load PR contributors for #${pullNumber}:`, error.message);
+	}
+
+	return mentions;
+}
+
+/**
+ * Extract co-author identities from commit body text.
+ * @param {string} body - Commit message body.
+ * @returns {Array<{author: string, email: string}>} Co-author identities.
+ */
+function extractCoAuthorIdentitiesFromBody(body) {
+	if (!body) {
+		return [];
+	}
+
+	const identities = [];
+	const coAuthorRegex = /^\s*co-authored-by\s*:\s*(.+?)\s*<([^>]+)>\s*$/gim;
+	let match = coAuthorRegex.exec(body);
+
+	while (match) {
+		identities.push({
+			author: (match[1] || "").trim(),
+			email: (match[2] || "").trim()
+		});
+		match = coAuthorRegex.exec(body);
+	}
+
+	return identities;
+}
+
+/**
+ * Convert co-author commit trailers into GitHub @mentions.
+ * @param {Array} commits - Commit objects.
+ * @param {string} token - GitHub token for optional user lookup.
+ * @returns {Promise<Set<string>>} Set of @mention strings.
+ */
+async function getCoAuthorMentionsFromCommits(commits, token) {
+	const mentions = new Set();
+
+	for (const commit of commits) {
+		const coAuthors = extractCoAuthorIdentitiesFromBody(commit?.body || "");
+		for (const coAuthor of coAuthors) {
+			const linkedAuthor = await convertAuthorToGitHubLink(coAuthor.author, coAuthor.email, token);
+			const mention = toGitHubMention(linkedAuthor, coAuthor.author);
+
+			if (!mention) {
+				continue;
+			}
+
+			const normalizedMention = mention.toLowerCase();
+			if (normalizedMention === "@internal" || normalizedMention.includes("internal") || normalizedMention.includes("[bot]")) {
+				continue;
+			}
+
+			mentions.add(mention);
+		}
+	}
+
+	return mentions;
+}
+
+/**
  * Build a collapsible contributors section with @mentions.
  * @param {Array} commits - Commit objects.
  * @param {string} token - GitHub token for user lookups.
+ * @param {boolean} enablePullRequestLookup - Whether PR-based contributor lookup should run.
  * @returns {Promise<string>} Markdown details section or empty string.
  */
-async function buildContributorMentionsDetails(commits, token) {
+async function buildContributorMentionsDetails(commits, token, enablePullRequestLookup = false) {
 	const contributors = getHumanContributors(commits);
 	const uniqueMentions = new Set();
+	let prMentions = new Set();
+	const coAuthorMentions = await getCoAuthorMentionsFromCommits(commits, token);
+
+	if (enablePullRequestLookup) {
+		const releaseCommitWithPr = commits.find((commit) => commit?.subject && /\(#\d+\)/.test(commit.subject));
+		const pullNumber = releaseCommitWithPr ? extractPullRequestNumber(releaseCommitWithPr.subject) : null;
+		prMentions = await getContributorMentionsFromPullRequest(pullNumber, token, GITHUB_REPOSITORY);
+	}
+
+	for (const mention of prMentions) {
+		const normalizedMention = mention.toLowerCase();
+		if (normalizedMention === "@internal" || normalizedMention.includes("internal")) {
+			continue;
+		}
+
+		uniqueMentions.add(mention);
+	}
+
+	for (const mention of coAuthorMentions) {
+		const normalizedMention = mention.toLowerCase();
+		if (normalizedMention === "@internal" || normalizedMention.includes("internal")) {
+			continue;
+		}
+
+		uniqueMentions.add(mention);
+	}
 
 	for (const contributor of contributors) {
 		const linkedAuthor = await convertAuthorToGitHubLink(contributor.author, contributor.email, token);
@@ -246,7 +469,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			const currentCommitInfo = gitCommand(`git log -1 --pretty=format:"%s|%b"`, true);
 			if (currentCommitInfo) {
 				const [subject, body] = currentCommitInfo.split("|");
-				const cleanedBody = removeDuplicatedLeadingSubject(subject, body);
+				const cleanedBody = await normalizeCoAuthorTrailers(removeDuplicatedLeadingSubject(subject, body), token);
 				let releaseNotes = subject;
 				if (cleanedBody && cleanedBody.trim()) {
 					releaseNotes += "\n\n" + cleanedBody.trim();
@@ -287,7 +510,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	if (commits.length === 1 && useSingleCommitMessage) {
 		const commit = commits[0];
 		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
-		const cleanedBody = removeDuplicatedLeadingSubject(commit.subject, commit.body);
+		const cleanedBody = await normalizeCoAuthorTrailers(removeDuplicatedLeadingSubject(commit.subject, commit.body), token);
 
 		let singleCommitChangelog = commit.subject;
 		if (cleanedBody && cleanedBody.trim()) {
@@ -295,7 +518,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		}
 
 		singleCommitChangelog = stripInternalContributorLines(singleCommitChangelog);
-		const contributorDetails = await buildContributorMentionsDetails(commits, token);
+		const contributorDetails = await buildContributorMentionsDetails(commits, token, true);
 		if (contributorDetails) {
 			singleCommitChangelog += contributorDetails;
 		}
@@ -373,7 +596,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		changelog += "\n";
 	}
 
-	const contributorDetails = await buildContributorMentionsDetails(commits, token);
+	const contributorDetails = await buildContributorMentionsDetails(commits, token, false);
 	if (contributorDetails) {
 		changelog += contributorDetails + "\n";
 	}
