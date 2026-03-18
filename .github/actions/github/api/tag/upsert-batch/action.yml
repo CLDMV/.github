@@ -38,5 +38,5 @@ outputs:
     description: 'Compact JSON array of results per tag (e.g., [{"tag":"v2.0.0","action":"create","tag_obj_sha":"..."}, ...])'
 
 runs:
-  using: node20
+  using: node24
   main: action.mjs
