@@ -1,0 +1,39 @@
+# Individual repo: .github/workflows/docker-publish.yml
+name: 🐳 Build and Publish Docker Image
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Enable debug logging"
+        type: boolean
+        required: false
+        default: false
+      image_namespace:
+        description: "Optional image namespace override (defaults to repo owner)"
+        type: string
+        required: false
+        default: "cldmv"
+      pre_publish_command:
+        description: "Optional command to run before Docker build/push"
+        type: string
+        required: false
+        default: "npm test"
+
+jobs:
+  docker-publish:
+    uses: CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v1
+    with:
+      debug: ${{ github.event.inputs.debug == 'true' }}
+      registry: ghcr.io
+      image_namespace: ${{ github.event.inputs.image_namespace || 'cldmv' }}
+      package_json_path: package.json
+      docker_context: .
+      dockerfile: ./Dockerfile
+      pre_publish_command: ${{ github.event.inputs.pre_publish_command || 'npm test' }}
+      push_latest: true
+    secrets:
+      BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

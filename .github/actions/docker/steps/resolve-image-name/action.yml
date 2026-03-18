@@ -1,0 +1,32 @@
+name: "Resolve GHCR Image Name"
+description: "Derive GHCR image name from package.json and workflow inputs"
+
+inputs:
+  package_json_path:
+    description: "Path to the package.json file"
+    required: false
+    default: "package.json"
+  image_namespace:
+    description: "Optional image namespace (defaults to repository owner)"
+    required: false
+    default: ""
+  image_name_override:
+    description: "Optional image name override (without registry)"
+    required: false
+    default: ""
+  registry:
+    description: "Container registry host"
+    required: false
+    default: "ghcr.io"
+
+outputs:
+  image-name:
+    description: "Resolved image path in namespace/name format"
+  image:
+    description: "Resolved full image name including registry"
+  package-name:
+    description: "Raw package name from package.json"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

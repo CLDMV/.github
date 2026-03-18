@@ -27,9 +27,15 @@ The `individual-repo-workflows/` folder contains example workflow files that sho
   - Uses: `CLDMV/.github/.github/workflows/workflow-publish.yml@v1`
   - Creates GitHub releases AND publishes to NPM/GitHub Packages
 
+- **`docker-publish.yml`** - Docker image build and GHCR publish workflow
+  - Place in: `.github/workflows/docker-publish.yml` in your project repo
+  - Triggers: Push to master/main (and manual dispatch)
+  - Uses: `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v1`
+  - Derives image name from root `package.json` and supports optional pre-publish command
+
 ### Usage:
 
-1. Copy the three workflow files to your project's `.github/workflows/` directory
+1. Copy the workflow files you need to your project's `.github/workflows/` directory
 2. Update the `package_name` to match your NPM package name
 3. Customize other inputs as needed for your project
 4. Commit and push - the workflows will automatically run when triggered

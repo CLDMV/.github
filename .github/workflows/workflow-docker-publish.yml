@@ -1,0 +1,177 @@
+# CLDMV/.github/.github/workflows/docker-publish.yml
+name: "🐳 Docker Publish Workflow (Org-Level)"
+
+on:
+    workflow_call:
+        inputs:
+            debug:
+                required: false
+                type: boolean
+                default: false
+                description: "Enable debug logging"
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+                description: "Node.js version used for optional pre-publish command"
+            registry:
+                required: false
+                type: string
+                default: "ghcr.io"
+                description: "Container registry host"
+            image_namespace:
+                required: false
+                type: string
+                default: ""
+                description: "Optional image namespace override (defaults to repository owner)"
+            image_name_override:
+                required: false
+                type: string
+                default: ""
+                description: "Optional image name override (without registry)"
+            package_json_path:
+                required: false
+                type: string
+                default: "package.json"
+                description: "Path to root package.json used for image naming"
+            docker_context:
+                required: false
+                type: string
+                default: "."
+                description: "Docker build context"
+            dockerfile:
+                required: false
+                type: string
+                default: "./Dockerfile"
+                description: "Dockerfile path"
+            pre_publish_command:
+                required: false
+                type: string
+                default: ""
+                description: "Optional command to run before Docker build/push (e.g., npm test)"
+            push_latest:
+                required: false
+                type: boolean
+                default: true
+                description: "Whether to publish the latest tag"
+            platforms:
+                required: false
+                type: string
+                default: ""
+                description: "Optional comma-separated Docker platforms"
+        secrets:
+            BOT_APP_ID:
+                description: "GitHub App ID for CLDMV bot"
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                description: "GitHub App private key for CLDMV bot"
+                required: false
+        outputs:
+            image:
+                description: "Published image name"
+                value: ${{ jobs.build-and-push.outputs.image }}
+            digest:
+                description: "Pushed image digest"
+                value: ${{ jobs.build-and-push.outputs.digest }}
+
+jobs:
+    build-and-push:
+        name: "🐳 Build and Push GHCR Image"
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        outputs:
+            image: ${{ steps.resolve-image.outputs.image }}
+            digest: ${{ steps.build.outputs.digest }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ github.sha }}
+
+            - name: Create App token (auto-detect)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              with:
+                  app_id: ${{ secrets.BOT_APP_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Resolve registry auth identity
+              id: auth
+              shell: bash
+              run: |
+                  if [ "${{ steps.app-token.outputs.using_app_token }}" = "true" ] && [ -n "${{ steps.app-token.outputs.token }}" ]; then
+                    echo "username=${{ steps.app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
+                    echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+                    echo "Using GitHub App bot identity for registry login"
+                  else
+                    echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+                    echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
+                    echo "⚠️ Bot token unavailable; falling back to workflow token identity"
+                  fi
+
+            - name: Log in to container registry
+              uses: docker/login-action@v4
+              with:
+                  registry: ${{ inputs.registry }}
+                  username: ${{ steps.auth.outputs.username }}
+                  password: ${{ steps.auth.outputs.token }}
+
+            - name: Resolve image name from package.json
+              id: resolve-image
+              uses: ./.github/actions/docker/steps/resolve-image-name
+              with:
+                  package_json_path: ${{ inputs.package_json_path }}
+                  image_namespace: ${{ inputs.image_namespace }}
+                  image_name_override: ${{ inputs.image_name_override }}
+                  registry: ${{ inputs.registry }}
+
+            - name: Setup Node.js for pre-publish command
+              if: inputs.pre_publish_command != ''
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+
+            - name: Run pre-publish command
+              if: inputs.pre_publish_command != ''
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  echo "Running pre-publish command: ${{ inputs.pre_publish_command }}"
+                  ${{ inputs.pre_publish_command }}
+
+            - name: Extract Docker metadata
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ steps.resolve-image.outputs.image }}
+                  tags: |
+                      type=raw,value=latest,enable=${{ inputs.push_latest }}
+                      type=sha
+
+            - name: Build and push Docker image
+              id: build
+              uses: docker/build-push-action@v7
+              with:
+                  context: ${{ inputs.docker_context }}
+                  file: ${{ inputs.dockerfile }}
+                  push: true
+                  platforms: ${{ inputs.platforms }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+
+            - name: Summary
+              shell: bash
+              run: |
+                  {
+                    echo "## 🐳 Docker Publish Summary"
+                    echo
+                    echo "- **Image**: ${{ steps.resolve-image.outputs.image }}"
+                    echo "- **Digest**: ${{ steps.build.outputs.digest }}"
+                    echo "- **Registry User**: ${{ steps.auth.outputs.username }}"
+                    echo "- **Pre-publish Command**: ${{ inputs.pre_publish_command || 'none' }}"
+                  } >> "$GITHUB_STEP_SUMMARY"
