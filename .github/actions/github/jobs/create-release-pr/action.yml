@@ -162,6 +162,22 @@ runs:
       id: default-branch
       uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v1
 
+    - name: Restore src/ deleted by build
+      if: inputs.dry-run != 'true'
+      shell: bash
+      run: |
+        # The build command (e.g. npm run build:ci) may delete src/ as part of a
+        # post-build cleanup step so that downstream tests validate dist/ in isolation.
+        # That deletion must NOT be included in the version-bump commit, so we restore
+        # src/ from HEAD before git add . captures it.
+        if git ls-files --deleted -- src/ | grep -q .; then
+          echo "🔄 Restoring src/ deleted by build step..."
+          git checkout HEAD -- src/
+          echo "✅ src/ restored — only dist/, types/, and package files will be committed"
+        else
+          echo "ℹ️ No src/ deletions detected — skipping restore"
+        fi
+
     - name: Create signed commit
       if: inputs.dry-run != 'true'
       id: commit

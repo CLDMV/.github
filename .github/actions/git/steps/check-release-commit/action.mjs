@@ -81,7 +81,7 @@ function findReleaseCommits(commits) {
 /**
  * Check if commits contain conventional commits that warrant automatic release
  * @param {Array} commits - Array of commit objects
- * @returns {boolean} True if there are feat, fix, perf, revert, or breaking commits
+ * @returns {boolean} True if there are feat/feature, fix, perf, revert, or breaking commits
  */
 function hasConventionalCommits(commits) {
 	return commits.some((commit) => {
@@ -94,8 +94,9 @@ function hasConventionalCommits(commits) {
 		if (commit.category === "breaking" || commit.category === "feature" || commit.category === "fix") {
 			return true;
 		}
-		// Also check for perf: and revert: by type (in case they weren't categorized properly)
-		if (commit.type === "perf" || commit.type === "revert") {
+		// Also check by raw type as a fallback (in case the commit wasn't categorized properly).
+		// feat/feature → feature, perf → perf, revert → revert
+		if (commit.type === "feat" || commit.type === "feature" || commit.type === "perf" || commit.type === "revert") {
 			return true;
 		}
 		return false;
@@ -173,7 +174,10 @@ function analyzeVersionBump(commits) {
 	}
 
 	// Check for features (SECOND priority - minor bump)
-	const hasFeatures = nonReleaseCommits.some((commit) => commit.category === "feature");
+	// Check both category (set by get-commit-range) and raw type as a fallback for feat/feature.
+	const hasFeatures = nonReleaseCommits.some(
+		(commit) => commit.category === "feature" || commit.type === "feat" || commit.type === "feature"
+	);
 
 	if (hasFeatures) {
 		return {
