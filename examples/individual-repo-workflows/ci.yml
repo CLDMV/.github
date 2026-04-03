@@ -1,3 +1,16 @@
+#
+# @Project: individual-repo-workflows
+# @Filename: /ci.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-03 08:20:40 -07:00 (1775229640)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
 # Individual repo: .github/workflows/ci.yml
 name: 🧪 CI Tests & Build
 
@@ -51,6 +64,48 @@ on:
         type: string
         required: false
         default: "development"
+      # ── Coverage badge ───────────────────────────────────────────────
+      enable_coverage_badge:
+        description: "Run the coverage + badge-push job after CI passes"
+        type: boolean
+        required: false
+        default: true
+      coverage_command:
+        description: "Command to run tests and generate coverage data"
+        type: string
+        required: false
+        default: "npm run ci:coverage"
+      coverage_summary_path:
+        description: "Path to the coverage-summary.json produced by Jest / c8"
+        type: string
+        required: false
+        default: "coverage/coverage-summary.json"
+      badges_branch:
+        description: "Branch where the badge JSON is published"
+        type: string
+        required: false
+        default: "badges"
+      badge_filename:
+        description: "Filename for the badge JSON committed to the badges branch"
+        type: string
+        required: false
+        default: "coverage.json"
+      upload_coverage_artifact:
+        description: "Upload the full coverage/ directory as a workflow artifact"
+        type: boolean
+        required: false
+        default: true
+      # ── Type check ──────────────────────────────────────────────────
+      type_check_command:
+        description: "Command to run type checking"
+        type: string
+        required: false
+        default: "npm run types:check"
+      skip_type_check:
+        description: "Skip the type-check step in the coverage-badge job"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   ci:
@@ -72,6 +127,21 @@ jobs:
       skip_performance_tests: false
       skip_matrix_tests: false
 
+      # ── Coverage badge ─────────────────────────────────────────────────────
+      # Runs after a successful CI build; pushes a Shields.io-compatible badge
+      # JSON to the `badges` branch (signed commit via bot GPG).
+      # Requires: the coverage_command produces coverage/coverage-summary.json
+      enable_coverage_badge: ${{ github.event.inputs.enable_coverage_badge != 'false' }}
+      coverage_command: ${{ github.event.inputs.coverage_command || 'npm run ci:coverage' }}
+      coverage_summary_path: ${{ github.event.inputs.coverage_summary_path || 'coverage/coverage-summary.json' }}
+      badges_branch: ${{ github.event.inputs.badges_branch || 'badges' }}
+      badge_filename: ${{ github.event.inputs.badge_filename || 'coverage.json' }}
+      upload_coverage_artifact: ${{ github.event.inputs.upload_coverage_artifact != 'false' }}
+
+      # ── Type check (runs inside the coverage-badge job) ────────────────────
+      type_check_command: ${{ github.event.inputs.type_check_command || 'npm run types:check' }}
+      skip_type_check: ${{ github.event.inputs.skip_type_check == 'true' }}
+
     # Authentication & Bot Configuration
     # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
     # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
@@ -84,6 +154,11 @@ jobs:
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+      # Required when enable_coverage_badge: true
+      BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+      BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+      BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+      BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
 
   # ✅ Stable check that runs on BOTH push and PR and mirrors ci result
   required-check:

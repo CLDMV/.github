@@ -1,0 +1,221 @@
+# CLDMV/.github/.github/workflows/reusable-coverage-badge.yml
+name: "\U0001F4CA Coverage Badge (Reusable)"
+
+# Reusable workflow: type-checks, runs coverage, computes a Shields.io-compatible
+# badge JSON, then pushes it to a dedicated `badges` branch (signed commit via bot GPG).
+# Optionally uploads the full coverage report as a workflow artifact.
+#
+# Callers pass their CLDMV_BOT_* (or equivalent) secrets to the matching
+# BOT_* secret inputs below.
+
+on:
+    workflow_call:
+        inputs:
+            # ── Node / package manager ──────────────────────────────────────────
+            node_version:
+                description: "Node.js version to use (default: lts/*)"
+                required: false
+                type: string
+                default: "lts/*"
+
+            package_manager:
+                description: "Package manager (npm or yarn)"
+                required: false
+                type: string
+                default: "npm"
+
+            # ── Commands ────────────────────────────────────────────────────────
+            type_check_command:
+                description: "Command to run type checking (e.g. npm run types:check)"
+                required: false
+                type: string
+                default: "npm run types:check"
+
+            coverage_command:
+                description: "Command to run tests and generate coverage (e.g. npm run ci:coverage)"
+                required: false
+                type: string
+                default: "npm run ci:coverage"
+
+            # ── Type-check control ──────────────────────────────────────────────
+            skip_type_check:
+                description: "Set to true to skip the type-check step"
+                required: false
+                type: boolean
+                default: false
+
+            # ── Coverage badge options ──────────────────────────────────────────
+            coverage_summary_path:
+                description: "Repo-relative path to the coverage-summary.json produced by Jest / c8"
+                required: false
+                type: string
+                default: "coverage/coverage-summary.json"
+
+            badges_branch:
+                description: "Branch where the badge JSON is published"
+                required: false
+                type: string
+                default: "badges"
+
+            badge_filename:
+                description: "Filename for the badge JSON committed to the badges branch"
+                required: false
+                type: string
+                default: "coverage.json"
+
+            # ── Artifact upload ─────────────────────────────────────────────────
+            upload_coverage_artifact:
+                description: "Upload the full coverage/ directory as a workflow artifact"
+                required: false
+                type: boolean
+                default: true
+
+            # ── Debug ───────────────────────────────────────────────────────────
+            debug:
+                description: "Enable debug logging"
+                required: false
+                type: boolean
+                default: false
+
+        secrets:
+            # Bot App credentials — used to mint a short-lived token with write access.
+            # If omitted the push step will fail; both are required for badge publishing.
+            BOT_APP_ID:
+                description: "GitHub App ID for the CLDMV bot (e.g. secrets.CLDMV_BOT_APP_ID)"
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                description: "GitHub App private key for the CLDMV bot"
+                required: true
+
+            # Bot git identity — used in the signed badge commit.
+            BOT_NAME:
+                description: "Git user.name for the badge commit (e.g. secrets.CLDMV_BOT_NAME)"
+                required: true
+            BOT_EMAIL:
+                description: "Git user.email for the badge commit (e.g. secrets.CLDMV_BOT_EMAIL)"
+                required: true
+
+            # Bot GPG credentials — used to sign the badge commit.
+            BOT_GPG_PRIVATE_KEY:
+                description: "Armored GPG private key for commit signing"
+                required: true
+            BOT_GPG_PASSPHRASE:
+                description: "Passphrase for the GPG key"
+                required: true
+
+jobs:
+    coverage-badge:
+        name: "📊 Coverage & Badge Push"
+        runs-on: ubuntu-latest
+
+        steps:
+            # ── 1. Source ────────────────────────────────────────────────────────
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            # ── 2. Runtime ──────────────────────────────────────────────────────
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  cache: ${{ inputs.package_manager }}
+
+            # ── 3. Dependencies ─────────────────────────────────────────────────
+            - name: Install dependencies
+              run: |
+                  if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+                    yarn install --frozen-lockfile
+                  else
+                    npm ci
+                  fi
+
+            # ── 4. Type check ───────────────────────────────────────────────────
+            - name: Type check
+              if: ${{ !inputs.skip_type_check }}
+              run: ${{ inputs.type_check_command }}
+
+            # ── 5. Tests + coverage ─────────────────────────────────────────────
+            - name: Tests + coverage
+              run: ${{ inputs.coverage_command }}
+
+            # ── 6. Compute badge JSON ───────────────────────────────────────────
+            - name: Compute coverage badge JSON
+              id: badge
+              run: |
+                  node -e "
+                    const path = '${{ inputs.coverage_summary_path }}';
+                    const s = JSON.parse(require('fs').readFileSync(path, 'utf8')).total;
+                    const safePct = m => m.total === 0 ? 100 : m.pct;
+                    const avg = (
+                      (safePct(s.statements) + safePct(s.branches) + safePct(s.functions) + safePct(s.lines)) / 4
+                    ).toFixed(1);
+                    const color =
+                      avg >= 90 ? 'brightgreen' :
+                      avg >= 75 ? 'green'       :
+                      avg >= 60 ? 'yellow'      : 'red';
+                    require('fs').writeFileSync(
+                      'badge.json',
+                      JSON.stringify({ schemaVersion: 1, label: 'coverage', message: avg + '%', color })
+                    );
+                    console.log('Coverage avg:', avg + '%', '→ color:', color);
+                  "
+
+            # ── 7. Mint short-lived bot token ───────────────────────────────────
+            - name: Generate bot token
+              id: bot-token
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.BOT_APP_ID }}
+                  private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            # ── 8. Import GPG key for signed commit ─────────────────────────────
+            - name: Import bot GPG key
+              uses: crazy-max/ghaction-import-gpg@v6
+              with:
+                  gpg_private_key: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.BOT_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+
+            # ── 9. Push badge to badges branch ──────────────────────────────────
+            - name: Push coverage badge to badges branch
+              env:
+                  BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
+              run: |
+                  BADGES_BRANCH="${{ inputs.badges_branch }}"
+                  BADGE_FILE="${{ inputs.badge_filename }}"
+
+                  git config user.name  "${{ secrets.BOT_NAME }}"
+                  git config user.email "${{ secrets.BOT_EMAIL }}"
+
+                  # Stash the computed badge somewhere safe before we switch branches
+                  cp badge.json "$RUNNER_TEMP/$BADGE_FILE"
+
+                  if git fetch origin "$BADGES_BRANCH" 2>/dev/null; then
+                    git checkout "$BADGES_BRANCH"
+                  else
+                    # First run: create an orphan branch with no history
+                    git checkout --orphan "$BADGES_BRANCH"
+                    git rm -rf . --quiet 2>/dev/null || true
+                  fi
+
+                  cp "$RUNNER_TEMP/$BADGE_FILE" "$BADGE_FILE"
+                  git add "$BADGE_FILE"
+
+                  if git diff --cached --quiet; then
+                    echo "Badge unchanged — skipping commit."
+                    exit 0
+                  fi
+
+                  git commit -S -m "ci: update coverage badge"
+                  git push \
+                    "https://x-access-token:${BOT_TOKEN}@github.com/${{ github.repository }}.git" \
+                    "$BADGES_BRANCH"
+
+            # ── 10. Upload full coverage report ─────────────────────────────────
+            - name: Upload coverage artifact
+              if: ${{ inputs.upload_coverage_artifact }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage
+                  path: coverage/

@@ -60,6 +60,50 @@ on:
                 default: "development"
                 description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
 
+            # ── Type check ─────────────────────────────────────────────────────
+            type_check_command:
+                required: false
+                type: string
+                default: "npm run types:check"
+                description: "Command to run type checking (e.g. npm run types:check)"
+            skip_type_check:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip the type-check step in the coverage-badge job"
+
+            # ── Coverage badge ─────────────────────────────────────────────────
+            enable_coverage_badge:
+                required: false
+                type: boolean
+                default: false
+                description: "Run the coverage + badge-push job after CI passes"
+            coverage_command:
+                required: false
+                type: string
+                default: "npm run ci:coverage"
+                description: "Command to run tests and generate coverage data"
+            coverage_summary_path:
+                required: false
+                type: string
+                default: "coverage/coverage-summary.json"
+                description: "Path to the coverage-summary.json produced by Jest / c8"
+            badges_branch:
+                required: false
+                type: string
+                default: "badges"
+                description: "Branch where the badge JSON is published"
+            badge_filename:
+                required: false
+                type: string
+                default: "coverage.json"
+                description: "Filename for the badge JSON committed to the badges branch"
+            upload_coverage_artifact:
+                required: false
+                type: boolean
+                default: true
+                description: "Upload the full coverage/ directory as a workflow artifact"
+
         secrets:
             NPM_TOKEN:
                 description: "NPM token for publishing packages"
@@ -69,6 +113,19 @@ on:
                 required: false
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for CLDMV bot"
+                required: false
+            # Required when enable_coverage_badge is true
+            BOT_NAME:
+                description: "Git user.name for the signed badge commit"
+                required: false
+            BOT_EMAIL:
+                description: "Git user.email for the signed badge commit"
+                required: false
+            BOT_GPG_PRIVATE_KEY:
+                description: "Armored GPG private key for commit signing"
+                required: false
+            BOT_GPG_PASSPHRASE:
+                description: "Passphrase for the GPG key"
                 required: false
 
 jobs:
@@ -105,9 +162,36 @@ jobs:
             skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
             test_environment: ${{ inputs.test_environment }}
 
+    coverage-badge:
+        name: "📊 Coverage & Badge Push"
+        needs: [commit-gate, ci]
+        if: >
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.ci.result == 'success' &&
+            inputs.enable_coverage_badge == true
+        uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v1
+        with:
+            node_version: ${{ inputs.node_version }}
+            package_manager: ${{ inputs.package_manager }}
+            type_check_command: ${{ inputs.type_check_command }}
+            coverage_command: ${{ inputs.coverage_command }}
+            skip_type_check: ${{ inputs.skip_type_check }}
+            coverage_summary_path: ${{ inputs.coverage_summary_path }}
+            badges_branch: ${{ inputs.badges_branch }}
+            badge_filename: ${{ inputs.badge_filename }}
+            upload_coverage_artifact: ${{ inputs.upload_coverage_artifact }}
+            debug: ${{ inputs.debug }}
+        secrets:
+            BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+            BOT_NAME: ${{ secrets.BOT_NAME }}
+            BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+            BOT_GPG_PRIVATE_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+            BOT_GPG_PASSPHRASE: ${{ secrets.BOT_GPG_PASSPHRASE }}
+
     summary:
         name: "📊 CI Summary"
-        needs: [commit-gate, ci]
+        needs: [commit-gate, ci, coverage-badge]
         if: always() && needs.commit-gate.outputs.should_skip != 'true'
         runs-on: ubuntu-latest
         steps:
@@ -126,4 +210,16 @@ jobs:
                     echo "❌ **Overall Status**: CI workflow failed" >> $GITHUB_STEP_SUMMARY
                     echo "" >> $GITHUB_STEP_SUMMARY
                     echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
+                  fi
+
+                  if [ "${{ inputs.enable_coverage_badge }}" = "true" ]; then
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "### 📊 Coverage Badge" >> $GITHUB_STEP_SUMMARY
+                    if [ "${{ needs.coverage-badge.result }}" = "success" ]; then
+                      echo "✅ Coverage badge updated on \`${{ inputs.badges_branch }}\` branch" >> $GITHUB_STEP_SUMMARY
+                    elif [ "${{ needs.coverage-badge.result }}" = "skipped" ]; then
+                      echo "⏭️ Coverage badge skipped (CI did not pass)" >> $GITHUB_STEP_SUMMARY
+                    else
+                      echo "❌ Coverage badge push failed" >> $GITHUB_STEP_SUMMARY
+                    fi
                   fi
