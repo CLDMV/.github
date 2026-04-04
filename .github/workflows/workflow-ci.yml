@@ -1,3 +1,17 @@
+#
+# @Project: workflows
+# @Filename: /workflow-ci.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-03 17:15:32 -07:00 (1775261732)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+
 # CLDMV/.github/.github/workflows/ci.yml
 name: 🧪 CI Workflow (Org-Level)
 
@@ -64,8 +78,8 @@ on:
             type_check_command:
                 required: false
                 type: string
-                default: "npm run types:check"
-                description: "Command to run type checking (e.g. npm run types:check)"
+                default: "npm run test:types"
+                description: "Command to run type checking (e.g. npm run test:types)"
             skip_type_check:
                 required: false
                 type: boolean

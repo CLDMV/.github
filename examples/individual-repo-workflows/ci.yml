@@ -6,7 +6,7 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-03 08:20:40 -07:00 (1775229640)
+# @Last modified time: 2026-04-03 17:15:22 -07:00 (1775261722)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
@@ -100,7 +100,7 @@ on:
         description: "Command to run type checking"
         type: string
         required: false
-        default: "npm run types:check"
+        default: "npm run test:types"
       skip_type_check:
         description: "Skip the type-check step in the coverage-badge job"
         type: boolean
@@ -139,7 +139,7 @@ jobs:
       upload_coverage_artifact: ${{ github.event.inputs.upload_coverage_artifact != 'false' }}
 
       # ── Type check (runs inside the coverage-badge job) ────────────────────
-      type_check_command: ${{ github.event.inputs.type_check_command || 'npm run types:check' }}
+      type_check_command: ${{ github.event.inputs.type_check_command || 'npm run test:types' }}
       skip_type_check: ${{ github.event.inputs.skip_type_check == 'true' }}
 
     # Authentication & Bot Configuration
