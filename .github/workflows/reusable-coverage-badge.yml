@@ -191,6 +191,13 @@ jobs:
                   # Stash the computed badge somewhere safe before we switch branches
                   cp badge.json "$RUNNER_TEMP/$BADGE_FILE"
 
+                  # Type-check and coverage commands may leave generated files
+                  # (e.g. types/**/*.d.mts, coverage/**) in the working tree.
+                  # Reset tracked changes and remove untracked files so that
+                  # git checkout can switch to the badges branch cleanly.
+                  git checkout -- .
+                  git clean -ffd
+
                   if git fetch origin "$BADGES_BRANCH" 2>/dev/null; then
                     git checkout "$BADGES_BRANCH"
                   else
