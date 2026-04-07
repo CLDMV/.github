@@ -106,6 +106,11 @@ on:
         type: boolean
         required: false
         default: false
+      default_branch:
+        description: "Default branch name — badge is only pushed on pushes to this branch"
+        type: string
+        required: false
+        default: "master"
 
 jobs:
   ci:
@@ -133,8 +138,8 @@ jobs:
       # Only runs on direct pushes to default_branch — PRs and feature branches
       # are automatically skipped so coverage always reflects merged master code.
       # Requires: the coverage_command produces coverage/coverage-summary.json
-      enable_coverage_badge: true
-      default_branch: master  # Badge only pushed when a push lands on this branch
+      enable_coverage_badge: ${{ github.event.inputs.enable_coverage_badge != 'false' }}
+      default_branch: ${{ github.event.inputs.default_branch || 'master' }}  # Badge only pushed when a push lands on this branch
       coverage_command: ${{ github.event.inputs.coverage_command || 'npm run ci:coverage' }}
       coverage_summary_path: ${{ github.event.inputs.coverage_summary_path || 'coverage/coverage-summary.json' }}
       badges_branch: ${{ github.event.inputs.badges_branch || 'badges' }}
