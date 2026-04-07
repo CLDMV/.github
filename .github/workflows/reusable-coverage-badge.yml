@@ -182,6 +182,9 @@ jobs:
               env:
                   BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
               run: |
+                  # reusable-coverage-badge v1.12.5 — dirty-tree fix
+                  echo "::notice::reusable-coverage-badge v1.12.5"
+
                   BADGES_BRANCH="${{ inputs.badges_branch }}"
                   BADGE_FILE="${{ inputs.badge_filename }}"
 
@@ -191,12 +194,12 @@ jobs:
                   # Stash the computed badge somewhere safe before we switch branches
                   cp badge.json "$RUNNER_TEMP/$BADGE_FILE"
 
-                  # Type-check and coverage commands may leave generated files
-                  # (e.g. types/**/*.d.mts, coverage/**) in the working tree.
-                  # Reset tracked changes and remove untracked files so that
-                  # git checkout can switch to the badges branch cleanly.
-                  git checkout -- .
-                  git clean -ffd
+                  # Type-check and coverage commands may leave generated/modified files
+                  # (e.g. types/**/*.d.mts.map, coverage/**) in the working tree.
+                  # git refuses to checkout a different branch with a dirty tree, so
+                  # stash everything (tracked + untracked) before switching.
+                  echo "Stashing working tree before branch switch…"
+                  git stash push --include-untracked --message "badge-branch-switch" || true
 
                   if git fetch origin "$BADGES_BRANCH" 2>/dev/null; then
                     git checkout "$BADGES_BRANCH"
