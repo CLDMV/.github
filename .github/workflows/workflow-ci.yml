@@ -117,6 +117,11 @@ on:
                 type: boolean
                 default: true
                 description: "Upload the full coverage/ directory as a workflow artifact"
+            default_branch:
+                required: false
+                type: string
+                default: "master"
+                description: "Default branch name — badge is only pushed when a push lands on this branch (prevents PR coverage from overwriting merged coverage)"
 
         secrets:
             NPM_TOKEN:
@@ -182,7 +187,9 @@ jobs:
         if: >
             needs.commit-gate.outputs.should_skip != 'true' &&
             needs.ci.result == 'success' &&
-            inputs.enable_coverage_badge == true
+            inputs.enable_coverage_badge == true &&
+            github.event_name == 'push' &&
+            github.ref == format('refs/heads/{0}', inputs.default_branch)
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v1
         with:
             node_version: ${{ inputs.node_version }}
