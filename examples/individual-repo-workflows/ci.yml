@@ -173,7 +173,6 @@ jobs:
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Required when enable_coverage_badge: true
       BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

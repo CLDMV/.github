@@ -19,7 +19,8 @@ name: "PR Coverage Badge (Reusable)"
 # on re-runs, so successive pushes to the PR branch update it in place.
 # No comments are posted; no files are committed anywhere.
 #
-# Requires the caller to pass secrets.GITHUB_TOKEN with pull-requests: write.
+# The workflow uses github.token directly — no extra secrets needed.
+# Ensure the calling job has `permissions: pull-requests: write`.
 
 on:
     workflow_call:
@@ -65,15 +66,12 @@ on:
                 type: boolean
                 default: false
 
-        secrets:
-            GITHUB_TOKEN:
-                description: "Token used to update the PR body (needs pull-requests: write)"
-                required: true
-
 jobs:
     coverage-pr-comment:
         name: "PR Coverage Badge"
         runs-on: ubuntu-latest
+        permissions:
+            pull-requests: write
 
         steps:
             # ── 1. Source ────────────────────────────────────────────────────────
@@ -149,7 +147,7 @@ jobs:
             - name: Update PR description with coverage badge
               uses: actions/github-script@v7
               with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  github-token: ${{ github.token }}
                   script: |
                       const START = '<!-- coverage-badge-start -->';
                       const END   = '<!-- coverage-badge-end -->';

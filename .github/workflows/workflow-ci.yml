@@ -151,9 +151,7 @@ on:
                 description: "Passphrase for the GPG key"
                 required: false
             # Required when enable_coverage_pr_comment is true
-            GITHUB_TOKEN:
-                description: "GitHub token for posting PR coverage comments (needs pull-requests: write)"
-                required: false
+            # (no extra secrets needed — github.token is used directly)
 
 jobs:
     # Check if we should skip CI based on commit message
@@ -235,8 +233,6 @@ jobs:
             coverage_summary_path: ${{ inputs.coverage_summary_path }}
             skip_type_check: ${{ inputs.skip_type_check }}
             debug: ${{ inputs.debug }}
-        secrets:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     summary:
         name: "📊 CI Summary"
