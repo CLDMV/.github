@@ -2,6 +2,11 @@
 
 This folder contains example configurations for using the CLDMV org-level workflows with the streamlined orchestrator architecture.
 
+## 📖 Guides
+
+- **[WORKFLOW-SETUP-GUIDE.md](WORKFLOW-SETUP-GUIDE.md)** — What each workflow does, which `package.json` scripts it requires, which secrets it needs, and any other prerequisites. Start here when adding a workflow to a new repo.
+- **[DRY-RUN-GUIDE.md](DRY-RUN-GUIDE.md)** — How to use dry-run mode to validate release and publish pipelines without making real changes.
+
 ## Individual Repository Workflows
 
 The `individual-repo-workflows/` folder contains example workflow files that should be placed in individual project repositories to use the org-level workflows.
@@ -28,10 +33,17 @@ The `individual-repo-workflows/` folder contains example workflow files that sho
   - Creates GitHub releases AND publishes to NPM/GitHub Packages
 
 - **`docker-publish.yml`** - Docker image build and GHCR publish workflow
+
   - Place in: `.github/workflows/docker-publish.yml` in your project repo
   - Triggers: Push to master/main (and manual dispatch)
   - Uses: `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v1`
   - Derives image name from root `package.json` and supports optional pre-publish command
+
+- **`update-major-version-tags.yml`** - Floating version tag maintenance workflow
+  - Place in: `.github/workflows/update-major-version-tags.yml` in your project repo
+  - Triggers: Push to master/main, published releases, and manual dispatch
+  - Uses: `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1`
+  - Keeps `v1`, `v1.2` etc. pointing at the latest release — see [UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](./UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)
 
 ### Usage:
 
