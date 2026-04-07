@@ -127,7 +127,7 @@ jobs:
                     const badgeUrl =
                       'https://img.shields.io/badge/coverage-' +
                       encodeURIComponent(avg + '%').replace(/%25/g, '%25') +
-                      '-' + color + '?style=flat-square';
+                      '-' + color + '?style=for-the-badge&logo=vitest&logoColor=white';
 
                     const output = [
                       'avg=' + avg,
