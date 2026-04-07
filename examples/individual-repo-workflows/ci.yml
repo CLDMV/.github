@@ -6,7 +6,7 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-03 17:15:22 -07:00 (1775261722)
+# @Last modified time: 2026-04-06 17:56:17 -07:00 (1775523377)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
@@ -111,6 +111,11 @@ on:
         type: string
         required: false
         default: "master"
+      enable_coverage_pr_comment:
+        description: "Inject a coverage badge into the PR description on pull request events"
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   ci:
@@ -139,7 +144,7 @@ jobs:
       # are automatically skipped so coverage always reflects merged master code.
       # Requires: the coverage_command produces coverage/coverage-summary.json
       enable_coverage_badge: ${{ github.event.inputs.enable_coverage_badge != 'false' }}
-      default_branch: ${{ github.event.inputs.default_branch || 'master' }}  # Badge only pushed when a push lands on this branch
+      default_branch: ${{ github.event.inputs.default_branch || 'master' }} # Badge only pushed when a push lands on this branch
       coverage_command: ${{ github.event.inputs.coverage_command || 'npm run ci:coverage' }}
       coverage_summary_path: ${{ github.event.inputs.coverage_summary_path || 'coverage/coverage-summary.json' }}
       badges_branch: ${{ github.event.inputs.badges_branch || 'badges' }}
@@ -149,6 +154,12 @@ jobs:
       # ── Type check (runs inside the coverage-badge job) ────────────────────
       type_check_command: ${{ github.event.inputs.type_check_command || 'npm run test:types' }}
       skip_type_check: ${{ github.event.inputs.skip_type_check == 'true' }}
+
+      # ── PR coverage badge ─────────────────────────────────────────────────
+      # Injects a Shields.io badge + breakdown table directly into the PR body
+      # on every push to the PR branch. Only fires on pull_request events;
+      # skipped automatically on push and workflow_dispatch. No files committed.
+      enable_coverage_pr_comment: ${{ github.event.inputs.enable_coverage_pr_comment != 'false' }}
 
     # Authentication & Bot Configuration
     # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
@@ -162,6 +173,7 @@ jobs:
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Required when enable_coverage_badge: true
       BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
       BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

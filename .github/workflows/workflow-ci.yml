@@ -6,11 +6,10 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-03 17:15:32 -07:00 (1775261732)
+# @Last modified time: 2026-04-06 17:22:38 -07:00 (1775521358)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
-
 
 # CLDMV/.github/.github/workflows/ci.yml
 name: 🧪 CI Workflow (Org-Level)
@@ -122,6 +121,11 @@ on:
                 type: string
                 default: "master"
                 description: "Default branch name — badge is only pushed when a push lands on this branch (prevents PR coverage from overwriting merged coverage)"
+            enable_coverage_pr_comment:
+                required: false
+                type: boolean
+                default: true
+                description: "Post/update a sticky coverage report comment on pull requests"
 
         secrets:
             NPM_TOKEN:
@@ -145,6 +149,10 @@ on:
                 required: false
             BOT_GPG_PASSPHRASE:
                 description: "Passphrase for the GPG key"
+                required: false
+            # Required when enable_coverage_pr_comment is true
+            GITHUB_TOKEN:
+                description: "GitHub token for posting PR coverage comments (needs pull-requests: write)"
                 required: false
 
 jobs:
@@ -210,9 +218,29 @@ jobs:
             BOT_GPG_PRIVATE_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
             BOT_GPG_PASSPHRASE: ${{ secrets.BOT_GPG_PASSPHRASE }}
 
+    coverage-pr-comment:
+        name: "PR Coverage Badge"
+        needs: [commit-gate, ci]
+        if: >
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.ci.result == 'success' &&
+            inputs.enable_coverage_pr_comment == true &&
+            github.event_name == 'pull_request'
+        uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v1
+        with:
+            node_version: ${{ inputs.node_version }}
+            package_manager: ${{ inputs.package_manager }}
+            type_check_command: ${{ inputs.type_check_command }}
+            coverage_command: ${{ inputs.coverage_command }}
+            coverage_summary_path: ${{ inputs.coverage_summary_path }}
+            skip_type_check: ${{ inputs.skip_type_check }}
+            debug: ${{ inputs.debug }}
+        secrets:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     summary:
         name: "📊 CI Summary"
-        needs: [commit-gate, ci, coverage-badge]
+        needs: [commit-gate, ci, coverage-badge, coverage-pr-comment]
         if: always() && needs.commit-gate.outputs.should_skip != 'true'
         runs-on: ubuntu-latest
         steps:
@@ -242,5 +270,17 @@ jobs:
                       echo "⏭️ Coverage badge skipped (CI did not pass)" >> $GITHUB_STEP_SUMMARY
                     else
                       echo "❌ Coverage badge push failed" >> $GITHUB_STEP_SUMMARY
+                    fi
+                  fi
+
+                  if [ "${{ inputs.enable_coverage_pr_comment }}" = "true" ]; then
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "### PR Coverage Badge" >> $GITHUB_STEP_SUMMARY
+                    if [ "${{ needs.coverage-pr-comment.result }}" = "success" ]; then
+                      echo "✅ Coverage badge injected into PR description" >> $GITHUB_STEP_SUMMARY
+                    elif [ "${{ needs.coverage-pr-comment.result }}" = "skipped" ]; then
+                      echo "⏭️ PR coverage badge skipped (not a pull_request event)" >> $GITHUB_STEP_SUMMARY
+                    else
+                      echo "❌ PR coverage badge update failed" >> $GITHUB_STEP_SUMMARY
                     fi
                   fi
