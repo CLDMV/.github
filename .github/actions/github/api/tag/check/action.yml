@@ -18,5 +18,5 @@ outputs:
     description: "Type of referenced object: 'tag' or 'commit'"
 
 runs:
-  using: node20
+  using: node24
   main: action.mjs

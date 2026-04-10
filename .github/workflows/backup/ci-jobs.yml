@@ -458,7 +458,7 @@ jobs:
                   echo "  Expected artifact name: ${{ inputs.download_artifact_name }}"
 
             - name: Download build artifacts
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v7
               with:
                   name: ${{ inputs.download_artifact_name }}
                   path: ${{ inputs.download_artifact_path }}

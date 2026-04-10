@@ -24,5 +24,5 @@ outputs:
     description: "Reason from the API verification block (or 'not_found'/'lightweight')"
 
 runs:
-  using: node20
+  using: node24
   main: action.mjs

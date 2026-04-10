@@ -41,5 +41,5 @@ outputs:
     description: "Upload URL for assets"
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "action.mjs"

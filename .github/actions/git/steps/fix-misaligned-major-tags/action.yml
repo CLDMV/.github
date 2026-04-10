@@ -33,5 +33,5 @@ outputs:
     description: "Complete summary JSON with title, description, and detailed results"
 
 runs:
-  using: node20
+  using: node24
   main: action.mjs

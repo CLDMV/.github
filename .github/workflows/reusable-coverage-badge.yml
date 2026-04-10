@@ -225,7 +225,7 @@ jobs:
             # ── 10. Upload full coverage report ─────────────────────────────────
             - name: Upload coverage artifact
               if: ${{ inputs.upload_coverage_artifact }}
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: coverage
                   path: coverage/
