@@ -195,6 +195,31 @@ jobs:
             - name: Setup Node.js
               uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
 
+            - name: Check release commit type
+              id: release-check
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+              env:
+                  DEBUG: ${{ inputs.debug || 'true' }}
+
+            - name: Get base version from branch divergence point
+              id: base-version
+              shell: bash
+              run: |
+                  mkdir -p tmp
+                  MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null)
+                  git show "$MERGE_BASE:package.json" > tmp/base-package.json
+                  BASE_VERSION=$(node -p "require('./tmp/base-package.json').version")
+                  echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
+                  echo "📦 Base version at divergence point: $BASE_VERSION"
+
+            - name: Calculate new version
+              id: version
+              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
+              with:
+                  version-bump: ${{ steps.release-check.outputs.version-bump }}
+                  explicit-version: ${{ steps.release-check.outputs.explicit-version }}
+                  base-version: ${{ steps.base-version.outputs.base-version }}
+
             - name: Get PR commit range
               id: get-pr-range
               shell: bash
@@ -224,14 +249,15 @@ jobs:
               with:
                   commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
 
-            - name: Update PR description
+            - name: Update PR title and description
               shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
                   CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
+                  NEW_VERSION: ${{ steps.version.outputs.new-version }}
               run: |
-                  echo "📝 Updating PR #$PR_NUMBER description with latest changes..."
+                  echo "📝 Updating PR #$PR_NUMBER title and description..."
 
                   # Get the repository info
                   REPO_OWNER="${{ github.repository_owner }}"
@@ -253,15 +279,16 @@ jobs:
                                             > "$TMP_DIR/changelog.md"
                   fi
 
-                  # Update the PR description with the new changelog
-                  echo "📝 Updating PR description..."
-                                    jq -n --rawfile body "$TMP_DIR/changelog.md" '{body: $body}' > "$TMP_DIR/pr-body.json"
+                  # Update the PR title and description
+                  echo "📝 Updating PR title to: release: v${NEW_VERSION}"
+                                    jq -n --rawfile body "$TMP_DIR/changelog.md" --arg title "release: v${NEW_VERSION}" \
+                                        '{title: $title, body: $body}' > "$TMP_DIR/pr-patch.json"
 
                   gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
                     --method PATCH \
-                                        --input "$TMP_DIR/pr-body.json"
+                                        --input "$TMP_DIR/pr-patch.json"
 
-                  echo "✅ PR #$PR_NUMBER has been updated with the latest changelog"
+                  echo "✅ PR #$PR_NUMBER has been updated with title 'release: v${NEW_VERSION}' and latest changelog"
                   echo "ℹ️ Skipped full release workflow since PR already exists"
 
     build-and-test:
