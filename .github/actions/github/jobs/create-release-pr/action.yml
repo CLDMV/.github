@@ -224,6 +224,16 @@ runs:
       run: |
         echo "- 🧪 **DRY RUN**: Would create commit with message: 'chore: bump version to ${{ steps.version.outputs.new-version }}'" >> $GITHUB_STEP_SUMMARY
 
+    - name: Compute PR labels
+      id: pr-labels
+      shell: bash
+      run: |
+        BUMP_TYPE="${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}"
+        LABELS="release,${BUMP_TYPE}"
+        [ "$BUMP_TYPE" = "patch" ] && LABELS="${LABELS},bug"
+        echo "labels=${LABELS}" >> $GITHUB_OUTPUT
+        echo "🏷️ PR labels: ${LABELS}"
+
     - name: Create pull request
       if: inputs.dry-run != 'true'
       id: create-pr
@@ -233,7 +243,7 @@ runs:
         base-branch: ${{ steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
-        labels: "release,${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}"
+        labels: ${{ steps.pr-labels.outputs.labels }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
@@ -246,7 +256,7 @@ runs:
         echo "  - **Title**: release: v${{ steps.version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
         echo "  - **Base Branch**: ${{ steps.default-branch.outputs.default-branch }}" >> $GITHUB_STEP_SUMMARY
         echo "  - **Head Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "  - **Labels**: release,${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}" >> $GITHUB_STEP_SUMMARY
+        echo "  - **Labels**: ${{ steps.pr-labels.outputs.labels }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         # Set outputs for dry run (simulate PR creation success)
         echo "pr-created=true" >> $GITHUB_OUTPUT

@@ -2,8 +2,8 @@ name: "🔑 Create App Token (Auto-detect)"
 description: "Creates GitHub App installation token if secrets are available, otherwise falls back to default token"
 
 inputs:
-  app_id:
-    description: "GitHub App ID (leave empty to auto-detect from BOT_APP_ID)"
+  client_id:
+    description: "GitHub App Client ID (leave empty to auto-detect from BOT_APP_CLIENT_ID)"
     required: false
   private_key:
     description: "GitHub App private key (leave empty to auto-detect from BOT_APP_PRIVATE_KEY)"
@@ -34,10 +34,10 @@ runs:
       id: check-app
       shell: bash
       run: |
-        APP_ID="${{ inputs.app_id || env.BOT_APP_ID }}"
+        CLIENT_ID="${{ inputs.client_id || env.BOT_APP_CLIENT_ID }}"
         PRIVATE_KEY="${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}"
 
-        if [ -n "$APP_ID" ] && [ -n "$PRIVATE_KEY" ]; then
+        if [ -n "$CLIENT_ID" ] && [ -n "$PRIVATE_KEY" ]; then
           echo "use_app_token=true" >> "$GITHUB_OUTPUT"
           echo "✅ App secrets available - will use App token"
         else
@@ -50,7 +50,7 @@ runs:
       if: ${{ steps.check-app.outputs.use_app_token == 'true' }}
       uses: actions/create-github-app-token@v3
       with:
-        app-id: ${{ inputs.app_id || env.BOT_APP_ID }}
+        client-id: ${{ inputs.client_id || env.BOT_APP_CLIENT_ID }}
         private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
         owner: ${{ inputs.owner }}
         skip-token-revoke: true # Don't revoke token - needed for multi-job workflows

@@ -80,8 +80,8 @@ on:
         secrets:
             # Bot App credentials — used to mint a short-lived token with write access.
             # If omitted the push step will fail; both are required for badge publishing.
-            BOT_APP_ID:
-                description: "GitHub App ID for the CLDMV bot (e.g. secrets.CLDMV_BOT_APP_ID)"
+            BOT_APP_CLIENT_ID:
+                description: "GitHub App Client ID for the CLDMV bot (e.g. secrets.CLDMV_BOT_APP_CLIENT_ID)"
                 required: true
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for the CLDMV bot"
@@ -163,9 +163,9 @@ jobs:
             # ── 7. Mint short-lived bot token ───────────────────────────────────
             - name: Generate bot token
               id: bot-token
-              uses: actions/create-github-app-token@v1
+              uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.BOT_APP_ID }}
+                  client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             # ── 8. Import GPG key for signed commit ─────────────────────────────

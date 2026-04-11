@@ -27,8 +27,8 @@ on:
                 type: boolean
                 default: true
         secrets:
-            CLDMV_BOT_APP_ID:
-                description: "GitHub App ID for creating app tokens"
+            CLDMV_BOT_APP_CLIENT_ID:
+                description: "GitHub App Client ID for creating app tokens"
                 required: true
             CLDMV_BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for creating app tokens"
@@ -64,7 +64,7 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  client-id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
 
@@ -102,22 +102,22 @@ jobs:
 
             - name: Debug - Check if App ID secret is available
               run: |
-                  if [ -n "$CLDMV_BOT_APP_ID" ] && [ "$CLDMV_BOT_APP_ID" != "" ]; then
-                    echo "✅ CLDMV_BOT_APP_ID secret is available (length: ${#CLDMV_BOT_APP_ID})"
+                  if [ -n "$CLDMV_BOT_APP_CLIENT_ID" ] && [ "$CLDMV_BOT_APP_CLIENT_ID" != "" ]; then
+                    echo "✅ CLDMV_BOT_APP_CLIENT_ID secret is available (length: ${#CLDMV_BOT_APP_CLIENT_ID})"
                   else
-                    echo "❌ CLDMV_BOT_APP_ID secret is empty or not available"
-                    echo "CLDMV_BOT_APP_ID value: '$CLDMV_BOT_APP_ID'"
-                    echo "❌ This will cause the app token creation to fail with 'appId option is required'"
+                    echo "❌ CLDMV_BOT_APP_CLIENT_ID secret is empty or not available"
+                    echo "CLDMV_BOT_APP_CLIENT_ID value: '$CLDMV_BOT_APP_CLIENT_ID'"
+                    echo "❌ This will cause the app token creation to fail with 'clientId option is required'"
                     exit 1
                   fi
               env:
-                  CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  CLDMV_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
 
             - name: Get CLDMV app token (no permissions)
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  client-id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
                   # No permission-* specified = minimal permissions
@@ -176,7 +176,7 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  client-id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
                   permission-contents: write
@@ -272,7 +272,7 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  client-id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
                   # No permission-* specified = minimal permissions
@@ -335,7 +335,7 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ secrets.CLDMV_BOT_APP_ID }}
+                  client-id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
                   permission-contents: write

@@ -38,7 +38,7 @@ jobs:
       cleanup_old_artifacts: ${{ inputs.cleanup_old_artifacts }}
     secrets:
       # REQUIRED: GitHub App and GPG credentials for your organization
-      CLDMV_BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      CLDMV_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
       CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
       # IMPORTANT: GPG Identity for signing

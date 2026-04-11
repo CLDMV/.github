@@ -116,8 +116,8 @@ on:
             NPM_TOKEN:
                 description: "NPM token for publishing packages"
                 required: false
-            BOT_APP_ID:
-                description: "GitHub App ID for CLDMV bot"
+            BOT_APP_CLIENT_ID:
+                description: "GitHub App Client ID for CLDMV bot"
                 required: false
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for CLDMV bot"
@@ -253,10 +253,10 @@ jobs:
             #   id: app-token
             #   uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
             #   with:
-            #       app_id: ${{ secrets.BOT_APP_ID }}
+            #       client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
             #       private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
             #   env:
-            #       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+            #       BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
             #       BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Calculate artifact names
@@ -320,10 +320,10 @@ jobs:
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
               with:
-                  app_id: ${{ secrets.BOT_APP_ID }}
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
               env:
-                  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Create GitHub Release
