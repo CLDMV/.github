@@ -169,6 +169,35 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	debugLog(`  body length: ${finalBody.length}`);
 	debugLog(`  assets: ${assets}`);
 
+	// Wait for the tag ref to be resolvable on GitHub before creating the release.
+	// If we proceed immediately after tag creation the GitHub API may still return 404
+	// for the ref, causing the release to be created against an untagged SHA — which
+	// GitHub marks as draft by default and names "untagged-<sha>".
+	{
+		const maxAttempts = 12;
+		const delayMs = 5000;
+		let tagReady = false;
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			const tagCheckResponse = await fetch(`https://api.github.com/repos/${repo}/git/refs/tags/${tag_name}`, {
+				method: "GET",
+				headers: {
+					"Authorization": `token ${token}`,
+					"Accept": "application/vnd.github.v3+json"
+				}
+			});
+			if (tagCheckResponse.ok) {
+				tagReady = true;
+				debugLog(`Tag ref ${tag_name} confirmed on GitHub API (attempt ${attempt})`);
+				break;
+			}
+			debugLog(`Tag ref ${tag_name} not yet visible (attempt ${attempt}/${maxAttempts}, status ${tagCheckResponse.status}) — waiting ${delayMs}ms`);
+			await new Promise((r) => setTimeout(r, delayMs));
+		}
+		if (!tagReady) {
+			throw new Error(`Tag ${tag_name} was not resolvable via GitHub API after ${maxAttempts} attempts. Cannot create release against a missing tag.`);
+		}
+	}
+
 	// Check if release already exists
 	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag_name}`, {
 		method: "GET",
