@@ -220,6 +220,50 @@ jobs:
                   explicit-version: ${{ steps.release-check.outputs.explicit-version }}
                   base-version: ${{ steps.base-version.outputs.base-version }}
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              with:
+                  app_id: ${{ secrets.BOT_APP_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Install dependencies
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
+            - name: Build package
+              uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+              with:
+                  build-command: ${{ inputs.build_command }}
+                  environment: production
+
+            - name: Update package version
+              uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v1
+              with:
+                  new-version: ${{ steps.version.outputs.new-version }}
+                  package-manager: ${{ inputs.package_manager }}
+
+            - name: Restore src/ deleted by build
+              shell: bash
+              run: |
+                  if git ls-files --deleted -- src/ | grep -q .; then
+                    echo "🔄 Restoring src/ deleted by build step..."
+                    git checkout HEAD -- src/
+                    echo "✅ src/ restored"
+                  else
+                    echo "ℹ️ No src/ deletions detected — skipping restore"
+                  fi
+
+            - name: Create signed commit
+              uses: CLDMV/.github/.github/actions/github/api/commit@v1
+              with:
+                  commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
+                  github-token: ${{ steps.app-token.outputs.token }}
+
             - name: Get PR commit range
               id: get-pr-range
               shell: bash
