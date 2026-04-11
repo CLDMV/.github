@@ -5,55 +5,55 @@ name: 🧪 Debug Tag Creation Methods
 # tag creation methods and identify permission problems.
 
 on:
-  workflow_dispatch:
-    inputs:
-      test_tag_name:
-        description: "Tag name to create for testing (e.g., test-v1.0.0)"
-        required: true
-        default: "test-debug-v1.0.0"
-      target_commit:
-        description: "Commit SHA to tag (leave empty for HEAD)"
-        required: false
-      cleanup_tag:
-        description: "Clean up test tags after testing"
-        required: false
-        default: true
-        type: boolean
-      cleanup_old_artifacts:
-        description: "Clean up old test artifacts before running new tests"
-        required: false
-        default: true
-        type: boolean
+    workflow_dispatch:
+        inputs:
+            test_tag_name:
+                description: "Tag name to create for testing (e.g., test-v1.0.0)"
+                required: true
+                default: "test-debug-v1.0.0"
+            target_commit:
+                description: "Commit SHA to tag (leave empty for HEAD)"
+                required: false
+            cleanup_tag:
+                description: "Clean up test tags after testing"
+                required: false
+                default: true
+                type: boolean
+            cleanup_old_artifacts:
+                description: "Clean up old test artifacts before running new tests"
+                required: false
+                default: true
+                type: boolean
 
 jobs:
-  debug-tag-creation:
-    name: "🧪 Debug Tag Creation Issues"
-    uses: CLDMV/.github/.github/workflows/test-tag-creation.yml@v1
-    with:
-      # CHANGE THIS: Replace with your package name
-      package_name: "@your-org/your-package"
-      test_tag_name: ${{ inputs.test_tag_name }}
-      target_commit: ${{ inputs.target_commit }}
-      cleanup_tag: ${{ inputs.cleanup_tag }}
-      cleanup_old_artifacts: ${{ inputs.cleanup_old_artifacts }}
-    secrets:
-      # REQUIRED: GitHub App and GPG credentials for your organization
-      CLDMV_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+    debug-tag-creation:
+        name: "🧪 Debug Tag Creation Issues"
+        uses: CLDMV/.github/.github/workflows/test-tag-creation.yml@v1
+        with:
+            # CHANGE THIS: Replace with your package name
+            package_name: "@your-org/your-package"
+            test_tag_name: ${{ inputs.test_tag_name }}
+            target_commit: ${{ inputs.target_commit }}
+            cleanup_tag: ${{ inputs.cleanup_tag }}
+            cleanup_old_artifacts: ${{ inputs.cleanup_old_artifacts }}
+        secrets:
+            # REQUIRED: GitHub App and GPG credentials for your organization
+            CLDMV_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            CLDMV_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
-      # IMPORTANT: GPG Identity for signing
-      # The app token generates emails like "230771808+cldmv-bot[bot]@users.noreply.github.com"
-      # which CANNOT be verified for GPG signatures. For proper GPG signing, you need:
-      # 1. A real email address that can be verified (CLDMV_BOT_EMAIL)
-      # 2. A GPG key generated for that email address
-      # 3. The GPG key uploaded to GitHub and verified for that email
-      # If GPG signing is critical, consider using these bot identity secrets consistently
-      CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
-      CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            # IMPORTANT: GPG Identity for signing
+            # The app token generates emails like "230771808+cldmv-bot[bot]@users.noreply.github.com"
+            # which CANNOT be verified for GPG signatures. For proper GPG signing, you need:
+            # 1. A real email address that can be verified (CLDMV_BOT_EMAIL)
+            # 2. A GPG key generated for that email address
+            # 3. The GPG key uploaded to GitHub and verified for that email
+            # If GPG signing is critical, consider using these bot identity secrets consistently
+            CLDMV_BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            CLDMV_BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
 
-      # OPTIONAL: GPG signing (recommended for production)
-      CLDMV_BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
-      CLDMV_BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+            # OPTIONAL: GPG signing (recommended for production)
+            CLDMV_BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            CLDMV_BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
 # This workflow will automatically run all 6 test scenarios to help you identify:
 #
 # 1. **App Token vs GITHUB_TOKEN differences**
