@@ -162,15 +162,26 @@ function analyzeVersionBump(commits) {
 		if (explicitVersion) {
 			console.log(`🔍 Found explicit version in release commit: ${explicitVersion}`);
 
-			return {
-				versionBump: "explicit",
-				hasBreaking: false,
-				explicitVersion: explicitVersion,
-				reason: `Explicit version specified in release commit: ${explicitVersion}`
-			};
-		}
+			// Only use the explicit version when the release commit is the sole trigger
+			// (no non-release commits alongside it). If non-release commits are also present
+			// (e.g. a fix that landed after the release was squashed into master), those
+			// commits represent work that needs its own version bump PAST the release version.
+			// Fall through to normal bump detection so they drive the bump type.
+			if (nonReleaseCommits.length === 0) {
+				return {
+					versionBump: "explicit",
+					hasBreaking: false,
+					explicitVersion: explicitVersion,
+					reason: `Explicit version specified in release commit: ${explicitVersion}`
+				};
+			}
 
-		console.log(`🔍 Release commit found but no version extracted from: ${releaseCommit.subject}`);
+			console.log(
+				`🔍 Non-release commits present alongside release commit — falling through to bump detection (ignoring explicit version ${explicitVersion})`
+			);
+		} else {
+			console.log(`🔍 Release commit found but no version extracted from: ${releaseCommit.subject}`);
+		}
 	}
 
 	// Check for features (SECOND priority - minor bump)

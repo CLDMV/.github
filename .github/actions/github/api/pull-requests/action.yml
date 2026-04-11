@@ -1,3 +1,16 @@
+#
+# @Project: pull-requests
+# @Filename: /action.yml
+# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-11 08:05:46 -07:00 (1775919946)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
 name: "Create Pull Request"
 description: "Create or update a pull request with release changes"
 
@@ -75,7 +88,36 @@ runs:
         EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
 
         if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
-          echo "📋 PR already exists: #$EXISTING_PR_NUMBER"
+          echo "📋 PR already exists: #$EXISTING_PR_NUMBER — updating title, body, and labels"
+
+          # Read current PR body for update
+          PR_BODY=$(cat PR_BODY.md)
+
+          PATCH_JSON=$(jq -n \
+            --arg title "${{ inputs.title }}" \
+            --arg body "$PR_BODY" \
+            '{title: $title, body: $body}')
+
+          curl -s -X PATCH \
+            -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$EXISTING_PR_NUMBER" \
+            -d "$PATCH_JSON" > /dev/null
+
+          # Sync labels: replace all labels with the current set
+          if [ -n "${{ inputs.labels }}" ]; then
+            echo "🏷️ Syncing labels: ${{ inputs.labels }}"
+            LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
+            curl -s -X PUT \
+              -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/$EXISTING_PR_NUMBER/labels" \
+              -d "{\"labels\": $LABELS_JSON}" > /dev/null
+          fi
+
+          echo "✅ Updated PR: #$EXISTING_PR_NUMBER"
           echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr-created=false" >> $GITHUB_OUTPUT
         else
@@ -130,7 +172,32 @@ runs:
             EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
             
             if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
-              echo "📋 Found existing PR: #$EXISTING_PR_NUMBER"
+              echo "📋 Found existing PR: #$EXISTING_PR_NUMBER — updating title, body, and labels"
+
+              PR_BODY=$(cat PR_BODY.md)
+              PATCH_JSON=$(jq -n \
+                --arg title "${{ inputs.title }}" \
+                --arg body "$PR_BODY" \
+                '{title: $title, body: $body}')
+
+              curl -s -X PATCH \
+                -H "Authorization: token $TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -H "Content-Type: application/json" \
+                "https://api.github.com/repos/${{ github.repository }}/pulls/$EXISTING_PR_NUMBER" \
+                -d "$PATCH_JSON" > /dev/null
+
+              if [ -n "${{ inputs.labels }}" ]; then
+                LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
+                curl -s -X PUT \
+                  -H "Authorization: token $TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Content-Type: application/json" \
+                  "https://api.github.com/repos/${{ github.repository }}/issues/$EXISTING_PR_NUMBER/labels" \
+                  -d "{\"labels\": $LABELS_JSON}" > /dev/null
+              fi
+
+              echo "✅ Updated PR: #$EXISTING_PR_NUMBER"
               echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
               echo "pr-created=false" >> $GITHUB_OUTPUT
             else

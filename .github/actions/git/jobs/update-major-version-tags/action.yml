@@ -117,9 +117,20 @@ runs:
       shell: bash
       run: |
         # Check if we're in workflow_call mode OR we have version tags OR bot signatures were fixed
-        if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ] || [ "${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}" = "true" ]; then
+        # Also check package.json as a fallback — it is the source of truth for the current version
+        # even when the corresponding vX.Y.Z tag has not been created yet.
+        PKG_SHOULD_RUN=false
+        if [ -f package.json ]; then
+          PKG_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
+          if [ -n "$PKG_VERSION" ]; then
+            echo "📦 package.json version: $PKG_VERSION"
+            PKG_SHOULD_RUN=true
+          fi
+        fi
+
+        if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ steps.check-tags.outputs.has_version_tags }}" = "true" ] || [ "${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}" = "true" ] || [ "$PKG_SHOULD_RUN" = "true" ]; then
           echo "result=true" >> "$GITHUB_OUTPUT"
-          echo "✅ Should run tag updates (event: ${{ github.event_name }}, has_tags: ${{ steps.check-tags.outputs.has_version_tags }}, fixed_signatures: ${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }})"
+          echo "✅ Should run tag updates (event: ${{ github.event_name }}, has_tags: ${{ steps.check-tags.outputs.has_version_tags }}, fixed_signatures: ${{ steps.fix-bot-signatures.outputs.non-bot-tags-found }}, pkg_version: $PKG_SHOULD_RUN)"
         else
           echo "result=false" >> "$GITHUB_OUTPUT"
           echo "❌ Skipping tag updates - no version tags found and no signatures fixed"
@@ -133,21 +144,90 @@ runs:
         if [ "${{ github.event_name }}" = "release" ]; then
           TAG_NAME="${{ github.event.release.tag_name }}"
           echo "Using release tag: $TAG_NAME"
+          echo "needs-create=false" >> "$GITHUB_OUTPUT"
         else
-          # For push events, find the latest semantic version tag
-          echo "Event is push, finding latest semantic version tag..."
-          git fetch --tags
-          LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
-          if [ -n "$LATEST_TAG" ]; then
-            TAG_NAME="$LATEST_TAG"
-            echo "Found latest semantic version tag: $TAG_NAME"
+          git fetch --tags --force
+
+          # --- Source-of-truth: package.json ---
+          # Read the current version from package.json and derive the expected semver tag.
+          # This is more reliable than searching existing git tags because the full vX.Y.Z
+          # tag may not have been created yet (e.g. the release workflow hadn't run yet when
+          # this push-triggered workflow started).
+          PKG_TAG=""
+          if [ -f package.json ]; then
+            PKG_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
+            if [ -n "$PKG_VERSION" ]; then
+              PKG_TAG="v${PKG_VERSION}"
+              echo "📦 Derived tag from package.json: $PKG_TAG"
+            fi
+          fi
+
+          if [ -n "$PKG_TAG" ]; then
+            # Check whether the full semver tag already exists
+            if git tag -l | grep -qxF "$PKG_TAG"; then
+              TAG_NAME="$PKG_TAG"
+              echo "✅ Tag $PKG_TAG exists — using it"
+              echo "needs-create=false" >> "$GITHUB_OUTPUT"
+            else
+              # The tag is missing: we will create it in the next step pointing to HEAD
+              TAG_NAME="$PKG_TAG"
+              echo "⚠️  Tag $PKG_TAG does not exist yet — will create it before updating major/minor aliases"
+              echo "needs-create=true" >> "$GITHUB_OUTPUT"
+              echo "tag-sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            fi
           else
-            TAG_NAME="${{ github.ref_name }}"
-            echo "No semantic version tags found, using ref: $TAG_NAME"
+            # No package.json — fall back to latest existing semver tag
+            echo "⚠️  No package.json found, falling back to latest tag search"
+            LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+            if [ -n "$LATEST_TAG" ]; then
+              TAG_NAME="$LATEST_TAG"
+              echo "Found latest semantic version tag: $TAG_NAME"
+            else
+              TAG_NAME="${{ github.ref_name }}"
+              echo "No semantic version tags found, using ref: $TAG_NAME"
+            fi
+            echo "needs-create=false" >> "$GITHUB_OUTPUT"
           fi
         fi
         echo "tag-name=$TAG_NAME" >> "$GITHUB_OUTPUT"
         echo "Processing tag: $TAG_NAME"
+
+    - name: Create missing semver tag
+      id: create-semver-tag
+      if: steps.should-run.outputs.result == 'true' && steps.get-tag.outputs.needs-create == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      run: |
+        TAG_NAME="${{ steps.get-tag.outputs.tag-name }}"
+        TAG_SHA="${{ steps.get-tag.outputs.tag-sha }}"
+        REPO="${{ github.repository }}"
+
+        echo "🏷️  Creating missing semver tag $TAG_NAME → $TAG_SHA"
+
+        # Create a lightweight tag via the GitHub refs API
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/$REPO/git/refs" \
+          -d "{\"ref\":\"refs/tags/$TAG_NAME\",\"sha\":\"$TAG_SHA\"}")
+
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | head -n-1)
+
+        if [ "$HTTP_CODE" = "201" ]; then
+          echo "✅ Created tag $TAG_NAME"
+        elif [ "$HTTP_CODE" = "422" ]; then
+          # Tag already exists (race condition) — safe to continue
+          echo "ℹ️  Tag $TAG_NAME already exists (created concurrently) — continuing"
+        else
+          echo "❌ Failed to create tag $TAG_NAME (HTTP $HTTP_CODE)"
+          echo "Response: $BODY"
+          exit 1
+        fi
+
+        # Refresh local tag cache so update-major-version-tags sees the new tag
+        git fetch --tags --force
 
     - name: Update major/minor version tags to this release
       id: update-tags

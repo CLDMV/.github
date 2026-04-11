@@ -100,12 +100,44 @@ runs:
       id: commit-check
       uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
 
+    - name: Get base version from branch divergence point
+      id: base-version
+      shell: bash
+      run: |
+        # Find where this branch diverged from master/main. The package.json version at
+        # that exact commit is the authoritative "base" that bump types should be applied
+        # against — NOT the current branch package.json, which may already contain a
+        # previous bump commit. This ensures the version is calculated idempotently: no
+        # matter how many commits are pushed to the branch, the result is always
+        # <master-version> + <highest-bump-across-all-branch-commits>.
+        MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || \
+                     git merge-base HEAD origin/main 2>/dev/null || echo "")
+
+        if [ -n "$MERGE_BASE" ]; then
+          echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
+          mkdir -p tmp
+          git show "$MERGE_BASE:package.json" > tmp/base-package.json 2>/dev/null || true
+          if [ -f tmp/base-package.json ]; then
+            BASE_VERSION=$(node -p "require('./tmp/base-package.json').version" 2>/dev/null || echo "")
+            rm -f tmp/base-package.json
+          fi
+        fi
+
+        if [ -n "$BASE_VERSION" ]; then
+          echo "📦 Base version at divergence point: $BASE_VERSION"
+          echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Could not determine base version from divergence point — falling back to package.json"
+          echo "base-version=" >> $GITHUB_OUTPUT
+        fi
+
     - name: Calculate new version
       id: version
       uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
       with:
         version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
         explicit-version: ${{ steps.commit-check.outputs.explicit-version }}
+        base-version: ${{ steps.base-version.outputs.base-version }}
 
     - name: Update Summary - Version Calculated
       shell: bash
