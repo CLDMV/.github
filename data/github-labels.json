@@ -1,0 +1,140 @@
+[
+	{
+		"name": "good first issue",
+		"color": "7057ff",
+		"description": "A great starting point for new contributors with limited experience",
+		"aliases": ["beginner", "beginner friendly", "starter", "easy", "first-issue", "newcomer"]
+	},
+	{
+		"name": "help wanted",
+		"color": "008672",
+		"description": "Community contributions are welcome and encouraged on this item",
+		"aliases": ["help", "help needed", "need help", "wanted", "contributions welcome"]
+	},
+	{
+		"name": "priority: critical",
+		"color": "b60205",
+		"description": "Must be resolved immediately — blocks releases or causes data loss",
+		"aliases": ["critical", "p0", "p-critical", "urgent", "blocker", "showstopper"]
+	},
+	{
+		"name": "priority: high",
+		"color": "d93f0b",
+		"description": "Needs attention soon — not blocking, but don't let it sit",
+		"aliases": ["high", "p1", "p-high", "high priority"]
+	},
+	{
+		"name": "priority: low",
+		"color": "0e8a16",
+		"description": "Minor issue or improvement that can be deferred without impact",
+		"aliases": ["low", "p3", "p-low", "low priority", "nice to have"]
+	},
+	{
+		"name": "priority: medium",
+		"color": "fbca04",
+		"description": "Should be addressed in the normal course of development",
+		"aliases": ["medium", "p2", "p-medium", "medium priority", "normal"]
+	},
+	{
+		"name": "status: can't reproduce",
+		"color": "fec1c1",
+		"description": "The reported issue could not be reproduced with the provided steps",
+		"aliases": ["cant reproduce", "cannot reproduce", "unreproducible", "not reproducible", "no repro"]
+	},
+	{
+		"name": "status: confirmed",
+		"color": "215cea",
+		"description": "The issue has been verified and reproduced by a maintainer",
+		"aliases": ["confirmed", "verified", "reproduced", "acknowledged"]
+	},
+	{
+		"name": "status: duplicate",
+		"color": "cfd3d7",
+		"description": "This issue or pull request already exists elsewhere",
+		"aliases": ["duplicate", "dupe", "dup", "already exists", "same as"]
+	},
+	{
+		"name": "status: needs information",
+		"color": "fef2c0",
+		"description": "Additional details or clarification from the author are required before proceeding",
+		"aliases": ["needs info", "more info needed", "needs more info", "waiting for response", "needs clarification", "triage"]
+	},
+	{
+		"name": "status: wont do/fix",
+		"color": "eeeeee",
+		"description": "This has been reviewed and will not be addressed or implemented",
+		"aliases": ["wontfix", "wont fix", "by design", "intentional", "closed won't fix", "not a bug"]
+	},
+	{
+		"name": "type: bug",
+		"color": "d73a4a",
+		"description": "Something is broken or not behaving as expected",
+		"aliases": ["bug", "defect", "error", "fault", "regression", "broken", "patch"]
+	},
+	{
+		"name": "type: discussion",
+		"color": "d4c5f9",
+		"description": "An open-ended conversation, RFC, or topic that needs team input",
+		"aliases": ["discussion", "rfc", "proposal", "talk", "question and answer", "debate"]
+	},
+	{
+		"name": "type: documentation",
+		"color": "006b75",
+		"description": "Relates to docs, README updates, guides, or inline code comments",
+		"aliases": ["docs", "documentation", "doc", "readme", "wiki", "guide"]
+	},
+	{
+		"name": "type: enhancement",
+		"color": "84b6eb",
+		"description": "An improvement to existing functionality without adding a new feature",
+		"aliases": ["enhancement", "improvement", "improve", "refactor", "refactoring", "chore"]
+	},
+	{
+		"name": "type: epic",
+		"color": "3E4B9E",
+		"description": "A large theme of work that groups related issues and sub-tasks",
+		"aliases": ["epic", "initiative", "milestone", "theme", "umbrella", "meta"]
+	},
+	{
+		"name": "type: feature request",
+		"color": "fbca04",
+		"description": "A request to add new functionality that does not currently exist",
+		"aliases": ["feature", "feature request", "feat", "new feature", "request", "fr"]
+	},
+	{
+		"name": "type: question",
+		"color": "d876e3",
+		"description": "A general question or support request that needs clarification",
+		"aliases": ["question", "inquiry", "how to", "howto", "support", "ask"]
+	},
+	{
+		"name": "release",
+		"color": "0075ca",
+		"description": "Marks a pull request as a pending release — merge to publish a new version",
+		"aliases": ["autorelease", "release pr", "release-pr", "pending release"]
+	},
+	{
+		"name": "semver: major",
+		"color": "e11d48",
+		"description": "This release includes breaking changes and bumps the major version",
+		"aliases": ["major", "breaking", "breaking change", "breaking-change"]
+	},
+	{
+		"name": "semver: minor",
+		"color": "f97316",
+		"description": "This release adds new functionality in a backwards-compatible way",
+		"aliases": ["minor", "feature release"]
+	},
+	{
+		"name": "semver: patch",
+		"color": "22c55e",
+		"description": "This release contains only backwards-compatible bug fixes",
+		"aliases": ["patch", "hotfix", "bugfix"]
+	},
+	{
+		"name": "semver: explicit",
+		"color": "8b5cf6",
+		"description": "This release uses an explicitly specified version rather than an auto-detected bump",
+		"aliases": ["explicit", "explicit version", "manual version", "pinned"]
+	}
+]

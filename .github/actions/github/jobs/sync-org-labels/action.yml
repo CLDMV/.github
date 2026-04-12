@@ -1,0 +1,34 @@
+name: "Sync Org Labels"
+description: "Syncs labels across all repos in an org using data/github-labels.json as the source of truth. Repos with a .labelignore file at the root are skipped."
+
+inputs:
+  github-token:
+    description: "GitHub App token with org-level repo/issues write access"
+    required: true
+  org:
+    description: "GitHub organisation to sync (defaults to current repo owner)"
+    required: false
+    default: ${{ github.repository_owner }}
+  dry-run:
+    description: "Dry run — report changes without applying them"
+    required: false
+    default: "false"
+  debug:
+    description: "Enable verbose debug logging"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Sync labels
+      id: sync
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ORG: ${{ inputs.org }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        DEBUG: ${{ inputs.debug }}
+        # Absolute path to the labels JSON — the .github repo is always checked out to GITHUB_WORKSPACE
+        LABELS_JSON_PATH: ${{ github.workspace }}/data/github-labels.json
+      run: node "${{ github.action_path }}/sync.mjs"

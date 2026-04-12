@@ -224,15 +224,20 @@ runs:
       run: |
         echo "- 🧪 **DRY RUN**: Would create commit with message: 'chore: bump version to ${{ steps.version.outputs.new-version }}'" >> $GITHUB_STEP_SUMMARY
 
-    - name: Compute PR labels
-      id: pr-labels
+    - name: Compute raw label aliases
+      id: raw-labels
       shell: bash
       run: |
         BUMP_TYPE="${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}"
-        LABELS="release,${BUMP_TYPE}"
-        [ "$BUMP_TYPE" = "patch" ] && LABELS="${LABELS},bug"
-        echo "labels=${LABELS}" >> $GITHUB_OUTPUT
-        echo "🏷️ PR labels: ${LABELS}"
+        ALIASES="release,${BUMP_TYPE}"
+        [ "$BUMP_TYPE" = "patch" ] && ALIASES="${ALIASES},bug"
+        echo "labels=${ALIASES}" >> $GITHUB_OUTPUT
+
+    - name: Resolve PR label aliases
+      id: pr-labels
+      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
+      with:
+        aliases: ${{ steps.raw-labels.outputs.labels }}
 
     - name: Create pull request
       if: inputs.dry-run != 'true'

@@ -338,17 +338,31 @@ jobs:
                   echo "✅ PR #$PR_NUMBER has been updated with title 'release: v${NEW_VERSION}' and latest changelog"
                   echo "ℹ️ Skipped full release workflow since PR already exists"
 
+            - name: Compute raw label aliases
+              id: raw-labels
+              shell: bash
+              env:
+                  BUMP_TYPE: ${{ steps.release-check.outputs.version-bump }}
+              run: |
+                  ALIASES="release,${BUMP_TYPE}"
+                  [ "$BUMP_TYPE" = "patch" ] && ALIASES="${ALIASES},bug"
+                  echo "labels=${ALIASES}" >> $GITHUB_OUTPUT
+
+            - name: Resolve PR label aliases
+              id: resolved-labels
+              uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
+              with:
+                  aliases: ${{ steps.raw-labels.outputs.labels }}
+
             - name: Sync PR labels
               shell: bash
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-                  BUMP_TYPE: ${{ steps.release-check.outputs.version-bump }}
+                  LABELS: ${{ steps.resolved-labels.outputs.labels }}
               run: |
                   REPO_OWNER="${{ github.repository_owner }}"
                   REPO_NAME="${{ github.event.repository.name }}"
-                  LABELS="release,${BUMP_TYPE}"
-                  [ "$BUMP_TYPE" = "patch" ] && LABELS="${LABELS},bug"
                   echo "🏷️ Syncing labels: ${LABELS}"
                   LABELS_JSON=$(echo "$LABELS" | tr ',' '\n' | jq -R . | jq -s .)
                   gh api repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels \

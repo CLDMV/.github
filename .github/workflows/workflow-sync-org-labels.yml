@@ -1,0 +1,46 @@
+name: "🏷️ Sync Org Labels"
+
+on:
+    schedule:
+        # Runs every Monday at 06:00 UTC
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Dry run — report what would change without applying it"
+                type: boolean
+                default: false
+            debug:
+                description: "Enable debug logging"
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+
+jobs:
+    sync-labels:
+        name: "🏷️ Sync Labels Across Org"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout .github repo
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+
+            - name: Setup Node.js
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+
+            - name: Create App token (org-wide)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  owner: ${{ github.repository_owner }}
+
+            - name: Sync org labels
+              uses: CLDMV/.github/.github/actions/github/jobs/sync-org-labels@v2
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  org: ${{ github.repository_owner }}
+                  dry-run: ${{ inputs.dry_run || 'false' }}
+                  debug: ${{ inputs.debug || 'false' }}
