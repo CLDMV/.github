@@ -12,6 +12,10 @@ inputs:
     description: "Repository owner (defaults to current repository owner)"
     required: false
     default: ${{ github.repository_owner }}
+  permission_contents:
+    description: "Request contents write permission"
+    required: false
+    default: "false"
   permission_workflows:
     description: "Request workflows write permission (needed when pushing tags that touch .github/workflows/)"
     required: false
@@ -24,16 +28,16 @@ inputs:
 outputs:
   token:
     description: "The App token if available, otherwise the default GITHUB_TOKEN"
-    value: ${{ steps.app-token.outputs.token || github.token }}
+    value: ${{ steps.app-token-full.outputs.token || steps.app-token-scoped.outputs.token || github.token }}
   using_app_token:
     description: "Whether an App token was created (true/false)"
     value: ${{ steps.check-app.outputs.use_app_token }}
   installation-id:
     description: "GitHub App installation ID"
-    value: ${{ steps.app-token.outputs.installation-id }}
+    value: ${{ steps.app-token-full.outputs.installation-id || steps.app-token-scoped.outputs.installation-id }}
   app-slug:
     description: "GitHub App slug"
-    value: ${{ steps.app-token.outputs.app-slug }}
+    value: ${{ steps.app-token-full.outputs.app-slug || steps.app-token-scoped.outputs.app-slug }}
 
 runs:
   using: composite
@@ -53,15 +57,41 @@ runs:
           echo "⚠️  App secrets not available - will use default GITHUB_TOKEN"
         fi
 
-    - name: Create installation access token for the App
-      id: app-token
-      if: ${{ steps.check-app.outputs.use_app_token == 'true' }}
+    - name: Determine permissions mode
+      id: perms-mode
+      shell: bash
+      run: |
+        # When ANY permission flag is set to "true", enter fine-grained mode.
+        # Otherwise the token inherits ALL permissions the App has.
+        if [[ "${{ inputs.permission_contents }}" == "true" ]] || \
+           [[ "${{ inputs.permission_workflows }}" == "true" ]] || \
+           [[ "${{ inputs.permission_issues }}" == "true" ]]; then
+          echo "fine_grained=true" >> "$GITHUB_OUTPUT"
+          echo "🔒 Fine-grained permissions mode"
+        else
+          echo "fine_grained=false" >> "$GITHUB_OUTPUT"
+          echo "🔓 Full app permissions mode (no fine-grained scoping)"
+        fi
+
+    - name: Create installation access token (all app permissions)
+      id: app-token-full
+      if: ${{ steps.check-app.outputs.use_app_token == 'true' && steps.perms-mode.outputs.fine_grained == 'false' }}
       uses: actions/create-github-app-token@v3
       with:
         client-id: ${{ inputs.client_id || env.BOT_APP_CLIENT_ID }}
         private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
         owner: ${{ inputs.owner }}
-        skip-token-revoke: true # Don't revoke token - needed for multi-job workflows
-        permission-contents: write
+        skip-token-revoke: true
+
+    - name: Create installation access token (fine-grained permissions)
+      id: app-token-scoped
+      if: ${{ steps.check-app.outputs.use_app_token == 'true' && steps.perms-mode.outputs.fine_grained == 'true' }}
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.client_id || env.BOT_APP_CLIENT_ID }}
+        private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
+        owner: ${{ inputs.owner }}
+        skip-token-revoke: true
+        permission-contents: ${{ inputs.permission_contents == 'true' && 'write' || '' }}
         permission-workflows: ${{ inputs.permission_workflows == 'true' && 'write' || '' }}
         permission-issues: ${{ inputs.permission_issues == 'true' && 'write' || '' }}
