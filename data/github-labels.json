@@ -66,6 +66,12 @@
 		"aliases": ["wontfix", "wont fix", "by design", "intentional", "closed won't fix", "not a bug"]
 	},
 	{
+		"name": "status: invalid",
+		"color": "e4e669",
+		"description": "This issue or pull request is not valid, off-topic, or submitted in error",
+		"aliases": ["invalid", "spam", "not an issue", "wrong repo", "off topic"]
+	},
+	{
 		"name": "type: bug",
 		"color": "d73a4a",
 		"description": "Something is broken or not behaving as expected",
@@ -88,6 +94,12 @@
 		"color": "84b6eb",
 		"description": "An improvement to existing functionality without adding a new feature",
 		"aliases": ["enhancement", "improvement", "improve", "refactor", "refactoring", "chore"]
+	},
+	{
+		"name": "type: dependencies",
+		"color": "0075ca",
+		"description": "Relates to dependency updates, version bumps, or package management",
+		"aliases": ["dependencies", "deps", "dependency", "dependabot", "renovate", "npm", "packages"]
 	},
 	{
 		"name": "type: epic",

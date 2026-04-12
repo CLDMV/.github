@@ -47,8 +47,8 @@ async function api(path, options = {}) {
 			Accept: "application/vnd.github+json",
 			"X-GitHub-Api-Version": "2022-11-28",
 			"Content-Type": "application/json",
-			...(options.headers || {}),
-		},
+			...(options.headers || {})
+		}
 	});
 
 	let body = null;
@@ -78,8 +78,8 @@ async function paginate(path) {
 			headers: {
 				Authorization: `Bearer ${TOKEN}`,
 				Accept: "application/vnd.github+json",
-				"X-GitHub-Api-Version": "2022-11-28",
-			},
+				"X-GitHub-Api-Version": "2022-11-28"
+			}
 		});
 
 		const text = await res.text();
@@ -211,13 +211,13 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 		const patchBody = {
 			new_name: canonical.name,
 			color: canonical.color,
-			description: canonical.description ?? "",
+			description: canonical.description ?? ""
 		};
 
 		if (!DRY_RUN) {
 			const { status, body } = await api(`/repos/${owner}/${repo}/labels/${encodeURIComponent(current.name)}`, {
 				method: "PATCH",
-				body: JSON.stringify(patchBody),
+				body: JSON.stringify(patchBody)
 			});
 			if (status !== 200) {
 				report.errors.push(`Failed to update \`${current.name}\` (HTTP ${status}): ${typeof body === "object" ? body?.message : body}`);
@@ -226,7 +226,11 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 		}
 
 		const parts = [];
-		if (needsRename) parts.push(`renamed \`${current.name}\` → \`${canonical.name}\``);
+		if (needsRename) {
+			parts.push(`renamed \`${current.name}\` → \`${canonical.name}\``);
+		} else {
+			parts.push(`\`${canonical.name}\``);
+		}
 		if (needsColorUpdate) parts.push(`color \`#${current.color}\` → \`#${canonical.color}\``);
 		if (needsDescUpdate) parts.push(`description updated`);
 		report.changes.push(`✏️  ${parts.join(", ")}`);
@@ -242,8 +246,8 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 				body: JSON.stringify({
 					name: canonical.name,
 					color: canonical.color,
-					description: canonical.description ?? "",
-				}),
+					description: canonical.description ?? ""
+				})
 			});
 			if (status !== 201) {
 				report.errors.push(`Failed to create \`${canonical.name}\` (HTTP ${status}): ${typeof body === "object" ? body?.message : body}`);
