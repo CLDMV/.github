@@ -120,7 +120,7 @@ on:
 jobs:
   ci:
     name: 🏗️ Continuous Integration
-    uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v1
+    uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v2
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}

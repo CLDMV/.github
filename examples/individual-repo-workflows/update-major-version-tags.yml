@@ -54,7 +54,7 @@ on:
 
 jobs:
   update-tags:
-    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1
+    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v2
     permissions:
       contents: write
     with:

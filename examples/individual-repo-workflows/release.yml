@@ -97,7 +97,7 @@ jobs:
       github.actor != 'cldmv-bot[bot]' && 
       github.actor != 'github-actions[bot]' &&
       !startsWith(github.event.head_commit.message, 'chore: bump version')
-    uses: CLDMV/.github/.github/workflows/workflow-release.yml@v1
+    uses: CLDMV/.github/.github/workflows/workflow-release.yml@v2
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}
