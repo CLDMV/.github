@@ -394,8 +394,10 @@ const aliasMap = buildAliasMap(canonicalLabels);
 console.log(`📋 Loaded ${canonicalLabels.length} canonical labels from ${LABELS_JSON_PATH}`);
 console.log(`🏢 Syncing labels for org: ${ORG}${DRY_RUN ? " (DRY RUN)" : ""}`);
 
-// Fetch all repos in the org
-const allRepos = await paginate(`/orgs/${ORG}/repos`);
+// Fetch all repos in the org, sort alphabetically
+const allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) =>
+	a.name.localeCompare(b.name)
+);
 console.log(`📦 Found ${allRepos.length} repositories`);
 
 // Write summary header
@@ -407,6 +409,9 @@ let reposChanged = 0;
 let reposClean = 0;
 let reposSkipped = 0;
 let reposErrored = 0;
+
+// Repos that are already clean — collected and written at the end
+const cleanRepos = [];
 
 for (const repoData of allRepos) {
 	const repo = repoData.name;
@@ -440,13 +445,14 @@ for (const repoData of allRepos) {
 	const hasErrors = report.errors.length > 0;
 	const hasChanges = report.changes.length > 0;
 
-	summary(`\n---\n\n## 📦 \`${repo}\``);
-
 	if (!hasChanges && !hasErrors) {
-		summary(`\n✅ All labels are up to date — no changes needed`);
+		// Defer clean repos to the end summary
+		cleanRepos.push(repo);
 		reposClean++;
 		continue;
 	}
+
+	summary(`\n---\n\n## 📦 \`${repo}\``);
 
 	if (hasChanges) {
 		summary(`\n${DRY_RUN ? "**Would apply:**" : "**Changes applied:**"}`);
@@ -475,6 +481,14 @@ summary(`| ✏️ Updated | ${reposChanged} |`);
 summary(`| ⏭️ Skipped | ${reposSkipped} |`);
 summary(`| ❌ Errors | ${reposErrored} |`);
 summary(`| **Total** | **${allRepos.length}** |`);
+
+// List clean repos in a collapsed section at the end
+if (cleanRepos.length > 0) {
+	summary(`\n---\n\n## ✅ Already Up To Date (${cleanRepos.length})\n`);
+	for (const repo of cleanRepos) {
+		summary(`- \`${repo}\``);
+	}
+}
 
 console.log(`\n✅ Done. Changed: ${reposChanged}, Clean: ${reposClean}, Skipped: ${reposSkipped}, Errors: ${reposErrored}`);
 
