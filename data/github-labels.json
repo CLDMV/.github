@@ -114,6 +114,12 @@
 		"aliases": ["feature", "feature request", "feat", "new feature", "request", "fr"]
 	},
 	{
+		"name": "type: future feature",
+		"color": "c2e0c6",
+		"description": "A feature idea that is out of scope for now but worth revisiting later",
+		"aliases": ["future feature", "future", "someday", "backlog", "deferred", "long-term", "icebox"]
+	},
+	{
 		"name": "type: question",
 		"color": "d876e3",
 		"description": "A general question or support request that needs clarification",
