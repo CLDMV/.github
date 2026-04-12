@@ -56,9 +56,10 @@ async function validateToken() {
 
 	// ── 1. Rate-limit check ─────────────────────────────────────────────
 	//    App installation tokens get 5 000 req/h; GITHUB_TOKEN gets 1 000.
+	//    The `rate` object was removed in 2026-03-10; use `resources.core`.
 	const rl = await fetch(`${BASE}/rate_limit`, { headers: authHeaders() });
 	const rlBody = await rl.json().catch(() => null);
-	const limit = rlBody?.rate?.limit ?? "unknown";
+	const limit = rlBody?.resources?.core?.limit ?? rlBody?.rate?.limit ?? "unknown";
 
 	console.log(`Rate-limit : ${limit} req/h  (app ≈ 5 000, GITHUB_TOKEN ≈ 1 000)`);
 	if (typeof limit === "number" && limit <= 1000) {
@@ -68,50 +69,24 @@ async function validateToken() {
 		);
 	}
 
-	// ── 2. Token introspection via installation endpoint ────────────────
-	//    POST /applications/{client_id}/token introspects the token and
-	//    returns the *actual* permissions the token was granted.
-	//    But that requires basic auth (client_id:client_secret) which we
-	//    don't have here.  Instead, check the installation metadata:
-	//    GET /installation/repositories returns repos + includes the
-	//    installation's permissions in the response.
+	// ── 2. Installation repository count ────────────────────────────────
+	//    GET /installation/repositories confirms the token is a valid
+	//    installation token and shows how many repos it can access.
+	//    Note: this endpoint does NOT return installation-level permissions
+	//    at the top level — permissions are per-repo inside `repositories[]`.
 	const instRes = await fetch(`${BASE}/installation/repositories?per_page=1`, {
 		headers: authHeaders()
 	});
 	if (instRes.ok) {
 		const instBody = await instRes.json();
-		const perms = instBody.permissions ?? {};
-		console.log(`Token perms: ${JSON.stringify(perms)}`);
-		console.log(`Total repos: ${instBody.total_count ?? "unknown"}`);
-		if (!perms.issues || perms.issues === "none") {
-			console.error("⚠️  Token does NOT have issues permission — labels require issues:write.");
-		} else if (perms.issues === "read") {
-			console.error("⚠️  Token has issues:read but NOT issues:write — labels require write.");
-		} else {
-			console.log(`✅ Token has issues:${perms.issues}`);
-		}
+		console.log(`Install    : ✅ Valid installation token — ${instBody.total_count ?? "unknown"} repos accessible`);
 	} else {
-		const instErr = await instRes.text().catch(() => "");
-		console.log(`GET /installation/repositories: ${instRes.status} — ${instErr}`);
+		console.log(`Install    : ❌ GET /installation/repositories → ${instRes.status} (not an installation token?)`);
 	}
 
-	// ── 3. Repo-level permissions on a sample repo ──────────────────────
-	const probe = await fetch(`${BASE}/orgs/${ORG}/repos?per_page=1&sort=pushed&type=all`, {
-		headers: authHeaders()
-	});
-	const repos = await probe.json().catch(() => []);
-	if (Array.isArray(repos) && repos.length > 0) {
-		const perms = repos[0].permissions ?? {};
-		console.log(`Repo perms : ${repos[0].full_name} → ${JSON.stringify(perms)}`);
-		if (!perms.triage && !perms.push && !perms.admin) {
-			console.error("⚠️  Token has NO write/triage access on this repo — label sync will fail.");
-		}
-	}
-
-	// ── 4. Targeted label write test ────────────────────────────────────
-	//    Try to create a temporary label on the .github repo itself, then
-	//    immediately delete it.  This is the most conclusive proof of
-	//    whether the token can actually manage labels.
+	// ── 3. Targeted label write test ────────────────────────────────────
+	//    The most conclusive proof: try to create a temporary label on the
+	//    .github repo, then immediately delete it.
 	const testRepo = `${ORG}/.github`;
 	const testLabel = `__sync-diag-${Date.now()}`;
 	const writeRes = await fetch(`${BASE}/repos/${testRepo}/labels`, {
@@ -137,15 +112,10 @@ async function validateToken() {
 		console.error(`Label write: ❌ DENIED on ${testRepo}  (HTTP ${writeRes.status})`);
 		console.error(`  Response  : ${body}`);
 		console.error(`  Required  : ${accepted}`);
-		console.error("");
-		console.error("  This means the token does not have issues:write.");
 		console.error("  Possible causes:");
-		console.error("    1. The app installation's 'Issues' permission is set to 'Read' instead of 'Read & write'");
-		console.error("       → Org Settings → GitHub Apps → <your bot> → Configure → Permissions → Repository permissions → Issues");
-		console.error("    2. The app manifest has issues:write BUT the installation was approved before that");
-		console.error("       permission was added. GitHub does NOT auto-upgrade installations — the org admin");
-		console.error("       must accept the new permission request (a banner appears on the app's config page).");
-		console.error("    3. The token fell through to github.token (check rate-limit above — should be 5000).");
+		console.error("    1. The app installation's 'Issues' permission is not 'Read & write'");
+		console.error("    2. The org admin has not accepted a pending permission upgrade");
+		console.error("    3. The token fell through to github.token (check rate-limit above)");
 	}
 
 	console.log("::endgroup::");
