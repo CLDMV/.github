@@ -33,6 +33,117 @@ if (!LABELS_JSON_PATH) throw new Error("LABELS_JSON_PATH is not set");
 const BASE = "https://api.github.com";
 
 /**
+ * Standard headers for GitHub API requests.
+ * @returns {Record<string, string>}
+ */
+function authHeaders() {
+	return {
+		Authorization: `Bearer ${TOKEN}`,
+		Accept: "application/vnd.github+json",
+		"X-GitHub-Api-Version": "2022-11-28"
+	};
+}
+
+/**
+ * Validates the token by checking rate-limit, app identity, repo
+ * permissions, and — most importantly — whether label writes are
+ * actually allowed.  Logs diagnostics so we can tell at a glance
+ * whether the token is an app installation token and what
+ * permissions the installation was granted.
+ */
+async function validateToken() {
+	console.log("::group::🔑 Token diagnostics");
+
+	// ── 1. Rate-limit check ─────────────────────────────────────────────
+	//    App installation tokens get 5 000 req/h; GITHUB_TOKEN gets 1 000.
+	const rl = await fetch(`${BASE}/rate_limit`, { headers: authHeaders() });
+	const rlBody = await rl.json().catch(() => null);
+	const limit = rlBody?.rate?.limit ?? "unknown";
+
+	console.log(`Rate-limit : ${limit} req/h  (app ≈ 5 000, GITHUB_TOKEN ≈ 1 000)`);
+	if (typeof limit === "number" && limit <= 1000) {
+		console.error(
+			"⚠️  Token looks like the default GITHUB_TOKEN, NOT an App installation token!\n" +
+				"    The create-app-token step may have been skipped or its output was empty."
+		);
+	}
+
+	// ── 2. App identity + manifest permissions ──────────────────────────
+	//    GET /app works with installation tokens and returns the app's
+	//    *registered* permissions (the maximum the token can ever have).
+	const appRes = await fetch(`${BASE}/app`, { headers: authHeaders() });
+	if (appRes.ok) {
+		const app = await appRes.json();
+		console.log(`App        : "${app.name}" (slug: ${app.slug}, id: ${app.id})`);
+		console.log(`App perms  : ${JSON.stringify(app.permissions)}`);
+		if (!app.permissions?.issues || app.permissions.issues === "none") {
+			console.error("⚠️  The app's manifest does NOT include issues permission — labels require issues:write.");
+		} else if (app.permissions.issues === "read") {
+			console.error("⚠️  The app's manifest has issues:read but NOT issues:write — labels require write.");
+		}
+	} else {
+		console.log(`GET /app   : ${appRes.status} — token is probably NOT an app installation token`);
+	}
+
+	// ── 3. Repo-level permissions on a sample repo ──────────────────────
+	const probe = await fetch(`${BASE}/orgs/${ORG}/repos?per_page=1&sort=pushed&type=all`, {
+		headers: authHeaders()
+	});
+	const repos = await probe.json().catch(() => []);
+	if (Array.isArray(repos) && repos.length > 0) {
+		const perms = repos[0].permissions ?? {};
+		console.log(`Repo perms : ${repos[0].full_name} → ${JSON.stringify(perms)}`);
+		if (!perms.triage && !perms.push && !perms.admin) {
+			console.error("⚠️  Token has NO write/triage access on this repo — label sync will fail.");
+		}
+	}
+
+	// ── 4. Targeted label write test ────────────────────────────────────
+	//    Try to create a temporary label on the .github repo itself, then
+	//    immediately delete it.  This is the most conclusive proof of
+	//    whether the token can actually manage labels.
+	const testRepo = `${ORG}/.github`;
+	const testLabel = `__sync-diag-${Date.now()}`;
+	const writeRes = await fetch(`${BASE}/repos/${testRepo}/labels`, {
+		method: "POST",
+		headers: { ...authHeaders(), "Content-Type": "application/json" },
+		body: JSON.stringify({
+			name: testLabel,
+			color: "000000",
+			description: "Temporary diagnostic label — safe to delete"
+		})
+	});
+
+	if (writeRes.ok) {
+		console.log(`Label write: ✅ CONFIRMED on ${testRepo}`);
+		// Clean up the test label immediately
+		await fetch(`${BASE}/repos/${testRepo}/labels/${encodeURIComponent(testLabel)}`, {
+			method: "DELETE",
+			headers: authHeaders()
+		});
+	} else {
+		const body = await writeRes.text();
+		const accepted = writeRes.headers.get("x-accepted-github-permissions") || "(not present)";
+		console.error(`Label write: ❌ DENIED on ${testRepo}  (HTTP ${writeRes.status})`);
+		console.error(`  Response  : ${body}`);
+		console.error(`  Required  : ${accepted}`);
+		console.error("");
+		console.error("  This means the token does not have issues:write.");
+		console.error("  Possible causes:");
+		console.error("    1. The app installation's 'Issues' permission is set to 'Read' instead of 'Read & write'");
+		console.error("       → Org Settings → GitHub Apps → <your bot> → Configure → Permissions → Repository permissions → Issues");
+		console.error("    2. The app manifest has issues:write BUT the installation was approved before that");
+		console.error("       permission was added. GitHub does NOT auto-upgrade installations — the org admin");
+		console.error("       must accept the new permission request (a banner appears on the app's config page).");
+		console.error("    3. The token fell through to github.token (check rate-limit above — should be 5000).");
+	}
+
+	console.log("::endgroup::");
+}
+
+await validateToken();
+
+/**
  * Makes an authenticated GitHub API request.
  * @param {string} path - API path (e.g. "/orgs/CLDMV/repos")
  * @param {object} [options] - fetch options (method, body, etc.)
@@ -186,9 +297,9 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 		if (!canonical) {
 			// No match at all → delete
 			if (!DRY_RUN) {
-				const { status } = await api(`/repos/${owner}/${repo}/labels/${encodeURIComponent(current.name)}`, { method: "DELETE" });
+				const { status, body } = await api(`/repos/${owner}/${repo}/labels/${encodeURIComponent(current.name)}`, { method: "DELETE" });
 				if (status !== 204) {
-					report.errors.push(`Failed to delete \`${current.name}\` (HTTP ${status})`);
+					report.errors.push(`Failed to delete \`${current.name}\` (HTTP ${status}): ${typeof body === "object" ? body?.message : body}`);
 					continue;
 				}
 			}

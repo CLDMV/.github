@@ -95,3 +95,17 @@ runs:
         permission-contents: ${{ inputs.permission_contents == 'true' && 'write' || '' }}
         permission-workflows: ${{ inputs.permission_workflows == 'true' && 'write' || '' }}
         permission-issues: ${{ inputs.permission_issues == 'true' && 'write' || '' }}
+
+    - name: Log token resolution
+      shell: bash
+      run: |
+        echo "::group::🔑 Token resolution diagnostic"
+        echo "use_app_token=${{ steps.check-app.outputs.use_app_token }}"
+        echo "fine_grained=${{ steps.perms-mode.outputs.fine_grained }}"
+        echo "app-token-full ran=${{ steps.app-token-full.outcome || 'skipped' }}"
+        echo "app-token-scoped ran=${{ steps.app-token-scoped.outcome || 'skipped' }}"
+        echo "app-token-full has output=${{ steps.app-token-full.outputs.token != '' }}"
+        echo "app-token-scoped has output=${{ steps.app-token-scoped.outputs.token != '' }}"
+        echo "installation-id=${{ steps.app-token-full.outputs.installation-id || steps.app-token-scoped.outputs.installation-id || 'none' }}"
+        echo "app-slug=${{ steps.app-token-full.outputs.app-slug || steps.app-token-scoped.outputs.app-slug || 'none' }}"
+        echo "::endgroup::"
