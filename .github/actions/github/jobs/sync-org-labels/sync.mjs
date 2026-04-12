@@ -395,9 +395,7 @@ console.log(`📋 Loaded ${canonicalLabels.length} canonical labels from ${LABEL
 console.log(`🏢 Syncing labels for org: ${ORG}${DRY_RUN ? " (DRY RUN)" : ""}`);
 
 // Fetch all repos in the org, sort alphabetically
-const allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) =>
-	a.name.localeCompare(b.name)
-);
+const allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
 console.log(`📦 Found ${allRepos.length} repositories`);
 
 // Write summary header

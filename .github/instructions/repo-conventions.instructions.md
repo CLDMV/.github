@@ -1,5 +1,5 @@
 ---
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Agent Instructions — CLDMV/.github
@@ -17,12 +17,14 @@ and `vX` (major rolling). Callers reference `@v2` or `@v2.0` to always get the l
 ### ALWAYS use `--force` push for rolling tags — NEVER delete+recreate
 
 **Wrong (creates a gap where the tag doesn't exist):**
+
 ```bash
 git push origin :refs/tags/v2         # tag is GONE — any workflow resolving @v2 FAILS here
 git push origin v2                    # tag comes back
 ```
 
 **Correct (atomic, tag is always reachable):**
+
 ```bash
 git push --force origin v2 v2.0
 ```
@@ -60,11 +62,13 @@ git push --force origin vX vX.Y
 ## API Version
 
 All GitHub REST API calls in this repo use:
+
 ```
 Accept: application/vnd.github+json
 Authorization: Bearer <token>
 X-GitHub-Api-Version: 2026-03-10
 ```
+
 Never use the deprecated `application/vnd.github.v3+json` or `Authorization: token`.
 
 ---
@@ -72,6 +76,7 @@ Never use the deprecated `application/vnd.github.v3+json` or `Authorization: tok
 ## Secret Names
 
 Org-level secrets use the `CLDMV_` prefix. Always use:
+
 - `secrets.CLDMV_BOT_APP_CLIENT_ID`
 - `secrets.CLDMV_BOT_APP_PRIVATE_KEY`
 
@@ -82,5 +87,6 @@ Reusable workflows accept them mapped to `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_
 ## Commit & Tag Signing
 
 All commits and tags must be GPG-signed:
+
 - `git commit -S`
 - `git tag -s` (not `-a`)
