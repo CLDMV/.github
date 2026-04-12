@@ -16,6 +16,10 @@ inputs:
     description: "Request workflows write permission (needed when pushing tags that touch .github/workflows/)"
     required: false
     default: "false"
+  permission_issues:
+    description: "Request issues write permission (needed for creating/updating/deleting labels)"
+    required: false
+    default: "false"
 
 outputs:
   token:
@@ -60,3 +64,4 @@ runs:
         skip-token-revoke: true # Don't revoke token - needed for multi-job workflows
         permission-contents: write
         permission-workflows: ${{ inputs.permission_workflows == 'true' && 'write' || '' }}
+        permission-issues: ${{ inputs.permission_issues == 'true' && 'write' || '' }}
