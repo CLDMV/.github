@@ -205,7 +205,14 @@ async function main() {
 		// unless the token has workflows:write.  Fix:
 		//   1. Unset the checkout-installed extraheader so git uses URL credentials instead.
 		//   2. Embed the app token (which has workflows:write) in the remote URL.
-		const pushToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+		// Use the native Actions token (passed as ACTIONS_TOKEN) for the git push, not the
+		// app token.  GitHub App installations require an explicit `workflows:write` permission
+		// grant (configured in the App's settings page) to push refs that point to commits
+		// containing .github/workflows/ files.  The Actions-provisioned token (github.token)
+		// with `permissions: contents: write` on the job has an implicit bypass from GitHub
+		// for this, so it succeeds where the app token fails.  App token is still used for
+		// all GitHub API calls (tag object creation, etc.).
+		const pushToken = process.env.ACTIONS_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 		const repo = process.env.GITHUB_REPOSITORY;
 		if (pushToken && repo) {
 			// actions/checkout writes the extraheader into the LOCAL repo config (.git/config),
