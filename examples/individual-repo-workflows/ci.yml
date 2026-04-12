@@ -171,7 +171,7 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       # Optional: CLDMV Bot credentials for enhanced permissions and proper attribution
       # If not provided, will use default GITHUB_TOKEN with GitHub Actions bot attribution
-      BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
+      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
       # Required when enable_coverage_badge: true
       BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
