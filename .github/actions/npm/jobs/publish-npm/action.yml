@@ -99,7 +99,7 @@ runs:
 
     - name: Publish package to NPM
       id: publish-package
-      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v2
       with:
         registry-name: "NPM"
         registry-url: "https://registry.npmjs.org"

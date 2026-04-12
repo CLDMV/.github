@@ -94,7 +94,7 @@ runs:
 
     - name: Publish package to GitHub Packages
       id: publish-package
-      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/publish-package@v2
       with:
         registry-name: "GitHub Packages"
         registry-url: "https://npm.pkg.github.com"

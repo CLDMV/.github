@@ -1,3 +1,17 @@
+#
+# @Project: generate-version-documentation
+# @Filename: /action.yml
+# @Date: 2026-04-11 19:35:57 -07:00 (1775961357)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-11 19:37:11 -07:00 (1775961431)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+
 name: "Generate Version Documentation"
 description: "Create or update VERSION_TAGS.md with current major version mappings"
 
@@ -43,7 +57,7 @@ runs:
         ```yaml
         jobs:
           ci:
-            uses: CLDMV/.github/workflows/ci.yml@v1
+            uses: CLDMV/.github/workflows/ci.yml@v2
         ```
 
         Or use specific versions for stability:
@@ -51,7 +65,7 @@ runs:
         ```yaml
         jobs:
           ci:
-            uses: CLDMV/.github/workflows/ci.yml@v1.0.1
+            uses: CLDMV/.github/workflows/ci.yml@v2.0.1
         ```
 
         Major version tags are automatically updated when new patch/minor releases are published.
@@ -65,7 +79,3 @@ runs:
           git commit -m "docs: update version tags documentation"
           git push origin HEAD:${{ github.event.repository.default_branch }}
         fi
-
-
-
-

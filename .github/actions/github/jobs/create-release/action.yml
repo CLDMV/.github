@@ -100,7 +100,7 @@ runs:
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
       with:
         fetch-depth: 0
 
@@ -119,13 +119,13 @@ runs:
 
     - name: Get commits for changelog
       id: get-commits
-      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
       with:
         exclude-version: v${{ steps.detect-version.outputs.version }}
 
     - name: Generate comprehensive changelog for release notes
       id: release-notes
-      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.get-commits.outputs.commits-file }}
@@ -139,7 +139,7 @@ runs:
 
     - name: Calculate artifact and release names
       id: names
-      uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+      uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v2
       with:
         node-version: ${{ inputs.node-version }}
         package-name: ${{ inputs.package-name }}
@@ -148,7 +148,7 @@ runs:
     - name: Create tag if needed
       if: inputs.dry-run != 'true'
       id: create-tag
-      uses: CLDMV/.github/.github/actions/github/api/tag/create@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/create@v2
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
@@ -181,19 +181,19 @@ runs:
 
     - name: Setup Node.js (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Build package (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
       with:
         build-command: ${{ inputs.build-command || 'npm run build:ci' }}
         environment: production
@@ -201,7 +201,7 @@ runs:
     - name: Create npm package (if no artifacts available)
       if: inputs.release-source-only == 'false'
       id: create-package
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v2
       with:
         package-manager: ${{ inputs.package-manager }}
         package-name: ${{ inputs.package-name }}
@@ -209,14 +209,14 @@ runs:
     - name: Create package files for release
       if: inputs.release-source-only == 'false'
       id: package-files
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v2
       with:
         package-path: ${{ steps.create-package.outputs.package-path }}
 
     - name: Create GitHub release
       if: inputs.dry-run != 'true'
       id: create-release
-      uses: CLDMV/.github/.github/actions/github/api/release/create@v1
+      uses: CLDMV/.github/.github/actions/github/api/release/create@v2
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
@@ -356,7 +356,7 @@ runs:
     - name: Verify tag signature
       if: inputs.dry-run != 'true'
       id: verify-tag
-      uses: CLDMV/.github/.github/actions/github/api/tag/verify@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/verify@v2
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:

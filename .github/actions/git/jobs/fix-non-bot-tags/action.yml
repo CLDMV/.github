@@ -64,7 +64,7 @@ runs:
 
     - name: Recreate non-bot tags with bot signatures
       if: ${{ steps.gather.outputs.non-bot-tags-found == 'true' }}
-      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v1
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v2
       env:
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:

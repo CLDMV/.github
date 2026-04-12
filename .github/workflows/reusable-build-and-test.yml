@@ -138,7 +138,7 @@ jobs:
                 node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
         steps:
             - name: Build and Test
-              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v1
+              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v2
               with:
                   node-version: ${{ matrix.node-version }}
                   package-manager: ${{ inputs.package_manager }}

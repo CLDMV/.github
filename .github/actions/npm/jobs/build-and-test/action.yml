@@ -31,10 +31,10 @@ runs:
   using: composite
   steps:
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
 
     - name: Setup Node.js
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
 
@@ -46,7 +46,7 @@ runs:
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Install dependencies
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
       with:
         package-manager: ${{ inputs.package-manager }}
 
@@ -57,13 +57,13 @@ runs:
 
     - name: Get Node.js Version
       id: get_node_version
-      uses: CLDMV/.github/.github/actions/node/steps/get-node-version@v1
+      uses: CLDMV/.github/.github/actions/node/steps/get-node-version@v2
       with:
         label: ${{ (inputs.node-version == 'lts/*' || inputs.node-version == 'lts') && 'lts' || '' }}
 
     - name: Run pre-build tests
       id: pre-tests
-      uses: CLDMV/.github/.github/actions/common/steps/run-tests@v1
+      uses: CLDMV/.github/.github/actions/common/steps/run-tests@v2
       with:
         test-command: ${{ inputs.test-command }}
         environment: ${{ inputs.test-environment }}
@@ -79,7 +79,7 @@ runs:
 
     - name: Build package
       id: build
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
@@ -95,7 +95,7 @@ runs:
 
     - name: Create npm package
       id: create-package
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v2
       with:
         package-manager: ${{ inputs.package-manager }}
 
@@ -128,7 +128,7 @@ runs:
         echo "- ✅ NPM package created successfully" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload build artifacts
-      uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v1
+      uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v2
       with:
         artifact-name: build-artifacts-${{ steps.get_node_version.outputs.node-label }}
         artifact-path: |

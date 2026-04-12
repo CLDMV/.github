@@ -82,23 +82,23 @@ runs:
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
       with:
         fetch-depth: 0
 
     - name: Setup Node.js
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Check release commit for auto-detection
       id: commit-check
-      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
 
     - name: Get base version from branch divergence point
       id: base-version
@@ -133,7 +133,7 @@ runs:
 
     - name: Calculate new version
       id: version
-      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
       with:
         version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
         explicit-version: ${{ steps.commit-check.outputs.explicit-version }}
@@ -148,14 +148,14 @@ runs:
         fi
 
     - name: Build package
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
 
     - name: Update package version
       if: inputs.dry-run != 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v1
+      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
       with:
         new-version: ${{ steps.version.outputs.new-version }}
         package-manager: ${{ inputs.package-manager }}
@@ -168,7 +168,7 @@ runs:
 
     - name: Generate comprehensive changelog
       id: changelog
-      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.commit-check.outputs.commits-file }}
@@ -192,7 +192,7 @@ runs:
 
     - name: Detect default branch
       id: default-branch
-      uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v1
+      uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v2
 
     - name: Restore src/ deleted by build
       if: inputs.dry-run != 'true'
@@ -213,7 +213,7 @@ runs:
     - name: Create signed commit
       if: inputs.dry-run != 'true'
       id: commit
-      uses: CLDMV/.github/.github/actions/github/api/commit@v1
+      uses: CLDMV/.github/.github/actions/github/api/commit@v2
       with:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
         github-token: ${{ inputs.github-token }}
@@ -237,7 +237,7 @@ runs:
     - name: Create pull request
       if: inputs.dry-run != 'true'
       id: create-pr
-      uses: CLDMV/.github/.github/actions/github/api/pull-requests@v1
+      uses: CLDMV/.github/.github/actions/github/api/pull-requests@v2
       with:
         title: "release: v${{ steps.version.outputs.new-version }}"
         base-branch: ${{ steps.default-branch.outputs.default-branch }}

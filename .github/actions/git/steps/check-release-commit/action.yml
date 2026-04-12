@@ -34,7 +34,7 @@ runs:
   steps:
     - name: Get commit range and categorized commits
       id: commit-range
-      uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v1
+      uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v2
       with:
         debug: "true"
         exclude-version: ${{ inputs.exclude-version }}

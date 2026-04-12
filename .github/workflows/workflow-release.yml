@@ -157,7 +157,7 @@ jobs:
         steps:
             - name: Check for existing release PR
               id: check
-              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v1
+              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v2
               with:
                   github-token: ${{ github.token }}
                   head-branch: ${{ github.ref_name }}
@@ -174,13 +174,13 @@ jobs:
             has-breaking: ${{ steps.check.outputs.has-breaking }}
         steps:
             - name: Checkout code
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
               with:
                   fetch-depth: 0
 
             - name: Check Release Commit
               id: check
-              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
               env:
                   DEBUG: ${{ inputs.debug || 'true' }}
 
@@ -191,16 +191,16 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v1
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
               with:
                   fetch-depth: 0
 
             - name: Setup Node.js
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v1
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
 
             - name: Check release commit type
               id: release-check
-              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v1
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
               env:
                   DEBUG: ${{ inputs.debug || 'true' }}
 
@@ -217,7 +217,7 @@ jobs:
 
             - name: Calculate new version
               id: version
-              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v1
+              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
               with:
                   version-bump: ${{ steps.release-check.outputs.version-bump }}
                   explicit-version: ${{ steps.release-check.outputs.explicit-version }}
@@ -225,7 +225,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -234,18 +234,18 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Install dependencies
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v1
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
               with:
                   package-manager: ${{ inputs.package_manager }}
 
             - name: Build package
-              uses: CLDMV/.github/.github/actions/common/steps/build-project@v1
+              uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
               with:
                   build-command: ${{ inputs.build_command }}
                   environment: production
 
             - name: Update package version
-              uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v1
+              uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
               with:
                   new-version: ${{ steps.version.outputs.new-version }}
                   package-manager: ${{ inputs.package_manager }}
@@ -262,7 +262,7 @@ jobs:
                   fi
 
             - name: Create signed commit
-              uses: CLDMV/.github/.github/actions/github/api/commit@v1
+              uses: CLDMV/.github/.github/actions/github/api/commit@v2
               with:
                   commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
                   github-token: ${{ steps.app-token.outputs.token }}
@@ -292,7 +292,7 @@ jobs:
 
             - name: Generate updated changelog
               id: changelog
-              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v1
+              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
               with:
                   commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
 
@@ -360,7 +360,7 @@ jobs:
         name: "🏗️ Build and Test"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release]
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v2
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -379,7 +379,7 @@ jobs:
         name: "🚀 Release Management"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release, build-and-test]
-        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v1
+        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v2
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}

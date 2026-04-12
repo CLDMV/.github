@@ -28,7 +28,7 @@ on:
 jobs:
     debug-tag-creation:
         name: "🧪 Debug Tag Creation Issues"
-        uses: CLDMV/.github/.github/workflows/test-tag-creation.yml@v1
+        uses: CLDMV/.github/.github/workflows/test-tag-creation.yml@v2
         with:
             # CHANGE THIS: Replace with your package name
             package_name: "@your-org/your-package"

@@ -275,7 +275,7 @@ jobs:
 
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -336,7 +336,7 @@ jobs:
 
             - name: Fix orphaned releases
               id: fix-orphaned-releases
-              uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v1
+              uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
                   GH_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
@@ -375,7 +375,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -409,7 +409,7 @@ jobs:
             - name: Update major/minor version tags
               id: update-major-tags
               if: steps.find-latest.outputs.has-tag == 'true'
-              uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
               with:
@@ -491,7 +491,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -503,7 +503,7 @@ jobs:
 
             - name: Fix non-bot signatures
               id: fix-bot-sigs
-              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -538,7 +538,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -550,7 +550,7 @@ jobs:
 
             - name: Fix unsigned tags
               id: fix-unsigned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -585,7 +585,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -597,7 +597,7 @@ jobs:
 
             - name: Fix misaligned major/minor version tags
               id: fix-misaligned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -632,7 +632,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -644,7 +644,7 @@ jobs:
 
             - name: Fix orphaned tags
               id: fix-orphaned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v2
               env:
                   GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -698,7 +698,7 @@ jobs:
 
             - name: Final tag scan for summary
               id: final-scan
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -711,13 +711,13 @@ jobs:
             - name: Revoke App token
               if: always() && needs.setup-shared.outputs.auth-token != ''
               id: revoke-token
-              uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v2
               with:
                   auth-token: ${{ needs.setup-shared.outputs.auth-token }}
 
             - name: Build comprehensive summary
               id: summarize
-              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-summary@v1
+              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-summary@v2
               with:
                   debug: ${{ inputs.debug }}
                   final_count: ${{ steps.final-scan.outputs.tags_count }}

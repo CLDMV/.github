@@ -194,7 +194,7 @@ jobs:
     build-and-test:
         name: "🏗️ Build and Test"
         needs: debug-inputs
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v1
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v2
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -216,7 +216,7 @@ jobs:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: read
             packages: write # Required to publish to GitHub Packages
-        uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v1
+        uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v2
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}

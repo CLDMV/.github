@@ -69,7 +69,7 @@ jobs:
                   owner: ${{ github.repository_owner }}
 
             - name: Cleanup old test artifacts
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "cleanup-placeholder"
                   target_commit: ${{ github.sha }}
@@ -141,7 +141,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "a00-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
@@ -233,7 +233,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "a10-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
@@ -296,7 +296,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "a01-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
@@ -386,7 +386,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "a11-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
@@ -419,7 +419,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "gh0-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
@@ -456,7 +456,7 @@ jobs:
 
             - name: Test tag creation
               id: test-tags
-              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v1
+              uses: CLDMV/.github/.github/actions/testing/steps/test-tag-creation-methods@v2
               with:
                   test_tag_name: "gh1-${{ inputs.test_tag_name }}"
                   target_commit: ${{ inputs.target_commit }}
