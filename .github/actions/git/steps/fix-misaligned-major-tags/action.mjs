@@ -197,6 +197,17 @@ async function main() {
 	// Push all fixed tags
 	if (fixedCount > 0) {
 		console.log(`🚀 Pushing fixed tags: ${fixedTags.join(", ")}`);
+
+		// actions/checkout bakes github.token into git's http.extraheader credential config.
+		// That credential doesn't have workflows:write, so pushing tags that touch .github/workflows/
+		// files is rejected. Re-configure the remote URL to use the app token (which does have
+		// workflows:write) so git uses it instead of the checkout-installed credential.
+		const pushToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+		const repo = process.env.GITHUB_REPOSITORY;
+		if (pushToken && repo) {
+			sh(`git remote set-url origin https://x-access-token:${pushToken}@github.com/${repo}.git`);
+		}
+
 		sh("git push origin --tags --force");
 	}
 
