@@ -33,8 +33,8 @@ jobs:
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
 
             - name: Sync org labels
