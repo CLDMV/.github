@@ -16,7 +16,7 @@ This action is typically used at the end of workflows to properly clean up GitHu
 
 ```yaml
 - name: Revoke App token
-  uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v1
+  uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v2
   with:
     auth-token: ${{ steps.create-token.outputs.token }}
 ```
@@ -42,7 +42,7 @@ jobs:
       
       - name: Revoke App token
         if: always() # Always run to ensure cleanup
-        uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v1
+        uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v2
         with:
           auth-token: ${{ steps.create-token.outputs.token }}
 ```

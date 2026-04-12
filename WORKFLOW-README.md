@@ -47,7 +47,7 @@ This repository uses a **streamlined orchestrator pattern** to eliminate hundred
 - **Purpose**: Streamlined CI testing and building for NPM packages
 - **Triggers**: Push to any branch, PR to master/main
 - **Features**: Calls the orchestrator with `run_build_and_test: true`
-- **Usage**: `CLDMV/.github/.github/workflows/ci.yml@v1`
+- **Usage**: `CLDMV/.github/.github/workflows/ci.yml@v2`
 
 ### Release Workflow (`release.yml`)
 
@@ -55,7 +55,7 @@ This repository uses a **streamlined orchestrator pattern** to eliminate hundred
 - **Triggers**: Push to non-master/main branches (when you push `release:` or `release!:` commits)
 - **Features**: Calls orchestrator with `run_detect_release` and `run_create_release_pr` flags
 - **Dry Run Support**: Test the entire release process without making any changes
-- **Usage**: `CLDMV/.github/.github/workflows/release.yml@v1`
+- **Usage**: `CLDMV/.github/.github/workflows/release.yml@v2`
 
 #### 🧪 Dry Run Mode
 
@@ -98,7 +98,7 @@ workflow_dispatch:
 - **Triggers**: PR closed on master branch (when release PRs are merged)
 - **Features**: Full publishing pipeline using orchestrator with multiple flags
 - **Dry Run Support**: Test the entire publishing process without making any changes
-- **Usage**: `CLDMV/.github/.github/workflows/publish.yml@v1`
+- **Usage**: `CLDMV/.github/.github/workflows/publish.yml@v2`
 
 #### 🧪 Dry Run Mode
 
@@ -141,14 +141,14 @@ workflow_dispatch:
 - **Purpose**: Automatically maintains major version tags (e.g., `v1`, `v2`) for semantic versioning
 - **Triggers**: New release published or semantic version tag pushed
 - **Features**: Calls orchestrator with `run_update_major_version_tags: true`
-- **Usage**: `CLDMV/.github/.github/workflows/update-major-version-tags.yml@v1`
+- **Usage**: `CLDMV/.github/.github/workflows/update-major-version-tags.yml@v2`
 
 ### Tag Health Workflow (`reusable-tag-health.yml`)
 
 - **Purpose**: Comprehensive tag maintenance and health monitoring for Git repositories
 - **Triggers**: Manual dispatch, tag push events, scheduled maintenance
 - **Features**: Multi-stage tag health operations with intelligent validation
-- **Usage**: `CLDMV/.github/.github/workflows/reusable-tag-health.yml@v1`
+- **Usage**: `CLDMV/.github/.github/workflows/reusable-tag-health.yml@v2`
 
 #### 🏥 Health Check Operations
 

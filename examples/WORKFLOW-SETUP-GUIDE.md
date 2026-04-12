@@ -19,7 +19,7 @@ Quick reference for every example workflow: what it does, what `package.json` sc
 ## 🧪 CI Tests & Build
 
 **File:** `individual-repo-workflows/ci.yml`  
-**Calls:** `CLDMV/.github/.github/workflows/workflow-ci.yml@v1`
+**Calls:** `CLDMV/.github/.github/workflows/workflow-ci.yml@v2`
 
 ### What it does
 
@@ -60,7 +60,7 @@ Quick reference for every example workflow: what it does, what `package.json` sc
 ## 🚀 Create Release PR
 
 **File:** `individual-repo-workflows/release.yml`  
-**Calls:** `CLDMV/.github/.github/workflows/workflow-release.yml@v1`
+**Calls:** `CLDMV/.github/.github/workflows/workflow-release.yml@v2`
 
 ### What it does
 
@@ -99,7 +99,7 @@ Bot commits are ignored to prevent infinite loops. Maintenance commits (`chore:`
 ## 📦 Release and Publish
 
 **File:** `individual-repo-workflows/publish.yml`  
-**Calls:** `CLDMV/.github/.github/workflows/workflow-publish.yml@v1`
+**Calls:** `CLDMV/.github/.github/workflows/workflow-publish.yml@v2`
 
 ### What it does
 
@@ -140,7 +140,7 @@ Both registries are enabled by default and can be toggled independently. Support
 ## 🐳 Build and Publish Docker Image
 
 **File:** `individual-repo-workflows/docker-publish.yml`  
-**Calls:** `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v1`
+**Calls:** `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v2`
 
 ### What it does
 
@@ -172,7 +172,7 @@ Triggers on every push to master (and manually). Runs an optional pre-publish co
 ## 🏷️ Update Major Version Tags
 
 **File:** `individual-repo-workflows/update-major-version-tags.yml`  
-**Calls:** `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1`
+**Calls:** `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v2`
 
 ### What it does
 

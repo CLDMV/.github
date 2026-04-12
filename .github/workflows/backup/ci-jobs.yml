@@ -6,11 +6,10 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-03-13 16:04:09 -07:00 (1773443049)
+# @Last modified time: 2026-04-12 14:17:48 -07:00 (1776028668)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
-
 
 # CLDMV/.github/.github/workflows/ci-jobs.yml
 name: ⚙️ CI Jobs Workflow (Internal Org-Level)
@@ -381,7 +380,7 @@ jobs:
                 node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
         steps:
             - name: Build and Test
-              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v1
+              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v2
               with:
                   node-version: ${{ matrix.node-version }}
                   package-manager: ${{ inputs.package_manager }}
@@ -400,7 +399,7 @@ jobs:
         steps:
             - name: Detect Release
               id: detect
-              uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v1
+              uses: CLDMV/.github/.github/actions/git/jobs/detect-release@v2
 
     create-release-pr:
         name: "📋 Create Release PR"
@@ -413,7 +412,7 @@ jobs:
         steps:
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   app_id: ${{ secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -423,7 +422,7 @@ jobs:
 
             - name: Create Release PR
               id: create
-              uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v1
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v2
               with:
                   package-name: ${{ inputs.package_name }}
                   node-version: ${{ inputs.node_version }}
@@ -473,7 +472,7 @@ jobs:
         steps:
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   app_id: ${{ secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -483,7 +482,7 @@ jobs:
 
             - name: Create GitHub Release
               id: create
-              uses: CLDMV/.github/.github/actions/github/jobs/create-release@v1
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release@v2
               with:
                   version: ${{ needs.detect-release.outputs.version || inputs.version }}
                   package-name: ${{ inputs.package_name }}
@@ -505,7 +504,7 @@ jobs:
         steps:
             - name: Detect Repository Config
               id: detect
-              uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v1
+              uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v2
               with:
                   package-manager: ${{ inputs.package_manager }}
                   custom-npm-command: ${{ inputs.publish_command_npm }}
@@ -532,7 +531,7 @@ jobs:
 
             - name: Calculate artifact names
               id: names
-              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v2
               with:
                   node-version: ${{ inputs.node_version }}
                   package-name: ${{ inputs.package_name }}
@@ -540,7 +539,7 @@ jobs:
 
             - name: Publish to NPM
               id: publish
-              uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v1
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v2
               with:
                   package-name: ${{ inputs.package_name }}
                   version: ${{ steps.extract-version.outputs.version }}
@@ -570,7 +569,7 @@ jobs:
 
             - name: Calculate artifact names
               id: names
-              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v1
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v2
               with:
                   node-version: ${{ inputs.node_version }}
                   package-name: ${{ inputs.package_name }}
@@ -578,7 +577,7 @@ jobs:
 
             - name: Publish to GitHub Packages
               id: publish
-              uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v1
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v2
               with:
                   package-name: ${{ inputs.package_name }}
                   version: ${{ steps.extract-version.outputs.version }}
@@ -600,7 +599,7 @@ jobs:
         steps:
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   app_id: ${{ secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -610,7 +609,7 @@ jobs:
 
             - name: Fix non-bot-signed version tags
               id: fix-bot-signatures
-              uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v1
+              uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -645,7 +644,7 @@ jobs:
         steps:
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   app_id: ${{ secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -655,7 +654,7 @@ jobs:
 
             - name: Check for version tags and update
               id: tags
-              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -705,7 +704,7 @@ jobs:
 
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v1
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
               with:
                   app_id: ${{ secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -716,7 +715,7 @@ jobs:
             # Step 1: Get detailed tag list for processing
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -729,7 +728,7 @@ jobs:
             # Step 2: Update major/minor version tags FIRST (creates new tags if needed)
             - name: Update major/minor version tags
               id: update-major-tags
-              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v1
+              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -747,7 +746,7 @@ jobs:
             # Step 3: Re-scan tags after major/minor updates
             - name: Re-scan tags after major/minor updates
               id: rescan-after-major
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -760,7 +759,7 @@ jobs:
             # Step 4: Fix non-bot signatures (using fresh tag data)
             - name: Fix non-bot signatures
               id: fix-bot-sigs
-              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -778,7 +777,7 @@ jobs:
             # Step 5: Re-scan tags after bot signature fixes
             - name: Re-scan tags after bot signature fixes
               id: rescan-after-bot-sigs
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -791,7 +790,7 @@ jobs:
             # Step 6: Fix unsigned tags (using fresh tag data)
             - name: Fix unsigned tags
               id: fix-unsigned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -809,7 +808,7 @@ jobs:
             # Step 7: Re-scan tags after unsigned tag fixes
             - name: Re-scan tags after unsigned tag fixes
               id: rescan-after-unsigned
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -822,7 +821,7 @@ jobs:
             # Step 8: Fix orphaned tags (using fresh tag data)
             - name: Fix orphaned tags
               id: fix-orphaned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -838,7 +837,7 @@ jobs:
             # Step 9: Final scan for summary
             - name: Final tag scan for summary
               id: final-scan
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v1
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}

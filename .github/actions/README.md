@@ -82,7 +82,7 @@ on:
 
 jobs:
   ci:
-    uses: CLDMV/.github/.github/workflows/ci.yml@v1
+    uses: CLDMV/.github/.github/workflows/ci.yml@v2
     with:
       package_name: "@cldmv/your-package" # Required
       node_version: "lts/*"
@@ -106,7 +106,7 @@ on:
 
 jobs:
   create-release-pr:
-    uses: CLDMV/.github/.github/workflows/release.yml@v1
+    uses: CLDMV/.github/.github/workflows/release.yml@v2
     with:
       package_name: "@cldmv/your-package" # Required
       node_version: "lts/*"
@@ -128,7 +128,7 @@ on:
 
 jobs:
   publish-package:
-    uses: CLDMV/.github/.github/workflows/publish.yml@v1
+    uses: CLDMV/.github/.github/workflows/publish.yml@v2
     with:
       package_name: "@cldmv/your-package" # Required
       node_version: "lts/*"

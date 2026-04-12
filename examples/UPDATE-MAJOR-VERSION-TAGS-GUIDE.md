@@ -1,6 +1,6 @@
 # 🏷️ Update Major Version Tags Guide
 
-The `update-major-version-tags.yml` workflow automatically maintains **floating version tags** (e.g. `v1`, `v1.2`) that always point to the latest release within their version range. This is the same pattern used by GitHub Actions — `uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v1` works because `v1` is a floating tag.
+The `update-major-version-tags.yml` workflow automatically maintains **floating version tags** (e.g. `v1`, `v1.2`) that always point to the latest release within their version range. This is the same pattern used by GitHub Actions — `uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v2` works because `v1` is a floating tag.
 
 ## 🎯 What Are Floating Tags?
 

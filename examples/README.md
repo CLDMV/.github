@@ -17,32 +17,32 @@ The `individual-repo-workflows/` folder contains example workflow files that sho
 
   - Place in: `.github/workflows/ci.yml` in your project repo
   - Triggers: Push to any branch, PR to master/main
-  - Uses: `CLDMV/.github/.github/workflows/workflow-ci.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-ci.yml@v2`
 
 - **`release.yml`** - Release PR creation workflow
 
   - Place in: `.github/workflows/release.yml` in your project repo
   - Triggers: Push to non-master/main branches (when you push `release:` or `release!:` commits)
-  - Uses: `CLDMV/.github/.github/workflows/workflow-release.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-release.yml@v2`
   - **Auto-detects version bump**: Uses `release!:` for major, `release:` + commit analysis for minor/patch
 
 - **`publish.yml`** - Package publishing and release creation workflow
   - Place in: `.github/workflows/publish.yml` in your project repo
   - Triggers: PR closed on master branch (when release PRs are merged)
-  - Uses: `CLDMV/.github/.github/workflows/workflow-publish.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-publish.yml@v2`
   - Creates GitHub releases AND publishes to NPM/GitHub Packages
 
 - **`docker-publish.yml`** - Docker image build and GHCR publish workflow
 
   - Place in: `.github/workflows/docker-publish.yml` in your project repo
   - Triggers: Push to master/main (and manual dispatch)
-  - Uses: `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v2`
   - Derives image name from root `package.json` and supports optional pre-publish command
 
 - **`update-major-version-tags.yml`** - Floating version tag maintenance workflow
   - Place in: `.github/workflows/update-major-version-tags.yml` in your project repo
   - Triggers: Push to master/main, published releases, and manual dispatch
-  - Uses: `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v1`
+  - Uses: `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v2`
   - Keeps `v1`, `v1.2` etc. pointing at the latest release — see [UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](./UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)
 
 ### Usage:

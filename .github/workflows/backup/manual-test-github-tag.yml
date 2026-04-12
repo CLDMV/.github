@@ -60,7 +60,7 @@ jobs:
                   echo "Using sha=$TSHA"
 
             - name: Smart tag (create or update)
-              uses: CLDMV/.github/.github/actions/github/api/tag/create@v1
+              uses: CLDMV/.github/.github/actions/github/api/tag/create@v2
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
