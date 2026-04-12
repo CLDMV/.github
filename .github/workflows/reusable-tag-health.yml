@@ -263,7 +263,6 @@ jobs:
         # permissions:
         #   contents: write
         outputs:
-            auth-token: ${{ steps.app-token.outputs.token }}
             user-name: ${{ steps.setup-git.outputs.user-name }}
             user-email: ${{ steps.setup-git.outputs.user-email }}
         steps:
@@ -335,16 +334,27 @@ jobs:
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Fix orphaned releases
               id: fix-orphaned-releases
               uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
-                  GH_TOKEN: ${{ needs.setup-shared.outputs.auth-token || github.token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}
-                  github_token: ${{ needs.setup-shared.outputs.auth-token || github.token }}
+                  github_token: ${{ steps.app-token.outputs.token }}
                   gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
@@ -407,12 +417,23 @@ jobs:
                     echo "has-tag=false" >> "$GITHUB_OUTPUT"
                   fi
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Update major/minor version tags
               id: update-major-tags
               if: steps.find-latest.outputs.has-tag == 'true'
               uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
               with:
                   debug: ${{ inputs.debug }}
                   gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
@@ -502,11 +523,22 @@ jobs:
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Fix non-bot signatures
               id: fix-bot-sigs
               uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}
@@ -549,11 +581,22 @@ jobs:
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Fix unsigned tags
               id: fix-unsigned
               uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}
@@ -596,11 +639,22 @@ jobs:
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Fix misaligned major/minor version tags
               id: fix-misaligned
               uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}
@@ -643,11 +697,22 @@ jobs:
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
 
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Fix orphaned tags
               id: fix-orphaned
               uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v2
               env:
-                  GITHUB_TOKEN: ${{ needs.setup-shared.outputs.auth-token }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}
@@ -708,13 +773,6 @@ jobs:
                   bot_patterns: ${{ inputs.bot_patterns }}
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
-
-            - name: Revoke App token
-              if: always() && needs.setup-shared.outputs.auth-token != ''
-              id: revoke-token
-              uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v2
-              with:
-                  auth-token: ${{ needs.setup-shared.outputs.auth-token }}
 
             - name: Build comprehensive summary
               id: summarize
