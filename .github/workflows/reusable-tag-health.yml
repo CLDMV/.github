@@ -649,7 +649,6 @@ jobs:
               uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v2
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  ACTIONS_TOKEN: ${{ github.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
               with:
                   debug: ${{ inputs.debug }}

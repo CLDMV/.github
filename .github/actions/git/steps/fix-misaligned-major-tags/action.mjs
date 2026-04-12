@@ -198,35 +198,21 @@ async function main() {
 	if (fixedCount > 0) {
 		console.log(`🚀 Pushing fixed tags: ${fixedTags.join(", ")}`);
 
-		// actions/checkout bakes github.token into git's http.https://github.com/.extraheader
-		// config key.  That Basic-auth header takes precedence over URL-embedded credentials and
-		// carries only the default runner token, which does NOT have workflows:write permission.
-		// Pushing any tag that points to a commit containing .github/workflows/ files is rejected
-		// unless the token has workflows:write.  Fix:
-		//   1. Unset the checkout-installed extraheader so git uses URL credentials instead.
-		//   2. Embed the app token (which has workflows:write) in the remote URL.
-		// Use the native Actions token (passed as ACTIONS_TOKEN) for the git push, not the
-		// app token.  GitHub App installations require an explicit `workflows:write` permission
-		// grant (configured in the App's settings page) to push refs that point to commits
-		// containing .github/workflows/ files.  The Actions-provisioned token (github.token)
-		// with `permissions: contents: write` on the job has an implicit bypass from GitHub
-		// for this, so it succeeds where the app token fails.  App token is still used for
-		// all GitHub API calls (tag object creation, etc.).
-		const pushToken = process.env.ACTIONS_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+		// actions/checkout injects the runner token into git's http.extraheader at an unknown
+		// config scope (local, global, or system depending on checkout version).  That header
+		// takes precedence over URL-embedded credentials regardless of which scope it sits in.
+		// Rather than trying to unset it by scope, use `git -c` to override it to an empty
+		// string inline — this neutralises the header for this one command across ALL scopes.
+		// The bot app token (GITHUB_TOKEN, set to the installation token in the workflow env)
+		// is embedded in the remote URL.  The app has workflows:write, so GitHub accepts the push.
+		const pushToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 		const repo = process.env.GITHUB_REPOSITORY;
 		if (pushToken && repo) {
-			// actions/checkout writes the extraheader into the LOCAL repo config (.git/config),
-			// not the global config.  We must unset it from --local so git falls back to the
-			// URL-embedded credentials below.  git exits 5 when the key isn't present — catch.
-			try {
-				sh("git config --local --unset-all 'http.https://github.com/.extraheader'");
-			} catch {
-				// Key not present — nothing to unset, proceed normally.
-			}
 			sh(`git remote set-url origin https://x-access-token:${pushToken}@github.com/${repo}.git`);
 		}
 
-		sh(`git push origin --force ${fixedTags.map((t) => `refs/tags/${t}`).join(" ")}`);
+		const tagRefs = fixedTags.map((t) => `refs/tags/${t}`).join(" ");
+		sh(`git -c http.https://github.com/.extraheader="" push origin --force ${tagRefs}`);
 	}
 
 	// Generate summary JSON
