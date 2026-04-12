@@ -241,8 +241,9 @@ runs:
 
         if [ -z "${RELEASE_ID:-}" ]; then
           RELEASE_ID=$(curl -fsSL \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
             "https://api.github.com/repos/$REPO/releases/tags/$VERSION" | jq -r '.id // empty')
         fi
 
@@ -254,15 +255,17 @@ runs:
         echo "ℹ️ Enforcing non-draft state for release ID $RELEASE_ID"
 
         curl -fsSL -X PATCH \
-          -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2026-03-10" \
           -H "Content-Type: application/json" \
           -d '{"draft":false}' \
           "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" > /dev/null
 
         DRAFT_STATE=$(curl -fsSL \
-          -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2026-03-10" \
           "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" | jq -r '.draft')
 
         if [ "$DRAFT_STATE" != "false" ]; then
@@ -290,8 +293,9 @@ runs:
         echo ""
 
         # Test GitHub API access
-        if curl -s -H "Authorization: token $GITHUB_TOKEN" \
-               -H "Accept: application/vnd.github.v3+json" \
+        if curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               -H "X-GitHub-Api-Version: 2026-03-10" \
                "https://api.github.com/repos/${{ github.repository }}" > /dev/null; then
           echo "  - GitHub API access: ✅ Verified"
         else
@@ -307,8 +311,9 @@ runs:
         fi
 
         # Check if release already exists
-        RELEASE_EXISTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                              -H "Accept: application/vnd.github.v3+json" \
+        RELEASE_EXISTS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                              -H "Accept: application/vnd.github+json" \
+                              -H "X-GitHub-Api-Version: 2026-03-10" \
                               "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ steps.detect-version.outputs.version }}" \
                               | jq -r '.id // "null"')
 

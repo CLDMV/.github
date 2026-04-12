@@ -4,11 +4,6 @@ name: 🏷️ Update Major Version Tags
 on:
   release:
     types: [published]
-  push:
-    branches:
-      - main
-      - master
-
   workflow_dispatch:
     inputs:
       debug:

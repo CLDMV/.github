@@ -161,6 +161,19 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	const wantsPrerelease = toBoolean(is_prerelease, false);
 	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
 
+	/**
+	 * Standard GitHub API headers using current API version.
+	 * @returns {Record<string, string>}
+	 */
+	function apiHeaders() {
+		return {
+			Authorization: `Bearer ${token}`,
+			Accept: "application/vnd.github+json",
+			"X-GitHub-Api-Version": "2026-03-10",
+			"Content-Type": "application/json"
+		};
+	}
+
 	debugLog(`Creating release for ${repo}:`);
 	debugLog(`  tag_name: ${tag_name}`);
 	debugLog(`  name: ${name}`);
@@ -180,10 +193,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			const tagCheckResponse = await fetch(`https://api.github.com/repos/${repo}/git/refs/tags/${tag_name}`, {
 				method: "GET",
-				headers: {
-					"Authorization": `token ${token}`,
-					"Accept": "application/vnd.github.v3+json"
-				}
+				headers: apiHeaders()
 			});
 			if (tagCheckResponse.ok) {
 				tagReady = true;
@@ -201,10 +211,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	// Check if release already exists
 	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag_name}`, {
 		method: "GET",
-		headers: {
-			"Authorization": `token ${token}`,
-			"Accept": "application/vnd.github.v3+json"
-		}
+		headers: apiHeaders()
 	});
 
 	let releaseData;
@@ -226,11 +233,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		const updateResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
-			headers: {
-				"Authorization": `token ${token}`,
-				"Accept": "application/vnd.github.v3+json",
-				"Content-Type": "application/json"
-			},
+			headers: apiHeaders(),
 			body: JSON.stringify(updatePayload)
 		});
 
@@ -257,11 +260,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		const releaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases`, {
 			method: "POST",
-			headers: {
-				"Authorization": `token ${token}`,
-				"Accept": "application/vnd.github.v3+json",
-				"Content-Type": "application/json"
-			},
+			headers: apiHeaders(),
 			body: JSON.stringify(releasePayload)
 		});
 
@@ -287,11 +286,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "PATCH",
-			headers: {
-				"Authorization": `token ${token}`,
-				"Accept": "application/vnd.github.v3+json",
-				"Content-Type": "application/json"
-			},
+			headers: apiHeaders(),
 			body: JSON.stringify({ draft: false })
 		});
 
@@ -305,10 +300,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		const verifyResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
 			method: "GET",
-			headers: {
-				"Authorization": `token ${token}`,
-				"Accept": "application/vnd.github.v3+json"
-			}
+			headers: apiHeaders()
 		});
 
 		if (!verifyResponse.ok) {
@@ -385,8 +377,9 @@ async function uploadAssets({ token, repo, release_id, upload_url, assets, debug
 			const uploadResponse = await fetch(finalUploadUrl, {
 				method: "POST",
 				headers: {
-					"Authorization": `token ${token}`,
-					"Accept": "application/vnd.github.v3+json",
+					Authorization: `Bearer ${token}`,
+					Accept: "application/vnd.github+json",
+					"X-GitHub-Api-Version": "2026-03-10",
 					"Content-Type": mimeType
 				},
 				body: fileContent
