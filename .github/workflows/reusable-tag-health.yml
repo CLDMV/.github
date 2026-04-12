@@ -279,6 +279,7 @@ jobs:
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  permission_workflows: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}

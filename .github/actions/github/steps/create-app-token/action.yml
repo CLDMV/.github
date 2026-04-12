@@ -12,6 +12,10 @@ inputs:
     description: "Repository owner (defaults to current repository owner)"
     required: false
     default: ${{ github.repository_owner }}
+  permission_workflows:
+    description: "Request workflows write permission (needed when pushing tags that touch .github/workflows/)"
+    required: false
+    default: "false"
 
 outputs:
   token:
@@ -54,5 +58,5 @@ runs:
         private-key: ${{ inputs.private_key || env.BOT_APP_PRIVATE_KEY }}
         owner: ${{ inputs.owner }}
         skip-token-revoke: true # Don't revoke token - needed for multi-job workflows
-        # permission-contents: write
-        # permission-workflows: write
+        permission-contents: write
+        permission-workflows: ${{ inputs.permission_workflows == 'true' && 'write' || '' }}
