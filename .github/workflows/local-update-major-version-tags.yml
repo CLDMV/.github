@@ -4,7 +4,9 @@ name: 🏷️ Update Major Version Tags
 on:
     release:
         types: [published]
-    push: # Allow all pushes (branches and tags)
+    push:
+        tags:
+            - "v[0-9]*"
 
     workflow_dispatch:
         inputs:
@@ -51,9 +53,6 @@ on:
 
 jobs:
     update-tags:
-        if: >
-            (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') ||
-            startsWith(github.ref, 'refs/tags/v')
         permissions:
             contents: write
             actions: write
