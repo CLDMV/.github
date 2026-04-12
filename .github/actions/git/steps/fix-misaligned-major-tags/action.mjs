@@ -208,9 +208,11 @@ async function main() {
 		const pushToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 		const repo = process.env.GITHUB_REPOSITORY;
 		if (pushToken && repo) {
-			// Remove the Basic-auth extraheader; git exits 5 when the key doesn't exist, so catch.
+			// actions/checkout writes the extraheader into the LOCAL repo config (.git/config),
+			// not the global config.  We must unset it from --local so git falls back to the
+			// URL-embedded credentials below.  git exits 5 when the key isn't present — catch.
 			try {
-				sh("git config --global --unset-all 'http.https://github.com/.extraheader'");
+				sh("git config --local --unset-all 'http.https://github.com/.extraheader'");
 			} catch {
 				// Key not present — nothing to unset, proceed normally.
 			}
