@@ -198,17 +198,26 @@ async function main() {
 	if (fixedCount > 0) {
 		console.log(`🚀 Pushing fixed tags: ${fixedTags.join(", ")}`);
 
-		// actions/checkout bakes github.token into git's http.extraheader credential config.
-		// That credential doesn't have workflows:write, so pushing tags that touch .github/workflows/
-		// files is rejected. Re-configure the remote URL to use the app token (which does have
-		// workflows:write) so git uses it instead of the checkout-installed credential.
+		// actions/checkout bakes github.token into git's http.https://github.com/.extraheader
+		// config key.  That Basic-auth header takes precedence over URL-embedded credentials and
+		// carries only the default runner token, which does NOT have workflows:write permission.
+		// Pushing any tag that points to a commit containing .github/workflows/ files is rejected
+		// unless the token has workflows:write.  Fix:
+		//   1. Unset the checkout-installed extraheader so git uses URL credentials instead.
+		//   2. Embed the app token (which has workflows:write) in the remote URL.
 		const pushToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 		const repo = process.env.GITHUB_REPOSITORY;
 		if (pushToken && repo) {
+			// Remove the Basic-auth extraheader; git exits 5 when the key doesn't exist, so catch.
+			try {
+				sh("git config --global --unset-all 'http.https://github.com/.extraheader'");
+			} catch {
+				// Key not present — nothing to unset, proceed normally.
+			}
 			sh(`git remote set-url origin https://x-access-token:${pushToken}@github.com/${repo}.git`);
 		}
 
-		sh("git push origin --tags --force");
+		sh(`git push origin --force ${fixedTags.map((t) => `refs/tags/${t}`).join(" ")}`);
 	}
 
 	// Generate summary JSON
