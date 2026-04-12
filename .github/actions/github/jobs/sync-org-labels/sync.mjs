@@ -270,6 +270,9 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 	// Track which canonical labels are already present (by name) after processing
 	const canonicalPresent = new Set();
 
+	// Build a set of current label names (lowercased) for collision detection
+	const currentNameSet = new Set(currentLabels.map((l) => l.name.toLowerCase()));
+
 	// ── Pass 1: rename / update / delete existing labels ──
 	for (const current of currentLabels) {
 		const canonical = aliasMap.get(current.name.toLowerCase());
@@ -296,6 +299,23 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 
 		if (!needsRename && !needsColorUpdate && !needsDescUpdate) {
 			// Already perfect
+			continue;
+		}
+
+		// If this is an alias AND the canonical name already exists as a
+		// separate label, we can't rename — just delete the alias.
+		// The canonical label will be updated when we encounter it.
+		if (needsRename && currentNameSet.has(canonical.name.toLowerCase())) {
+			if (!DRY_RUN) {
+				const { status, body } = await api(`/repos/${owner}/${repo}/labels/${encodeURIComponent(current.name)}`, { method: "DELETE" });
+				if (status !== 204) {
+					report.errors.push(
+						`Failed to delete alias \`${current.name}\` (HTTP ${status}): ${typeof body === "object" ? body?.message : body}`
+					);
+					continue;
+				}
+			}
+			report.changes.push(`🗑️  Deleted alias \`${current.name}\` (canonical \`${canonical.name}\` already exists)`);
 			continue;
 		}
 
