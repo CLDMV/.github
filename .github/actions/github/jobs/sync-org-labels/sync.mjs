@@ -40,7 +40,7 @@ function authHeaders() {
 	return {
 		Authorization: `Bearer ${TOKEN}`,
 		Accept: "application/vnd.github+json",
-		"X-GitHub-Api-Version": "2022-11-28"
+		"X-GitHub-Api-Version": "2026-03-10"
 	};
 }
 
@@ -68,21 +68,31 @@ async function validateToken() {
 		);
 	}
 
-	// ── 2. App identity + manifest permissions ──────────────────────────
-	//    GET /app works with installation tokens and returns the app's
-	//    *registered* permissions (the maximum the token can ever have).
-	const appRes = await fetch(`${BASE}/app`, { headers: authHeaders() });
-	if (appRes.ok) {
-		const app = await appRes.json();
-		console.log(`App        : "${app.name}" (slug: ${app.slug}, id: ${app.id})`);
-		console.log(`App perms  : ${JSON.stringify(app.permissions)}`);
-		if (!app.permissions?.issues || app.permissions.issues === "none") {
-			console.error("⚠️  The app's manifest does NOT include issues permission — labels require issues:write.");
-		} else if (app.permissions.issues === "read") {
-			console.error("⚠️  The app's manifest has issues:read but NOT issues:write — labels require write.");
+	// ── 2. Token introspection via installation endpoint ────────────────
+	//    POST /applications/{client_id}/token introspects the token and
+	//    returns the *actual* permissions the token was granted.
+	//    But that requires basic auth (client_id:client_secret) which we
+	//    don't have here.  Instead, check the installation metadata:
+	//    GET /installation/repositories returns repos + includes the
+	//    installation's permissions in the response.
+	const instRes = await fetch(`${BASE}/installation/repositories?per_page=1`, {
+		headers: authHeaders()
+	});
+	if (instRes.ok) {
+		const instBody = await instRes.json();
+		const perms = instBody.permissions ?? {};
+		console.log(`Token perms: ${JSON.stringify(perms)}`);
+		console.log(`Total repos: ${instBody.total_count ?? "unknown"}`);
+		if (!perms.issues || perms.issues === "none") {
+			console.error("⚠️  Token does NOT have issues permission — labels require issues:write.");
+		} else if (perms.issues === "read") {
+			console.error("⚠️  Token has issues:read but NOT issues:write — labels require write.");
+		} else {
+			console.log(`✅ Token has issues:${perms.issues}`);
 		}
 	} else {
-		console.log(`GET /app   : ${appRes.status} — token is probably NOT an app installation token`);
+		const instErr = await instRes.text().catch(() => "");
+		console.log(`GET /installation/repositories: ${instRes.status} — ${instErr}`);
 	}
 
 	// ── 3. Repo-level permissions on a sample repo ──────────────────────
@@ -156,7 +166,7 @@ async function api(path, options = {}) {
 		headers: {
 			Authorization: `Bearer ${TOKEN}`,
 			Accept: "application/vnd.github+json",
-			"X-GitHub-Api-Version": "2022-11-28",
+			"X-GitHub-Api-Version": "2026-03-10",
 			"Content-Type": "application/json",
 			...(options.headers || {})
 		}
@@ -189,7 +199,7 @@ async function paginate(path) {
 			headers: {
 				Authorization: `Bearer ${TOKEN}`,
 				Accept: "application/vnd.github+json",
-				"X-GitHub-Api-Version": "2022-11-28"
+				"X-GitHub-Api-Version": "2026-03-10"
 			}
 		});
 
