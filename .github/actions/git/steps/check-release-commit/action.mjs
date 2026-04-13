@@ -244,6 +244,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		commits.slice(0, 3).map((c) => `${c.hash?.substring(0, 7)}: ${c.subject}`)
 	);
 
+	// Guard: if the most recent commit is the bot's version bump, the release PR has
+	// already been processed.  Re-running would create a duplicate bump commit.
+	const latestCommit = commits[0];
+	if (latestCommit && /^chore(\([^)]*\))?:\s*bump version to /i.test(latestCommit.subject)) {
+		console.log(`⏭️ Latest commit is a bot version bump ('${latestCommit.subject}') — release already processed, skipping`);
+		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+		process.exit(0);
+	}
+
 	const releaseAnalysis = findReleaseCommits(commits);
 	console.log(`🔍 DEBUG: Release analysis result:`, {
 		hasRelease: releaseAnalysis.hasRelease,
