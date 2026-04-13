@@ -371,6 +371,7 @@ jobs:
 
             - name: Compute raw label aliases
               id: raw-labels
+              if: steps.release-check.outputs.should-create-pr == 'true'
               shell: bash
               env:
                   BUMP_TYPE: ${{ steps.release-check.outputs.version-bump }}
@@ -381,11 +382,13 @@ jobs:
 
             - name: Resolve PR label aliases
               id: resolved-labels
+              if: steps.release-check.outputs.should-create-pr == 'true'
               uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
               with:
                   aliases: ${{ steps.raw-labels.outputs.labels }}
 
             - name: Sync PR labels
+              if: steps.release-check.outputs.should-create-pr == 'true'
               shell: bash
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
