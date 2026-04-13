@@ -29,6 +29,15 @@ runs:
         ORG: ${{ inputs.org }}
         DRY_RUN: ${{ inputs.dry-run }}
         DEBUG: ${{ inputs.debug }}
-        # Absolute path to the labels JSON — the .github repo is always checked out to GITHUB_WORKSPACE
-        LABELS_JSON_PATH: ${{ github.workspace }}/data/github-labels.json
+        # github.action_path is the action's own directory inside the runner's _actions cache,
+        # regardless of which repo triggered the workflow.  The labels JSON lives at
+        # data/github-labels.json relative to the root of the CLDMV/.github repo, which is
+        # four directories above this action's path:
+        #   _actions/CLDMV/.github/v2/.github/actions/github/jobs/sync-org-labels  ← action_path
+        #   _actions/CLDMV/.github/v2/.github/actions/github/jobs               ← ../
+        #   _actions/CLDMV/.github/v2/.github/actions/github                    ← ../../
+        #   _actions/CLDMV/.github/v2/.github/actions                           ← ../../../
+        #   _actions/CLDMV/.github/v2/.github                                   ← ../../../../
+        #   _actions/CLDMV/.github/v2                                           ← ../../../../../  (repo root)
+        LABELS_JSON_PATH: ${{ github.action_path }}/../../../../../data/github-labels.json
       run: node "${{ github.action_path }}/sync.mjs"
