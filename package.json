@@ -1,0 +1,34 @@
+{
+	"name": "@cldmv/.github",
+	"description": "Shared GitHub Actions, reusable workflows, and org-wide tooling for the CLDMV organization.",
+	"author": {
+		"name": "Shinrai",
+		"company": "CLDMV",
+		"email": "git+npm@cldmv.net",
+		"url": "https://cldmv.net"
+	},
+	"contributors": [
+		{
+			"name": "CLDMV",
+			"url": "https://github.com/CLDMV"
+		}
+	],
+	"license": "Apache-2.0",
+	"funding": {
+		"type": "github",
+		"url": "https://github.com/sponsors/shinrai"
+	},
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/CLDMV/.github.git"
+	},
+	"bugs": {
+		"url": "https://github.com/CLDMV/.github/issues"
+	},
+	"homepage": "https://github.com/CLDMV/.github#readme",
+	"publishConfig": {
+		"access": "public"
+	},
+	"sideEffects": false
+}
