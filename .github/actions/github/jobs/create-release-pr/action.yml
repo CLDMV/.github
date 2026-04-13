@@ -96,25 +96,36 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    - name: Get branch divergence point
+      id: divergence
+      shell: bash
+      run: |
+        # Find where this branch diverged from master/main. Used as both the commit-range
+        # base (so we analyse exactly the right commits) and the version base (so we compute
+        # the bump against the correct pre-branch version, not a bump commit on the branch).
+        MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || \
+                     git merge-base HEAD origin/main 2>/dev/null || echo "")
+        if [ -n "$MERGE_BASE" ]; then
+          echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
+          echo "merge-base=$MERGE_BASE" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Could not determine branch divergence point — falling back to tag-based range"
+          echo "merge-base=" >> $GITHUB_OUTPUT
+        fi
+
     - name: Check release commit for auto-detection
       id: commit-check
       uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+      with:
+        base-ref: ${{ steps.divergence.outputs.merge-base }}
 
     - name: Get base version from branch divergence point
       id: base-version
       shell: bash
       run: |
-        # Find where this branch diverged from master/main. The package.json version at
-        # that exact commit is the authoritative "base" that bump types should be applied
-        # against — NOT the current branch package.json, which may already contain a
-        # previous bump commit. This ensures the version is calculated idempotently: no
-        # matter how many commits are pushed to the branch, the result is always
-        # <master-version> + <highest-bump-across-all-branch-commits>.
-        MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || \
-                     git merge-base HEAD origin/main 2>/dev/null || echo "")
+        MERGE_BASE="${{ steps.divergence.outputs.merge-base }}"
 
         if [ -n "$MERGE_BASE" ]; then
-          echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
           mkdir -p tmp
           git show "$MERGE_BASE:package.json" > tmp/base-package.json 2>/dev/null || true
           if [ -f tmp/base-package.json ]; then

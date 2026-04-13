@@ -244,16 +244,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		commits.slice(0, 3).map((c) => `${c.hash?.substring(0, 7)}: ${c.subject}`)
 	);
 
-	// Guard: if the most recent commit is the bot's version bump, the release PR has
-	// already been processed.  Re-running would create a duplicate bump commit.
-	const latestCommit = commits[0];
-	if (latestCommit && /^chore(\([^)]*\))?:\s*bump version to /i.test(latestCommit.subject)) {
-		console.log(`⏭️ Latest commit is a bot version bump ('${latestCommit.subject}') — release already processed, skipping`);
+	// Filter out bot version bump commits before any analysis.  These are produced by this
+	// very pipeline and must never drive a release decision — including them would cause an
+	// infinite loop where each bump commit triggers another bump.
+	const botBumpRe = /^chore(\([^)]*\))?:\s*bump version to /i;
+	const actionableCommits = commits.filter((c) => !botBumpRe.test(c.subject));
+	const filteredCount = commits.length - actionableCommits.length;
+	if (filteredCount > 0) {
+		console.log(`⏭️ Filtered out ${filteredCount} bot version bump commit(s) from analysis`);
+	}
+
+	if (actionableCommits.length === 0) {
+		console.log("ℹ️ No actionable commits after filtering bot bumps — not triggering release");
 		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
 		process.exit(0);
 	}
 
-	const releaseAnalysis = findReleaseCommits(commits);
+	const releaseAnalysis = findReleaseCommits(actionableCommits);
 	console.log(`🔍 DEBUG: Release analysis result:`, {
 		hasRelease: releaseAnalysis.hasRelease,
 		breakingRelease: releaseAnalysis.breakingRelease?.subject || null,
@@ -262,7 +269,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	});
 
 	// Check if there are conventional commits even without explicit release: commits
-	const hasConventional = hasConventionalCommits(commits);
+	const hasConventional = hasConventionalCommits(actionableCommits);
 	console.log(`🔍 DEBUG: Conventional commits detected: ${hasConventional}`);
 
 	// Determine if we should create a release PR
@@ -291,13 +298,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				console.log("🚀 Breaking release commit detected - will create major version PR");
 			} else {
 				// For non-breaking release commits, analyze the other commits
-				versionAnalysis = analyzeVersionBump(commits);
+				versionAnalysis = analyzeVersionBump(actionableCommits);
 				console.log(`🚀 Release commit detected - analyzing other commits for version bump`);
 			}
 		} else {
 			// No explicit release commit, but conventional commits detected
 			console.log(`🔍 No explicit release commit, but conventional commits detected - auto-creating release PR`);
-			versionAnalysis = analyzeVersionBump(commits);
+			versionAnalysis = analyzeVersionBump(actionableCommits);
 
 			// Create a synthetic commit message describing what we found
 			if (versionAnalysis.versionBump === "major") {

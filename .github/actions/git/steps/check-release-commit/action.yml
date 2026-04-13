@@ -2,6 +2,9 @@ name: "Check Release Commit"
 description: "Check if the latest commit is a release commit and determine version bump type"
 
 inputs:
+  base-ref:
+    description: "Override the base ref for commit range (e.g., merge-base SHA). If not provided, uses latest semantic version tag."
+    required: false
   exclude-version:
     description: "Version to exclude when finding latest tag (e.g., 'v2.0.1' to find previous version)"
     required: false
@@ -37,6 +40,7 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/get-commit-range@v2
       with:
         debug: "true"
+        base-ref: ${{ inputs.base-ref }}
         exclude-version: ${{ inputs.exclude-version }}
       env:
         DEBUG: "true"
