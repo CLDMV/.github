@@ -375,6 +375,15 @@ async function syncRepo(owner, repo, canonicalLabels, aliasMap) {
 // ─── Summary helpers ───────────────────────────────────────────────────────────
 
 /**
+ * Returns a Markdown link to a GitHub repo.
+ * @param {string} repo
+ * @returns {string}
+ */
+function repoLink(repo) {
+	return `[${repo}](https://github.com/${ORG}/${repo})`;
+}
+
+/**
  * Appends a line to the GitHub Actions step summary.
  * @param {string} line
  */
@@ -411,13 +420,16 @@ let reposErrored = 0;
 // Repos that are already clean — collected and written at the end
 const cleanRepos = [];
 
+// Archived/disabled repos — collected and written at the end (avoids log spam)
+const archivedOrDisabledRepos = [];
+
 for (const repoData of allRepos) {
 	const repo = repoData.name;
 	const isArchived = repoData.archived;
 	const isDisabled = repoData.disabled;
 
 	if (isArchived || isDisabled) {
-		summary(`\n---\n\n## 📦 \`${repo}\`\n\n⏭️ Skipped — repository is ${isArchived ? "archived" : "disabled"}`);
+		archivedOrDisabledRepos.push({ name: repo, reason: isArchived ? "archived" : "disabled" });
 		reposSkipped++;
 		continue;
 	}
@@ -428,14 +440,14 @@ for (const repoData of allRepos) {
 	try {
 		report = await syncRepo(ORG, repo, canonicalLabels, aliasMap);
 	} catch (err) {
-		summary(`\n---\n\n## 📦 \`${repo}\`\n\n❌ Error: ${err.message}`);
+		summary(`\n---\n\n## 📦 ${repoLink(repo)}\n\n❌ Error: ${err.message}`);
 		console.error(`  Error processing ${repo}:`, err);
 		reposErrored++;
 		continue;
 	}
 
 	if (report.skipped) {
-		summary(`\n---\n\n## 📦 \`${repo}\`\n\n⏭️ Skipped — ${report.reason}`);
+		summary(`\n---\n\n## 📦 ${repoLink(repo)}\n\n⏭️ Skipped — ${report.reason}`);
 		reposSkipped++;
 		continue;
 	}
@@ -450,7 +462,7 @@ for (const repoData of allRepos) {
 		continue;
 	}
 
-	summary(`\n---\n\n## 📦 \`${repo}\``);
+	summary(`\n---\n\n## 📦 ${repoLink(repo)}`);
 
 	if (hasChanges) {
 		summary(`\n${DRY_RUN ? "**Would apply:**" : "**Changes applied:**"}`);
@@ -484,7 +496,14 @@ summary(`| **Total** | **${allRepos.length}** |`);
 if (cleanRepos.length > 0) {
 	summary(`\n---\n\n## ✅ Already Up To Date (${cleanRepos.length})\n`);
 	for (const repo of cleanRepos) {
-		summary(`- \`${repo}\``);
+		summary(`- ${repoLink(repo)}`);
+	}
+}
+
+if (archivedOrDisabledRepos.length > 0) {
+	summary(`\n---\n\n## ⏭️ Archived / Disabled (${archivedOrDisabledRepos.length})\n`);
+	for (const { name, reason } of archivedOrDisabledRepos) {
+		summary(`- ${repoLink(name)} _(${reason})_`);
 	}
 }
 
