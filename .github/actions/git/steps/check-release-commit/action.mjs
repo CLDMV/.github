@@ -1,14 +1,14 @@
 /**
- *	@Project: check-release-commit
- *	@Filename: /action.mjs
+ *	@Project: @cldmv/.github
+ *	@Filename: /.github/actions/git/steps/check-release-commit/action.mjs
  *	@Date: 2025-09-09 16:08:15 -07:00 (1757459295)
  *	@Author: Nate Hyson <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
- *	@Last modified by: Nate Hyson <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2025-12-30 16:58:15 -08:00 (1767142695)
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-04-12 23:56:09 -07:00 (1776063369)
  *	-----
- *	@Copyright: Copyright (c) 2013-2025 Catalyzed Motivation Inc. All rights reserved.
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  */
 
 import { appendFileSync, readFileSync } from "fs";
@@ -244,9 +244,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	const bumpCommits = commits.filter((c) => botBumpRe.test(c.subject));
 	const actionableCommits = commits.filter((c) => !botBumpRe.test(c.subject));
 
-	const alreadyBumpedVersions = new Set(
-		bumpCommits.map((c) => c.subject.match(botBumpRe)?.[2]).filter(Boolean)
-	);
+	const alreadyBumpedVersions = new Set(bumpCommits.map((c) => c.subject.match(botBumpRe)?.[2]).filter(Boolean));
 
 	console.log(`🔍 Bot bump commits found: ${bumpCommits.length} (versions: ${[...alreadyBumpedVersions].join(", ") || "none"})`);
 	console.log(`🔍 Actionable commits: ${actionableCommits.length}`);

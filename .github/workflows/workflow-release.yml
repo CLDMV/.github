@@ -198,30 +198,37 @@ jobs:
             - name: Setup Node.js
               uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
 
+            - name: Get branch divergence point
+              id: divergence
+              shell: bash
+              run: |
+                  MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo "")
+                  if [ -n "$MERGE_BASE" ]; then
+                    echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
+                    echo "merge-base=$MERGE_BASE" >> $GITHUB_OUTPUT
+                    mkdir -p tmp
+                    git show "$MERGE_BASE:package.json" > tmp/base-package.json 2>/dev/null || true
+                    if [ -f tmp/base-package.json ]; then
+                      BASE_VERSION=$(node -p "require('./tmp/base-package.json').version" 2>/dev/null || echo "")
+                      rm -f tmp/base-package.json
+                    fi
+                  fi
+                  if [ -n "$BASE_VERSION" ]; then
+                    echo "📦 Base version at divergence point: $BASE_VERSION"
+                    echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
+                  else
+                    echo "⚠️ Could not determine base version — dedup check will be skipped"
+                    echo "base-version=" >> $GITHUB_OUTPUT
+                  fi
+
             - name: Check release commit type
               id: release-check
               uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+              with:
+                  base-ref: ${{ steps.divergence.outputs.merge-base }}
+                  base-version: ${{ steps.divergence.outputs.base-version }}
               env:
                   DEBUG: ${{ inputs.debug || 'true' }}
-
-            - name: Get base version from branch divergence point
-              id: base-version
-              shell: bash
-              run: |
-                  mkdir -p tmp
-                  MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null)
-                  git show "$MERGE_BASE:package.json" > tmp/base-package.json
-                  BASE_VERSION=$(node -p "require('./tmp/base-package.json').version")
-                  echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
-                  echo "📦 Base version at divergence point: $BASE_VERSION"
-
-            - name: Calculate new version
-              id: version
-              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
-              with:
-                  version-bump: ${{ steps.release-check.outputs.version-bump }}
-                  explicit-version: ${{ steps.release-check.outputs.explicit-version }}
-                  base-version: ${{ steps.base-version.outputs.base-version }}
 
             - name: Create App token
               id: app-token
@@ -233,24 +240,37 @@ jobs:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
+            - name: Calculate new version
+              id: version
+              if: steps.release-check.outputs.should-create-pr == 'true'
+              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
+              with:
+                  version-bump: ${{ steps.release-check.outputs.version-bump }}
+                  explicit-version: ${{ steps.release-check.outputs.explicit-version }}
+                  base-version: ${{ steps.divergence.outputs.base-version }}
+
             - name: Install dependencies
+              if: steps.release-check.outputs.should-create-pr == 'true'
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
               with:
                   package-manager: ${{ inputs.package_manager }}
 
             - name: Build package
+              if: steps.release-check.outputs.should-create-pr == 'true'
               uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
               with:
                   build-command: ${{ inputs.build_command }}
                   environment: production
 
             - name: Update package version
+              if: steps.release-check.outputs.should-create-pr == 'true'
               uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
               with:
                   new-version: ${{ steps.version.outputs.new-version }}
                   package-manager: ${{ inputs.package_manager }}
 
             - name: Restore src/ deleted by build
+              if: steps.release-check.outputs.should-create-pr == 'true'
               shell: bash
               run: |
                   if git ls-files --deleted -- src/ | grep -q .; then
@@ -262,10 +282,21 @@ jobs:
                   fi
 
             - name: Create signed commit
+              if: steps.release-check.outputs.should-create-pr == 'true'
               uses: CLDMV/.github/.github/actions/github/api/commit@v2
               with:
                   commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
                   github-token: ${{ steps.app-token.outputs.token }}
+
+            - name: Determine display version
+              id: display-version
+              shell: bash
+              run: |
+                  if [ -n "${{ steps.version.outputs.new-version }}" ]; then
+                    echo "version=${{ steps.version.outputs.new-version }}" >> $GITHUB_OUTPUT
+                  else
+                    echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+                  fi
 
             - name: Get PR commit range
               id: get-pr-range
@@ -302,7 +333,7 @@ jobs:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
                   CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
-                  NEW_VERSION: ${{ steps.version.outputs.new-version }}
+                  NEW_VERSION: ${{ steps.display-version.outputs.version }}
               run: |
                   echo "📝 Updating PR #$PR_NUMBER title and description..."
 
