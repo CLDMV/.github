@@ -231,115 +231,99 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 	if (!HAS_COMMITS) {
 		console.log("ℹ️ No commits in range - not triggering release");
-		console.log("🔍 DEBUG: This suggests the commit range calculation found no commits");
-		console.log("🔍 DEBUG: This could happen if the latest tag is ahead of or equal to HEAD");
 		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
 		process.exit(0);
 	}
 
 	const commits = getCommits();
-	console.log(`🔍 Analyzing ${commits.length} commits`);
-	console.log(
-		`🔍 DEBUG: First few commits:`,
-		commits.slice(0, 3).map((c) => `${c.hash?.substring(0, 7)}: ${c.subject}`)
+	console.log(`🔍 Analyzing ${commits.length} commits since branch was created`);
+
+	// ── Step 1: Separate bot bump commits from real work ───────────────────────
+	const botBumpRe = /^chore(\([^)]*\))?:\s*bump version to v?(\d+\.\d+\.\d+)/i;
+
+	const bumpCommits = commits.filter((c) => botBumpRe.test(c.subject));
+	const actionableCommits = commits.filter((c) => !botBumpRe.test(c.subject));
+
+	const alreadyBumpedVersions = new Set(
+		bumpCommits.map((c) => c.subject.match(botBumpRe)?.[2]).filter(Boolean)
 	);
 
-	// Filter out bot version bump commits before any analysis.  These are produced by this
-	// very pipeline and must never drive a release decision — including them would cause an
-	// infinite loop where each bump commit triggers another bump.
-	const botBumpRe = /^chore(\([^)]*\))?:\s*bump version to /i;
-	const actionableCommits = commits.filter((c) => !botBumpRe.test(c.subject));
-	const filteredCount = commits.length - actionableCommits.length;
-	if (filteredCount > 0) {
-		console.log(`⏭️ Filtered out ${filteredCount} bot version bump commit(s) from analysis`);
-	}
+	console.log(`🔍 Bot bump commits found: ${bumpCommits.length} (versions: ${[...alreadyBumpedVersions].join(", ") || "none"})`);
+	console.log(`🔍 Actionable commits: ${actionableCommits.length}`);
 
 	if (actionableCommits.length === 0) {
-		console.log("ℹ️ No actionable commits after filtering bot bumps — not triggering release");
+		console.log("ℹ️ No actionable commits — nothing to release");
 		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
 		process.exit(0);
 	}
 
+	// ── Step 2: Determine what the version bump SHOULD be ─────────────────────
 	const releaseAnalysis = findReleaseCommits(actionableCommits);
-	console.log(`🔍 DEBUG: Release analysis result:`, {
-		hasRelease: releaseAnalysis.hasRelease,
-		breakingRelease: releaseAnalysis.breakingRelease?.subject || null,
-		normalRelease: releaseAnalysis.normalRelease?.subject || null,
-		mostRecent: releaseAnalysis.mostRecent?.subject || null
-	});
-
-	// Check if there are conventional commits even without explicit release: commits
 	const hasConventional = hasConventionalCommits(actionableCommits);
-	console.log(`🔍 DEBUG: Conventional commits detected: ${hasConventional}`);
-
-	// Determine if we should create a release PR
-	// This happens if either:
-	// 1. There's an explicit release: or release!: commit, OR
-	// 2. There are conventional commits (feat:, fix:, breaking changes)
 	const shouldCreateRelease = releaseAnalysis.hasRelease || hasConventional;
 
-	if (shouldCreateRelease) {
-		let versionAnalysis;
-		let commitMessage;
-
-		if (releaseAnalysis.hasRelease) {
-			// Explicit release commit found - use it
-			const releaseCommit = releaseAnalysis.mostRecent;
-			console.log(`🔍 Found release commit: ${releaseCommit.subject}`);
-			commitMessage = releaseCommit.subject;
-
-			if (releaseAnalysis.breakingRelease) {
-				// Explicit breaking release
-				versionAnalysis = {
-					versionBump: "major",
-					hasBreaking: true,
-					reason: "Breaking release commit detected"
-				};
-				console.log("🚀 Breaking release commit detected - will create major version PR");
-			} else {
-				// For non-breaking release commits, analyze the other commits
-				versionAnalysis = analyzeVersionBump(actionableCommits);
-				console.log(`🚀 Release commit detected - analyzing other commits for version bump`);
-			}
-		} else {
-			// No explicit release commit, but conventional commits detected
-			console.log(`🔍 No explicit release commit, but conventional commits detected - auto-creating release PR`);
-			versionAnalysis = analyzeVersionBump(actionableCommits);
-
-			// Create a synthetic commit message describing what we found
-			if (versionAnalysis.versionBump === "major") {
-				commitMessage = "release!: breaking changes detected";
-			} else if (versionAnalysis.versionBump === "minor") {
-				commitMessage = "release: new features added";
-			} else {
-				commitMessage = "release: bug fixes and improvements";
-			}
-
-			console.log(`🔍 Generated synthetic release message: ${commitMessage}`);
-		}
-
-		// Output results
-		const outputs = [
-			"should-create-pr=true",
-			`commit-message=${commitMessage}`,
-			`version-bump=${versionAnalysis.versionBump}`,
-			`has-breaking=${versionAnalysis.hasBreaking || false}`
-		];
-
-		if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
-			outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
-			console.log(`🚀 Will create PR for explicit version ${versionAnalysis.explicitVersion}`);
-		} else {
-			console.log(`🚀 Will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
-		}
-
-		outputs.forEach((output) => {
-			appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
-		});
-	} else {
+	if (!shouldCreateRelease) {
 		console.log("ℹ️ No release commit or conventional commits found - not triggering release");
 		appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+		process.exit(0);
 	}
+
+	let versionAnalysis;
+	let commitMessage;
+
+	if (releaseAnalysis.hasRelease && releaseAnalysis.breakingRelease) {
+		versionAnalysis = { versionBump: "major", hasBreaking: true, reason: "Breaking release commit detected" };
+		commitMessage = releaseAnalysis.breakingRelease.subject;
+	} else if (releaseAnalysis.hasRelease) {
+		versionAnalysis = analyzeVersionBump(actionableCommits);
+		commitMessage = releaseAnalysis.mostRecent.subject;
+	} else {
+		versionAnalysis = analyzeVersionBump(actionableCommits);
+		if (versionAnalysis.versionBump === "major") commitMessage = "release!: breaking changes detected";
+		else if (versionAnalysis.versionBump === "minor") commitMessage = "release: new features added";
+		else commitMessage = "release: bug fixes and improvements";
+	}
+
+	console.log(`🔍 Version bump required: ${versionAnalysis.versionBump} (${versionAnalysis.reason})`);
+
+	// ── Step 3: Compute target version and dedup ───────────────────────────────
+	const baseVersion = process.env.BASE_VERSION?.trim();
+	if (baseVersion && versionAnalysis.versionBump !== "explicit") {
+		const [maj, min, pat] = baseVersion.split(".").map(Number);
+		let targetVersion;
+		if (versionAnalysis.versionBump === "major") targetVersion = `${maj + 1}.0.0`;
+		else if (versionAnalysis.versionBump === "minor") targetVersion = `${maj}.${min + 1}.0`;
+		else targetVersion = `${maj}.${min}.${pat + 1}`;
+
+		console.log(`🔍 Base version: ${baseVersion} → target: ${targetVersion}`);
+
+		if (alreadyBumpedVersions.has(targetVersion)) {
+			console.log(`⏭️ Version ${targetVersion} was already bumped on this branch — skipping`);
+			appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+			process.exit(0);
+		}
+
+		console.log(`✅ Target version ${targetVersion} not yet bumped — proceeding`);
+	}
+
+	// ── Step 4: Output results ─────────────────────────────────────────────────
+	const outputs = [
+		"should-create-pr=true",
+		`commit-message=${commitMessage}`,
+		`version-bump=${versionAnalysis.versionBump}`,
+		`has-breaking=${versionAnalysis.hasBreaking || false}`
+	];
+
+	if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
+		outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
+		console.log(`🚀 Will create PR for explicit version ${versionAnalysis.explicitVersion}`);
+	} else {
+		console.log(`🚀 Will create ${versionAnalysis.versionBump} version PR (${versionAnalysis.reason})`);
+	}
+
+	outputs.forEach((output) => {
+		appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
+	});
 } // End main execution block
 
 // Export functions for testing

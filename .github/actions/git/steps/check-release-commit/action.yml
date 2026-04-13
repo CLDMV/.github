@@ -5,6 +5,9 @@ inputs:
   base-ref:
     description: "Override the base ref for commit range (e.g., merge-base SHA). If not provided, uses latest semantic version tag."
     required: false
+  base-version:
+    description: "The package.json version at the base ref. Used to detect duplicate bump commits and skip re-bumping to the same version."
+    required: false
   exclude-version:
     description: "Version to exclude when finding latest tag (e.g., 'v2.0.1' to find previous version)"
     required: false
@@ -52,6 +55,7 @@ runs:
         # Pass the file path rather than the full JSON to avoid "Argument list too long" errors
         COMMITS_FILE: ${{ steps.commit-range.outputs.commits-file }}
         HAS_COMMITS: ${{ steps.commit-range.outputs.has-commits }}
+        BASE_VERSION: ${{ inputs.base-version }}
       run: |
         # Run the Node.js script
         node "${{ github.action_path }}/action.mjs"
