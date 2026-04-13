@@ -1,0 +1,33 @@
+# Private repo: .github/workflows/sync-org-labels.yml
+#
+# Place this in a PRIVATE repository (e.g. CLDMV/org-config).
+# Logs — including repo names — stay private. The reusable workflow
+# code lives in the public CLDMV/.github repo but executes here.
+name: 🏷️ Sync Org Labels
+
+on:
+  schedule:
+    # Runs every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — report what would change without applying it"
+        type: boolean
+        required: false
+        default: false
+      debug:
+        description: "Enable debug logging"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  sync-labels:
+    uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v2
+    with:
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+      debug: ${{ github.event.inputs.debug == 'true' }}
+    secrets:
+      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
