@@ -1,12 +1,12 @@
 #
-# @Project: workflows
-# @Filename: /workflow-ci.yml
+# @Project: @cldmv/.github
+# @Filename: /.github/workflows/workflow-ci.yml
 # @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-06 17:22:38 -07:00 (1775521358)
+# @Last modified time: 2026-04-27 23:38:59 -07:00 (1777358339)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
@@ -35,12 +35,19 @@ on:
                 required: false
                 type: string
                 default: "20"
-                description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+                description: "Minimum Node.js version for matrix testing (default: 20, oldest
+                    non-EOL)"
             max_node_major:
                 required: false
                 type: string
                 default: "22"
                 description: "Override max Node.js major version (default: 22)"
+            lts_only_matrix:
+                required: false
+                type: boolean
+                default: false
+                description: "Only include even-numbered (LTS) Node.js major versions in the
+                    test matrix"
             package_manager:
                 required: false
                 type: string
@@ -71,7 +78,8 @@ on:
                 required: false
                 type: string
                 default: "development"
-                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
+                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS
+                    --conditions flag)"
 
             # ── Type check ─────────────────────────────────────────────────────
             type_check_command:
@@ -120,7 +128,9 @@ on:
                 required: false
                 type: string
                 default: "master"
-                description: "Default branch name — badge is only pushed when a push lands on this branch (prevents PR coverage from overwriting merged coverage)"
+                description: "Default branch name — badge is only pushed when a push lands on
+                    this branch (prevents PR coverage from overwriting merged
+                    coverage)"
             enable_coverage_pr_comment:
                 required: false
                 type: boolean
@@ -183,6 +193,7 @@ jobs:
             node_version: ${{ inputs.node_version }}
             min_node_version: ${{ inputs.min_node_version }}
             max_node_major: ${{ inputs.max_node_major }}
+            lts_only_matrix: ${{ inputs.lts_only_matrix }}
             package_manager: ${{ inputs.package_manager }}
             test_command: ${{ inputs.test_command }}
             build_command: ${{ inputs.build_command }}
@@ -192,13 +203,12 @@ jobs:
 
     coverage-badge:
         name: "📊 Coverage & Badge Push"
-        needs: [commit-gate, ci]
+        needs: [ commit-gate, ci ]
         if: >
-            needs.commit-gate.outputs.should_skip != 'true' &&
-            needs.ci.result == 'success' &&
-            inputs.enable_coverage_badge == true &&
-            github.event_name == 'push' &&
-            github.ref == format('refs/heads/{0}', inputs.default_branch)
+            needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
+            == 'success' && inputs.enable_coverage_badge == true &&
+            github.event_name == 'push' && github.ref ==
+            format('refs/heads/{0}', inputs.default_branch)
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v2
         with:
             node_version: ${{ inputs.node_version }}
@@ -221,11 +231,10 @@ jobs:
 
     coverage-pr-comment:
         name: "PR Coverage Badge"
-        needs: [commit-gate, ci]
+        needs: [ commit-gate, ci ]
         if: >
-            needs.commit-gate.outputs.should_skip != 'true' &&
-            needs.ci.result == 'success' &&
-            inputs.enable_coverage_pr_comment == true &&
+            needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
+            == 'success' && inputs.enable_coverage_pr_comment == true &&
             github.event_name == 'pull_request'
         uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v2
         with:
@@ -239,7 +248,7 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [commit-gate, ci, coverage-badge, coverage-pr-comment]
+        needs: [ commit-gate, ci, coverage-badge, coverage-pr-comment ]
         if: always() && needs.commit-gate.outputs.should_skip != 'true'
         runs-on: ubuntu-latest
         steps:

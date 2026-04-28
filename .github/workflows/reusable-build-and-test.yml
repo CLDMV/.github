@@ -1,3 +1,17 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /.github/workflows/reusable-build-and-test.yml
+# @Date: 2026-04-11 19:35:57 -07:00 (1775961357)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-27 23:38:59 -07:00 (1777358339)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+
 # Build and Test Workflow Package
 name: 🏗️ Build and Test Jobs
 
@@ -40,6 +54,12 @@ on:
                 required: false
                 type: string
                 default: "22"
+            lts_only_matrix:
+                description: "Only include even-numbered (LTS) Node.js major versions in the
+                    test matrix"
+                required: false
+                type: boolean
+                default: false
             package_manager:
                 description: "Package manager (npm or yarn)"
                 required: false
@@ -68,7 +88,8 @@ on:
                 type: boolean
                 default: false
             test_environment:
-                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
+                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS
+                    --conditions flag)"
                 required: false
                 type: string
                 default: "development"
@@ -117,7 +138,11 @@ jobs:
                     ((MAJOR++))
                   fi
                   while [ $MAJOR -le $MAX ]; do
-                    VERSIONS+=("\"${MAJOR}\"")
+                    if [[ "${{ inputs.lts_only_matrix }}" == "true" ]] && (( MAJOR % 2 != 0 )); then
+                      echo "⏭️  Skipping non-LTS Node.js v${MAJOR} (odd major)"
+                    else
+                      VERSIONS+=("\"${MAJOR}\"")
+                    fi
                     ((MAJOR++))
                   done
                   VERSIONS+=("\"lts/*\"")
