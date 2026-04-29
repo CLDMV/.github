@@ -64,6 +64,11 @@ on:
                 type: string
                 default: "22"
                 description: "Override max Node.js major version (default: 22)"
+            lts_only_matrix:
+                required: false
+                type: boolean
+                default: true
+                description: "Only include even-numbered (LTS) Node.js majors in the test matrix. Required when deps declare engines that exclude odd-numbered releases (e.g. rolldown)."
             test_command:
                 required: false
                 type: string
@@ -182,6 +187,11 @@ on:
                 type: string
                 default: ""
                 description: "Version to publish (auto-detected from package.json if not provided)"
+            lts_only_matrix:
+                required: false
+                type: boolean
+                default: true
+                description: "Only include even-numbered (LTS) Node.js majors in the test matrix. Required when deps declare engines that exclude odd-numbered releases (e.g. rolldown)."
 
 jobs:
     debug-inputs:
@@ -205,6 +215,7 @@ jobs:
             node_version: ${{ inputs.node_version }}
             min_node_version: ${{ inputs.min_node_version }}
             max_node_major: ${{ inputs.max_node_major }}
+            lts_only_matrix: ${{ inputs.lts_only_matrix }}
             package_manager: ${{ inputs.package_manager }}
             test_command: ${{ inputs.test_command }}
             build_command: ${{ inputs.build_command }}
