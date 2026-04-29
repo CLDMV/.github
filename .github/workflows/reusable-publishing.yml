@@ -165,6 +165,17 @@ on:
                 description: "The ID of the created GitHub release"
                 value: ${{ jobs.create-release.outputs.release-id }}
 
+            # Version tag outputs
+            major-version:
+                description: "The major version tag that was updated (e.g. v1)"
+                value: ${{ jobs.update-version-tags.outputs.major-version }}
+            minor-version:
+                description: "The minor version tag that was updated (e.g. v1.2)"
+                value: ${{ jobs.update-version-tags.outputs.minor-version }}
+            tags-updated:
+                description: "Whether rolling version tags were successfully updated"
+                value: ${{ jobs.update-version-tags.outputs.updated }}
+
 jobs:
     detect-version:
         name: "🔍 Detect Version"
@@ -340,6 +351,29 @@ jobs:
                   dry-run: ${{ inputs.dry_run }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # GPG signing parameters
+                  gpg_enabled: ${{ inputs.use_gpg }}
+                  tagger_name: ${{ secrets.TAGGER_NAME }}
+                  tagger_email: ${{ secrets.TAGGER_EMAIL }}
+                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+                  gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+    update-version-tags:
+        name: "📌 Update Major Version Tags"
+        if: inputs.run_create_release == true
+        needs: [create-release]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        outputs:
+            major-version: ${{ steps.update.outputs.major-version }}
+            minor-version: ${{ steps.update.outputs.minor-version }}
+            updated: ${{ steps.update.outputs.updated }}
+        steps:
+            - name: Update Major Version Tags
+              id: update
+              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v2
+              with:
+                  debug: ${{ inputs.debug }}
                   gpg_enabled: ${{ inputs.use_gpg }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
