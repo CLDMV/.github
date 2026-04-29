@@ -1,4 +1,17 @@
 #
+# @Project: @cldmv/.github
+# @Filename: /.github/workflows/reusable-publishing.yml
+# @Date: 2026-04-11 19:35:57 -07:00 (1775961357)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# -----
+# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+# @Last modified time: 2026-04-29 07:08:27 -07:00 (1777471707)
+# -----
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+#
 # @Project: workflows
 # @Filename: /reusable-publishing.yml
 # @Date: 2025-09-09 20:39:34 -07:00 (1757475574)
@@ -30,7 +43,8 @@ on:
                 type: boolean
                 default: false
             dry_run:
-                description: "Dry run mode - validate everything but don't publish or create releases"
+                description: "Dry run mode - validate everything but don't publish or create
+                    releases"
                 required: false
                 type: boolean
                 default: false
@@ -195,7 +209,8 @@ jobs:
 
     detect-repo-config:
         name: "🔧 Detect Repository Config"
-        if: inputs.run_detect_repo_config == true || inputs.run_publish_npm == true || inputs.run_publish_github_packages == true
+        if: inputs.run_detect_repo_config == true || inputs.run_publish_npm == true ||
+            inputs.run_publish_github_packages == true
         runs-on: ubuntu-latest
         outputs:
             npm-command: ${{ steps.detect.outputs.npm-command }}
@@ -215,7 +230,7 @@ jobs:
         name: "📦 Publish to NPM"
         if: inputs.run_publish_npm == true
         runs-on: ubuntu-latest
-        needs: [detect-version, detect-repo-config]
+        needs: [ detect-version, detect-repo-config ]
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: read
@@ -250,7 +265,7 @@ jobs:
         name: "📦 Publish to GitHub Packages"
         if: inputs.run_publish_github_packages == true
         runs-on: ubuntu-latest
-        needs: [detect-version, detect-repo-config]
+        needs: [ detect-version, detect-repo-config ]
         permissions:
             contents: read
             packages: write # Required to publish to GitHub Packages
@@ -296,7 +311,7 @@ jobs:
         name: "⬇️ Download Build Artifacts"
         if: inputs.run_create_release == true && inputs.release_source_only == false
         runs-on: ubuntu-latest
-        needs: [detect-version]
+        needs: [ detect-version ]
         steps:
             - name: Calculate artifact names
               id: names
@@ -323,7 +338,7 @@ jobs:
         name: "📋 Create GitHub Release"
         if: inputs.run_create_release == true
         runs-on: ubuntu-latest
-        needs: [detect-version]
+        needs: [ detect-version ]
         outputs:
             release-id: ${{ steps.create.outputs.release-id }}
         steps:
@@ -360,7 +375,7 @@ jobs:
     update-version-tags:
         name: "📌 Update Major Version Tags"
         if: inputs.run_create_release == true
-        needs: [create-release]
+        needs: [ create-release ]
         runs-on: ubuntu-latest
         permissions:
             contents: write
