@@ -152,15 +152,6 @@ on:
             release-id:
                 description: "The ID of the created GitHub release"
                 value: ${{ jobs.publish.outputs.release-id }}
-            major-version:
-                description: "The major version tag that was updated"
-                value: ${{ jobs.publish.outputs.major-version }}
-            minor-version:
-                description: "The minor version tag that was updated"
-                value: ${{ jobs.publish.outputs.minor-version }}
-            tags-updated:
-                description: "Whether version tags were updated"
-                value: ${{ jobs.publish.outputs.tags-updated }}
     workflow_dispatch:
         inputs:
             package_name:
