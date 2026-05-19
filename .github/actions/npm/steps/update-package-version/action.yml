@@ -11,24 +11,5 @@ inputs:
     default: "npm"
 
 runs:
-  using: "composite"
-  steps:
-    - name: Update package version
-      shell: bash
-      env:
-        NEW_VERSION: ${{ inputs.new-version }}
-        PACKAGE_MANAGER: ${{ inputs.package-manager }}
-      run: |
-        CURRENT_VERSION=$(node -p "require('./package.json').version")
-
-        if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
-          echo "📝 Package.json already at version $NEW_VERSION - no update needed"
-        else
-          echo "📝 Updating package.json from $CURRENT_VERSION to $NEW_VERSION"
-          if [ "$PACKAGE_MANAGER" = "yarn" ]; then
-            yarn version --new-version "$NEW_VERSION" --no-git-tag-version
-          else
-            npm version "$NEW_VERSION" --no-git-tag-version
-          fi
-          echo "📝 Updated package.json to version $NEW_VERSION"
-        fi
+  using: "node24"
+  main: "action.mjs"

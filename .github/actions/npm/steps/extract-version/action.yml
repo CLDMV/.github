@@ -13,72 +13,13 @@ inputs:
 outputs:
   version:
     description: "Version to publish"
-    value: ${{ steps.extract.outputs.version }}
   package-json-version:
     description: "Version from package.json"
-    value: ${{ steps.extract.outputs.package-json-version }}
   npm-latest-version:
     description: "Latest version published on NPM"
-    value: ${{ steps.extract.outputs.npm-latest-version }}
   suggested-version:
     description: "Suggested next version based on NPM latest"
-    value: ${{ steps.extract.outputs.suggested-version }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Extract version
-      id: extract
-      shell: bash
-      env:
-        PACKAGE_NAME: ${{ inputs.package-name }}
-        VERSION_OVERRIDE: ${{ inputs.version-override }}
-      run: |
-        set -e
-
-        echo "📋 Extracting version for package: $PACKAGE_NAME"
-
-        # Get version from package.json
-        if [ -f "package.json" ]; then
-          PACKAGE_JSON_VERSION=$(node -p "require('./package.json').version")
-          echo "📦 package.json version: $PACKAGE_JSON_VERSION"
-          echo "package-json-version=$PACKAGE_JSON_VERSION" >> $GITHUB_OUTPUT
-        else
-          echo "❌ package.json not found"
-          exit 1
-        fi
-
-        # Get latest version from NPM registry for reference
-        echo "🔍 Checking NPM registry for latest version..."
-        NPM_LATEST_VERSION=""
-        if npm view "$PACKAGE_NAME" version 2>/dev/null; then
-          NPM_LATEST_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "")
-          echo "📊 NPM latest version: $NPM_LATEST_VERSION"
-        else
-          echo "📊 Package not found on NPM (first publish)"
-        fi
-        echo "npm-latest-version=$NPM_LATEST_VERSION" >> $GITHUB_OUTPUT
-
-        # Determine which version to use
-        if [ -n "$VERSION_OVERRIDE" ]; then
-          TARGET_VERSION="$VERSION_OVERRIDE"
-          echo "🎯 Using override version: $TARGET_VERSION"
-        else
-          TARGET_VERSION="$PACKAGE_JSON_VERSION"
-          echo "🎯 Using package.json version: $TARGET_VERSION"
-        fi
-
-        # Calculate suggested next version for potential use
-        if [ -n "$NPM_LATEST_VERSION" ]; then
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$NPM_LATEST_VERSION"
-          SUGGESTED_PATCH=$((PATCH + 1))
-          SUGGESTED_VERSION="${MAJOR}.${MINOR}.${SUGGESTED_PATCH}"
-          echo "suggested-version=$SUGGESTED_VERSION" >> $GITHUB_OUTPUT
-          echo "💡 Suggested next version (if needed): $SUGGESTED_VERSION"
-        else
-          echo "suggested-version=" >> $GITHUB_OUTPUT
-        fi
-
-        # Output final version
-        echo "version=$TARGET_VERSION" >> $GITHUB_OUTPUT
-        echo "✅ Will attempt to publish version: $TARGET_VERSION"
+  using: "node24"
+  main: "action.mjs"
