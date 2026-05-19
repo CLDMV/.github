@@ -208,19 +208,8 @@ on:
                     odd-numbered releases (e.g. rolldown)."
 
 jobs:
-    debug-inputs:
-        name: "🔍 Debug Input Parameters"
-        runs-on: ubuntu-latest
-        steps:
-            - name: "Debug min_node_version parameter"
-              run: |
-                  echo "🔍 DEBUG (publish.yml): min_node_version input = '${{ inputs.min_node_version }}'"
-                  echo "🔍 DEBUG (publish.yml): max_node_major input = '${{ inputs.max_node_major }}'"
-                  echo "🔍 DEBUG (publish.yml): node_version input = '${{ inputs.node_version }}'"
-
     build-and-test:
         name: "🏗️ Build and Test"
-        needs: debug-inputs
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v2
         with:
             package_name: ${{ inputs.package_name }}
