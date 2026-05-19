@@ -17,64 +17,11 @@ inputs:
 outputs:
   pr-exists:
     description: "Whether an existing PR was found (true/false)"
-    value: ${{ steps.check.outputs.pr-exists }}
   pr-number:
     description: "Number of the existing PR (empty if no PR exists)"
-    value: ${{ steps.check.outputs.pr-number }}
   should-skip:
     description: "Whether the workflow should skip full processing (true if PR exists)"
-    value: ${{ steps.check.outputs.should-skip }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Check for existing PR
-      id: check
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        HEAD_BRANCH: ${{ inputs.head-branch }}
-        BASE_BRANCH: ${{ inputs.base-branch }}
-      run: |
-        # Determine the actual base branch to use
-        if [ -z "$BASE_BRANCH" ] || [ "$BASE_BRANCH" = "null" ]; then
-          echo "🔍 Base branch not provided, detecting default branch..."
-          DEFAULT_BRANCH_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}")
-          BASE_BRANCH=$(echo "$DEFAULT_BRANCH_RESPONSE" | jq -r '.default_branch // "master"')
-          echo "🔍 Detected default branch: $BASE_BRANCH"
-        fi
-
-        echo "🔍 Checking for existing PR from '$HEAD_BRANCH' to '$BASE_BRANCH'..."
-        echo "🔍 Repository: ${{ github.repository }}"
-        echo "🔍 Repository Owner: ${{ github.repository_owner }}"
-
-        # Check if PR already exists using GitHub API
-        API_URL="https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:$HEAD_BRANCH&base=$BASE_BRANCH&state=open"
-        echo "🔍 API URL: $API_URL"
-        
-        EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "$API_URL")
-
-        echo "🔍 API Response: $EXISTING_PR_RESPONSE"
-
-        EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
-
-        if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
-          EXISTING_PR_URL=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].html_url // ""')
-          echo "📋 Existing PR found: #$EXISTING_PR_NUMBER"
-          echo "🔗 URL: $EXISTING_PR_URL"
-          echo "pr-exists=true" >> $GITHUB_OUTPUT
-          echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "should-skip=true" >> $GITHUB_OUTPUT
-          
-          echo "ℹ️ Since PR #$EXISTING_PR_NUMBER already exists, skipping full release processing."
-          echo "💡 The PR description should be updated instead of running full workflow."
-        else
-          echo "✅ No existing PR found - proceeding with release workflow"
-          echo "pr-exists=false" >> $GITHUB_OUTPUT
-          echo "pr-number=" >> $GITHUB_OUTPUT
-          echo "should-skip=false" >> $GITHUB_OUTPUT
-        fi
+  using: "node24"
+  main: "action.mjs"
