@@ -4,8 +4,30 @@ applyTo: "**"
 
 # Agent Instructions — CLDMV/.github
 
-This repository contains shared GitHub Actions (composite actions, reusable workflows,
-and org-wide tooling) for the CLDMV organization.
+This repository contains shared GitHub Actions, reusable workflows, and org-wide
+tooling for the CLDMV organization.
+
+---
+
+## Node Actions
+
+Actions under `.github/actions/` are **Node** (`using: node24` with an `action.mjs`
+entrypoint). Action logic belongs in `.mjs` files — not inline shell in `action.yml`.
+
+- **No dependencies, no build step.** Use Node built-ins only (`node:fs`,
+  `node:child_process`, global `fetch`, …). There is no `npm install` at action
+  runtime and no bundler.
+- **Use the shared lib** — import helpers instead of duplicating them:
+  `common/common/core.mjs` (`getInput`, `getBooleanInput`, `setOutput`,
+  `setOutputs`, `appendSummary`, `getEventPayload`, `exec`, `sh`, `debugLog`) and
+  `github/api/_api/core.mjs` (`api()` — a `fetch` wrapper — and `parseRepo`).
+- **`composite` only for orchestration.** Keep an action `using: composite` only
+  when it must `uses:` another action (a Node action cannot). Its own logic still
+  goes in a `.mjs` delegation script run via
+  `run: node "${{ github.action_path }}/<name>.mjs"`, never inline shell.
+- `node24` actions receive their declared inputs as `INPUT_<NAME>` env vars (read
+  them with `getInput`). Composite delegation steps must pass values to the script
+  via an explicit `env:` block.
 
 ---
 
@@ -36,15 +58,21 @@ branch, tag, or commit`.
 
 ### Standard release procedure
 
+`package.json` carries the `version` field and must stay in sync with the tags,
+so the release commit bumps it; the pinned tag is created on that commit.
+
 ```bash
-# 1. Create pinned tag (signed)
-git tag -s vX.Y.Z -m "vX.Y.Z – short description" <commit-sha>
+# 1. Bump package.json "version" to X.Y.Z, then commit it (signed)
+git commit -S -am "chore: release vX.Y.Z"
 
-# 2. Update rolling tags (signed, force)
-git tag -fs vX.Y -m "vX.Y → vX.Y.Z" <commit-sha>
-git tag -fs vX   -m "vX → vX.Y.Z"   <commit-sha>
+# 2. Create pinned tag (signed) on the release commit
+git tag -s vX.Y.Z -m "vX.Y.Z – short description" HEAD
 
-# 3. Push — pinned tag first, then force-update rolling tags
+# 3. Update rolling tags (signed, force)
+git tag -fs vX.Y -m "vX.Y → vX.Y.Z" HEAD
+git tag -fs vX   -m "vX → vX.Y.Z"   HEAD
+
+# 4. Push — master + pinned tag first, then force-update rolling tags
 git push origin master vX.Y.Z
 git push --force origin vX vX.Y
 ```
