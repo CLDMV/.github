@@ -10,6 +10,14 @@ inputs:
     description: "Whether GPG signing should be used (auto-detected from workflow)"
     required: false
     default: "false"
+  github_token:
+    description: >-
+      GitHub token for tag operations. To move rolling tags onto commits that
+      touch .github/workflows/ this must carry the `workflows` scope (a GitHub
+      App installation token whose App is granted Workflows: write). Falls back
+      to the GITHUB_TOKEN env var, then github.token.
+    required: false
+    default: ""
   create-documentation:
     description: "Whether to create/update VERSION_TAGS.md documentation"
     required: false
@@ -92,7 +100,7 @@ runs:
       with:
         debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
-        github_token: ${{ env.GITHUB_TOKEN }}
+        github_token: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
@@ -104,7 +112,7 @@ runs:
       uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v2
       with:
         debug: ${{ inputs.debug }}
-        github_token: ${{ env.GITHUB_TOKEN }}
+        github_token: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
@@ -197,7 +205,7 @@ runs:
       if: steps.should-run.outputs.result == 'true' && steps.get-tag.outputs.needs-create == 'true'
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
       run: |
         TAG_NAME="${{ steps.get-tag.outputs.tag-name }}"
         TAG_SHA="${{ steps.get-tag.outputs.tag-sha }}"
@@ -235,7 +243,7 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v2
       with:
         debug: ${{ inputs.debug }}
-        github_token: ${{ env.GITHUB_TOKEN }}
+        github_token: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tag-name: ${{ steps.get-tag.outputs.tag-name }}
 

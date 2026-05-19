@@ -384,11 +384,26 @@ jobs:
             minor-version: ${{ steps.update.outputs.minor-version }}
             updated: ${{ steps.update.outputs.updated }}
         steps:
+            # An App installation token is required: moving the rolling vX / vX.Y
+            # tags onto a release commit that modifies .github/workflows/ needs the
+            # `workflows` scope, which the default Actions GITHUB_TOKEN can never
+            # hold. The GitHub App must also be granted Workflows: write on the repo.
+            - name: Create App token (auto-detect)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Update Major Version Tags
               id: update
               uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v2
               with:
                   debug: ${{ inputs.debug }}
+                  github_token: ${{ steps.app-token.outputs.token }}
                   gpg_enabled: ${{ inputs.use_gpg }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
