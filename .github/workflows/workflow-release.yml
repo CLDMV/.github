@@ -464,66 +464,16 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate Release Summary
-              run: |
-                  if [ "${{ inputs.dry_run }}" = "true" ]; then
-                    echo "## 🧪 Dry Run - Release Workflow Validation" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "## 🚀 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
-                  fi
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-
-                  # Check if PR was updated (existing PR path)
-                  if [ "${{ needs.update-existing-pr.result }}" = "success" ]; then
-                    echo "✅ **Overall Status**: Existing release PR updated successfully" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**PR Number**: [#${{ needs.check-existing-pr.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.check-existing-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "📝 **Updated**: The PR description has been updated with the latest commits and changelog." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "🔄 **Next Steps**: Review the updated PR and merge when ready to publish the package." >> $GITHUB_STEP_SUMMARY
-                  # Check if release was detected
-                  elif [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
-                    echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "This commit was not detected as a release trigger." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**Automatic release detection:** The workflow detects conventional commits (\`feat:\`, \`fix:\`, breaking changes) and creates release PRs automatically." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**Manual release:** Use \`release:\` or \`release!:\` prefix to explicitly trigger releases with custom versioning." >> $GITHUB_STEP_SUMMARY
-                  elif [ "${{ needs.release.result }}" = "success" ]; then
-                    if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
-                      if [ "${{ inputs.dry_run }}" = "true" ]; then
-                        echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🧪 **Dry Run Complete**: All validations passed! No changes were made." >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
-                        echo "- Release commit detected successfully" >> $GITHUB_STEP_SUMMARY
-                        echo "- Version calculation completed" >> $GITHUB_STEP_SUMMARY
-                        echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
-                        echo "- Changelog generation successful" >> $GITHUB_STEP_SUMMARY
-                        echo "- All prerequisites met for release PR creation" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🚀 **Ready to Release**: Re-run with \`dry_run: false\` to create the actual release PR." >> $GITHUB_STEP_SUMMARY
-                      else
-                        echo "✅ **Overall Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                        echo "**PR Number**: [#${{ needs.release.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.release.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🔄 **Next Steps**: Review and merge the release PR to publish the package." >> $GITHUB_STEP_SUMMARY
-                      fi
-                    else
-                      echo "ℹ️ **Overall Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "Release was detected but no PR was created." >> $GITHUB_STEP_SUMMARY
-                    fi
-                  else
-                    echo "❌ **Overall Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-                  fi
+              uses: CLDMV/.github/.github/actions/workflows/release-summary@v2
+              with:
+                  dry-run: ${{ inputs.dry_run }}
+                  package-name: ${{ inputs.package_name }}
+                  update-existing-pr-result: ${{ needs.update-existing-pr.result }}
+                  existing-pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  should-release: ${{ needs.detect-release.outputs.should-release }}
+                  release-result: ${{ needs.release.result }}
+                  release-pr-created: ${{ needs.release.outputs.pr-created }}
+                  release-new-version: ${{ needs.release.outputs.new-version }}
+                  release-pr-number: ${{ needs.release.outputs.pr-number }}
+                  server-url: ${{ github.server_url }}
+                  repository: ${{ github.repository }}
