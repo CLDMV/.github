@@ -281,38 +281,9 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate Publish Summary
-              run: |
-                  if [ "${{ inputs.dry_run }}" = "true" ]; then
-                    echo "## 🧪 Dry Run - Publish Workflow Validation" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "## 📦 Publish Workflow Summary" >> $GITHUB_STEP_SUMMARY
-                  fi
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "**Version**: \`${{ needs.publish.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-
-                  if [ "${{ needs.publish.result }}" = "success" ]; then
-                    if [ "${{ inputs.dry_run }}" = "true" ]; then
-                      echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "🧪 **Dry Run Complete**: All validations passed! No publishing or releases were created." >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
-                      echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
-                      echo "- Package configuration is valid" >> $GITHUB_STEP_SUMMARY
-                      echo "- NPM authentication and commands validated" >> $GITHUB_STEP_SUMMARY
-                      echo "- GitHub Packages authentication and commands validated" >> $GITHUB_STEP_SUMMARY
-                      echo "- Release creation prerequisites verified" >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "🚀 **Ready to Publish**: Re-run with \`dry_run: false\` to execute the actual publishing." >> $GITHUB_STEP_SUMMARY
-                    else
-                      echo "✅ **Overall Status**: Publishing workflow completed successfully" >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "Check the detailed progress above for specific publishing results to each registry." >> $GITHUB_STEP_SUMMARY
-                    fi
-                  else
-                    echo "❌ **Overall Status**: Publishing workflow failed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-                  fi
+              uses: CLDMV/.github/.github/actions/workflows/publish-summary@v2
+              with:
+                  dry-run: ${{ inputs.dry_run }}
+                  package-name: ${{ inputs.package_name }}
+                  version: ${{ needs.publish.outputs.version }}
+                  publish-result: ${{ needs.publish.result }}
