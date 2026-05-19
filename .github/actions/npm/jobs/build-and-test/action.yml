@@ -38,22 +38,10 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
-    - name: Update Summary - Node.js Setup
-      shell: bash
-      run: |
-        echo "## 🏗️ Build & Test Progress" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Node.js ${{ inputs.node-version }} setup complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
     - name: Install dependencies
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
       with:
         package-manager: ${{ inputs.package-manager }}
-
-    - name: Update Summary - Dependencies
-      shell: bash
-      run: |
-        echo "- ✅ Dependencies installed with ${{ inputs.package-manager }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Get Node.js Version
       id: get_node_version
@@ -68,30 +56,12 @@ runs:
         test-command: ${{ inputs.test-command }}
         environment: ${{ inputs.test-environment }}
 
-    - name: Update Summary - Tests
-      shell: bash
-      run: |
-        if [ "${{ steps.pre-tests.outcome }}" = "success" ]; then
-          echo "- ✅ Pre-build tests passed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- ❌ Pre-build tests failed" >> $GITHUB_STEP_SUMMARY
-        fi
-
     - name: Build package
       id: build
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
-
-    - name: Update Summary - Build
-      shell: bash
-      run: |
-        if [ "${{ steps.build.outcome }}" = "success" ]; then
-          echo "- ✅ Package build completed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- ❌ Package build failed" >> $GITHUB_STEP_SUMMARY
-        fi
 
     - name: Create npm package
       id: create-package
@@ -101,31 +71,7 @@ runs:
 
     - name: Extract package contents for artifacts
       shell: bash
-      run: |
-        echo "📦 Extracting npm package contents for easier access..."
-
-        # Find the .tgz file
-        TGZ_FILE=$(find . -name "*.tgz" -type f | head -1)
-
-        if [ -z "$TGZ_FILE" ]; then
-          echo "❌ No .tgz file found"
-          exit 1
-        fi
-
-        echo "📦 Found package file: $TGZ_FILE"
-
-        # Extract to package-contents directory
-        mkdir -p package-contents
-        tar -xzf "$TGZ_FILE" -C package-contents --strip-components=1
-
-        echo "📂 Package contents extracted to package-contents/"
-        echo "📋 Extracted files:"
-        ls -la package-contents/
-
-    - name: Update Summary - Package Created
-      shell: bash
-      run: |
-        echo "- ✅ NPM package created successfully" >> $GITHUB_STEP_SUMMARY
+      run: node "${{ github.action_path }}/extract-contents.mjs"
 
     - name: Upload build artifacts
       uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v2
@@ -142,16 +88,12 @@ runs:
           yarn.lock
         retention-days: 1
 
-    - name: Update Summary - Final
+    - name: Build & Test summary
       if: always()
       shell: bash
-      run: |
-        echo "- ✅ Build artifacts uploaded" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        # Check overall success
-        if [ "${{ steps.pre-tests.outcome }}" = "success" ] && [ "${{ steps.build.outcome }}" = "success" ]; then
-          echo "🎉 **Build & Test Complete** - All steps passed successfully" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ **Build & Test Failed** - Check the individual step results above" >> $GITHUB_STEP_SUMMARY
-        fi
+      run: node "${{ github.action_path }}/summary.mjs"
+      env:
+        NODE_VERSION: ${{ inputs.node-version }}
+        PACKAGE_MANAGER: ${{ inputs.package-manager }}
+        PRE_TESTS_OUTCOME: ${{ steps.pre-tests.outcome }}
+        BUILD_OUTCOME: ${{ steps.build.outcome }}
