@@ -15,17 +15,26 @@
 name: 🧪 CI Tests & Build
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [master, main]
+  # `push` fires for branches in this repo only (forks push to their own remote,
+  # not ours). Branch protection on the PR reads the status check from the
+  # commit SHA, so this single trigger covers both pre-PR pushes and PR head
+  # updates without duplicating runs.
+  push:
+    branches: ["**"]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - "*.md"
       - "LICENSE"
       - ".gitignore"
-  push:
-    branches: ["**"]
+  # `pull_request` is kept ONLY to surface CI on PRs from forks (push doesn't
+  # fire upstream for fork commits). For non-fork PRs the `ci` job below skips
+  # this trigger via an `if:` so the push run isn't duplicated. Fork PRs from
+  # outside collaborators are gated by the repo's "Require approval to run
+  # workflows" setting; a maintainer clicks "Approve and run" after reviewing.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [master, main]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -122,9 +131,23 @@ on:
         required: false
         default: true
 
+# Cancel superseded runs on feature branches; keep every master/main run as the
+# permanent green record. Keyed on github.ref so push and pull_request events
+# for the same branch share a group (the `if:` on the ci job already prevents
+# non-fork PR sync from running, but the shared group guards against edge
+# cases).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
 jobs:
   ci:
     name: 🏗️ Continuous Integration
+    # Skip `pull_request` events for branches that live in this repo — `push`
+    # already ran CI for that SHA, and the status attaches to the PR head.
+    # Fork PRs (head.repo.fork == true) DO run here; they're gated by the
+    # repo's "Require approval to run workflows" setting.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
     uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v2
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
@@ -132,7 +155,9 @@ jobs:
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
-      lts_only_matrix: ${{ github.event.inputs.lts_only_matrix == 'true' }}
+      # Full matrix on feature branches (catch per-version bugs pre-merge);
+      # LTS-only on master/main as the final confidence check / audit record.
+      lts_only_matrix: ${{ github.event.inputs.lts_only_matrix == 'true' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
       package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
       test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
       # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
@@ -185,12 +210,19 @@ jobs:
       BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
       BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
 
-  # ✅ Stable check that runs on BOTH push and PR and mirrors ci result
+  # ✅ Stable check that mirrors the `ci` result so branch protection has a
+  # single, predictable status name to require. The push event runs on the
+  # same SHA that becomes the PR head, so the status attaches to the PR
+  # automatically — no `pull_request` round-trip needed for non-fork PRs.
   required-check:
     name: ✅ Required PR Check
     needs: ci
-    # run on both push and PR so the context exists on the PR head SHA
-    if: always()
+    # Mirror the `ci` job's gating: if `ci` was skipped because this is a
+    # non-fork PR event (push already ran), we must NOT post a mirrored
+    # status — that would overwrite the push run's real success/failure on
+    # the same SHA. Skipping the whole job leaves the push run's status
+    # intact for branch protection.
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest
     steps:
       - name: Mirror reusable result

@@ -28,10 +28,14 @@ name: 🚀 Create Release PR
 
 on:
   push:
-    branches-ignore: [master, main]
+    branches-ignore: [master, main, badges]
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".github/workflows/**"
   workflow_dispatch:
     inputs:
       debug:
@@ -89,6 +93,13 @@ on:
         type: boolean
         required: false
         default: true
+
+# Rapid successive pushes to a release branch should collapse into a single
+# in-flight Create-Release-PR run. The PR is updated in place by the action,
+# but cancelling superseded runs avoids minutes of wasted build time per push.
+concurrency:
+  group: release-pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   create-release-pr:

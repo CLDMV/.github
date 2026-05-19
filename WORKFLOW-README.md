@@ -8,6 +8,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 2. **Update `package_name`** in each workflow to match your NPM package name.
 3. **Customize inputs** as needed for your project.
 4. **Commit and push** — the workflows run automatically when triggered.
+5. **Configure fork-PR approval** — in **Settings → Actions → General → Fork pull request workflows from outside collaborators**, choose **"Require approval for all outside collaborators"** (or stricter). The example `ci.yml` runs on `push` for branches in this repo (no duplicates with PR sync) and on `pull_request` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR's checks. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
 
 ## 🏗️ Architecture Overview
 

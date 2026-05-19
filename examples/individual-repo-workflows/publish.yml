@@ -79,6 +79,13 @@ on:
         required: false
         default: false
 
+# NEVER cancel an in-flight publish — half-published versions are nasty to
+# clean up. Concurrent publishes for the same ref queue instead so they
+# serialize naturally.
+concurrency:
+  group: publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish-package:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
