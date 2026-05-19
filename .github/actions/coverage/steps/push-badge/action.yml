@@ -1,0 +1,29 @@
+name: "Push Coverage Badge"
+description: "Commit and push badge.json to the badges branch (creating it as an orphan if needed)"
+
+inputs:
+  badges-branch:
+    description: "Branch the badge JSON is published to"
+    required: false
+    default: "badges"
+  badge-filename:
+    description: "Filename for the badge JSON on the badges branch"
+    required: false
+    default: "coverage.json"
+  bot-name:
+    description: "Git committer name"
+    required: true
+  bot-email:
+    description: "Git committer email"
+    required: true
+  bot-token:
+    description: "Token used to push (overridden by the BOT_TOKEN env var if set)"
+    required: false
+    default: ""
+  repository:
+    description: "owner/repo of the repository"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

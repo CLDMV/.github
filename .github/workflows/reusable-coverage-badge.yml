@@ -122,12 +122,9 @@ jobs:
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
-              run: |
-                  if [ "${{ inputs.package_manager }}" = "yarn" ]; then
-                    yarn install --frozen-lockfile
-                  else
-                    npm ci
-                  fi
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              with:
+                  package-manager: ${{ inputs.package_manager }}
 
             # ── 4. Type check ───────────────────────────────────────────────────
             - name: Type check
@@ -141,24 +138,9 @@ jobs:
             # ── 6. Compute badge JSON ───────────────────────────────────────────
             - name: Compute coverage badge JSON
               id: badge
-              run: |
-                  node -e "
-                    const path = '${{ inputs.coverage_summary_path }}';
-                    const s = JSON.parse(require('fs').readFileSync(path, 'utf8')).total;
-                    const safePct = m => m.total === 0 ? 100 : m.pct;
-                    const avg = (
-                      (safePct(s.statements) + safePct(s.branches) + safePct(s.functions) + safePct(s.lines)) / 4
-                    ).toFixed(1);
-                    const color =
-                      avg >= 90 ? 'brightgreen' :
-                      avg >= 75 ? 'green'       :
-                      avg >= 60 ? 'yellow'      : 'red';
-                    require('fs').writeFileSync(
-                      'badge.json',
-                      JSON.stringify({ schemaVersion: 1, label: 'coverage', message: avg + '%', color })
-                    );
-                    console.log('Coverage avg:', avg + '%', '→ color:', color);
-                  "
+              uses: CLDMV/.github/.github/actions/coverage/steps/compute-badge@v2
+              with:
+                  coverage-summary-path: ${{ inputs.coverage_summary_path }}
 
             # ── 7. Mint short-lived bot token ───────────────────────────────────
             - name: Generate bot token
@@ -179,48 +161,15 @@ jobs:
 
             # ── 9. Push badge to badges branch ──────────────────────────────────
             - name: Push coverage badge to badges branch
+              uses: CLDMV/.github/.github/actions/coverage/steps/push-badge@v2
               env:
                   BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
-              run: |
-                  # reusable-coverage-badge v1.12.5 — dirty-tree fix
-                  echo "::notice::reusable-coverage-badge v1.12.5"
-
-                  BADGES_BRANCH="${{ inputs.badges_branch }}"
-                  BADGE_FILE="${{ inputs.badge_filename }}"
-
-                  git config user.name  "${{ secrets.BOT_NAME }}"
-                  git config user.email "${{ secrets.BOT_EMAIL }}"
-
-                  # Stash the computed badge somewhere safe before we switch branches
-                  cp badge.json "$RUNNER_TEMP/$BADGE_FILE"
-
-                  # Type-check and coverage commands may leave generated/modified files
-                  # (e.g. types/**/*.d.mts.map, coverage/**) in the working tree.
-                  # git refuses to checkout a different branch with a dirty tree, so
-                  # stash everything (tracked + untracked) before switching.
-                  echo "Stashing working tree before branch switch…"
-                  git stash push --include-untracked --message "badge-branch-switch" || true
-
-                  if git fetch origin "$BADGES_BRANCH" 2>/dev/null; then
-                    git checkout "$BADGES_BRANCH"
-                  else
-                    # First run: create an orphan branch with no history
-                    git checkout --orphan "$BADGES_BRANCH"
-                    git rm -rf . --quiet 2>/dev/null || true
-                  fi
-
-                  cp "$RUNNER_TEMP/$BADGE_FILE" "$BADGE_FILE"
-                  git add "$BADGE_FILE"
-
-                  if git diff --cached --quiet; then
-                    echo "Badge unchanged — skipping commit."
-                    exit 0
-                  fi
-
-                  git commit -S -m "ci: update coverage badge"
-                  git push \
-                    "https://x-access-token:${BOT_TOKEN}@github.com/${{ github.repository }}.git" \
-                    "$BADGES_BRANCH"
+              with:
+                  badges-branch: ${{ inputs.badges_branch }}
+                  badge-filename: ${{ inputs.badge_filename }}
+                  bot-name: ${{ secrets.BOT_NAME }}
+                  bot-email: ${{ secrets.BOT_EMAIL }}
+                  repository: ${{ github.repository }}
 
             # ── 10. Upload full coverage report ─────────────────────────────────
             - name: Upload coverage artifact
