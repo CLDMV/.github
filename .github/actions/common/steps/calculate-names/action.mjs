@@ -4,7 +4,7 @@
  * @module @cldmv/.github.common.steps.calculate-names
  */
 
-import { getInput, setOutputs } from "../../common/common/core.mjs";
+import { getInput, setOutputs } from "../../../common/common/core.mjs";
 
 try {
 	const nodeVersion = getInput("node-version", { default: "lts/*" });

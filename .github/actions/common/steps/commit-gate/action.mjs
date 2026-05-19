@@ -5,7 +5,7 @@
  * @module @cldmv/.github.common.steps.commit-gate
  */
 
-import { getInput, getEventPayload, setOutputs } from "../../common/common/core.mjs";
+import { getInput, getEventPayload, setOutputs } from "../../../common/common/core.mjs";
 
 try {
 	// Use the explicit input, falling back to the push event's head commit.

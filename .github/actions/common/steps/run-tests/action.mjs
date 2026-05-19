@@ -6,7 +6,7 @@
  * @module @cldmv/.github.common.steps.run-tests
  */
 
-import { getInput, exec } from "../../common/common/core.mjs";
+import { getInput, exec } from "../../../common/common/core.mjs";
 
 try {
 	const testCommand = getInput("test-command", { required: true });

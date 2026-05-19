@@ -5,7 +5,7 @@
  * @module @cldmv/.github.common.steps.build-project
  */
 
-import { getInput, exec, appendSummary } from "../../common/common/core.mjs";
+import { getInput, exec, appendSummary } from "../../../common/common/core.mjs";
 
 const buildCommand = getInput("build-command", { required: true });
 const environment = getInput("environment", { default: "production" });
