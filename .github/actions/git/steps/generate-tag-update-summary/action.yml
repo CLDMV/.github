@@ -1,0 +1,28 @@
+name: "Generate Tag Update Summary"
+description: "Build the summary JSON describing a major/minor version tag update"
+
+inputs:
+  updated:
+    description: "Whether tags were updated"
+    required: false
+    default: "false"
+  major-version:
+    description: "Major version tag"
+    required: false
+    default: ""
+  minor-version:
+    description: "Minor version tag"
+    required: false
+    default: ""
+  source-tag:
+    description: "Source semantic version tag the rolling tags point at"
+    required: false
+    default: ""
+
+outputs:
+  summary-json:
+    description: "Summary JSON with title, description, lines, and stats"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

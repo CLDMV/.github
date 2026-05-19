@@ -1,0 +1,21 @@
+name: "Setup Bot Git Identity"
+description: "Resolve the GitHub App bot user and configure the global git identity"
+
+inputs:
+  app-slug:
+    description: "GitHub App slug (the bot is <slug>[bot])"
+    required: true
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  user-name:
+    description: "Configured git user.name"
+  user-email:
+    description: "Configured git user.email"
+
+runs:
+  using: "node24"
+  main: "action.mjs"
