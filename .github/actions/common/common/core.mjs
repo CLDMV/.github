@@ -14,11 +14,126 @@
  */
 
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 
 export const sh = (cmd) =>
 	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], env: process.env })
 		.toString()
 		.trim();
+
+/**
+ * Execute a command, streaming its stdout/stderr to the parent process.
+ * Throws if the command exits non-zero.
+ * @public
+ * @param {string} cmd - Command to execute (run via the system shell).
+ * @param {Record<string, string>} [env={}] - Extra environment variables to merge in.
+ * @returns {void}
+ */
+export function exec(cmd, env = {}) {
+	execSync(cmd, { stdio: "inherit", env: { ...process.env, ...env } });
+}
+
+/**
+ * Read a GitHub Actions input (the `INPUT_<NAME>` environment variable).
+ * @public
+ * @param {string} name - Input name as declared in action.yml.
+ * @param {object} [opts] - Options.
+ * @param {boolean} [opts.required=false] - Throw if the input is empty.
+ * @param {string} [opts.default=""] - Value returned when the input is empty.
+ * @returns {string} The trimmed input value.
+ *
+ * @example
+ * const version = getInput("node-version", { default: "lts/*" });
+ */
+export function getInput(name, { required = false, default: def = "" } = {}) {
+	const key = "INPUT_" + String(name).toUpperCase().replace(/ /g, "_");
+	const raw = process.env[key];
+	const value = (raw == null ? "" : String(raw)).trim();
+	if (!value) {
+		if (required) throw new Error(`Input '${name}' is required and was not provided`);
+		return def;
+	}
+	return value;
+}
+
+/**
+ * Read a GitHub Actions input as a boolean.
+ * @public
+ * @param {string} name - Input name as declared in action.yml.
+ * @param {boolean} [def=false] - Value returned when the input is empty.
+ * @returns {boolean} The parsed boolean.
+ */
+export function getBooleanInput(name, def = false) {
+	const value = getInput(name).toLowerCase();
+	if (!value) return def;
+	return value === "true" || value === "1" || value === "yes";
+}
+
+/**
+ * Append one output to the `GITHUB_OUTPUT` file, handling multiline values.
+ * @public
+ * @param {string} name - Output name.
+ * @param {*} value - Output value (coerced to string).
+ * @returns {void}
+ */
+export function setOutput(name, value) {
+	const file = process.env.GITHUB_OUTPUT;
+	const str = value == null ? "" : String(value);
+	if (!file) {
+		console.log(`(no GITHUB_OUTPUT) ${name}=${str}`);
+		return;
+	}
+	if (str.includes("\n")) {
+		const delim = `ghadelimiter_${randomUUID()}`;
+		fs.appendFileSync(file, `${name}<<${delim}\n${str}\n${delim}\n`);
+	} else {
+		fs.appendFileSync(file, `${name}=${str}\n`);
+	}
+}
+
+/**
+ * Append multiple outputs to the `GITHUB_OUTPUT` file.
+ * @public
+ * @param {Record<string, *>} values - Key/value pairs to write.
+ * @returns {void}
+ */
+export function setOutputs(values) {
+	for (const [key, value] of Object.entries(values)) {
+		setOutput(key, value);
+	}
+}
+
+/**
+ * Append markdown to the GitHub Actions step summary (`GITHUB_STEP_SUMMARY`).
+ * @public
+ * @param {string} text - Markdown content; a trailing newline is ensured.
+ * @returns {void}
+ */
+export function appendSummary(text) {
+	const file = process.env.GITHUB_STEP_SUMMARY;
+	const content = text.endsWith("\n") ? text : `${text}\n`;
+	if (!file) {
+		process.stdout.write(content);
+		return;
+	}
+	fs.appendFileSync(file, content);
+}
+
+/**
+ * Parse and return the triggering event payload (`GITHUB_EVENT_PATH`).
+ * @public
+ * @returns {object} The parsed event payload, or an empty object if unavailable.
+ */
+export function getEventPayload() {
+	const eventPath = process.env.GITHUB_EVENT_PATH;
+	if (!eventPath || !fs.existsSync(eventPath)) return {};
+	try {
+		return JSON.parse(fs.readFileSync(eventPath, "utf8"));
+	} catch {
+		return {};
+	}
+}
 
 /**
  * Check if debug logging is currently enabled

@@ -11,28 +11,5 @@ inputs:
     default: "production"
 
 runs:
-  using: "composite"
-  steps:
-    - name: Build project
-      shell: bash
-      run: |
-        echo "🏗️ **Building project** (\`${{ inputs.build-command }}\`)" >> $GITHUB_STEP_SUMMARY
-        echo "- Environment: \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Started: $(date)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        # Run the build command
-        if ${{ inputs.build-command }}; then
-          echo "✅ **Build completed successfully**" >> $GITHUB_STEP_SUMMARY
-          echo "- Finished: $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ **Build failed**" >> $GITHUB_STEP_SUMMARY
-          echo "- Command: \`${{ inputs.build-command }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Environment: \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Failed at: $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
-      env:
-        NODE_ENV: ${{ inputs.environment }}
+  using: "node24"
+  main: "action.mjs"
