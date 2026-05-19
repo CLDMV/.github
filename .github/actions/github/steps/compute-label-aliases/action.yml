@@ -1,0 +1,15 @@
+name: "Compute PR Label Aliases"
+description: "Compute raw release label aliases from a version bump type"
+
+inputs:
+  bump-type:
+    description: "Version bump type (major, minor, patch)"
+    required: true
+
+outputs:
+  labels:
+    description: "Comma-separated raw label aliases"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

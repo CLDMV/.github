@@ -1,0 +1,18 @@
+name: "Sync PR Labels"
+description: "Replace a pull request's labels with the given comma-separated set"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: "Pull request number"
+    required: true
+  labels:
+    description: "Comma-separated list of labels to apply"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

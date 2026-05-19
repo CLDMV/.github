@@ -1,0 +1,22 @@
+name: "Update PR Title and Changelog"
+description: "Update a pull request's title and body with the latest release changelog"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: "Pull request number"
+    required: true
+  new-version:
+    description: "New release version (used for the PR title)"
+    required: true
+  changelog-content:
+    description: "Generated changelog markdown for the PR body"
+    required: false
+    default: ""
+
+runs:
+  using: "node24"
+  main: "action.mjs"

@@ -1,0 +1,6 @@
+name: "Restore Deleted src/"
+description: "Restore src/ from HEAD if the build step deleted it, so the deletion is not committed"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

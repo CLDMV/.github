@@ -1,0 +1,16 @@
+name: "Resolve Display Version"
+description: "Use the provided new version, falling back to the package.json version"
+
+inputs:
+  new-version:
+    description: "Explicit new version (takes precedence when non-empty)"
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: "Resolved version"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

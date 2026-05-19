@@ -205,26 +205,7 @@ jobs:
 
             - name: Get branch divergence point
               id: divergence
-              shell: bash
-              run: |
-                  MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo "")
-                  if [ -n "$MERGE_BASE" ]; then
-                    echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
-                    echo "merge-base=$MERGE_BASE" >> $GITHUB_OUTPUT
-                    mkdir -p tmp
-                    git show "$MERGE_BASE:package.json" > tmp/base-package.json 2>/dev/null || true
-                    if [ -f tmp/base-package.json ]; then
-                      BASE_VERSION=$(node -p "require('./tmp/base-package.json').version" 2>/dev/null || echo "")
-                      rm -f tmp/base-package.json
-                    fi
-                  fi
-                  if [ -n "$BASE_VERSION" ]; then
-                    echo "📦 Base version at divergence point: $BASE_VERSION"
-                    echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
-                  else
-                    echo "⚠️ Could not determine base version — dedup check will be skipped"
-                    echo "base-version=" >> $GITHUB_OUTPUT
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/find-divergence@v2
 
             - name: Check release commit type
               id: release-check
@@ -276,15 +257,7 @@ jobs:
 
             - name: Restore src/ deleted by build
               if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              run: |
-                  if git ls-files --deleted -- src/ | grep -q .; then
-                    echo "🔄 Restoring src/ deleted by build step..."
-                    git checkout HEAD -- src/
-                    echo "✅ src/ restored"
-                  else
-                    echo "ℹ️ No src/ deletions detected — skipping restore"
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v2
 
             - name: Create signed commit
               if: steps.release-check.outputs.should-create-pr == 'true'
@@ -295,36 +268,16 @@ jobs:
 
             - name: Determine display version
               id: display-version
-              shell: bash
-              run: |
-                  if [ -n "${{ steps.version.outputs.new-version }}" ]; then
-                    echo "version=${{ steps.version.outputs.new-version }}" >> $GITHUB_OUTPUT
-                  else
-                    echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-                  fi
+              uses: CLDMV/.github/.github/actions/npm/steps/resolve-version@v2
+              with:
+                  new-version: ${{ steps.version.outputs.new-version }}
 
             - name: Get PR commit range
               id: get-pr-range
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-              run: |
-                  # Get the repository info
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-
-                  # Get current PR details
-                  CURRENT_PR=$(gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER)
-
-                  # Get the base branch and commit from the PR
-                  BASE_SHA=$(echo "$CURRENT_PR" | jq -r '.base.sha')
-                  HEAD_SHA=$(echo "$CURRENT_PR" | jq -r '.head.sha')
-
-                  # Create commit range
-                  COMMIT_RANGE="${BASE_SHA}..${HEAD_SHA}"
-                  echo "commit-range=${COMMIT_RANGE}" >> $GITHUB_OUTPUT
-                  echo "🔍 Using commit range: ${COMMIT_RANGE}"
+              uses: CLDMV/.github/.github/actions/github/steps/get-pr-commit-range@v2
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
 
             - name: Generate updated changelog
               id: changelog
@@ -333,57 +286,19 @@ jobs:
                   commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
 
             - name: Update PR title and description
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-                  CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
-                  NEW_VERSION: ${{ steps.display-version.outputs.version }}
-              run: |
-                  echo "📝 Updating PR #$PR_NUMBER title and description..."
-
-                  # Get the repository info
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-                                    TMP_DIR="tmp/pr-update"
-                                    mkdir -p "$TMP_DIR"
-
-                                    # Get the generated changelog from env and write to file safely
-                                    printf "%s\n" "$CHANGELOG_CONTENT" > "$TMP_DIR/changelog.md"
-
-                                    if [ ! -s "$TMP_DIR/changelog.md" ]; then
-                                        echo "⚠️ No changelog generated, using fallback message"
-                                        printf "%s\n" \
-                                            "## 🚀 What's Changed" \
-                                            "" \
-                                            "_Changelog generation in progress. The PR has been updated with the latest commits._" \
-                                            "" \
-                                            "Please check the commit history for details of the changes included in this release." \
-                                            > "$TMP_DIR/changelog.md"
-                  fi
-
-                  # Update the PR title and description
-                  echo "📝 Updating PR title to: release: v${NEW_VERSION}"
-                                    jq -n --rawfile body "$TMP_DIR/changelog.md" --arg title "release: v${NEW_VERSION}" \
-                                        '{title: $title, body: $body}' > "$TMP_DIR/pr-patch.json"
-
-                  gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
-                    --method PATCH \
-                                        --input "$TMP_DIR/pr-patch.json"
-
-                  echo "✅ PR #$PR_NUMBER has been updated with title 'release: v${NEW_VERSION}' and latest changelog"
-                  echo "ℹ️ Skipped full release workflow since PR already exists"
+              uses: CLDMV/.github/.github/actions/github/steps/update-pr-changelog@v2
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  new-version: ${{ steps.display-version.outputs.version }}
+                  changelog-content: ${{ steps.changelog.outputs.changelog-content }}
 
             - name: Compute raw label aliases
               id: raw-labels
               if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              env:
-                  BUMP_TYPE: ${{ steps.release-check.outputs.version-bump }}
-              run: |
-                  ALIASES="release,${BUMP_TYPE}"
-                  [ "$BUMP_TYPE" = "patch" ] && ALIASES="${ALIASES},bug"
-                  echo "labels=${ALIASES}" >> $GITHUB_OUTPUT
+              uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v2
+              with:
+                  bump-type: ${{ steps.release-check.outputs.version-bump }}
 
             - name: Resolve PR label aliases
               id: resolved-labels
@@ -394,20 +309,11 @@ jobs:
 
             - name: Sync PR labels
               if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-                  LABELS: ${{ steps.resolved-labels.outputs.labels }}
-              run: |
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-                  echo "🏷️ Syncing labels: ${LABELS}"
-                  LABELS_JSON=$(echo "$LABELS" | tr ',' '\n' | jq -R . | jq -s .)
-                  gh api repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels \
-                    --method PUT \
-                    --input <(echo "{\"labels\": $LABELS_JSON}")
-                  echo "✅ Labels synced: ${LABELS}"
+              uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v2
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  labels: ${{ steps.resolved-labels.outputs.labels }}
 
     build-and-test:
         name: "🏗️ Build and Test"
