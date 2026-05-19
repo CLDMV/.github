@@ -1,0 +1,20 @@
+name: "Detect GPG Capability"
+description: "Decide whether GPG signing is enabled from the use_gpg flag and key availability"
+
+inputs:
+  use-gpg:
+    description: "Whether GPG signing was requested"
+    required: false
+    default: "false"
+  has-gpg-key:
+    description: "Whether a GPG private key is available"
+    required: false
+    default: "false"
+
+outputs:
+  gpg-enabled:
+    description: "Whether GPG signing should be used"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

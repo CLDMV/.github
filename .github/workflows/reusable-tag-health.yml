@@ -175,59 +175,7 @@ jobs:
 
             - name: Validate tag source branch
               id: validate
-              run: |
-                  # If not a tag push, always proceed
-                  if [[ ! "$GITHUB_REF" =~ ^refs/tags/ ]]; then
-                    echo "should-proceed=true" >> $GITHUB_OUTPUT
-                    echo "message=Not a tag push, proceeding normally" >> $GITHUB_OUTPUT
-                    echo "🟢 Not a tag push, proceeding with workflow"
-                    exit 0
-                  fi
-
-                  # Extract tag name from ref
-                  TAG_NAME="${GITHUB_REF#refs/tags/}"
-                  echo "🏷️ Validating tag: $TAG_NAME"
-
-                  # Get the commit that the tag points to
-                  TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
-                  echo "📍 Tag points to commit: $TAG_COMMIT"
-
-                  # Check if this commit is reachable from main or master
-                  # First try to fetch the latest refs to ensure we have up-to-date information
-                  git fetch origin 2>/dev/null || true
-
-                  MAIN_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/main && echo "true" || echo "false")
-                  MASTER_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/master && echo "true" || echo "false")
-
-                  REACHABLE_FROM_MAIN="false"
-                  REACHABLE_FROM_MASTER="false"
-
-                  if [[ "$MAIN_EXISTS" == "true" ]]; then
-                    # Check if commit is in the history of origin/main
-                    if git rev-list "origin/main" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
-                      REACHABLE_FROM_MAIN="true"
-                      echo "✅ Tag commit is reachable from main branch"
-                    fi
-                  fi
-
-                  if [[ "$MASTER_EXISTS" == "true" ]]; then
-                    # Check if commit is in the history of origin/master  
-                    if git rev-list "origin/master" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
-                      REACHABLE_FROM_MASTER="true"
-                      echo "✅ Tag commit is reachable from master branch"
-                    fi
-                  fi
-
-                  # Determine if we should proceed
-                  if [[ "$REACHABLE_FROM_MAIN" == "true" || "$REACHABLE_FROM_MASTER" == "true" ]]; then
-                    echo "should-proceed=true" >> $GITHUB_OUTPUT
-                    echo "message=Tag $TAG_NAME is reachable from main/master branch" >> $GITHUB_OUTPUT
-                    echo "🟢 Validation passed: Tag is from main/master branch"
-                  else
-                    echo "should-proceed=false" >> $GITHUB_OUTPUT
-                    echo "message=Tag $TAG_NAME is not reachable from main/master branch" >> $GITHUB_OUTPUT
-                    echo "🟡 Validation failed: Tag is not from main/master branch, skipping major version tag updates"
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/validate-tag-source@v2
 
     # Auto-detect GPG capability once at the beginning
     detect-gpg:
@@ -240,19 +188,10 @@ jobs:
         steps:
             - name: Detect GPG capability
               id: detect
-              run: |
-                  # Auto-detect based on use_gpg input AND GPG_PRIVATE_KEY availability
-                  if [[ "${{ inputs.use_gpg }}" == "true" && -n "${{ secrets.GPG_PRIVATE_KEY }}" ]]; then
-                    echo "gpg-enabled=true" >> $GITHUB_OUTPUT
-                    echo "✅ GPG signing enabled (use_gpg=true, GPG_PRIVATE_KEY available)"
-                  else
-                    echo "gpg-enabled=false" >> $GITHUB_OUTPUT
-                    if [[ "${{ inputs.use_gpg }}" != "true" ]]; then
-                      echo "🔒 GPG signing disabled (use_gpg=false)"
-                    else
-                      echo "⚠️ GPG signing disabled (GPG_PRIVATE_KEY not available)"
-                    fi
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/detect-gpg@v2
+              with:
+                  use-gpg: ${{ inputs.use_gpg }}
+                  has-gpg-key: ${{ secrets.GPG_PRIVATE_KEY != '' }}
 
     # Shared setup for unified tag health sequence
     setup-shared:
