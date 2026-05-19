@@ -85,8 +85,26 @@ try {
 		execSync('git config --local user.name "GitHub Action"');
 		execSync("git add VERSION_TAGS.md");
 		execSync('git commit -m "docs: update version tags documentation"', { stdio: "inherit" });
-		const defaultBranch = getEventPayload().repository?.default_branch;
-		execSync(`git push origin HEAD:${defaultBranch}`, { stdio: "inherit" });
+
+		// Resolve the branch to push to — never push to an empty "HEAD:" target.
+		let targetBranch = getEventPayload().repository?.default_branch || "";
+		if (!targetBranch) {
+			try {
+				targetBranch = execSync("git symbolic-ref --short refs/remotes/origin/HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+					.toString()
+					.trim()
+					.replace(/^origin\//, "");
+			} catch {
+				targetBranch = "";
+			}
+		}
+		if (!targetBranch) targetBranch = process.env.GITHUB_REF_NAME || "";
+
+		if (targetBranch) {
+			execSync(`git push origin HEAD:${targetBranch}`, { stdio: "inherit" });
+		} else {
+			console.log("::warning::Could not determine the default branch — skipping VERSION_TAGS.md push");
+		}
 	}
 } catch (error) {
 	console.error(`::error::${error.message}`);

@@ -120,8 +120,7 @@ runs:
 
     - name: Restore src/ deleted by build
       if: inputs.dry-run != 'true'
-      shell: bash
-      run: node "${{ github.action_path }}/restore-src.mjs"
+      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v2
 
     - name: Create signed commit
       if: inputs.dry-run != 'true'
@@ -133,10 +132,9 @@ runs:
 
     - name: Compute raw label aliases
       id: raw-labels
-      shell: bash
-      run: node "${{ github.action_path }}/raw-labels.mjs"
-      env:
-        BUMP_TYPE: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
+      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v2
+      with:
+        bump-type: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
 
     - name: Resolve PR label aliases
       id: pr-labels
