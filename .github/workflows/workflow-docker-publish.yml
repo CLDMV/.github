@@ -102,17 +102,13 @@ jobs:
 
             - name: Resolve registry auth identity
               id: auth
-              shell: bash
-              run: |
-                  if [ "${{ steps.app-token.outputs.using_app_token }}" = "true" ] && [ -n "${{ steps.app-token.outputs.token }}" ]; then
-                    echo "username=${{ steps.app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
-                    echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-                    echo "Using GitHub App bot identity for registry login"
-                  else
-                    echo "username=${{ github.actor }}" >> "$GITHUB_OUTPUT"
-                    echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
-                    echo "⚠️ Bot token unavailable; falling back to workflow token identity"
-                  fi
+              uses: CLDMV/.github/.github/actions/docker/steps/resolve-auth@v2
+              with:
+                  using-app-token: ${{ steps.app-token.outputs.using_app_token }}
+                  app-token: ${{ steps.app-token.outputs.token }}
+                  app-slug: ${{ steps.app-token.outputs.app-slug }}
+                  actor: ${{ github.actor }}
+                  github-token: ${{ github.token }}
 
             - name: Log in to container registry
               uses: docker/login-action@v4
@@ -165,13 +161,9 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
 
             - name: Summary
-              shell: bash
-              run: |
-                  {
-                    echo "## 🐳 Docker Publish Summary"
-                    echo
-                    echo "- **Image**: ${{ steps.resolve-image.outputs.image }}"
-                    echo "- **Digest**: ${{ steps.build.outputs.digest }}"
-                    echo "- **Registry User**: ${{ steps.auth.outputs.username }}"
-                    echo "- **Pre-publish Command**: ${{ inputs.pre_publish_command || 'none' }}"
-                  } >> "$GITHUB_STEP_SUMMARY"
+              uses: CLDMV/.github/.github/actions/docker/steps/publish-summary@v2
+              with:
+                  image: ${{ steps.resolve-image.outputs.image }}
+                  digest: ${{ steps.build.outputs.digest }}
+                  registry-user: ${{ steps.auth.outputs.username }}
+                  pre-publish-command: ${{ inputs.pre_publish_command }}
