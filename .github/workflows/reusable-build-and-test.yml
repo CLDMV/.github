@@ -103,55 +103,13 @@ jobs:
             node-matrix: ${{ steps.set-matrix.outputs.matrix }}
         steps:
             - id: set-matrix
-              run: |
-                  # Check if matrix testing is skipped
-                  if [[ "${{ inputs.skip_matrix_tests }}" == "true" ]]; then
-                    # Use single node version
-                    SINGLE_VERSION="${{ inputs.node_version }}"
-                    echo "📍 Matrix testing skipped, using single version: $SINGLE_VERSION"
-                    echo "matrix=[\"$SINGLE_VERSION\"]" >> $GITHUB_OUTPUT
-                    exit 0
-                  fi
-
-                  # Build matrix from min to max versions
-                  MIN="${{ inputs.min_node_version }}"
-                  MAX_INPUT="${{ inputs.max_node_major }}"
-                  DEFAULT_MAX=22
-
-                  echo "🔍 DEBUG (build-and-test): min_node_version = '$MIN'"
-                  echo "🔍 DEBUG (build-and-test): max_node_major = '$MAX_INPUT'"
-
-                  if [[ -n "$MAX_INPUT" ]]; then
-                    MAX=$MAX_INPUT
-                  else
-                    MAX=$DEFAULT_MAX
-                  fi
-
-                  # Parse major and minor from min version
-                  MAJOR=$(echo $MIN | cut -d. -f1)
-                  MINOR=$(echo $MIN | cut -d. -f2)
-
-                  # Build versions array
-                  VERSIONS=()
-                  if [[ "$MIN" == *"."* ]]; then
-                    VERSIONS+=("\"${MAJOR}.${MINOR}\"")
-                    ((MAJOR++))
-                  fi
-                  while [ $MAJOR -le $MAX ]; do
-                    if [[ "${{ inputs.lts_only_matrix }}" == "true" ]] && (( MAJOR % 2 != 0 )); then
-                      echo "⏭️  Skipping non-LTS Node.js v${MAJOR} (odd major)"
-                    else
-                      VERSIONS+=("\"${MAJOR}\"")
-                    fi
-                    ((MAJOR++))
-                  done
-                  VERSIONS+=("\"lts/*\"")
-
-                  # Join with commas and create JSON array
-                  printf -v joined '%s,' "${VERSIONS[@]}"
-                  joined="[${joined%,}]"
-                  echo "📊 Matrix testing enabled with versions: $joined"
-                  echo "matrix=$joined" >> $GITHUB_OUTPUT
+              uses: CLDMV/.github/.github/actions/node/steps/generate-matrix@v2
+              with:
+                  skip-matrix-tests: ${{ inputs.skip_matrix_tests }}
+                  node-version: ${{ inputs.node_version }}
+                  min-node-version: ${{ inputs.min_node_version }}
+                  max-node-major: ${{ inputs.max_node_major }}
+                  lts-only-matrix: ${{ inputs.lts_only_matrix }}
 
     build-and-test:
         name: "🏗️ Build & Test"

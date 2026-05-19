@@ -1,0 +1,42 @@
+name: "CI Workflow Summary"
+description: "Render the Continuous Integration job summary"
+
+inputs:
+  package-name:
+    description: "NPM package name"
+    required: true
+  node-version:
+    description: "Node.js version used"
+    required: false
+    default: "lts/*"
+  package-manager:
+    description: "Package manager used"
+    required: false
+    default: "npm"
+  ci-result:
+    description: "Result of the CI (build & test) job"
+    required: true
+  enable-coverage-badge:
+    description: "Whether the coverage badge job was enabled"
+    required: false
+    default: "false"
+  badges-branch:
+    description: "Branch the coverage badge is published to"
+    required: false
+    default: "badges"
+  coverage-badge-result:
+    description: "Result of the coverage badge job"
+    required: false
+    default: ""
+  enable-coverage-pr-comment:
+    description: "Whether the PR coverage comment job was enabled"
+    required: false
+    default: "false"
+  coverage-pr-comment-result:
+    description: "Result of the PR coverage comment job"
+    required: false
+    default: ""
+
+runs:
+  using: "node24"
+  main: "action.mjs"

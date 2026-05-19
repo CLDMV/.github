@@ -1,0 +1,32 @@
+name: "Generate Node.js Test Matrix"
+description: "Build the Node.js version matrix (min major .. max major + lts/*), with skip and LTS-only modes"
+
+inputs:
+  skip-matrix-tests:
+    description: "Use a single Node.js version instead of a full matrix"
+    required: false
+    default: "false"
+  node-version:
+    description: "Single Node.js version to use when matrix testing is skipped"
+    required: false
+    default: "lts/*"
+  min-node-version:
+    description: "Minimum Node.js version (major or major.minor) to start the matrix from"
+    required: false
+    default: "20"
+  max-node-major:
+    description: "Maximum Node.js major version (defaults to 22)"
+    required: false
+    default: ""
+  lts-only-matrix:
+    description: "Only include even-numbered (LTS) majors in the matrix"
+    required: false
+    default: "false"
+
+outputs:
+  matrix:
+    description: "JSON array of Node.js versions for the test matrix"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

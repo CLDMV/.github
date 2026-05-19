@@ -253,42 +253,14 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate CI Summary
-              run: |
-                  echo "## 🏗️ Continuous Integration Summary" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "**Node Version**: \`${{ inputs.node_version }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "**Package Manager**: \`${{ inputs.package_manager }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-
-                  if [ "${{ needs.ci.result }}" = "success" ]; then
-                    echo "✅ **Overall Status**: All CI checks passed successfully" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "❌ **Overall Status**: CI workflow failed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-                  fi
-
-                  if [ "${{ inputs.enable_coverage_badge }}" = "true" ]; then
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "### 📊 Coverage Badge" >> $GITHUB_STEP_SUMMARY
-                    if [ "${{ needs.coverage-badge.result }}" = "success" ]; then
-                      echo "✅ Coverage badge updated on \`${{ inputs.badges_branch }}\` branch" >> $GITHUB_STEP_SUMMARY
-                    elif [ "${{ needs.coverage-badge.result }}" = "skipped" ]; then
-                      echo "⏭️ Coverage badge skipped (CI did not pass)" >> $GITHUB_STEP_SUMMARY
-                    else
-                      echo "❌ Coverage badge push failed" >> $GITHUB_STEP_SUMMARY
-                    fi
-                  fi
-
-                  if [ "${{ inputs.enable_coverage_pr_comment }}" = "true" ]; then
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "### PR Coverage Badge" >> $GITHUB_STEP_SUMMARY
-                    if [ "${{ needs.coverage-pr-comment.result }}" = "success" ]; then
-                      echo "✅ Coverage badge injected into PR description" >> $GITHUB_STEP_SUMMARY
-                    elif [ "${{ needs.coverage-pr-comment.result }}" = "skipped" ]; then
-                      echo "⏭️ PR coverage badge skipped (not a pull_request event)" >> $GITHUB_STEP_SUMMARY
-                    else
-                      echo "❌ PR coverage badge update failed" >> $GITHUB_STEP_SUMMARY
-                    fi
-                  fi
+              uses: CLDMV/.github/.github/actions/workflows/ci-summary@v2
+              with:
+                  package-name: ${{ inputs.package_name }}
+                  node-version: ${{ inputs.node_version }}
+                  package-manager: ${{ inputs.package_manager }}
+                  ci-result: ${{ needs.ci.result }}
+                  enable-coverage-badge: ${{ inputs.enable_coverage_badge }}
+                  badges-branch: ${{ inputs.badges_branch }}
+                  coverage-badge-result: ${{ needs.coverage-badge.result }}
+                  enable-coverage-pr-comment: ${{ inputs.enable_coverage_pr_comment }}
+                  coverage-pr-comment-result: ${{ needs.coverage-pr-comment.result }}
