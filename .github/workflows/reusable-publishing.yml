@@ -196,6 +196,13 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.extract.outputs.version }}
+            # Latest version already on NPM. Downstream publish/release jobs gate
+            # on `version != npm-latest-version` to skip cleanly when the
+            # package.json version is unchanged (e.g. a non-release PR merged to
+            # master). Avoids the false-positive "version already published"
+            # failure that trains people to ignore real publish failures.
+            # See P3.3 in tmp/plan-future-workflows.md.
+            npm-latest-version: ${{ steps.extract.outputs.npm-latest-version }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v6
@@ -206,6 +213,16 @@ jobs:
               with:
                   package-name: ${{ inputs.package_name }}
                   version-override: ${{ inputs.version }}
+
+            - name: Report skip-publish status
+              shell: bash
+              run: |
+                  if [ "${{ steps.extract.outputs.version }}" = "${{ steps.extract.outputs.npm-latest-version }}" ] && [ -n "${{ steps.extract.outputs.npm-latest-version }}" ]; then
+                      echo "📦 v${{ steps.extract.outputs.version }} already on NPM — downstream publish/release jobs will skip."
+                      echo "::notice::Version unchanged (v${{ steps.extract.outputs.version }}) — publish/release jobs skipped. This is expected when a non-release PR merged to the default branch."
+                  else
+                      echo "🆕 v${{ steps.extract.outputs.version }} is new (NPM latest: ${{ steps.extract.outputs.npm-latest-version || '(unpublished)' }}) — proceeding with publish."
+                  fi
 
     detect-repo-config:
         name: "🔧 Detect Repository Config"
@@ -228,7 +245,14 @@ jobs:
 
     publish-npm:
         name: "📦 Publish to NPM"
-        if: inputs.run_publish_npm == true
+        # Skip when package.json version already matches NPM (no actual bump
+        # to publish). Dry-run still runs the validation steps so consumers
+        # can sanity-check the flow regardless of version state. P3.3.
+        if: |
+            inputs.run_publish_npm == true && (
+              inputs.dry_run == true ||
+              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
+            )
         runs-on: ubuntu-latest
         needs: [ detect-version, detect-repo-config ]
         permissions:
@@ -263,7 +287,13 @@ jobs:
 
     publish-github-packages:
         name: "📦 Publish to GitHub Packages"
-        if: inputs.run_publish_github_packages == true
+        # Mirrors the NPM gate (assumes NPM + GH Packages stay in sync, which is
+        # the case when both publish from the same package.json bump). P3.3.
+        if: |
+            inputs.run_publish_github_packages == true && (
+              inputs.dry_run == true ||
+              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
+            )
         runs-on: ubuntu-latest
         needs: [ detect-version, detect-repo-config ]
         permissions:
@@ -336,7 +366,13 @@ jobs:
 
     create-release:
         name: "📋 Create GitHub Release"
-        if: inputs.run_create_release == true
+        # Skip release creation when the version already has one on NPM (and
+        # therefore presumably here). Dry-run still validates. P3.3.
+        if: |
+            inputs.run_create_release == true && (
+              inputs.dry_run == true ||
+              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
+            )
         runs-on: ubuntu-latest
         needs: [ detect-version ]
         outputs:
