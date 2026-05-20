@@ -1,7 +1,7 @@
 #
 # @Project: @cldmv/.github
-# @Filename: /examples/individual-repo-workflows/sync-release-prs.yml
-# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Filename: /examples/individual-repo-workflows/release-companions/sync-release-prs.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
@@ -39,7 +39,7 @@ jobs:
             github.event.pull_request.user.login != 'github-actions[bot]'
         uses: CLDMV/.github/.github/workflows/workflow-sync-open-release-prs.yml@v3
         with:
-            package_name: "@cldmv/slothlet" # Required: your NPM package name
+            package_name: "@your-org/your-package" # Required: replace with your NPM package name
             # Optional overrides:
             # package_manager: "npm"
             # build_command: "npm run build:ci"

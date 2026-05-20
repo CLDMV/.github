@@ -4,16 +4,16 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 
 ## 📖 Guides
 
-- **[WORKFLOW-SETUP-GUIDE.md](WORKFLOW-SETUP-GUIDE.md)** — what each workflow does, which `package.json` scripts it requires, which secrets it needs, prerequisites. Start here when adding a workflow to a new repo.
-- **[DRY-RUN-GUIDE.md](DRY-RUN-GUIDE.md)** — how to use dry-run mode on release and publish pipelines without making real changes.
-- **[UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)** — how the floating `vX` / `vX.Y` rolling tags are maintained.
+- **[guides/WORKFLOW-SETUP-GUIDE.md](guides/WORKFLOW-SETUP-GUIDE.md)** — what each workflow does, which `package.json` scripts it requires, which secrets it needs, prerequisites. Start here when adding a workflow to a new repo.
+- **[guides/DRY-RUN-GUIDE.md](guides/DRY-RUN-GUIDE.md)** — how to use dry-run mode on release and publish pipelines without making real changes.
+- **[guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)** — how the floating `vX` / `vX.Y` rolling tags are maintained.
 - **[../docs/migration/v2-to-v3.md](../docs/migration/v2-to-v3.md)** — migration guide for consumers updating from v2 to v3.
 
 ## Template Catalog
 
-All templates live in [`individual-repo-workflows/`](individual-repo-workflows/) and are organized below by purpose. Each one references the matching org workflow via `@v3`. Copy what you need; you don't need to adopt all of them.
+Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into five subfolders. Each one references the matching org workflow via `@v3`. Copy what you need; you don't need to adopt all of them.
 
-### 🧪 Core CI/CD (most repos want all four)
+### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD (most repos want all four)
 
 | Template | Triggers | Calls | What it does |
 |---|---|---|---|
@@ -22,7 +22,7 @@ All templates live in [`individual-repo-workflows/`](individual-repo-workflows/)
 | `publish.yml` | push to default branch | `workflow-publish.yml` | Publishes to NPM + GitHub Packages, creates GitHub release |
 | `update-major-version-tags.yml` | `release: published` | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags |
 
-### 📋 Release-flow companions
+### 📋 [`release-companions/`](individual-repo-workflows/release-companions/) — Release-flow companions
 
 | Template | Triggers | What it does |
 |---|---|---|
@@ -31,7 +31,7 @@ All templates live in [`individual-repo-workflows/`](individual-repo-workflows/)
 | `release-notify.yml` | `release: published` | Posts to configured Discord/Slack/generic webhook channels. |
 | `master-commit-audit.yml` | push to default | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern. |
 
-### 🔒 Security baseline (recommended for OSS repos)
+### 🔒 [`security/`](individual-repo-workflows/security/) — Security baseline (recommended for OSS repos)
 
 | Template | Triggers | What it does |
 |---|---|---|
@@ -40,7 +40,7 @@ All templates live in [`individual-repo-workflows/`](individual-repo-workflows/)
 | `scorecard.yml` | weekly + branch_protection_rule | OpenSSF Scorecard, publishes to public scoreboard. |
 | `cla.yml` | PR + issue_comment | Per-PR CLA signing for external contributors. Org members exempt. |
 
-### 🤖 Automation
+### 🤖 [`automation/`](individual-repo-workflows/automation/) — Automation
 
 | Template | Triggers | What it does |
 |---|---|---|
@@ -50,7 +50,7 @@ All templates live in [`individual-repo-workflows/`](individual-repo-workflows/)
 | `stale.yml` | daily cron | Marks/closes inactive issues + PRs. Defaults: 60+14 days issues, 30+7 days PRs. |
 | `branch-retention.yml` | PR merged | Prunes most head branches; keeps last N of `release/*` and `hotfix/*`. |
 
-### 📦 Packaging / docs (opt-in)
+### 📦 [`packaging-docs/`](individual-repo-workflows/packaging-docs/) — Packaging / docs (opt-in)
 
 | Template | Triggers | What it does |
 |---|---|---|
@@ -61,9 +61,9 @@ All templates live in [`individual-repo-workflows/`](individual-repo-workflows/)
 
 ## How to use
 
-1. Copy the template(s) you want into your repo's `.github/workflows/` directory.
-2. Update `package_name` (where present) to match your NPM package name.
-3. Configure required repo settings — see [WORKFLOW-SETUP-GUIDE.md](WORKFLOW-SETUP-GUIDE.md):
+1. Copy the template(s) you want into your repo's `.github/workflows/` directory. The category subfolders are organizational only — copy the `.yml` file itself, not the subfolder.
+2. Update `package_name` (where present) to match your NPM package name — templates ship with the placeholder `@your-org/your-package`.
+3. Configure required repo settings — see [guides/WORKFLOW-SETUP-GUIDE.md](guides/WORKFLOW-SETUP-GUIDE.md):
    - **Settings → Actions → "Require approval for outside collaborators"**
    - **Settings → Pull Requests → "Allow auto-merge"** (if adopting `dependabot-auto-merge.yml`)
    - **Branch protection** on master/main with required CI status check

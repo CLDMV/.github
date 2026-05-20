@@ -1,13 +1,9 @@
 #
-# @Project: individual-repo-workflows
-# @Filename: /ci.yml
-# @Date: 2026-02-21 12:59:41 -08:00 (1771707581)
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/core-cicd/ci.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
-# -----
-# @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-06 17:56:17 -07:00 (1775523377)
-# -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
@@ -151,7 +147,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
     uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v3
     with:
-      package_name: "@cldmv/slothlet" # Required: Your NPM package name
+      package_name: "@your-org/your-package" # Required: replace with your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}

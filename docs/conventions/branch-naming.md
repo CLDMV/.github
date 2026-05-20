@@ -37,5 +37,5 @@ Org admins can bypass the ruleset (configured in the script). Useful for one-off
 
 ## Related
 
-- Branch retention: `examples/individual-repo-workflows/branch-retention.yml` keeps the last N of `release/*` and `hotfix/*` and deletes everything else immediately on merge. The retention `exempt_patterns` align with this convention's `master`/`main`/`badges`/`gh-pages` defaults.
+- Branch retention: `examples/individual-repo-workflows/automation/branch-retention.yml` keeps the last N of `release/*` and `hotfix/*` and deletes everything else immediately on merge. The retention `exempt_patterns` align with this convention's `master`/`main`/`badges`/`gh-pages` defaults.
 - Label catalog: `data/github-labels.json` has prefixed families (`type:`, `status:`, `priority:`, `semver:`, `area:`) that mirror the branch-prefix style.

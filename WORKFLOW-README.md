@@ -65,7 +65,13 @@ docs/conventions/branch-naming.md                # 🆕 v3: branch naming conven
 scripts/setup-org-rulesets.mjs                   # 🆕 v3: installer for naming Ruleset
 CLA.md                                           # 🆕 v3: contributor license agreement
 examples/
-└── individual-repo-workflows/                   # copy-paste templates for consumers
+├── guides/                                      # 🆕 v3: setup / dry-run / rolling-tag guides
+└── individual-repo-workflows/                   # copy-paste templates for consumers, grouped:
+    ├── core-cicd/         (ci, release, publish, update-major-version-tags)
+    ├── release-companions/(sync-release-prs, tag-health, release-notify, master-commit-audit)
+    ├── security/          (codeql, dependency-review, scorecard, cla)
+    ├── automation/        (dependabot-auto-merge, labeler, welcome, stale, branch-retention)
+    └── packaging-docs/    (docker-publish, bundle-size, docs, sync-org-labels)
 ```
 
 ## 🔧 Available Workflows

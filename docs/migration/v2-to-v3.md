@@ -139,7 +139,7 @@ Pre-existing issues on the repo and how v3 addresses them:
 
 ### [#1 — Workflow publish is publishing from PR branches rather than master](https://github.com/CLDMV/.github/issues/1)
 
-**Resolved.** v3's `examples/individual-repo-workflows/publish.yml` triggers ONLY on `push: branches: [master, main]`. On a master push, `github.ref = refs/heads/master`, `github.sha = master HEAD`, and the reusable's checkout pulls master content. Consumers that copy the new template won't see the old PR-branch behavior.
+**Resolved.** v3's `examples/individual-repo-workflows/core-cicd/publish.yml` triggers ONLY on `push: branches: [master, main]`. On a master push, `github.ref = refs/heads/master`, `github.sha = master HEAD`, and the reusable's checkout pulls master content. Consumers that copy the new template won't see the old PR-branch behavior.
 
 **Note:** `workflow_dispatch` still allows manual invocation against any branch via the Actions UI's branch picker. This is an intentional escape hatch for emergency publishes, not a bug.
 

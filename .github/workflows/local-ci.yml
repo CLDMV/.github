@@ -82,7 +82,7 @@ jobs:
                       ".github/workflows/*.yml",
                       ".github/actions/**/*.yml",
                       ".github/labeler.default.yml",
-                      "examples/individual-repo-workflows/*.yml",
+                      "examples/individual-repo-workflows/**/*.yml",
                   ]
                   for pattern in patterns:
                       for f in glob.glob(pattern, recursive=True):
