@@ -76,7 +76,7 @@ jobs:
                   dist_paths: ${{ inputs.dist_paths }}
                   output_file: sizes.json
             - name: Upload head sizes
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: head-sizes
                   path: sizes.json
@@ -107,7 +107,7 @@ jobs:
                   dist_paths: ${{ inputs.dist_paths }}
                   output_file: sizes.json
             - name: Upload base sizes
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: base-sizes
                   path: sizes.json
@@ -118,12 +118,12 @@ jobs:
         needs: [build-head, build-base]
         steps:
             - name: Download head sizes
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v7
               with:
                   name: head-sizes
                   path: head-sizes
             - name: Download base sizes
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v7
               with:
                   name: base-sizes
                   path: base-sizes
