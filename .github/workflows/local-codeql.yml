@@ -30,6 +30,12 @@ permissions:
     contents: read
     actions: read
 
+# Opt in early to Node 24 for github/codeql-action/*@v3 (which still runs on
+# Node 20). Silences the Node-20-deprecation warning until codeql-action v4
+# ships in December 2026.
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
     group: local-codeql-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
@@ -48,27 +54,15 @@ jobs:
               with:
                   fetch-depth: 0
 
-            # CodeQL init doesn't accept `paths-ignore:` as a direct input;
-            # path filtering must come from a codeql-config.yml file referenced
-            # via `config-file:`. Write a tiny one inline before init.
-            - name: Write CodeQL config
-              shell: bash
-              run: |
-                  cat > /tmp/codeql-config.yml <<'EOF'
-                  paths-ignore:
-                    - node_modules/
-                    - tmp/
-                    - backup/
-                    - .archive/
-                    - examples/
-                  EOF
-
+            # CodeQL init requires `config-file:` to point at a path INSIDE the
+            # workspace (checked-out tree). Use the checked-in config file under
+            # `.github/codeql/`.
             - name: Initialize CodeQL
               uses: github/codeql-action/init@v3
               with:
                   languages: javascript-typescript
                   queries: security-extended,security-and-quality
-                  config-file: /tmp/codeql-config.yml
+                  config-file: .github/codeql/codeql-config.yml
 
             - name: Analyze
               uses: github/codeql-action/analyze@v3
