@@ -75,6 +75,13 @@ jobs:
             # and tag in that mode.
             publish_to_npm: false
             publish_to_github_packages: false
+            # Source-only release: skip the download-artifacts job in the
+            # publish flow. There's no build output to attach as a release
+            # asset (echo build_command produces nothing, no .tgz, no dist/).
+            # Without this, download-artifacts fails ("Artifact not found")
+            # and the workflow's overall status flips to failed even though
+            # create-release succeeded.
+            release_source_only: true
             # Stub commands: no npm test / npm run build:ci scripts exist in
             # this repo's package.json. local-ci.yml is the real validation
             # gate (runs on the PR before merge).
