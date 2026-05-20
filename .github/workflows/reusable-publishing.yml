@@ -126,6 +126,23 @@ on:
                 type: boolean
                 default: false
 
+            # SBOM generation (Batch 4.2)
+            generate_sbom:
+                description: "Generate CycloneDX SBOM during publish; attach to release if create_release runs. Opt-in (off by default since dep-free repos produce meaningless artifacts)."
+                required: false
+                type: boolean
+                default: false
+            attest_sbom:
+                description: "Sigstore-attest the SBOM. Only relevant when generate_sbom is true. Un-attested SBOMs are 'trust me bro' data."
+                required: false
+                type: boolean
+                default: true
+            sbom_format:
+                description: "SBOM format: cyclonedx-json (recommended) or spdx-json"
+                required: false
+                type: string
+                default: "cyclonedx-json"
+
         secrets:
             NPM_TOKEN:
                 description: "NPM token for publishing packages"
@@ -407,6 +424,43 @@ jobs:
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
                   gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+            # SBOM generation + attestation. Anchore's syft does the per-
+            # ecosystem dep-tree walking (~2000 lines of correctness logic);
+            # actions/attest-sbom is GitHub-owned Sigstore signing. Both
+            # substantive external systems — we wrap, don't roll our own.
+            # Batch 4.2.
+            - name: Generate SBOM (CycloneDX)
+              if: inputs.generate_sbom == true && inputs.dry_run != true
+              uses: anchore/sbom-action@v0
+              with:
+                  format: ${{ inputs.sbom_format }}
+                  output-file: sbom.${{ inputs.sbom_format == 'spdx-json' && 'spdx.json' || 'cdx.json' }}
+                  artifact-name: sbom.${{ inputs.sbom_format == 'spdx-json' && 'spdx.json' || 'cdx.json' }}
+
+            - name: Attest SBOM (Sigstore)
+              if: inputs.generate_sbom == true && inputs.attest_sbom == true && inputs.dry_run != true
+              uses: actions/attest-sbom@v2
+              with:
+                  subject-path: "*.tgz"
+                  sbom-path: sbom.${{ inputs.sbom_format == 'spdx-json' && 'spdx.json' || 'cdx.json' }}
+
+            - name: Attach SBOM to release
+              if: inputs.generate_sbom == true && inputs.dry_run != true && steps.create.outputs.release-id != ''
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  REPO: ${{ github.repository }}
+                  RELEASE_ID: ${{ steps.create.outputs.release-id }}
+                  SBOM_PATH: sbom.${{ inputs.sbom_format == 'spdx-json' && 'spdx.json' || 'cdx.json' }}
+              run: |
+                  curl -sSL -X POST \
+                    -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    -H "Content-Type: application/octet-stream" \
+                    "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$SBOM_PATH" \
+                    --data-binary "@$SBOM_PATH"
+                  echo "📋 SBOM attached to release"
 
     update-version-tags:
         name: "📌 Update Major Version Tags"

@@ -1,0 +1,77 @@
+#
+# @Project: workflows
+# @Filename: /reusable-container-scan.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Container vulnerability scan via Trivy (org-level, reusable).
+#
+# Aquasecurity's marketplace action IS the Trivy team's official integration
+# (handles vuln-DB caching, retries, SARIF emission, exit codes). Reimplementing
+# would just re-wrap their CLI — substantive external system.
+#
+# Batch 4.1 from tmp/plan-future-workflows.md.
+name: 🛡️ Container Scan (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            image:
+                description: "Full image ref (registry/repo:tag)"
+                required: true
+                type: string
+            severity:
+                description: "Comma-sep severities to report. Defaults to CRITICAL+HIGH (these block when fail_on_severity is true)."
+                required: false
+                type: string
+                default: "CRITICAL,HIGH"
+            fail_on_severity:
+                description: "Fail the job (and block publish) on any finding at `severity` or above"
+                required: false
+                type: boolean
+                default: true
+            ignore_unfixed:
+                description: "Skip vulns with no upstream fix. Default true: failing on unfixable vulns stalls publishes indefinitely."
+                required: false
+                type: boolean
+                default: true
+            sarif_upload:
+                description: "Upload SARIF to GitHub Security tab"
+                required: false
+                type: boolean
+                default: true
+            sarif_category:
+                description: "SARIF category for Code-Scanning grouping"
+                required: false
+                type: string
+                default: "trivy"
+
+permissions:
+    contents: read
+    security-events: write
+    actions: read
+
+jobs:
+    scan:
+        name: "🛡️ Trivy Scan"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Trivy scan
+              uses: aquasecurity/trivy-action@0.28.0
+              with:
+                  image-ref: ${{ inputs.image }}
+                  format: ${{ inputs.sarif_upload && 'sarif' || 'table' }}
+                  output: ${{ inputs.sarif_upload && 'trivy.sarif' || '' }}
+                  severity: ${{ inputs.severity }}
+                  ignore-unfixed: ${{ inputs.ignore_unfixed }}
+                  exit-code: ${{ inputs.fail_on_severity && '1' || '0' }}
+
+            - name: Upload SARIF
+              if: inputs.sarif_upload && always()
+              uses: github/codeql-action/upload-sarif@v3
+              with:
+                  sarif_file: trivy.sarif
+                  category: ${{ inputs.sarif_category }}

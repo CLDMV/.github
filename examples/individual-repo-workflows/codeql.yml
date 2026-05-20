@@ -1,0 +1,45 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/codeql.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/codeql.yml
+name: 🔍 CodeQL
+
+on:
+    push:
+        branches: [master, main]
+    # Same fork-PR consideration as ci.yml: pull_request fires for forks; SARIF
+    # upload to base-repo Security tab fails with read-only token. Acceptable —
+    # push-to-master analysis after merge catches anything missed. DO NOT use
+    # pull_request_target (runs base-repo workflow with secrets against fork
+    # code; dangerous).
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches: [master, main]
+    schedule:
+        - cron: "37 14 * * 1" # weekly Monday 14:37 UTC; GitHub updates queries over time
+
+permissions:
+    security-events: write
+    contents: read
+    actions: read
+
+concurrency:
+    group: codeql-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+    analyze:
+        uses: CLDMV/.github/.github/workflows/reusable-codeql.yml@v2
+        with:
+            languages: "javascript-typescript"
+            # Override defaults if needed:
+            # queries: "security-extended,security-and-quality"
+            # paths_ignore: "node_modules/,dist/,coverage/,**/test/**"
+            # config_file: ".github/codeql-config.yml"
+            # build_mode: "autobuild"

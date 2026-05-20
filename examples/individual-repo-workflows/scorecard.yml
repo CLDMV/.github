@@ -1,0 +1,57 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/scorecard.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/scorecard.yml
+#
+# OpenSSF Scorecard — scans the repo against ~18 security best-practice
+# checks (branch protection, signed releases, dependency-review, no binary
+# artifacts in repo, etc.) and produces a score 0-10.
+#
+# Trust signal for OSS consumers. Scorecard's checks are OpenSSF's research
+# output; reimplementing them would mean re-deriving an external project.
+# We wrap the marketplace action.
+#
+# Batch 4.3 from tmp/plan-future-workflows.md.
+name: 🔬 OpenSSF Scorecard
+
+on:
+    branch_protection_rule:
+    schedule:
+        - cron: "32 7 * * 1" # weekly Monday 07:32 UTC
+    push:
+        branches: [master, main]
+    workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+    analyze:
+        runs-on: ubuntu-latest
+        permissions:
+            security-events: write
+            id-token: write # publish to OpenSSF transparency log
+            contents: read
+        steps:
+            - name: Checkout
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              with:
+                  persist-credentials: false
+
+            - name: Run Scorecard
+              uses: ossf/scorecard-action@v2.4.0
+              with:
+                  results_file: results.sarif
+                  results_format: sarif
+                  publish_results: true
+
+            - name: Upload SARIF
+              uses: github/codeql-action/upload-sarif@v3
+              with:
+                  sarif_file: results.sarif
+                  category: scorecard
