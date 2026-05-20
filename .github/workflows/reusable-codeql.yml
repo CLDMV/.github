@@ -62,16 +62,30 @@ permissions:
     actions: read # required for private repos
 
 jobs:
+    # GitHub Actions expressions have no `split()` builtin, so we round-trip
+    # the comma-sep `languages` input through a small Node action that emits
+    # a JSON array. The analyze job then uses `fromJson(needs.setup.outputs.languages)`
+    # to drive its matrix.
+    setup:
+        name: "🧮 Build language matrix"
+        runs-on: ubuntu-latest
+        outputs:
+            languages: ${{ steps.parse.outputs.json }}
+        steps:
+            - name: Parse languages CSV
+              id: parse
+              uses: CLDMV/.github/.github/actions/common/utilities/parse-csv-list@v3
+              with:
+                  csv: ${{ inputs.languages }}
+
     analyze:
         name: "🔍 Analyze ${{ matrix.language }}"
+        needs: setup
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
             matrix:
-                # Expand the comma-sep input into a matrix. Using `fromJson`
-                # on a constructed JSON array is the standard pattern for
-                # dynamic matrices sourced from workflow inputs.
-                language: ${{ fromJson(format('[\"{0}\"]', join(split(inputs.languages, ','), '\",\"'))) }}
+                language: ${{ fromJson(needs.setup.outputs.languages) }}
         steps:
             - name: Checkout
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3

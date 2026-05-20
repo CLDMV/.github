@@ -1,0 +1,30 @@
+#
+# @Project: parse-csv-list
+# @Filename: /action.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Parse CSV to JSON array"
+description: "Convert a comma-separated string (trimmed, empty-filtered) into a JSON array. Used to feed `strategy.matrix` from a workflow_call CSV input since GitHub Actions expressions have no split() function."
+
+inputs:
+  csv:
+    description: "Comma-separated input (e.g. 'javascript-typescript, python')"
+    required: true
+  drop_empty:
+    description: "Filter out empty items after trim. Default true."
+    required: false
+    default: "true"
+
+outputs:
+  json:
+    description: "JSON array of trimmed items (e.g. '[\"javascript-typescript\",\"python\"]')"
+  count:
+    description: "Decimal count of items in the array"
+
+runs:
+  using: node24
+  main: action.mjs
