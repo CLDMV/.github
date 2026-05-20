@@ -59,9 +59,12 @@ on:
             min_node_version:
                 required: false
                 type: string
-                default: "20"
-                description: "Minimum Node.js version for matrix testing (enables matrix when
-                    set)"
+                default: ""
+                description: "Minimum Node.js version for matrix testing. Empty (default)
+                    = no matrix; the publish flow runs a single confidence test against
+                    max_node_major + lts/* instead of a full per-version regression sweep.
+                    Set explicitly (e.g. \"20\") to enable matrix during publish. See
+                    issue #2."
             max_node_major:
                 required: false
                 type: string

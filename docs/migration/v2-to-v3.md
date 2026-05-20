@@ -133,6 +133,26 @@ Idempotent — re-running updates the existing ruleset.
 - **Publish workflow skips when version unchanged (P3.3).** Where v2 would run-and-fail on `npm publish` for an already-published version, v3 cleanly skips with a `::notice::` annotation. If you have downstream automation that watched for the failure as a signal, switch it to watch the new skip annotation.
 - **Release-PR version base reads current master (P3.1).** A patch hotfix branch off v3.5.0 will calculate v3.6.1 if master is currently at v3.6.0, not v3.5.1. This is the correct behavior for a linear-release model; if your repo runs maintenance branches (continuing to ship v3.5.x patches after v3.6.0 lands), you'll need to override `version_bump` and `version` inputs explicitly.
 
+## Issues resolved in v3
+
+Pre-existing issues on the repo and how v3 addresses them:
+
+### [#1 — Workflow publish is publishing from PR branches rather than master](https://github.com/CLDMV/.github/issues/1)
+
+**Resolved.** v3's `examples/individual-repo-workflows/publish.yml` triggers ONLY on `push: branches: [master, main]`. On a master push, `github.ref = refs/heads/master`, `github.sha = master HEAD`, and the reusable's checkout pulls master content. Consumers that copy the new template won't see the old PR-branch behavior.
+
+**Note:** `workflow_dispatch` still allows manual invocation against any branch via the Actions UI's branch picker. This is an intentional escape hatch for emergency publishes, not a bug.
+
+### [#2 — Min version not set in publish causes multiple tests to run](https://github.com/CLDMV/.github/issues/2)
+
+**Resolved.** The description on `min_node_version` says *"enables matrix when set"* — but every default in the chain was `"20"`, so the matrix always ran. v3 fixes both ends:
+
+- `workflow-publish.yml` `min_node_version` default → `""` (no matrix for publish; just a single confidence check against `max_node_major + lts/*`).
+- `generate-matrix/action.mjs` now treats empty `min-node-version` as "no matrix" instead of snapping to "20".
+- `workflow-ci.yml` and `workflow-release.yml` keep their default of `"20"` (CI and release-PR validation legitimately want a matrix).
+
+To re-enable matrix during publish for a specific repo, set `min_node_version: "20"` (or whatever min you want) explicitly in the consumer's `publish.yml`.
+
 ## Roll-back plan
 
 If v3 misbehaves in a consumer repo, switch the `@v3` references back to `@v2` and re-push. The v2 rolling tag still points at the pre-refactor state — no work lost. Open an issue on `CLDMV/.github` with the failure context.

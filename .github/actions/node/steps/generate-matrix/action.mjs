@@ -16,7 +16,13 @@ try {
 		process.exit(0);
 	}
 
-	const min = getInput("min-node-version", { default: "20" });
+	// Empty min-node-version explicitly means "no matrix" — run only
+	// max_node_major + lts/*. Use this from workflows that don't need the
+	// full per-version matrix (e.g. workflow-publish does a single final
+	// confidence check, not a regression sweep). Aligns the implementation
+	// with the input description that says "enables matrix when set."
+	// See issue #2.
+	const min = getInput("min-node-version");
 	const maxInput = getInput("max-node-major");
 	const max = maxInput ? Number.parseInt(maxInput, 10) : 22;
 	const ltsOnly = getBooleanInput("lts-only-matrix");
@@ -24,8 +30,20 @@ try {
 	console.log(`🔍 DEBUG (build-and-test): min_node_version = '${min}'`);
 	console.log(`🔍 DEBUG (build-and-test): max_node_major = '${maxInput}'`);
 
+	if (!min) {
+		const versions = [String(max), "lts/*"];
+		const matrix = JSON.stringify(versions);
+		console.log(`📍 min_node_version not set — running single max + lts: ${matrix}`);
+		setOutput("matrix", matrix);
+		process.exit(0);
+	}
+
 	const versions = [];
 	let major = Number.parseInt(min.split(".")[0], 10);
+
+	if (Number.isNaN(major)) {
+		throw new Error(`min-node-version "${min}" is not a valid major or major.minor`);
+	}
 
 	// A "major.minor" minimum keeps that exact entry, then iterates by major.
 	if (min.includes(".")) {

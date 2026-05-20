@@ -11,9 +11,9 @@ inputs:
     required: false
     default: "lts/*"
   min-node-version:
-    description: "Minimum Node.js version (major or major.minor) to start the matrix from"
+    description: "Minimum Node.js major (or major.minor) the matrix starts from. Set to enable matrix testing across versions. Empty (default) = no matrix; run only `max-node-major` + `lts/*` as a single check. See issue #2."
     required: false
-    default: "20"
+    default: ""
   max-node-major:
     description: "Maximum Node.js major version (defaults to 22)"
     required: false
