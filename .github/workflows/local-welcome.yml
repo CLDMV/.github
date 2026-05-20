@@ -24,3 +24,9 @@ permissions:
 jobs:
     welcome:
         uses: ./.github/workflows/reusable-welcome.yml
+        # Pass bot App credentials so the welcome comment is posted by the
+        # CLDMV bot instead of github-actions[bot]. Falls back to GITHUB_TOKEN
+        # if these secrets aren't configured at the repo/org level.
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
