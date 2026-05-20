@@ -49,6 +49,12 @@ on:
 
 jobs:
   update-tags:
+    # Skip release events fired without a tag_name (e.g. "untagged-<sha>" runs
+    # the bot or a prior code path can produce). The reusable workflow has its
+    # own tag-readiness polling for forward-facing prevention; this guard
+    # protects against legacy / external sources of untagged release events.
+    # Batch 1.2 from tmp/plan-future-workflows.md.
+    if: github.event_name != 'release' || github.event.release.tag_name != ''
     uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v2
     permissions:
       contents: write

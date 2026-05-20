@@ -68,6 +68,14 @@ on:
 permissions:
     contents: write
 
+# Serialize tag operations across this workflow AND reusable-publishing.yml's
+# update-version-tags job (which declares the same group at job-level). Git
+# tags are atomic so a final race would land correctly, but flicker during
+# intermediate states is visible to consumers. P3.4.
+concurrency:
+    group: tags-${{ github.repository }}
+    cancel-in-progress: false
+
 jobs:
     version-tag-operations:
         name: Version Tag Operations

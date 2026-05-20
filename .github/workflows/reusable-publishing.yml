@@ -415,6 +415,12 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: write
+        # Serialize with workflow-update-major-version-tags.yml (which declares
+        # the same group at workflow-level). Prevents intermediate-state flicker
+        # when both run for the same repo around the same release. P3.4.
+        concurrency:
+            group: tags-${{ github.repository }}
+            cancel-in-progress: false
         outputs:
             major-version: ${{ steps.update.outputs.major-version }}
             minor-version: ${{ steps.update.outputs.minor-version }}
