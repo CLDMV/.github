@@ -18,9 +18,9 @@ inputs:
     description: "Multi-line list of JS-regex patterns. Match-any semantics: if ANY pattern matches the subject, the audit passes."
     required: true
   issue_labels:
-    description: "Comma-sep labels to apply to auto-filed issues"
+    description: "Comma-sep labels to apply to auto-filed issues. Must match canonical names in your org's label catalog (this default uses CLDMV/.github's data/github-labels.json conventions: `type: ci`, `priority: high` — note the space after each colon)."
     required: false
-    default: "bot:audit,priority:high"
+    default: "type: ci,priority: high"
   issue_assignee:
     description: "Optional GitHub login to assign to auto-filed issues. Empty = unassigned."
     required: false
