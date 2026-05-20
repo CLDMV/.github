@@ -64,7 +64,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -73,7 +73,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: CLA check
-              uses: CLDMV/.github/.github/actions/community/jobs/cla-check@v2
+              uses: CLDMV/.github/.github/actions/community/jobs/cla-check@v3
               with:
                   cla_version: ${{ inputs.cla_version }}
                   cla_path: ${{ inputs.cla_path }}
@@ -90,7 +90,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -100,12 +100,12 @@ jobs:
 
             # Need git for signing same-repo PRs (the record action pushes a commit)
             - name: Checkout (default; refs fetched in action)
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
               with:
                   fetch-depth: 0
 
             - name: CLA record
-              uses: CLDMV/.github/.github/actions/community/jobs/cla-record@v2
+              uses: CLDMV/.github/.github/actions/community/jobs/cla-record@v3
               with:
                   cla_version: ${{ inputs.cla_version }}
                   cla_path: ${{ inputs.cla_path }}

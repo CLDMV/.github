@@ -10,13 +10,14 @@ Actions live under `.github/actions/`, grouped by technology layer:
 ```
 .github/actions/
 ├── common/      # Cross-cutting steps + the shared lib (common/common/core.mjs)
-├── git/         # Local git operations and analysis
+├── git/         # Local git operations and analysis (audit-commit-subject, branch-retention)
 ├── github/      # GitHub platform operations
-│   └── api/     #   thin REST API wrappers (api/_api/core.mjs is the fetch helper)
-├── npm/         # NPM ecosystem operations
+│   └── api/     #   thin REST API wrappers (api/_api/core.mjs is fetch + paginate)
+├── npm/         # NPM ecosystem operations (bundle-size)
 ├── node/        # Node.js environment helpers
 ├── docker/      # Container image build/publish helpers
 ├── coverage/    # Coverage badge / PR-comment helpers
+├── community/   # 🆕 v3: CLA bot, release notifier — contributor/community-facing actions
 ├── testing/     # Test-only actions
 └── workflows/   # Workflow-level helpers (job summaries, etc.)
 ```
@@ -45,7 +46,8 @@ Import shared helpers rather than duplicating logic:
 - `common/common/core.mjs` — `getInput`, `getBooleanInput`, `setOutput`,
   `setOutputs`, `appendSummary`, `getEventPayload`, `exec`, `sh`, `debugLog`.
 - `github/api/_api/core.mjs` — `api(method, path, body, { token, owner, repo })`
-  (a `fetch` wrapper) and `parseRepo`.
+  (a `fetch` wrapper), `paginate(path, ctx)` (paginated GET with rate-limit
+  awareness), and `parseRepo`.
 - `git/utilities/git-utils.mjs`, `common/utilities/bot-detection.mjs`, and the
   `github/api/_api/{gpg,tag}.mjs` modules.
 
@@ -61,6 +63,6 @@ inputs for free. Composite delegation steps must instead pass values to the
    genuinely needs to `uses:` another action.
 3. Import shared helpers from `core.mjs` instead of reimplementing them.
 4. Keep `action.yml` inputs/outputs stable — consumers pin these actions by
-   tag, and other actions reference them as `@v2`.
+   tag, and other actions reference them as `@v3`.
 5. See [`../instructions/repo-conventions.instructions.md`](../instructions/repo-conventions.instructions.md)
    for tag, signing, API-version, and secret-naming rules.

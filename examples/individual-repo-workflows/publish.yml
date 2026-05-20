@@ -93,7 +93,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
-    uses: CLDMV/.github/.github/workflows/workflow-publish.yml@v2
+    uses: CLDMV/.github/.github/workflows/workflow-publish.yml@v3
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}

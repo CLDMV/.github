@@ -52,23 +52,23 @@ runs:
   using: composite
   steps:
     - name: Checkout PR branch
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
       with:
         ref: ${{ inputs.head-ref }}
         fetch-depth: 0
 
     - name: Setup Node.js
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Get branch divergence point
       id: divergence
-      uses: CLDMV/.github/.github/actions/git/steps/find-divergence@v2
+      uses: CLDMV/.github/.github/actions/git/steps/find-divergence@v3
 
     - name: Check release commit type
       id: release-check
-      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v3
       with:
         base-ref: ${{ steps.divergence.outputs.merge-base }}
         base-version: ${{ steps.divergence.outputs.base-version }}
@@ -78,7 +78,7 @@ runs:
     - name: Calculate new version
       id: version
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v3
       with:
         version-bump: ${{ steps.release-check.outputs.version-bump }}
         explicit-version: ${{ steps.release-check.outputs.explicit-version }}
@@ -86,31 +86,31 @@ runs:
 
     - name: Install dependencies
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Build package
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v3
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
 
     - name: Update package version
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v3
       with:
         new-version: ${{ steps.version.outputs.new-version }}
         package-manager: ${{ inputs.package-manager }}
 
     - name: Restore src/ deleted by build
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v2
+      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v3
 
     - name: Create signed commit
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/api/commit@v2
+      uses: CLDMV/.github/.github/actions/github/api/commit@v3
       with:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
         github-token: ${{ inputs.github-token }}
@@ -118,14 +118,14 @@ runs:
     - name: Determine display version
       id: display-version
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/resolve-version@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/resolve-version@v3
       with:
         new-version: ${{ steps.version.outputs.new-version }}
 
     - name: Get PR commit range
       id: get-pr-range
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/steps/get-pr-commit-range@v2
+      uses: CLDMV/.github/.github/actions/github/steps/get-pr-commit-range@v3
       with:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
@@ -133,13 +133,13 @@ runs:
     - name: Generate updated changelog
       id: changelog
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v3
       with:
         commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
 
     - name: Update PR title and description
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/steps/update-pr-changelog@v2
+      uses: CLDMV/.github/.github/actions/github/steps/update-pr-changelog@v3
       with:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
@@ -149,20 +149,20 @@ runs:
     - name: Compute raw label aliases
       id: raw-labels
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v2
+      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v3
       with:
         bump-type: ${{ steps.release-check.outputs.version-bump }}
 
     - name: Resolve PR label aliases
       id: resolved-labels
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
+      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v3
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
     - name: Sync PR labels
       if: steps.release-check.outputs.should-create-pr == 'true'
-      uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v2
+      uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v3
       with:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}

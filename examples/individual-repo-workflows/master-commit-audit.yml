@@ -33,7 +33,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Audit commit subject
-              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v2
+              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v3
               with:
                   commit_sha: ${{ github.sha }}
                   # Allow release commits (from the release workflow), maintenance

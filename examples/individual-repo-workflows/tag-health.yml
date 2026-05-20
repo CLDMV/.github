@@ -46,7 +46,7 @@ permissions:
 
 jobs:
     health:
-        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v3
         with:
             debug: ${{ github.event.inputs.debug == 'true' }}
             # Full unified sweep: validates, fixes bot signatures, fixes

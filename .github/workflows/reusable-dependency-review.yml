@@ -64,7 +64,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
 
             - name: Review dependencies
               uses: actions/dependency-review-action@v4

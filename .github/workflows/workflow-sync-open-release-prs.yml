@@ -81,7 +81,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -91,7 +91,7 @@ jobs:
 
             - name: List open release PRs
               id: list
-              uses: CLDMV/.github/.github/actions/github/api/list-release-prs@v2
+              uses: CLDMV/.github/.github/actions/github/api/list-release-prs@v3
               with:
                   title-pattern: ${{ inputs.pr_title_pattern }}
                   github-token: ${{ steps.app-token.outputs.token }}
@@ -109,7 +109,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -118,7 +118,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Refresh release PR
-              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v2
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
               with:
                   head-ref: ${{ matrix.pr.head_ref }}
                   pr-number: ${{ matrix.pr.number }}

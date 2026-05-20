@@ -55,22 +55,22 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout PR head
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
               with:
                   ref: ${{ github.event.pull_request.head.sha }}
             - name: Setup Node
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
               with:
                   node-version: ${{ inputs.node_version }}
             - name: Install
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
               with:
                   package-manager: ${{ inputs.package_manager }}
             - name: Build
               shell: bash
               run: ${{ inputs.build_command }}
             - name: Measure
-              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v2
+              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v3
               with:
                   mode: measure
                   dist_paths: ${{ inputs.dist_paths }}
@@ -86,22 +86,22 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout PR base
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
               with:
                   ref: ${{ github.event.pull_request.base.sha }}
             - name: Setup Node
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
               with:
                   node-version: ${{ inputs.node_version }}
             - name: Install
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
               with:
                   package-manager: ${{ inputs.package_manager }}
             - name: Build
               shell: bash
               run: ${{ inputs.build_command }}
             - name: Measure
-              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v2
+              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v3
               with:
                   mode: measure
                   dist_paths: ${{ inputs.dist_paths }}
@@ -128,7 +128,7 @@ jobs:
                   name: base-sizes
                   path: base-sizes
             - name: Compare and comment
-              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v2
+              uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v3
               with:
                   mode: compare
                   head_sizes: head-sizes/sizes.json

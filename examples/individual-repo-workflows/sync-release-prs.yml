@@ -37,7 +37,7 @@ jobs:
             github.event.pull_request.merged == true &&
             github.event.pull_request.user.login != 'cldmv-bot[bot]' &&
             github.event.pull_request.user.login != 'github-actions[bot]'
-        uses: CLDMV/.github/.github/workflows/workflow-sync-open-release-prs.yml@v2
+        uses: CLDMV/.github/.github/workflows/workflow-sync-open-release-prs.yml@v3
         with:
             package_name: "@cldmv/slothlet" # Required: your NPM package name
             # Optional overrides:

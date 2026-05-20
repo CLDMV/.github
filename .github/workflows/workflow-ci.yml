@@ -177,7 +177,7 @@ jobs:
         steps:
             - name: Check commit message
               id: gate
-              uses: CLDMV/.github/.github/actions/common/steps/commit-gate@v2
+              uses: CLDMV/.github/.github/actions/common/steps/commit-gate@v3
               with:
                   prefixes: "chore: bump version"
 
@@ -185,7 +185,7 @@ jobs:
         name: "🏗️ Continuous Integration"
         needs: commit-gate
         if: needs.commit-gate.outputs.should_skip != 'true'
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v3
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -209,7 +209,7 @@ jobs:
             == 'success' && inputs.enable_coverage_badge == true &&
             github.event_name == 'push' && github.ref ==
             format('refs/heads/{0}', inputs.default_branch)
-        uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v3
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
@@ -236,7 +236,7 @@ jobs:
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && inputs.enable_coverage_pr_comment == true &&
             github.event_name == 'pull_request'
-        uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v3
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
@@ -253,7 +253,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate CI Summary
-              uses: CLDMV/.github/.github/actions/workflows/ci-summary@v2
+              uses: CLDMV/.github/.github/actions/workflows/ci-summary@v3
               with:
                   package-name: ${{ inputs.package_name }}
                   node-version: ${{ inputs.node_version }}

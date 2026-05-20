@@ -36,7 +36,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Welcome contributor
-              uses: CLDMV/.github/.github/actions/github/jobs/welcome-contributor@v2
+              uses: CLDMV/.github/.github/actions/github/jobs/welcome-contributor@v3
               with:
                   pr_message_path: ${{ inputs.pr_message_path }}
                   issue_message_path: ${{ inputs.issue_message_path }}

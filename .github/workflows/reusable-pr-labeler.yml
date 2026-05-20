@@ -43,7 +43,7 @@ jobs:
         steps:
             - name: Compute path-based label aliases
               id: compute
-              uses: CLDMV/.github/.github/actions/github/steps/compute-path-labels@v2
+              uses: CLDMV/.github/.github/actions/github/steps/compute-path-labels@v3
               with:
                   pr-number: ${{ github.event.pull_request.number }}
                   github-token: ${{ github.token }}
@@ -55,13 +55,13 @@ jobs:
             - name: Resolve aliases to canonical labels
               id: resolved
               if: steps.compute.outputs.labels != ''
-              uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
+              uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v3
               with:
                   aliases: ${{ steps.compute.outputs.labels }}
 
             - name: Apply labels (additive)
               if: steps.compute.outputs.labels != '' && steps.resolved.outputs.labels != ''
-              uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v2
+              uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v3
               with:
                   github-token: ${{ github.token }}
                   pr-number: ${{ github.event.pull_request.number }}

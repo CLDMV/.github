@@ -74,7 +74,7 @@ jobs:
                 language: ${{ fromJson(format('[\"{0}\"]', join(split(inputs.languages, ','), '\",\"'))) }}
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
               with:
                   fetch-depth: 0
 

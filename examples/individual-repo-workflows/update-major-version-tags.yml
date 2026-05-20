@@ -55,7 +55,7 @@ jobs:
     # protects against legacy / external sources of untagged release events.
     # Batch 1.2 from tmp/plan-future-workflows.md.
     if: github.event_name != 'release' || github.event.release.tag_name != ''
-    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v2
+    uses: CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v3
     permissions:
       contents: write
     with:

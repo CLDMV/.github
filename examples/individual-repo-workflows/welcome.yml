@@ -30,4 +30,4 @@ permissions:
 
 jobs:
     welcome:
-        uses: CLDMV/.github/.github/workflows/reusable-welcome.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-welcome.yml@v3

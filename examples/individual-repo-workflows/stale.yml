@@ -33,7 +33,7 @@ permissions:
 
 jobs:
     sweep:
-        uses: CLDMV/.github/.github/workflows/reusable-stale.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-stale.yml@v3
         with:
             dry_run: ${{ github.event.inputs.dry_run == 'true' }}
             # Override timers if needed:

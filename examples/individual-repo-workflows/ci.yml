@@ -149,7 +149,7 @@ jobs:
     # Fork PRs (head.repo.fork == true) DO run here; they're gated by the
     # repo's "Require approval to run workflows" setting.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
-    uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v2
+    uses: CLDMV/.github/.github/workflows/workflow-ci.yml@v3
     with:
       package_name: "@cldmv/slothlet" # Required: Your NPM package name
       debug: ${{ github.event.inputs.debug == 'true' }}

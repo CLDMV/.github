@@ -32,7 +32,7 @@ permissions:
 
 jobs:
     diff:
-        uses: CLDMV/.github/.github/workflows/reusable-bundle-size.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-bundle-size.yml@v3
         with:
             build_command: "npm run build"
             dist_paths: "dist/**"

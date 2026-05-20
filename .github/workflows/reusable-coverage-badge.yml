@@ -122,7 +122,7 @@ jobs:
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
               with:
                   package-manager: ${{ inputs.package_manager }}
 
@@ -138,7 +138,7 @@ jobs:
             # ── 6. Compute badge JSON ───────────────────────────────────────────
             - name: Compute coverage badge JSON
               id: badge
-              uses: CLDMV/.github/.github/actions/coverage/steps/compute-badge@v2
+              uses: CLDMV/.github/.github/actions/coverage/steps/compute-badge@v3
               with:
                   coverage-summary-path: ${{ inputs.coverage_summary_path }}
 
@@ -161,7 +161,7 @@ jobs:
 
             # ── 9. Push badge to badges branch ──────────────────────────────────
             - name: Push coverage badge to badges branch
-              uses: CLDMV/.github/.github/actions/coverage/steps/push-badge@v2
+              uses: CLDMV/.github/.github/actions/coverage/steps/push-badge@v3
               env:
                   BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
               with:

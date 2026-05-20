@@ -87,7 +87,7 @@ jobs:
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
               with:
                   package-manager: ${{ inputs.package_manager }}
 
@@ -102,7 +102,7 @@ jobs:
 
             # ── 6. Compute coverage and inject the badge block into the PR body ──
             - name: Update PR description with coverage badge
-              uses: CLDMV/.github/.github/actions/coverage/steps/update-pr-coverage@v2
+              uses: CLDMV/.github/.github/actions/coverage/steps/update-pr-coverage@v3
               with:
                   coverage-summary-path: ${{ inputs.coverage_summary_path }}
                   node-version: ${{ inputs.node_version }}

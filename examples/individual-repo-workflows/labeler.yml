@@ -36,4 +36,4 @@ permissions:
 
 jobs:
     label:
-        uses: CLDMV/.github/.github/workflows/reusable-pr-labeler.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-pr-labeler.yml@v3

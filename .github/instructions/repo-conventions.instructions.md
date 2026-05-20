@@ -15,12 +15,13 @@ Actions under `.github/actions/` are **Node** (`using: node24` with an `action.m
 entrypoint). Action logic belongs in `.mjs` files — not inline shell in `action.yml`.
 
 - **No dependencies, no build step.** Use Node built-ins only (`node:fs`,
-  `node:child_process`, global `fetch`, …). There is no `npm install` at action
-  runtime and no bundler.
+  `node:child_process`, global `fetch`, `node:zlib`, …). There is no `npm install`
+  at action runtime and no bundler.
 - **Use the shared lib** — import helpers instead of duplicating them:
   `common/common/core.mjs` (`getInput`, `getBooleanInput`, `setOutput`,
   `setOutputs`, `appendSummary`, `getEventPayload`, `exec`, `sh`, `debugLog`) and
-  `github/api/_api/core.mjs` (`api()` — a `fetch` wrapper — and `parseRepo`).
+  `github/api/_api/core.mjs` (`api()` — a `fetch` wrapper —, `paginate()` for
+  paginated GETs with rate-limit awareness, and `parseRepo`).
 - **`composite` only for orchestration.** Keep an action `using: composite` only
   when it must `uses:` another action (a Node action cannot). Its own logic still
   goes in a `.mjs` delegation script run via
@@ -29,19 +30,41 @@ entrypoint). Action logic belongs in `.mjs` files — not inline shell in `actio
   them with `getInput`). Composite delegation steps must pass values to the script
   via an explicit `env:` block.
 
+### Roll our own vs. wrap a marketplace action
+
+When deciding whether a new action should be a thin wrapper or a from-scratch
+implementation:
+
+- **Roll our own** when the third-party action is *a thin wrapper over generic
+  mechanics* — operations any competent GitHub Actions user could implement (label
+  management, PR approvals, REST orchestration). Examples in this repo: stale,
+  Dependabot auto-merge, PR labeler, welcomer, bundle-size diff, gh-pages
+  publisher, release notifier, CLA bot. Rolling our own keeps bot attribution
+  consistent, removes third-party dependencies, and fits the existing Node-action
+  conventions.
+- **Wrap the marketplace action** when it wraps a *substantive external system* —
+  a vuln database (Trivy), per-ecosystem dep tree resolution (Anchore syft),
+  GitHub's own Sigstore signing (`actions/attest-sbom`), a research project's
+  check suite (OpenSSF Scorecard, CodeQL). Rolling our own here means
+  re-deriving someone else's substantive work.
+
+The decision is recorded next to each `*.yml` action either as
+`description: "...wraps github/codeql-action..."` or
+`description: "...roll-our-own implementation..."`.
+
 ---
 
 ## Rolling Tag Strategy
 
 This repo uses **three-tier semantic version tags**: `vX.Y.Z` (pinned), `vX.Y` (minor rolling),
-and `vX` (major rolling). Callers reference `@v2` or `@v2.0` to always get the latest patch.
+and `vX` (major rolling). Callers reference `@v3` or `@v3.0` to always get the latest patch.
 
 ### ALWAYS use `--force` push for rolling tags — NEVER delete+recreate
 
 **Wrong (creates a gap where the tag doesn't exist):**
 
 ```bash
-git push origin :refs/tags/v2         # tag is GONE — any workflow resolving @v2 FAILS here
+git push origin :refs/tags/v2         # tag is GONE — any workflow resolving @v3 FAILS here
 git push origin v2                    # tag comes back
 ```
 
@@ -52,7 +75,7 @@ git push --force origin v2 v2.0
 ```
 
 The delete+recreate approach causes a race condition: workflows in this repo are triggered by
-`push` to version tags and resolve `@v2` at startup. If `v2` is deleted at that moment, the
+`push` to version tags and resolve `@v3` at startup. If `v2` is deleted at that moment, the
 workflow fails with `failed to fetch workflow: reference to workflow should be either a valid
 branch, tag, or commit`.
 

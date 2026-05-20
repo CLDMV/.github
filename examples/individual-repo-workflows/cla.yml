@@ -36,7 +36,7 @@ permissions:
 
 jobs:
     cla:
-        uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v3
         with:
             cla_version: "1.0.0"
         secrets:

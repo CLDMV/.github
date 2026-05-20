@@ -24,7 +24,7 @@ on:
 
 jobs:
   sync-labels:
-    uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v2
+    uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v3
     with:
       dry_run: ${{ github.event.inputs.dry_run == 'true' }}
       debug: ${{ github.event.inputs.debug == 'true' }}
