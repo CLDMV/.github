@@ -243,7 +243,7 @@ Path-based PR labels. Uses the org-wide [`labeler.default.yml`](../../.github/la
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — none (uses `GITHUB_TOKEN`).
+**Required secrets** — none required. **Optional**: pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` to attribute the label changes to your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset.
 
 **Prereqs** — none. Optional `.github/labeler.yml` in the repo for per-repo path patterns.
 
@@ -259,7 +259,7 @@ Posts a friendly welcome comment to first-time contributors on their first issue
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — none (uses `GITHUB_TOKEN`).
+**Required secrets** — none required. **Optional**: pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` to post the welcome comment as your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset.
 
 **Prereqs** — none.
 
@@ -319,7 +319,7 @@ Runtime-library helper: on every PR against default, builds the package and post
 
 **Required `package.json` scripts** — `build` (default `npm run build`; configurable via `build_command`).
 
-**Required secrets** — none (uses `GITHUB_TOKEN`).
+**Required secrets** — none required. **Optional**: pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` to post the size-diff comment as your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset. (Fork PRs can't access org secrets, so attribution only applies to same-repo PRs there.)
 
 **Prereqs** — buildable distributable in `dist/` (or `dist_paths`).
 
@@ -379,7 +379,11 @@ The table below maps each template to the org/repo secrets it actually reference
 ² Required when `use_gpg: true`
 ³ Required when installing private deps from npm
 
-Templates not in this table (`codeql.yml`, `dependency-review.yml`, `scorecard.yml`, `labeler.yml`, `welcome.yml`, `bundle-size.yml`, `master-commit-audit.yml`, `release-notify.yml`) need no secrets beyond the automatic `GITHUB_TOKEN`. `release-notify.yml` additionally references per-channel webhook secrets you define yourself (e.g. `DISCORD_<REPO>_WEBHOOK`).
+Templates not in this table (`codeql.yml`, `dependency-review.yml`, `scorecard.yml`, `labeler.yml`, `welcome.yml`, `bundle-size.yml`, `master-commit-audit.yml`, `release-notify.yml`) need no secrets beyond the automatic `GITHUB_TOKEN`.
+
+**Optional bot-attribution secrets:** `labeler.yml`, `welcome.yml`, `bundle-size.yml`, and the coverage-PR-comment leg of `ci.yml` accept `CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY` to attribute their PR mutations (labels, comments, PR-body edits) to your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset, so they work without these secrets — just with different attribution.
+
+`release-notify.yml` additionally references per-channel webhook secrets you define yourself (e.g. `DISCORD_<REPO>_WEBHOOK`).
 
 ---
 

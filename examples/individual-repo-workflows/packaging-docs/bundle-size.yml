@@ -39,3 +39,10 @@ jobs:
             # warning_pct: 5
             # warning_bytes: 500
             # comment_mode: "update"
+        # Optional. Without these, the size-diff comment is posted by
+        # github-actions[bot]. With these, it's posted by your CLDMV bot App.
+        # Note: fork PRs can't access org secrets, so the bot attribution only
+        # applies to same-repo PRs; fork PRs fall back to GITHUB_TOKEN.
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

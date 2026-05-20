@@ -245,6 +245,11 @@ jobs:
             coverage_summary_path: ${{ inputs.coverage_summary_path }}
             skip_type_check: ${{ inputs.skip_type_check }}
             debug: ${{ inputs.debug }}
+        # Pass the bot App credentials through so the PR-body edit is attributed
+        # to the consumer's bot. Falls back to GITHUB_TOKEN if these are unset.
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
     summary:
         name: "📊 CI Summary"
