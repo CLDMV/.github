@@ -1,0 +1,95 @@
+#
+# @Project: workflows
+# @Filename: /local-publish.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Local Publish for THIS repo (CLDMV/.github). Fires on push to master/main
+# (i.e. after a release PR is merged) and is responsible for the post-merge
+# release artifacts:
+#   - Creating the pinned vX.Y.Z tag (signed, attributed to the bot App)
+#   - Publishing the GitHub Release with auto-generated notes
+#
+# This repo is NOT an npm package — `publish_to_npm` and
+# `publish_to_github_packages` are both `false`. The workflow-publish entry
+# point still creates the tag + GitHub release in that mode; only the
+# registry-push jobs are skipped.
+#
+# Tag-rolling (vX, vX.Y) is handled by local-update-major-version-tags.yml,
+# which fires on the `release: published` event this workflow emits.
+name: 📦 Local Publish
+
+on:
+    push:
+        branches: [master, main]
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - "LICENSE"
+            - ".gitignore"
+    workflow_dispatch:
+        inputs:
+            debug:
+                description: "Enable debug logging"
+                type: boolean
+                required: false
+                default: false
+            dry_run:
+                description: "Dry run mode — validate everything but don't create the release/tag"
+                type: boolean
+                required: false
+                default: false
+            version:
+                description: "Override version (defaults to package.json)"
+                type: string
+                required: false
+                default: ""
+
+concurrency:
+    group: local-publish-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false # never cancel an in-flight publish
+
+jobs:
+    publish:
+        # Skip on bot-authored push commits that aren't a release merge — the
+        # only commit subject that should trigger a real publish is the
+        # `release: vX.Y.Z` merge commit from the release-flow.
+        if: |
+            github.event_name == 'workflow_dispatch' ||
+            startsWith(github.event.head_commit.message, 'release:')
+        permissions:
+            contents: write
+            packages: write
+            id-token: write
+        uses: ./.github/workflows/workflow-publish.yml
+        with:
+            package_name: "@cldmv/.github"
+            debug: ${{ github.event.inputs.debug == 'true' }}
+            dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+            version: ${{ github.event.inputs.version || '' }}
+            # This repo is not on npm and has no GitHub Packages distribution —
+            # disable both. The entry point still creates the GitHub Release
+            # and tag in that mode.
+            publish_to_npm: false
+            publish_to_github_packages: false
+            # Stub commands: no npm test / npm run build:ci scripts exist in
+            # this repo's package.json. local-ci.yml is the real validation
+            # gate (runs on the PR before merge).
+            test_command: "echo '✓ Tests already ran on the PR via local-ci.yml; skipping here.'"
+            build_command: "echo '✓ No build step for a workflows + actions package.'"
+            skip_matrix_tests: true
+            skip_performance_tests: true
+            min_node_version: ""
+            create_documentation: true
+            use_gpg: true
+        secrets:
+            # NPM_TOKEN intentionally omitted — this repo isn't on npm.
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
