@@ -9,7 +9,7 @@ inputs:
     description: "Explicit version to use when version-bump is explicit"
     required: false
   base-version:
-    description: "Version to calculate from (overrides package.json). Provide the version at the branch divergence point so re-runs remain idempotent."
+    description: "Version to calculate from (overrides package.json). Provide the CURRENT default-branch (master/main) version so the bump targets the latest published state. This prevents silent regressions when parallel release PRs merge out of order — see P3.1."
     required: false
 
 outputs:
