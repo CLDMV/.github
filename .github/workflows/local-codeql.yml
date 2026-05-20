@@ -48,17 +48,27 @@ jobs:
               with:
                   fetch-depth: 0
 
+            # CodeQL init doesn't accept `paths-ignore:` as a direct input;
+            # path filtering must come from a codeql-config.yml file referenced
+            # via `config-file:`. Write a tiny one inline before init.
+            - name: Write CodeQL config
+              shell: bash
+              run: |
+                  cat > /tmp/codeql-config.yml <<'EOF'
+                  paths-ignore:
+                    - node_modules/
+                    - tmp/
+                    - backup/
+                    - .archive/
+                    - examples/
+                  EOF
+
             - name: Initialize CodeQL
               uses: github/codeql-action/init@v3
               with:
                   languages: javascript-typescript
                   queries: security-extended,security-and-quality
-                  paths-ignore: |
-                      node_modules/
-                      tmp/
-                      backup/
-                      .archive/
-                      examples/
+                  config-file: /tmp/codeql-config.yml
 
             - name: Analyze
               uses: github/codeql-action/analyze@v3

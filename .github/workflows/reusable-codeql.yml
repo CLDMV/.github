@@ -92,14 +92,42 @@ jobs:
               with:
                   fetch-depth: 0
 
+            # `paths` / `paths-ignore` are not direct inputs to codeql-action/init —
+            # they belong in a codeql-config.yml referenced via `config-file:`. Write
+            # one from our inputs unless the caller already supplied their own.
+            - name: Write CodeQL config
+              if: inputs.config_file == ''
+              id: codeql_cfg
+              shell: bash
+              env:
+                  PATHS: ${{ inputs.paths }}
+                  PATHS_IGNORE: ${{ inputs.paths_ignore }}
+              run: |
+                  cfg=/tmp/codeql-config.yml
+                  : > "$cfg"
+                  emit_list() {
+                      local key="$1" csv="$2"
+                      [ -z "$csv" ] && return
+                      echo "${key}:" >> "$cfg"
+                      IFS=',' read -ra arr <<< "$csv"
+                      for p in "${arr[@]}"; do
+                          p="${p# }"; p="${p% }"
+                          [ -n "$p" ] && echo "  - \"${p}\"" >> "$cfg"
+                      done
+                  }
+                  emit_list paths "$PATHS"
+                  emit_list paths-ignore "$PATHS_IGNORE"
+                  if [ -s "$cfg" ]; then
+                      echo "path=$cfg" >> "$GITHUB_OUTPUT"
+                  fi
+
             - name: Initialize CodeQL
               uses: github/codeql-action/init@v3
               with:
                   languages: ${{ matrix.language }}
                   queries: ${{ inputs.queries }}
-                  config-file: ${{ inputs.config_file }}
-                  paths: ${{ inputs.paths }}
-                  paths-ignore: ${{ inputs.paths_ignore }}
+                  # Either the caller's config_file or our generated one (may be empty).
+                  config-file: ${{ inputs.config_file != '' && inputs.config_file || steps.codeql_cfg.outputs.path }}
 
             - name: Autobuild
               if: inputs.build_mode == 'autobuild'

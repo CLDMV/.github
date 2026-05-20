@@ -146,10 +146,21 @@ jobs:
               # default `file:line:col:` output format.
               run: |
                   set -e
-                  url='https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz'
+                  # 1.7.12 is the first release to recognize `using: node24`.
+                  url='https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz'
                   curl -sSL "$url" | tar -xzC /tmp actionlint
                   set +e
-                  out=$(/tmp/actionlint -no-color -ignore 'SC2002' 2>&1)
+                  # Ignores:
+                  #   SC2002: shellcheck UUOC noise; not a real issue.
+                  #   create-github-app-token: actionlint 1.7.12's bundled metadata
+                  #     for actions/create-github-app-token@v3 is stale — it treats
+                  #     `app-id` as required and `client-id` as undefined, but the
+                  #     upstream action.yml (https://github.com/actions/create-github-app-token/blob/v3/action.yml)
+                  #     marks `app-id` deprecated and uses `client-id` as canonical.
+                  out=$(/tmp/actionlint -no-color \
+                      -ignore 'SC2002' \
+                      -ignore 'actions/create-github-app-token@v3' \
+                      2>&1)
                   rc=$?
                   echo "$out"
                   if [ "$rc" -eq 0 ]; then
@@ -176,7 +187,11 @@ jobs:
               run: |
                   # After the v3 cut all internal references should be @v3.
                   # tmp/ is gitignored historical-planning material; skip.
-                  out=$(git grep -nI '@v2\b' -- ':!tmp/**' ':!docs/migration/**' ':!CHANGELOG*')
+                  # Exclude this workflow file itself — it contains literal "@v2"
+                  # strings in step names, error messages, and the grep below.
+                  out=$(git grep -nI '@v2\b' \
+                      -- ':!tmp/**' ':!docs/migration/**' ':!CHANGELOG*' \
+                      ':!.github/workflows/local-ci.yml')
                   if [ -z "$out" ]; then
                       echo "### ✅ No stale @v2 references" >> "$GITHUB_STEP_SUMMARY"
                       echo "count=0" >> "$GITHUB_OUTPUT"

@@ -116,31 +116,31 @@ on:
             # Version tag outputs
             major-version:
                 description: "The major version tag that was updated"
-                value: ${{ jobs.update-version-tags.outputs.major-version || jobs.unified-update-major-minor.outputs.major-version }}
+                value: ${{ jobs.unified-update-major-minor.outputs.major-version }}
             minor-version:
                 description: "The minor version tag that was updated"
-                value: ${{ jobs.update-version-tags.outputs.minor-version || jobs.unified-update-major-minor.outputs.minor-version }}
+                value: ${{ jobs.unified-update-major-minor.outputs.minor-version }}
             tags-updated:
                 description: "Whether version tags were updated"
-                value: ${{ jobs.update-version-tags.outputs.updated || jobs.unified-update-major-minor.outputs.updated }}
+                value: ${{ jobs.unified-update-major-minor.outputs.updated }}
             has-version-tags:
                 description: "Whether the repository has version tags"
-                value: ${{ jobs.update-version-tags.outputs.has-version-tags || jobs.unified-update-major-minor.outputs.has-version-tags }}
+                value: ${{ jobs.unified-update-major-minor.outputs.has-version-tags }}
             should-run:
                 description: "Whether tag updates should run"
-                value: ${{ jobs.update-version-tags.outputs.should-run || jobs.unified-update-major-minor.outputs.should-run }}
+                value: ${{ jobs.unified-update-major-minor.outputs.should-run }}
             fixed-orphans:
                 description: "Orphaned tags that were fixed"
-                value: ${{ jobs.update-version-tags.outputs.fixed-orphans || jobs.unified-update-major-minor.outputs.fixed-orphans }}
+                value: ${{ jobs.unified-update-major-minor.outputs.fixed-orphans }}
             orphans-found:
                 description: "Whether orphaned tags were found"
-                value: ${{ jobs.update-version-tags.outputs.orphans-found || jobs.unified-update-major-minor.outputs.orphans-found }}
+                value: ${{ jobs.unified-update-major-minor.outputs.orphans-found }}
             fixed-bot-signatures:
                 description: "Non-bot tags that were fixed"
-                value: ${{ jobs.fix-bot-signatures.outputs.fixed-tags || jobs.unified-summarize-results.outputs.fixed-bot-signatures }}
+                value: ${{ jobs.unified-summarize-results.outputs.fixed-bot-signatures }}
             non-bot-tags-found:
                 description: "Whether non-bot tags were found"
-                value: ${{ jobs.fix-bot-signatures.outputs.non-bot-tags-found || jobs.unified-summarize-results.outputs.non-bot-tags-found }}
+                value: ${{ jobs.unified-summarize-results.outputs.non-bot-tags-found }}
             # Unified outputs
             total_processed:
                 description: "Total number of tags processed"
