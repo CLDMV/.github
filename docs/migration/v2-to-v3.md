@@ -3,55 +3,41 @@
 ## TL;DR
 
 - Bump every `@v2` reference in your consumer workflows to `@v3`.
-- For repos that want the new features, copy fresh templates from `examples/individual-repo-workflows/` (CLA, stale, labeler, welcomer, branch-retention, etc.).
-- Configure a few one-time settings (Allow auto-merge, branch protection with required checks, the bot App's org-level `Members: read` permission).
-- Verify in the dummy testbed before rolling out to production repos.
+- For repos that want the new features, copy fresh templates from `examples/individual-repo-workflows/`.
+- Configure a few one-time settings (Allow auto-merge, branch protection with required checks, the bot App's org-level `Members: read` permission) if you adopt the new automations that need them.
 
-v3 is mostly additive — the existing `workflow-ci.yml` / `workflow-release.yml` / `workflow-publish.yml` / `workflow-update-major-version-tags.yml` entry points are backward-compatible with v2 callers. The major bump is because the surface area grew significantly and some Pass-3 bugfixes (P3.1, P3.3) change observable behavior in the release/publish flow.
+v3 is mostly additive — the existing `workflow-ci.yml` / `workflow-release.yml` / `workflow-publish.yml` / `workflow-update-major-version-tags.yml` entry points are backward-compatible with v2 callers. The major bump is because the surface area grew significantly and a few release/publish bugfixes change observable behavior (see [Things that change behavior](#things-that-change-behavior) below).
 
 ## What's new in v3
 
-### Pass-3 bugfixes
+### Release-flow bugfixes that change observable behavior
 
-- **P3.1** — Version-bump base now reads `package.json` from the current default branch HEAD, not the merge-base. Prevents silent version regressions when parallel release PRs merge out of order. Combined with P3.2, closes the bug entirely.
-- **P3.2** — New `workflow-sync-open-release-prs.yml` fans out on any PR merge to master and re-updates every open release PR's version + changelog. Requires a new consumer template (`sync-release-prs.yml`).
-- **P3.3** — `reusable-publishing.yml` skips publish/release jobs when the package.json version on master matches the latest NPM version. Kills the false-failure noise from non-release PR merges.
-- **P3.4** — Shared `tags-${repo}` concurrency group between `workflow-update-major-version-tags.yml` and `reusable-publishing.yml`'s `update-version-tags` job. No consumer change needed.
+- **Release-PR version base now reads from the current default-branch HEAD**, not the merge-base. Fixes silent version regressions when parallel release PRs merged out of order.
+- **New `workflow-sync-open-release-prs.yml`** — when any PR merges to master, fans out and re-evaluates every open release PR's version + changelog. Pair it with the version-base fix above to close the regression bug completely.
+- **`workflow-publish.yml` skips publish/release when `package.json` version on master matches the latest npm version.** Previously this produced a noisy `npm publish` failure; now it's a clean skip with a `::notice::`.
+- **Empty `min_node_version` now means "no matrix"** instead of accidentally creating one (closes [#2](https://github.com/CLDMV/.github/issues/2)).
+- **`workflow-publish.yml` triggers on `push: branches: [master, main]` only** (closes [#1](https://github.com/CLDMV/.github/issues/1)). Manual `workflow_dispatch` against other branches still works as an emergency-publish escape hatch.
 
 ### New reusable workflows
 
-| Workflow | Template |
+| Workflow | Consumer template |
 |---|---|
-| `reusable-codeql.yml` | `examples/.../codeql.yml` |
-| `reusable-dependency-review.yml` | `examples/.../dependency-review.yml` |
-| `reusable-container-scan.yml` | (called from `reusable-docker-publish.yml`) |
-| `reusable-stale.yml` | `examples/.../stale.yml` |
-| `reusable-dependabot-auto-merge.yml` | `examples/.../dependabot-auto-merge.yml` |
-| `reusable-pr-labeler.yml` | `examples/.../labeler.yml` |
-| `reusable-welcome.yml` | `examples/.../welcome.yml` |
-| `reusable-bundle-size.yml` | `examples/.../bundle-size.yml` |
-| `reusable-docs-publish.yml` | `examples/.../docs.yml` |
-| `reusable-release-notifier.yml` | `examples/.../release-notify.yml` |
-| `reusable-branch-retention.yml` | `examples/.../branch-retention.yml` |
-| `reusable-cla.yml` | `examples/.../cla.yml` |
+| `reusable-codeql.yml` | `examples/.../security/codeql.yml` |
+| `reusable-dependency-review.yml` | `examples/.../security/dependency-review.yml` |
+| `reusable-container-scan.yml` | (invoked from `reusable-docker-publish.yml`) |
+| `reusable-stale.yml` | `examples/.../automation/stale.yml` |
+| `reusable-dependabot-auto-merge.yml` | `examples/.../automation/dependabot-auto-merge.yml` |
+| `reusable-pr-labeler.yml` | `examples/.../automation/labeler.yml` |
+| `reusable-welcome.yml` | `examples/.../automation/welcome.yml` |
+| `reusable-bundle-size.yml` | `examples/.../packaging-docs/bundle-size.yml` |
+| `reusable-docs-publish.yml` | `examples/.../packaging-docs/docs.yml` |
+| `reusable-release-notifier.yml` | `examples/.../release-companions/release-notify.yml` |
+| `reusable-branch-retention.yml` | `examples/.../automation/branch-retention.yml` |
+| `reusable-cla.yml` | `examples/.../security/cla.yml` |
+| `workflow-sync-open-release-prs.yml` | `examples/.../release-companions/sync-release-prs.yml` |
+| `examples/.../release-companions/master-commit-audit.yml` | (uses an action directly) |
 
-Plus `workflow-sync-open-release-prs.yml` (consumer template: `examples/.../sync-release-prs.yml`) and `examples/.../master-commit-audit.yml` (uses an action only; no reusable wrapper).
-
-### New consumer-facing actions worth knowing about
-
-- `.github/actions/github/jobs/update-release-pr/` — extracted from the inline YAML of `workflow-release.yml`'s `update-existing-pr` job so it can be reused. Backward-compat for callers of `workflow-release.yml`; only direct callers of the inner job have to switch.
-- `.github/actions/github/api/list-release-prs/` — REST helper used by the auto-sync fan-out. Generic; usable in custom workflows that need to enumerate open release PRs.
-- `.github/actions/github/steps/sync-pr-labels/` — gained a new `mode: add | replace` input. Default stays `replace` for backward compat.
-- `.github/actions/github/api/_api/core.mjs` — new exported `paginate(path, ctx)` helper.
-
-### Org-default config files
-
-- `.github/labeler.default.yml` — path → label-alias mapping consumed by the PR labeler.
-- `.github/templates/welcome-issue.md`, `welcome-pr.md` — Mustache-subset templates for the welcomer.
-- `.github/templates/release-notifier.default.yml` — channel config for the release notifier.
-- `CLA.md` — starting-point Contributor License Agreement text (**legal review required**).
-- `docs/conventions/branch-naming.md` — branch-naming convention reference.
-- `scripts/setup-org-rulesets.mjs` — installer for the branch-naming Ruleset.
+See [examples/guides/WORKFLOW-SETUP-GUIDE.md](../../examples/guides/WORKFLOW-SETUP-GUIDE.md) for required `package.json` scripts, secrets, and per-workflow prerequisites.
 
 ### Label catalog additions
 
@@ -65,30 +51,28 @@ Plus `workflow-sync-open-release-prs.yml` (consumer template: `examples/.../sync
 
 ## Required one-time setup
 
+Only the settings actually needed by the workflows you adopt.
+
 ### Per-repo settings
 
-1. **Settings → Actions → Fork pull request workflows from outside collaborators**:
-   - Set to **"Require approval for all outside collaborators"** (or stricter).
-   - Prevents fork CI from running until a maintainer clicks **"Approve and run"**.
-
-2. **Settings → Pull Requests → "Allow auto-merge"**:
-   - Set to **ON** for any repo adopting `dependabot-auto-merge.yml`. The action validates this and refuses to enable auto-merge otherwise.
-
-3. **Settings → Branches → Branch protection rule on `master`/`main`**:
-   - Required for auto-merge to function safely. The action checks `/branches/{ref}/protection` and refuses if no required status checks are configured.
-
-4. **Settings → General → Default branch**: ensure it's `master` or `main` (the divergence and find-divergence actions detect this automatically).
+1. **Settings → Actions → "Fork pull request workflows from outside collaborators"** → set to **"Require approval for all outside collaborators"**. Required for safe fork-PR CI on every workflow.
+2. **Settings → Pull Requests → "Allow auto-merge"** → ON. Required if you adopt `dependabot-auto-merge.yml`.
+3. **Settings → Branches → Branch protection rule** on `master` / `main` with at least one required status check. Required for `dependabot-auto-merge.yml` to function safely.
+4. **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` if you keep coverage badging enabled (it's on by default).
+5. **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
 
 ### Org-level bot App permissions
 
-The CLDMV-bot App needs (in addition to existing permissions):
+If you adopt the new automations, the CLDMV-bot App needs these permissions in addition to what v2 used:
 
-- **Organization permissions → Members: Read** — required for the CLA bot's org-member exemption (`GET /orgs/CLDMV/members/{login}`).
-- **Repository permissions → Issues: Write** — for stale, audit, welcome, CLA-check status updates.
-- **Repository permissions → Pull requests: Write** — for labeler, welcomer, auto-merge approval.
-- **Repository permissions → Contents: Write** — for branch retention, gh-pages publish, CLA-record commit on branches.
+- **Organization → Members: Read** — for `cla.yml` (lets it exempt org members from CLA signing).
+- **Repository → Issues: Write** — for `stale.yml`, `master-commit-audit.yml`, `welcome.yml`, `cla.yml`.
+- **Repository → Pull requests: Write** — for `labeler.yml`, `welcome.yml`, `dependabot-auto-merge.yml`.
+- **Repository → Contents: Write** — for `branch-retention.yml`, `docs.yml`, the CLA-record commit.
 
-### Branch-naming Ruleset (org-wide)
+### Org-wide branch-naming Ruleset (optional)
+
+If you want the org-wide branch name convention enforced (`master`, `release/*`, `hotfix/*`, `feat/*`, `fix/*`, …):
 
 ```bash
 GH_TOKEN=<token-with-org-admin> node scripts/setup-org-rulesets.mjs
@@ -98,61 +82,60 @@ Idempotent — re-running updates the existing ruleset.
 
 ## Migration steps for an existing v2 consumer repo
 
-1. **Update existing template `uses:` lines from `@v2` to `@v3`** in `ci.yml`, `release.yml`, `publish.yml`, `update-major-version-tags.yml`. Single sed: `sed -i 's|@v2|@v3|g' .github/workflows/*.yml`.
+1. **Bump `@v2` → `@v3`** in your existing templates:
 
-2. **Re-copy the example templates** to pick up the v3 trigger changes (push-only with concurrency, fork-PR handling, etc.). At minimum check that:
-   - `ci.yml` uses `branches-ignore: [badges, gh-pages]` on push
-   - `release.yml` uses `branches-ignore: [master, main, badges, gh-pages]` on push
-   - All have appropriate `concurrency:` blocks
+   ```bash
+   sed -i 's|@v2|@v3|g' .github/workflows/*.yml
+   ```
 
-3. **Add `sync-release-prs.yml`** — completes the P3.2 fix that closes the version-regression bug.
+   This covers `ci.yml`, `release.yml`, `publish.yml`, `update-major-version-tags.yml`, and anything else pointing at this org repo.
 
-4. **Optionally adopt new workflows** by copying their templates:
-   - `cla.yml` — gates fork PRs on signing the CLA. Adds friction; valuable for external contributions.
-   - `dependabot-auto-merge.yml` — only safe after configuring the repo settings above.
-   - `labeler.yml`, `welcome.yml` — quality-of-life for OSS-facing repos.
-   - `stale.yml` — for repos with backlog accumulation.
-   - `branch-retention.yml` — cleans `feat/*`/`fix/*` after merge; preserves last N of `release/*`/`hotfix/*`.
-   - `master-commit-audit.yml` — post-merge audit safety net.
-   - `codeql.yml`, `dependency-review.yml`, `scorecard.yml` — security baseline.
-   - `tag-health.yml` — wakes the existing reusable on a weekly schedule.
-   - `bundle-size.yml`, `docs.yml`, `release-notify.yml` — opt-in per repo.
+2. **Re-copy the example templates** if you want the v3 trigger changes (push-only with concurrency, fork-PR handling). At minimum verify:
+   - `ci.yml` uses `branches-ignore: [badges, gh-pages]` on push.
+   - `release.yml` uses `branches-ignore: [master, main, badges, gh-pages]` on push.
+   - All have appropriate `concurrency:` blocks.
 
-5. **First-run guidance for stale**: start with `dry_run: true` via `workflow_dispatch` to preview the marking/closing set on existing backlog; flip to live once you're comfortable.
+3. **Add `sync-release-prs.yml`** — completes the version-regression fix; cheap addition.
 
-6. **First-run guidance for CLA**: bump the `cla_version` workflow input whenever CLA.md changes meaningfully; previously-signed contributors will be re-prompted.
+4. **Optionally adopt new workflows** by copying their templates from the appropriate subfolder under `examples/individual-repo-workflows/`:
+
+   | Want… | Template |
+   |---|---|
+   | Path-based PR labels | `automation/labeler.yml` |
+   | First-PR / first-issue welcome | `automation/welcome.yml` |
+   | Stale issue / PR sweep | `automation/stale.yml` |
+   | Auto-merge Dependabot patch/minor | `automation/dependabot-auto-merge.yml` |
+   | Branch retention on merge | `automation/branch-retention.yml` |
+   | CLA bot | `security/cla.yml` |
+   | CodeQL SAST | `security/codeql.yml` |
+   | PR-time CVE diff | `security/dependency-review.yml` |
+   | OpenSSF Scorecard | `security/scorecard.yml` |
+   | Master-commit audit | `release-companions/master-commit-audit.yml` |
+   | Tag-health weekly sweep | `release-companions/tag-health.yml` |
+   | Discord / Slack release notify | `release-companions/release-notify.yml` |
+   | Bundle-size diff on PRs | `packaging-docs/bundle-size.yml` |
+   | gh-pages docs publish | `packaging-docs/docs.yml` |
+
+5. **First-run guidance for `stale.yml`**: dispatch with `dry_run: true` first to preview the marking/closing set; flip to live once you're comfortable.
+
+6. **First-run guidance for `cla.yml`**: bump the `cla_version` workflow input whenever `CLA.md` changes meaningfully; previously-signed contributors will be re-prompted.
 
 ## Things that look different but aren't breaking
 
 - `reusable-publishing.yml` has new opt-in inputs (`generate_sbom`, `attest_sbom`, `sbom_format`). Defaults are off; existing callers unaffected.
-- `workflow-release.yml`'s `update-existing-pr` job collapsed from ~120 lines to ~20 (delegates to new `update-release-pr` action). Same behavior.
-- `examples/.../update-major-version-tags.yml` gained an `if:` guard that skips untagged-release events. Reduces wasted runner time; behavior unchanged for tagged releases.
+- `examples/.../update-major-version-tags.yml` gained an `if:` guard that skips untagged-release events. Reduces wasted runner time; tagged releases behave the same.
+- Several actions under `.github/actions/` were extracted from inline workflow YAML for reusability. Behavior is identical for callers of `workflow-*.yml`; only direct callers of inner jobs may need to update their `uses:` references.
 
-## Things that DO change behavior
+## Things that change behavior
 
-- **Publish workflow skips when version unchanged (P3.3).** Where v2 would run-and-fail on `npm publish` for an already-published version, v3 cleanly skips with a `::notice::` annotation. If you have downstream automation that watched for the failure as a signal, switch it to watch the new skip annotation.
-- **Release-PR version base reads current master (P3.1).** A patch hotfix branch off v3.5.0 will calculate v3.6.1 if master is currently at v3.6.0, not v3.5.1. This is the correct behavior for a linear-release model; if your repo runs maintenance branches (continuing to ship v3.5.x patches after v3.6.0 lands), you'll need to override `version_bump` and `version` inputs explicitly.
+- **Publish workflow skips when version unchanged.** Where v2 ran-and-failed on `npm publish` for an already-published version, v3 cleanly skips with a `::notice::`. If you had downstream automation watching for the failure as a signal, switch it to watch the new skip annotation.
+- **Release-PR version base reads current master.** A patch hotfix branch off `v3.5.0` will calculate `v3.6.1` if master is currently at `v3.6.0`, not `v3.5.1`. This is the correct behavior for a linear-release model. If you run maintenance branches (continuing to ship `v3.5.x` patches after `v3.6.0` lands), override `version_bump` and `version` inputs explicitly.
 
 ## Issues resolved in v3
 
-Pre-existing issues on the repo and how v3 addresses them:
-
-### [#1 — Workflow publish is publishing from PR branches rather than master](https://github.com/CLDMV/.github/issues/1)
-
-**Resolved.** v3's `examples/individual-repo-workflows/core-cicd/publish.yml` triggers ONLY on `push: branches: [master, main]`. On a master push, `github.ref = refs/heads/master`, `github.sha = master HEAD`, and the reusable's checkout pulls master content. Consumers that copy the new template won't see the old PR-branch behavior.
-
-**Note:** `workflow_dispatch` still allows manual invocation against any branch via the Actions UI's branch picker. This is an intentional escape hatch for emergency publishes, not a bug.
-
-### [#2 — Min version not set in publish causes multiple tests to run](https://github.com/CLDMV/.github/issues/2)
-
-**Resolved.** The description on `min_node_version` says *"enables matrix when set"* — but every default in the chain was `"20"`, so the matrix always ran. v3 fixes both ends:
-
-- `workflow-publish.yml` `min_node_version` default → `""` (no matrix for publish; just a single confidence check against `max_node_major + lts/*`).
-- `generate-matrix/action.mjs` now treats empty `min-node-version` as "no matrix" instead of snapping to "20".
-- `workflow-ci.yml` and `workflow-release.yml` keep their default of `"20"` (CI and release-PR validation legitimately want a matrix).
-
-To re-enable matrix during publish for a specific repo, set `min_node_version: "20"` (or whatever min you want) explicitly in the consumer's `publish.yml`.
+- [#1 — Workflow publish is publishing from PR branches rather than master](https://github.com/CLDMV/.github/issues/1) — **resolved.** New `publish.yml` triggers only on `push: branches: [master, main]`.
+- [#2 — `min_node_version` description says matrix is opt-in, but workflow created a matrix anyway](https://github.com/CLDMV/.github/issues/2) — **resolved.** Empty `min_node_version` now correctly means "no matrix"; `workflow-publish.yml` defaults to empty (single check against `max_node_major + lts/*`); `workflow-ci.yml` and `workflow-release.yml` keep `"20"` since CI legitimately wants a matrix.
 
 ## Roll-back plan
 
-If v3 misbehaves in a consumer repo, switch the `@v3` references back to `@v2` and re-push. The v2 rolling tag still points at the pre-refactor state — no work lost. Open an issue on `CLDMV/.github` with the failure context.
+If v3 misbehaves in a consumer repo, flip the `@v3` references back to `@v2` and re-push. The v2 rolling tag still points at the pre-refactor state — no work lost. Open an issue on `CLDMV/.github` with the failure context.
