@@ -1,0 +1,33 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/branch-retention.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/branch-retention.yml
+#
+# On PR merge: most branches deleted immediately; release/* keeps last 5,
+# hotfix/* keeps last 3. master/main/badges/gh-pages never touched.
+#
+# Batch 1.3 from tmp/plan-future-workflows.md.
+name: 🌿 Branch Retention
+
+on:
+    pull_request:
+        types: [closed]
+        branches: [master, main]
+
+permissions:
+    contents: write
+    pull-requests: read
+
+jobs:
+    retain:
+        if: github.event.pull_request.merged == true
+        uses: CLDMV/.github/.github/workflows/reusable-branch-retention.yml@v2
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
