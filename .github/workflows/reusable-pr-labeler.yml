@@ -1,0 +1,69 @@
+#
+# @Project: workflows
+# @Filename: /reusable-pr-labeler.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Path-based PR labeler (org-level, reusable). Plugs into the existing label
+# infrastructure (data/github-labels.json + resolve-labels + sync-pr-labels).
+# Batch 5.2 from tmp/plan-future-workflows.md.
+name: 🏷️ PR Labeler (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            config_path:
+                description: "Per-repo labeler config path"
+                required: false
+                type: string
+                default: ".github/labeler.yml"
+            default_config_repo:
+                required: false
+                type: string
+                default: "CLDMV/.github"
+            default_config_ref:
+                required: false
+                type: string
+                default: "v2"
+            default_config_path:
+                required: false
+                type: string
+                default: ".github/labeler.default.yml"
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    label:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Compute path-based label aliases
+              id: compute
+              uses: CLDMV/.github/.github/actions/github/steps/compute-path-labels@v3
+              with:
+                  pr-number: ${{ github.event.pull_request.number }}
+                  github-token: ${{ github.token }}
+                  config-path: ${{ inputs.config_path }}
+                  default-config-repo: ${{ inputs.default_config_repo }}
+                  default-config-ref: ${{ inputs.default_config_ref }}
+                  default-config-path: ${{ inputs.default_config_path }}
+
+            - name: Resolve aliases to canonical labels
+              id: resolved
+              if: steps.compute.outputs.labels != ''
+              uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v3
+              with:
+                  aliases: ${{ steps.compute.outputs.labels }}
+
+            - name: Apply labels (additive)
+              if: steps.compute.outputs.labels != '' && steps.resolved.outputs.labels != ''
+              uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v3
+              with:
+                  github-token: ${{ github.token }}
+                  pr-number: ${{ github.event.pull_request.number }}
+                  labels: ${{ steps.resolved.outputs.labels }}
+                  mode: add

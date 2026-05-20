@@ -49,53 +49,14 @@ runs:
     - name: Update version tags
       id: update
       shell: bash
-      run: |
-        TAG_NAME="${{ inputs.tag-name }}"
-        echo "Processing tag: $TAG_NAME"
-
-        # Validate that this is a semantic version tag
-        if [[ ! $TAG_NAME =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-          echo "Tag $TAG_NAME is not a semantic version tag, skipping"
-          echo "updated=false" >> $GITHUB_OUTPUT
-          echo 'summary-json={"major_minor_updates":{"title":"📌 Version Tags Updated","description":"No major/minor version tags updated - not a semantic version tag","updated":false,"lines":[],"stats_template":"📌 Major/minor tag updates: {count}"}}' >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        # Extract major and minor versions
-        MAJOR_VERSION="v${BASH_REMATCH[1]}"
-        MINOR_VERSION="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
-
-        echo "Major version: $MAJOR_VERSION"
-        echo "Minor version: $MINOR_VERSION"
-
-        # Get the commit SHA for the tag
-        TAG_SHA=$(git rev-list -n 1 "$TAG_NAME")
-        echo "Tag SHA: $TAG_SHA"
-
-        # Create JSON payload for upsert-batch action
-        JSON_PAYLOAD='[{"tag":"'"$MAJOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"'"$MAJOR_VERSION"' → '"$TAG_NAME"'"},{"tag":"'"$MINOR_VERSION"'","sha":"'"$TAG_SHA"'","message":"'"$MINOR_VERSION"' → '"$TAG_NAME"'"}]'
-
-        echo "🏷️ Updating version tags using upsert-batch:"
-        if [ "${{ inputs.debug }}" = "true" ]; then
-          echo "$JSON_PAYLOAD"
-        else
-          echo "- $MAJOR_VERSION -> $TAG_NAME"
-          echo "- $MINOR_VERSION -> $TAG_NAME"
-        fi
-
-        # Set output for upsert-batch step
-        echo "tags-payload=$JSON_PAYLOAD" >> $GITHUB_OUTPUT
-        echo "major-version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
-        echo "minor-version=$MINOR_VERSION" >> $GITHUB_OUTPUT
-        echo "updated=true" >> $GITHUB_OUTPUT
-
-        # Create summary JSON with title, description, and pre-formatted lines
-        SUMMARY_JSON='{"major_minor_updates":{"title":"📌 Version Tags Updated","description":"The following major/minor version tags have been updated:","updated":true,"lines":["- **'"$MAJOR_VERSION"'** → **'"$TAG_NAME"'**","- **'"$MINOR_VERSION"'** → **'"$TAG_NAME"'**"],"stats_template":"📌 Major/minor tag updates: {count}","notes":["Workflows can reference major version tags (e.g., `@'"$MAJOR_VERSION"'`) for automatic updates."]}}'
-        echo "summary-json=$SUMMARY_JSON" >> $GITHUB_OUTPUT
+      run: node "${{ github.action_path }}/action.mjs"
+      env:
+        TAG_NAME: ${{ inputs.tag-name }}
+        DEBUG: ${{ inputs.debug }}
 
     - name: Update tags with proper signing
       if: ${{ steps.update.outputs.updated == 'true' }}
-      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v2
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v3
       env:
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:

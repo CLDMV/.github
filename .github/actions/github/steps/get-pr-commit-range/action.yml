@@ -1,0 +1,19 @@
+name: "Get PR Commit Range"
+description: "Resolve the base..head commit range for a pull request"
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: "Pull request number"
+    required: true
+
+outputs:
+  commit-range:
+    description: "Commit range in base-sha..head-sha form"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

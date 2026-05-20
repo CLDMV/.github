@@ -1,0 +1,22 @@
+name: "Sync PR Labels"
+description: "Apply labels to a pull request. Default mode 'replace' replaces all labels; mode 'add' applies additively (preserves existing labels added by humans/other automation)."
+
+inputs:
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: "Pull request number"
+    required: true
+  labels:
+    description: "Comma-separated list of labels to apply"
+    required: true
+  mode:
+    description: "'replace' (default; full sync) or 'add' (additive; preserves existing labels)"
+    required: false
+    default: "replace"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

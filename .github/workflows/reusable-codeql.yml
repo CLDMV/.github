@@ -1,0 +1,144 @@
+#
+# @Project: workflows
+# @Filename: /reusable-codeql.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# CodeQL static-analysis (org-level, reusable).
+#
+# Wraps github/codeql-action so consumer repos get one version-pinned source
+# of truth for query suites, path filters, and language matrix. Marketplace
+# action is GitHub-owned; rolling our own would reimplement OpenSSF's research
+# output, so we wrap.
+#
+# Batch 2.1 from tmp/plan-future-workflows.md.
+name: 🔍 CodeQL Analysis (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            languages:
+                description: "Comma-sep CodeQL languages. Matrix-expanded inside. Examples: javascript-typescript, python, java, go, ruby, csharp, swift, kotlin, cpp."
+                required: false
+                type: string
+                default: "javascript-typescript"
+            queries:
+                description: "Query suites. 'security-extended' = standard + extra security checks. 'security-and-quality' adds maintainability."
+                required: false
+                type: string
+                default: "security-extended,security-and-quality"
+            paths:
+                description: "Optional comma-sep paths to limit analysis to (e.g. 'src/')."
+                required: false
+                type: string
+                default: ""
+            paths_ignore:
+                description: "Paths to exclude. Defaults skip vendored code and test fixtures (which produce noise without value)."
+                required: false
+                type: string
+                default: "node_modules/,dist/,coverage/,build/,**/test/**,**/tests/**,**/__tests__/**"
+            config_file:
+                description: "Optional path to custom codeql-config.yml in consumer repo. When set, inputs above are ignored."
+                required: false
+                type: string
+                default: ""
+            build_mode:
+                description: "none = analyze source directly (JS/TS, Python, Ruby). autobuild = CodeQL detects build system. manual = run manual_build_command."
+                required: false
+                type: string
+                default: "none"
+            manual_build_command:
+                description: "Build command when build_mode == manual."
+                required: false
+                type: string
+                default: ""
+
+permissions:
+    security-events: write # upload SARIF results
+    contents: read
+    actions: read # required for private repos
+
+jobs:
+    # GitHub Actions expressions have no `split()` builtin, so we round-trip
+    # the comma-sep `languages` input through a small Node action that emits
+    # a JSON array. The analyze job then uses `fromJson(needs.setup.outputs.languages)`
+    # to drive its matrix.
+    setup:
+        name: "🧮 Build language matrix"
+        runs-on: ubuntu-latest
+        outputs:
+            languages: ${{ steps.parse.outputs.json }}
+        steps:
+            - name: Parse languages CSV
+              id: parse
+              uses: CLDMV/.github/.github/actions/common/utilities/parse-csv-list@v3
+              with:
+                  csv: ${{ inputs.languages }}
+
+    analyze:
+        name: "🔍 Analyze ${{ matrix.language }}"
+        needs: setup
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                language: ${{ fromJson(needs.setup.outputs.languages) }}
+        steps:
+            - name: Checkout
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              with:
+                  fetch-depth: 0
+
+            # `paths` / `paths-ignore` are not direct inputs to codeql-action/init —
+            # they belong in a codeql-config.yml referenced via `config-file:`. Write
+            # one from our inputs unless the caller already supplied their own.
+            - name: Write CodeQL config
+              if: inputs.config_file == ''
+              id: codeql_cfg
+              shell: bash
+              env:
+                  PATHS: ${{ inputs.paths }}
+                  PATHS_IGNORE: ${{ inputs.paths_ignore }}
+              run: |
+                  cfg=/tmp/codeql-config.yml
+                  : > "$cfg"
+                  emit_list() {
+                      local key="$1" csv="$2"
+                      [ -z "$csv" ] && return
+                      echo "${key}:" >> "$cfg"
+                      IFS=',' read -ra arr <<< "$csv"
+                      for p in "${arr[@]}"; do
+                          p="${p# }"; p="${p% }"
+                          [ -n "$p" ] && echo "  - \"${p}\"" >> "$cfg"
+                      done
+                  }
+                  emit_list paths "$PATHS"
+                  emit_list paths-ignore "$PATHS_IGNORE"
+                  if [ -s "$cfg" ]; then
+                      echo "path=$cfg" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: ${{ matrix.language }}
+                  queries: ${{ inputs.queries }}
+                  # Either the caller's config_file or our generated one (may be empty).
+                  config-file: ${{ inputs.config_file != '' && inputs.config_file || steps.codeql_cfg.outputs.path }}
+
+            - name: Autobuild
+              if: inputs.build_mode == 'autobuild'
+              uses: github/codeql-action/autobuild@v3
+
+            - name: Manual build
+              if: inputs.build_mode == 'manual' && inputs.manual_build_command != ''
+              shell: bash
+              run: ${{ inputs.manual_build_command }}
+
+            - name: Analyze
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:${{ matrix.language }}"

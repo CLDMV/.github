@@ -1,0 +1,35 @@
+#
+# @Project: workflows
+# @Filename: /local-stale.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Daily stale sweep for this repo. Calls our own reusable so the implementation
+# is exercised against real data.
+name: 🍂 Local Stale
+
+on:
+    schedule:
+        - cron: "13 5 * * *" # daily 05:13 UTC
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Preview only — no changes will be made"
+                type: boolean
+                default: false
+
+permissions:
+    issues: write
+    pull-requests: write
+
+jobs:
+    sweep:
+        uses: ./.github/workflows/reusable-stale.yml
+        with:
+            dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

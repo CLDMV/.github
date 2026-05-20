@@ -1,0 +1,22 @@
+name: "Update PR Coverage Badge"
+description: "Compute coverage stats and inject/update a coverage badge block in the pull request body"
+
+inputs:
+  coverage-summary-path:
+    description: "Path to the coverage-summary.json produced by the test run"
+    required: true
+  node-version:
+    description: "Node.js version used (shown in the coverage block)"
+    required: false
+    default: "lts/*"
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ${{ github.token }}
+  repository:
+    description: "owner/repo of the repository"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

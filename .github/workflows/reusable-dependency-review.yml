@@ -1,0 +1,78 @@
+#
+# @Project: workflows
+# @Filename: /reusable-dependency-review.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Dependency Review (org-level, reusable).
+#
+# At PR-time, flags new/changed deps + CVE matches from the GitHub Advisory
+# Database. Comments a summary on the PR. Optional license-policy enforcement.
+#
+# Batch 2.2 from tmp/plan-future-workflows.md.
+name: 🔒 Dependency Review (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            fail_on_severity:
+                description: "low | moderate | high | critical | none (informational)"
+                required: false
+                type: string
+                default: "moderate"
+            comment_summary:
+                description: "Post a summary comment on the PR"
+                required: false
+                type: boolean
+                default: true
+            base_ref:
+                description: "Base ref override; defaults to PR base"
+                required: false
+                type: string
+                default: ""
+            head_ref:
+                description: "Head ref override; defaults to PR head"
+                required: false
+                type: string
+                default: ""
+            allow_licenses:
+                description: "Comma-sep SPDX allowlist (mutually exclusive with deny_licenses)"
+                required: false
+                type: string
+                default: ""
+            deny_licenses:
+                description: "Comma-sep SPDX denylist. Empty default since CLDMV is mixed-license."
+                required: false
+                type: string
+                default: ""
+            warn_on_openssf_scorecard_level:
+                description: "Warn if a new dep has an OpenSSF Scorecard score below this. 0 = disable."
+                required: false
+                type: number
+                default: 3
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    review:
+        name: "🔒 Dependency Review"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+
+            - name: Review dependencies
+              uses: actions/dependency-review-action@v4
+              with:
+                  fail-on-severity: ${{ inputs.fail_on_severity }}
+                  comment-summary-in-pr: ${{ inputs.comment_summary && 'always' || 'never' }}
+                  base-ref: ${{ inputs.base_ref }}
+                  head-ref: ${{ inputs.head_ref }}
+                  allow-licenses: ${{ inputs.allow_licenses }}
+                  deny-licenses: ${{ inputs.deny_licenses }}
+                  warn-on-openssf-scorecard-level: ${{ inputs.warn_on_openssf_scorecard_level }}

@@ -1,0 +1,50 @@
+name: "Release Workflow Summary"
+description: "Render the release workflow job summary"
+
+inputs:
+  dry-run:
+    description: "Whether the workflow ran in dry-run mode"
+    required: false
+    default: "false"
+  package-name:
+    description: "NPM package name"
+    required: true
+  update-existing-pr-result:
+    description: "Result of the update-existing-pr job"
+    required: false
+    default: ""
+  existing-pr-number:
+    description: "Number of the existing release PR (if one was updated)"
+    required: false
+    default: ""
+  should-release:
+    description: "Whether a release was detected"
+    required: false
+    default: "false"
+  release-result:
+    description: "Result of the release job"
+    required: false
+    default: ""
+  release-pr-created:
+    description: "Whether the release job created a PR"
+    required: false
+    default: "false"
+  release-new-version:
+    description: "New version produced by the release job"
+    required: false
+    default: ""
+  release-pr-number:
+    description: "Number of the PR created by the release job"
+    required: false
+    default: ""
+  server-url:
+    description: "GitHub server URL"
+    required: false
+    default: "https://github.com"
+  repository:
+    description: "owner/repo of the repository"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

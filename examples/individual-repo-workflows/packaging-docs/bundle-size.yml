@@ -1,0 +1,41 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/packaging-docs/bundle-size.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/bundle-size.yml
+#
+# Only relevant for runtime libraries where bundle size matters (e.g.
+# @cldmv/slothlet). Skip this template for tool repos / meta repos.
+#
+# Fork-PR caveat: builds PR-supplied code, so we use `pull_request`
+# (NOT pull_request_target). Fork builds run safely without secrets;
+# comment posting fails for fork PRs because the token is read-only.
+# Maintainer can run via workflow_dispatch after reviewing the code.
+#
+# Batch 5.4 from tmp/plan-future-workflows.md.
+name: 📊 Bundle Size
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches: [master, main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    diff:
+        uses: CLDMV/.github/.github/workflows/reusable-bundle-size.yml@v3
+        with:
+            build_command: "npm run build"
+            dist_paths: "dist/**"
+            # warning_pct: 5
+            # warning_bytes: 500
+            # comment_mode: "update"

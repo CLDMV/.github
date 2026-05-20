@@ -1,0 +1,11 @@
+name: "Compute Coverage Badge JSON"
+description: "Compute average coverage from a coverage-summary.json and write a Shields.io badge.json"
+
+inputs:
+  coverage-summary-path:
+    description: "Path to the coverage-summary.json produced by the test run"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

@@ -1,0 +1,41 @@
+# Per-repo labeler override for CLDMV/.github itself.
+# Patterns are tailored to THIS repo's structure (no src/, no bin/).
+# Falls back to org default (.github/labeler.default.yml) only if this file
+# is absent — but since we're the org repo, this IS the source of truth.
+
+"area:core":
+  - ".github/actions/common/**"
+  - ".github/actions/git/**"
+  - ".github/actions/github/**"
+  - ".github/actions/node/**"
+  - ".github/actions/npm/**"
+  - ".github/actions/docker/**"
+  - ".github/actions/coverage/**"
+  - ".github/actions/community/**"
+  - ".github/actions/workflows/**"
+
+"area:tests":
+  - ".github/actions/testing/**"
+  - "**/*.test.*"
+  - "**/*.spec.*"
+
+docs: # → type: documentation
+  - "**.md"
+  - "docs/**"
+  - "examples/**.md"
+
+ci: # → type: ci
+  - ".github/workflows/**"
+  - ".github/labeler.default.yml"
+  - ".github/labeler.yml"
+
+config: # → type: config
+  - ".github/instructions/**"
+  - ".github/templates/**"
+  - ".github/dependabot.yml"
+  - ".github/codeql.yml"
+  - ".gitignore"
+  - ".editorconfig"
+  - "package.json"
+  - "data/**"
+  - "scripts/**"

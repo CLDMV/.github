@@ -11,52 +11,8 @@ inputs:
 outputs:
   should_skip:
     description: "true if commit message starts with any of the specified prefixes, false otherwise"
-    value: ${{ steps.check.outputs.should_skip }}
   matched_prefix:
     description: "The prefix that was matched (if any)"
-    value: ${{ steps.check.outputs.matched_prefix }}
 runs:
-  using: "composite"
-  steps:
-    - name: Check commit message against prefixes
-      id: check
-      shell: bash
-      env:
-        INPUT_COMMIT_MESSAGE: ${{ inputs.commit_message }}
-        GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        INPUT_PREFIXES: ${{ inputs.prefixes }}
-      run: |
-        # Get commit message - use input or default to github context
-        COMMIT_MSG="$INPUT_COMMIT_MESSAGE"
-        if [ -z "$COMMIT_MSG" ]; then
-          COMMIT_MSG="$GITHUB_COMMIT_MESSAGE"
-        fi
-
-        echo "Checking commit message: ${COMMIT_MSG}"
-
-        # Split prefixes by comma and check each one
-        IFS=',' read -ra PREFIXES <<< "$INPUT_PREFIXES"
-        SHOULD_SKIP="false"
-        MATCHED_PREFIX=""
-
-        for prefix in "${PREFIXES[@]}"; do
-          # Trim whitespace
-          prefix=$(echo "$prefix" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          echo "Checking prefix: '$prefix'"
-          
-          if [[ "$COMMIT_MSG" == "$prefix"* ]]; then
-            echo "✅ Commit message starts with '$prefix'"
-            SHOULD_SKIP="true"
-            MATCHED_PREFIX="$prefix"
-            break
-          fi
-        done
-
-        if [ "$SHOULD_SKIP" = "false" ]; then
-          echo "❌ Commit message does not start with any specified prefix"
-        fi
-
-        echo "should_skip=$SHOULD_SKIP" >> $GITHUB_OUTPUT
-        echo "matched_prefix=$MATCHED_PREFIX" >> $GITHUB_OUTPUT
-
-        echo "Final result: should_skip=$SHOULD_SKIP, matched_prefix=$MATCHED_PREFIX"
+  using: "node24"
+  main: "action.mjs"

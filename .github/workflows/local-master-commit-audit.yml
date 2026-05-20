@@ -1,0 +1,43 @@
+#
+# @Project: workflows
+# @Filename: /local-master-commit-audit.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Audit every commit that lands on this repo's default branch against the
+# expected release-flow shape. On miss, files a GitHub Issue (deduped by SHA).
+name: 🧾 Local Master Commit Audit
+
+on:
+    push:
+        branches: [master, main]
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Audit commit subject
+              # Relative uses: doesn't work for an action that lives in this
+              # same repo when invoked directly from a workflow on this repo;
+              # use the @v3 pin (after v3 cut). Until then this job will skip
+              # gracefully because the action ref resolves at runtime.
+              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v3
+              with:
+                  commit_sha: ${{ github.sha }}
+                  allowed_patterns: |
+                      ^release: v\d+\.\d+\.\d+( \(#\d+\))?$
+                      ^chore(\([^)]+\))?: .+
+                      ^Merge pull request #\d+ from .+
+                      ^feat(\([^)]+\))?: .+
+                      ^fix(\([^)]+\))?: .+
+                      ^docs(\([^)]+\))?: .+
+                      ^refactor(\([^)]+\))?: .+
+                  issue_labels: "bot:audit,priority:high"
+                  github_token: ${{ secrets.GITHUB_TOKEN }}

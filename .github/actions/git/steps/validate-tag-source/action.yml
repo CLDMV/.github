@@ -1,0 +1,12 @@
+name: "Validate Tag Source Branch"
+description: "Verify a pushed tag points at a commit reachable from main or master"
+
+outputs:
+  should-proceed:
+    description: "Whether the workflow should proceed (true unless a tag is off-branch)"
+  message:
+    description: "Human-readable validation result"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

@@ -1,0 +1,55 @@
+#
+# @Project: workflows
+# @Filename: /reusable-release-notifier.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Release notifier (org-level, reusable).
+# Batch 6.2 from tmp/plan-future-workflows.md.
+name: 📣 Release Notifier (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            config_path:
+                required: false
+                type: string
+                default: ".github/release-notifier.yml"
+            default_config_repo:
+                required: false
+                type: string
+                default: "CLDMV/.github"
+            default_config_ref:
+                required: false
+                type: string
+                default: "v2"
+            default_config_path:
+                required: false
+                type: string
+                default: ".github/templates/release-notifier.default.yml"
+
+permissions:
+    contents: read
+
+jobs:
+    notify:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Dispatch release notifications
+              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v3
+              with:
+                  config_path: ${{ inputs.config_path }}
+                  default_config_repo: ${{ inputs.default_config_repo }}
+                  default_config_ref: ${{ inputs.default_config_ref }}
+                  default_config_path: ${{ inputs.default_config_path }}
+                  github_token: ${{ github.token }}
+              # `secrets: inherit` at the calling consumer level passes all
+              # secrets through env. Each channel handler reads the secret
+              # named by its `webhook_secret` field.
+              env:
+                  DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+                  SLACK_ENGINEERING_WEBHOOK: ${{ secrets.SLACK_ENGINEERING_WEBHOOK }}
+                  MATRIX_WEBHOOK_URL: ${{ secrets.MATRIX_WEBHOOK_URL }}

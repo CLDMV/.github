@@ -1,0 +1,40 @@
+#
+# @Project: cla-check
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "CLA Check"
+description: "On PR event: enumerate commit authors, check each is covered (org member, exempt bot, or already signed via comment/commit). Post request comment if any are missing; write a status check either way. Batch 1.1."
+
+inputs:
+  cla_version:
+    required: true
+    description: "Current CLA version string (must match the text in cla_path)"
+  cla_path:
+    required: false
+    default: "CLA.md"
+    description: "Path to CLA text (used to compute hash + link)"
+  exempt_users:
+    required: false
+    default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
+    description: "Comma-sep logins always exempt"
+  exempt_org_members:
+    required: false
+    default: "true"
+  exempt_org:
+    required: false
+    default: ${{ github.repository_owner }}
+  required_text_template:
+    required: false
+    default: "I have read and I agree to the CLA v${cla_version}"
+  github_token:
+    required: true
+    description: "App token; needs `members: read` org-level for org-member lookup"
+
+runs:
+  using: node24
+  main: action.mjs

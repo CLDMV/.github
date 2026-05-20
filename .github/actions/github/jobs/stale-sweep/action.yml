@@ -1,0 +1,40 @@
+#
+# @Project: stale-sweep
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Stale Sweep"
+description: "Mark inactive issues/PRs stale; close after grace period; un-stale on activity. Replaces actions/stale@v9 with a no-dep org-managed implementation that uses the bot identity for comments. Batch 2.3 from tmp/plan-future-workflows.md."
+
+inputs:
+  # Issues
+  days_before_issue_stale: { required: false, default: "60" }
+  days_before_issue_close: { required: false, default: "14" }
+  stale_issue_label: { required: false, default: "stale" }
+  stale_issue_message: { required: false, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, or close if no longer relevant." }
+  close_issue_message: { required: false, default: "Closed due to inactivity. Reopen if this is still relevant." }
+  # PRs
+  days_before_pr_stale: { required: false, default: "30" }
+  days_before_pr_close: { required: false, default: "7" }
+  stale_pr_label: { required: false, default: "stale" }
+  stale_pr_message: { required: false, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open." }
+  close_pr_message: { required: false, default: "Closed due to inactivity. Reopen the branch and PR when ready to resume." }
+  # Exemptions
+  exempt_issue_labels: { required: false, default: "pinned,security,help-wanted,good-first-issue,blocked" }
+  exempt_pr_labels: { required: false, default: "pinned,work-in-progress,dependencies,blocked" }
+  exempt_all_milestones: { required: false, default: "true" }
+  exempt_all_assignees: { required: false, default: "true" }
+  # Operation
+  operations_per_run: { required: false, default: "100" }
+  dry_run: { required: false, default: "false" }
+  github_token:
+    required: true
+    description: "App token (issues:write + pull-requests:write)"
+
+runs:
+  using: node24
+  main: action.mjs

@@ -1,0 +1,48 @@
+#
+# @Project: workflows
+# @Filename: /local-tag-health.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Weekly tag-health sweep for THIS repo. Eats our own dog food — if tag-
+# health is broken we'd rather find out here than in a consumer repo.
+name: 🏥 Local Tag Health
+
+on:
+    schedule:
+        - cron: "4 4 * * 0" # weekly Sunday 04:04 UTC
+    workflow_dispatch:
+        inputs:
+            debug:
+                type: boolean
+                default: false
+            create_documentation:
+                type: boolean
+                default: false
+            use_gpg:
+                type: boolean
+                default: true
+
+permissions:
+    contents: write
+
+jobs:
+    health:
+        # Use a RELATIVE uses: so PRs and branches test against the
+        # current-branch reusable, not the published @v3 tag. True dogfood.
+        uses: ./.github/workflows/reusable-tag-health.yml
+        with:
+            debug: ${{ github.event.inputs.debug == 'true' }}
+            run_unified_tag_health: true
+            create_documentation: ${{ github.event.inputs.create_documentation == 'true' }}
+            use_gpg: ${{ github.event.inputs.use_gpg != 'false' }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}

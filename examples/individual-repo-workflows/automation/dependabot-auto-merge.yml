@@ -1,0 +1,39 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/automation/dependabot-auto-merge.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/dependabot-auto-merge.yml
+#
+# Required setup (one-time per repo):
+#   1. Settings → Pull Requests → "Allow auto-merge" → ON
+#   2. Branch protection on master/main requires CI status checks
+# Both are validated by the action; the workflow will fail loudly if missing.
+#
+# Batch 3.2 from tmp/plan-future-workflows.md.
+name: 🤖 Dependabot Auto-Merge
+
+on:
+    pull_request:
+        types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    automerge:
+        # Pre-filter at workflow level so this doesn't spin up for every PR.
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        uses: CLDMV/.github/.github/workflows/reusable-dependabot-auto-merge.yml@v3
+        with:
+            bump_types: "patch,minor"
+            merge_method: "squash"
+            # also_for_actors: "renovate[bot]"   # extend if you adopt Renovate
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

@@ -68,10 +68,18 @@ on:
 permissions:
     contents: write
 
+# Serialize tag operations across this workflow AND reusable-publishing.yml's
+# update-version-tags job (which declares the same group at job-level). Git
+# tags are atomic so a final race would land correctly, but flicker during
+# intermediate states is visible to consumers. P3.4.
+concurrency:
+    group: tags-${{ github.repository }}
+    cancel-in-progress: false
+
 jobs:
     version-tag-operations:
         name: Version Tag Operations
-        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v3
         permissions:
             contents: write
         with:
@@ -107,7 +115,7 @@ jobs:
 #           fetch-depth: 0
 
 #       - name: Generate Detailed Version Tag Update Summary
-#         uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v2
+#         uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v3
 #         with:
 #           debug: ${{ inputs.debug }}
 #           summary_json: ${{ needs.version-tag-operations.outputs.summary_json || '{}' }}

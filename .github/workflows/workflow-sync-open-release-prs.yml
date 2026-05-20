@@ -1,0 +1,130 @@
+#
+# @Project: workflows
+# @Filename: /workflow-sync-open-release-prs.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Sync open release PRs (org-level, reusable).
+#
+# Triggered by consumer repos on `pull_request: closed && merged == true`
+# against the default branch. Enumerates open release PRs and re-runs the
+# update-release-pr action against each so they reflect the latest master
+# state — re-calculating the version bump, regenerating the changelog, and
+# force-pushing the new version-bump commit.
+#
+# Companion to P3.1 (calculate-version uses current master, not merge-base).
+# Without this fan-out, a release PR that gets no new pushes between sibling
+# merges still carries stale data; this closes that gap.
+name: 🔄 Sync Open Release PRs (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            package_name:
+                required: true
+                type: string
+                description: "NPM package name (e.g., @cldmv/slothlet)"
+            package_manager:
+                required: false
+                type: string
+                default: "npm"
+                description: "Package manager (npm or yarn)"
+            build_command:
+                required: false
+                type: string
+                default: "npm run build:ci"
+                description: "Command to build the package"
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+                description: "Node.js version to use"
+            pr_title_pattern:
+                required: false
+                type: string
+                default: '^release: v\d+\.\d+\.\d+$'
+                description: "Regex matching titles of PRs eligible for auto-sync"
+            debug:
+                required: false
+                type: boolean
+                default: false
+                description: "Enable debug logging"
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+                description: "GitHub App Client ID for CLDMV bot"
+            BOT_APP_PRIVATE_KEY:
+                required: true
+                description: "GitHub App private key for CLDMV bot"
+
+permissions:
+    contents: write
+    pull-requests: write
+
+# Multiple rapid master merges should queue sync runs, not race or cancel
+# each other. Each run re-enumerates the current set of open release PRs,
+# so a queued run picks up any PRs that were created mid-flight.
+concurrency:
+    group: sync-release-prs-${{ github.repository }}
+    cancel-in-progress: false
+
+jobs:
+    enumerate:
+        name: "🔍 Find Open Release PRs"
+        runs-on: ubuntu-latest
+        outputs:
+            release_prs: ${{ steps.list.outputs.prs }}
+            count: ${{ steps.list.outputs.count }}
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: List open release PRs
+              id: list
+              uses: CLDMV/.github/.github/actions/github/api/list-release-prs@v3
+              with:
+                  title-pattern: ${{ inputs.pr_title_pattern }}
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+    refresh:
+        name: "🔄 Refresh PR #${{ matrix.pr.number }} (${{ matrix.pr.head_ref }})"
+        needs: enumerate
+        if: needs.enumerate.outputs.count != '0'
+        runs-on: ubuntu-latest
+        strategy:
+            # One PR's refresh failing shouldn't block the others.
+            fail-fast: false
+            matrix:
+                pr: ${{ fromJson(needs.enumerate.outputs.release_prs) }}
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Refresh release PR
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
+              with:
+                  head-ref: ${{ matrix.pr.head_ref }}
+                  pr-number: ${{ matrix.pr.number }}
+                  package-name: ${{ inputs.package_name }}
+                  package-manager: ${{ inputs.package_manager }}
+                  build-command: ${{ inputs.build_command }}
+                  node-version: ${{ inputs.node_version }}
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  debug: ${{ inputs.debug }}

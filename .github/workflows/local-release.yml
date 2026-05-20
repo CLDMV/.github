@@ -1,0 +1,69 @@
+#
+# @Project: workflows
+# @Filename: /local-release.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Auto-create / refresh release PRs for THIS repo. Detects `release:` /
+# `release!:` commits on non-default branches and opens (or updates) the
+# matching release PR.
+#
+# Companion: local-sync-release-prs.yml fans out to refresh ALL open release
+# PRs whenever any PR merges to master/main (closes the silent-regression
+# gap from P3.1/P3.2).
+#
+# Note: this repo has no `npm test` / `npm run build:ci` scripts — it's a
+# workflows + actions package. Tests are replaced by local-ci.yml as the
+# real gate, and `skip_matrix_tests: true` keeps the release-workflow's
+# build phase a no-op.
+name: 🚀 Local Release PR
+
+on:
+    push:
+        # Don't fire on bot-managed or special branches.
+        branches-ignore: [master, main, badges, gh-pages, dev]
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - "*.md"
+            - "LICENSE"
+            - ".gitignore"
+
+permissions:
+    contents: write
+    pull-requests: write
+
+concurrency:
+    group: local-release-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    create-release-pr:
+        # Prevent infinite loops: don't run on bot commits or on the
+        # auto-generated version-bump commit the release workflow itself pushes.
+        if: |
+            github.actor != 'cldmv-bot[bot]' &&
+            github.actor != 'github-actions[bot]' &&
+            !startsWith(github.event.head_commit.message, 'chore: bump version')
+        uses: ./.github/workflows/workflow-release.yml
+        with:
+            package_name: "@cldmv/.github"
+            # No npm tests / build in this repo — local-ci.yml is the real
+            # gate. Stub commands keep workflow-release.yml's build-and-test
+            # phase happy without trying to invoke missing npm scripts.
+            test_command: "echo '✓ Tests run via local-ci.yml; no separate test phase here.'"
+            build_command: "echo '✓ No build step for a workflows + actions package.'"
+            skip_matrix_tests: true
+            skip_performance_tests: true
+            create_documentation: true
+        secrets:
+            # NPM_TOKEN intentionally omitted — this repo isn't on npm.
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}

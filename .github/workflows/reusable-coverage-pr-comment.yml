@@ -76,23 +76,20 @@ jobs:
         steps:
             # ── 1. Source ────────────────────────────────────────────────────────
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             # ── 2. Runtime ──────────────────────────────────────────────────────
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
                   node-version: ${{ inputs.node_version }}
                   cache: ${{ inputs.package_manager }}
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
-              run: |
-                  if [ "${{ inputs.package_manager }}" = "yarn" ]; then
-                    yarn install --frozen-lockfile
-                  else
-                    npm ci
-                  fi
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
+              with:
+                  package-manager: ${{ inputs.package_manager }}
 
             # ── 4. Type check ───────────────────────────────────────────────────
             - name: Type check
@@ -103,110 +100,11 @@ jobs:
             - name: Tests + coverage
               run: ${{ inputs.coverage_command }}
 
-            # ── 6. Parse coverage and build comment body ─────────────────────────
-            - name: Compute coverage stats
-              id: stats
-              run: |
-                  node -e "
-                    const fs = require('fs');
-                    const s = JSON.parse(fs.readFileSync('${{ inputs.coverage_summary_path }}', 'utf8')).total;
-
-                    const fmt = m => m.total === 0 ? '100.0' : m.pct.toFixed(1);
-                    const st = fmt(s.statements);
-                    const br = fmt(s.branches);
-                    const fn = fmt(s.functions);
-                    const ln = fmt(s.lines);
-                    const avg = ((parseFloat(st) + parseFloat(br) + parseFloat(fn) + parseFloat(ln)) / 4).toFixed(1);
-
-                    const color =
-                      avg >= 90 ? 'brightgreen' :
-                      avg >= 75 ? 'green' :
-                      avg >= 60 ? 'yellow' : 'red';
-
-                    // Shields.io badge URL — % must be encoded as %25
-                    const badgeUrl =
-                      'https://img.shields.io/badge/coverage-' +
-                      encodeURIComponent(avg + '%').replace(/%25/g, '%25') +
-                      '-' + color + '?style=for-the-badge&logo=vitest&logoColor=white';
-
-                    const output = [
-                      'avg=' + avg,
-                      'color=' + color,
-                      'badge_url=' + badgeUrl,
-                      'statements=' + st,
-                      'branches=' + br,
-                      'functions=' + fn,
-                      'lines=' + ln,
-                    ].join('\n');
-
-                    fs.appendFileSync(process.env.GITHUB_OUTPUT, output + '\n');
-                    console.log(output);
-                  "
-
-            # ── 7. Inject/update coverage block in the PR body ──────────────────
+            # ── 6. Compute coverage and inject the badge block into the PR body ──
             - name: Update PR description with coverage badge
-              uses: actions/github-script@v7
+              uses: CLDMV/.github/.github/actions/coverage/steps/update-pr-coverage@v3
               with:
+                  coverage-summary-path: ${{ inputs.coverage_summary_path }}
+                  node-version: ${{ inputs.node_version }}
                   github-token: ${{ github.token }}
-                  script: |
-                      const START = '<!-- coverage-badge-start -->';
-                      const END   = '<!-- coverage-badge-end -->';
-
-                      const avg      = '${{ steps.stats.outputs.avg }}';
-                      const badgeUrl = '${{ steps.stats.outputs.badge_url }}';
-                      const st       = '${{ steps.stats.outputs.statements }}';
-                      const br       = '${{ steps.stats.outputs.branches }}';
-                      const fn       = '${{ steps.stats.outputs.functions }}';
-                      const ln       = '${{ steps.stats.outputs.lines }}';
-                      const sha      = context.sha.slice(0, 7);
-                      const nodeVer  = '${{ inputs.node_version }}';
-
-                      const block = [
-                        START,
-                        '',
-                        `![coverage](${badgeUrl})`,
-                        '',
-                        '| Metric | Coverage |',
-                        '|--------|----------|',
-                        `| Statements | ${st}% |`,
-                        `| Branches   | ${br}% |`,
-                        `| Functions  | ${fn}% |`,
-                        `| Lines      | ${ln}% |`,
-                        '',
-                        `*Avg: **${avg}%** · \`${sha}\` · Node ${nodeVer}*`,
-                        '',
-                        END,
-                      ].join('\n');
-
-                      const { data: pr } = await github.rest.pulls.get({
-                        owner: context.repo.owner,
-                        repo:  context.repo.repo,
-                        pull_number: context.issue.number,
-                      });
-
-                      const currentBody = pr.body || '';
-                      let newBody;
-
-                      if (currentBody.includes(START) && currentBody.includes(END)) {
-                        // Replace the existing block between the markers
-                        const before = currentBody.slice(0, currentBody.indexOf(START));
-                        const after  = currentBody.slice(currentBody.indexOf(END) + END.length);
-                        newBody = before + block + after;
-                      } else {
-                        // Append the block separated by a horizontal rule
-                        const separator = currentBody.trimEnd().length > 0 ? '\n\n---\n\n' : '';
-                        newBody = currentBody + separator + block;
-                      }
-
-                      if (newBody === currentBody) {
-                        console.log('PR body unchanged — skipping update.');
-                        return;
-                      }
-
-                      await github.rest.pulls.update({
-                        owner: context.repo.owner,
-                        repo:  context.repo.repo,
-                        pull_number: context.issue.number,
-                        body: newBody,
-                      });
-                      console.log('PR description updated with coverage badge.');
+                  repository: ${{ github.repository }}

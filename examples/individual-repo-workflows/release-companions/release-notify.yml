@@ -1,0 +1,42 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/release-companions/release-notify.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/release-notify.yml
+#
+# Per-repo channel config: place .github/release-notifier.yml in this repo
+# (same shape as the org default) to add or override channels. Example:
+#
+#   channels:
+#     - id: discord-myrepo
+#       type: discord
+#       enabled: true
+#       webhook_secret: DISCORD_MYREPO_WEBHOOK
+#       color: 0x22c55e
+#       include_changelog: true
+#       changelog_lines: 10
+#
+# Channel webhook URLs are stored as repo secrets (referenced by name).
+# Add the relevant secrets in Settings → Secrets and variables → Actions.
+#
+# Batch 6.2 from tmp/plan-future-workflows.md.
+name: 📣 Release Notify
+
+on:
+    release:
+        types: [published]
+
+permissions:
+    contents: read
+
+jobs:
+    notify:
+        # Defensive: skip untagged releases (mirrors Batch 1.2's filter)
+        if: github.event.release.tag_name != ''
+        uses: CLDMV/.github/.github/workflows/reusable-release-notifier.yml@v3
+        secrets: inherit

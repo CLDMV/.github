@@ -1,0 +1,12 @@
+name: "Find Branch Divergence Point"
+description: "Locate the merge-base from master/main and read the package version at that point"
+
+outputs:
+  merge-base:
+    description: "Commit SHA where the branch diverged from the default branch"
+  base-version:
+    description: "package.json version at the divergence point (empty if undetermined)"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

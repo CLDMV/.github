@@ -162,7 +162,7 @@ jobs:
         steps:
             - name: Check for existing release PR
               id: check
-              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v2
+              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v3
               with:
                   github-token: ${{ github.token }}
                   head-branch: ${{ github.ref_name }}
@@ -179,13 +179,13 @@ jobs:
             has-breaking: ${{ steps.check.outputs.has-breaking }}
         steps:
             - name: Checkout code
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
               with:
                   fetch-depth: 0
 
             - name: Check Release Commit
               id: check
-              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v3
               env:
                   DEBUG: ${{ inputs.debug || 'true' }}
 
@@ -195,49 +195,9 @@ jobs:
         needs: check-existing-pr
         runs-on: ubuntu-latest
         steps:
-            - name: Checkout code
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
-              with:
-                  fetch-depth: 0
-
-            - name: Setup Node.js
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
-
-            - name: Get branch divergence point
-              id: divergence
-              shell: bash
-              run: |
-                  MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo "")
-                  if [ -n "$MERGE_BASE" ]; then
-                    echo "🔍 Branch divergence point: $(echo "$MERGE_BASE" | cut -c1-7)"
-                    echo "merge-base=$MERGE_BASE" >> $GITHUB_OUTPUT
-                    mkdir -p tmp
-                    git show "$MERGE_BASE:package.json" > tmp/base-package.json 2>/dev/null || true
-                    if [ -f tmp/base-package.json ]; then
-                      BASE_VERSION=$(node -p "require('./tmp/base-package.json').version" 2>/dev/null || echo "")
-                      rm -f tmp/base-package.json
-                    fi
-                  fi
-                  if [ -n "$BASE_VERSION" ]; then
-                    echo "📦 Base version at divergence point: $BASE_VERSION"
-                    echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
-                  else
-                    echo "⚠️ Could not determine base version — dedup check will be skipped"
-                    echo "base-version=" >> $GITHUB_OUTPUT
-                  fi
-
-            - name: Check release commit type
-              id: release-check
-              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
-              with:
-                  base-ref: ${{ steps.divergence.outputs.merge-base }}
-                  base-version: ${{ steps.divergence.outputs.base-version }}
-              env:
-                  DEBUG: ${{ inputs.debug || 'true' }}
-
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -245,175 +205,26 @@ jobs:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-            - name: Calculate new version
-              id: version
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
+            # Refresh logic lives in the update-release-pr composite action so
+            # it can be reused by workflow-sync-open-release-prs.yml (fan-out
+            # from master merges) without duplication. P3.2.
+            - name: Refresh release PR
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
               with:
-                  version-bump: ${{ steps.release-check.outputs.version-bump }}
-                  explicit-version: ${{ steps.release-check.outputs.explicit-version }}
-                  base-version: ${{ steps.divergence.outputs.base-version }}
-
-            - name: Install dependencies
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
-              with:
+                  head-ref: ${{ github.ref_name }}
+                  pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  package-name: ${{ inputs.package_name }}
                   package-manager: ${{ inputs.package_manager }}
-
-            - name: Build package
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
-              with:
                   build-command: ${{ inputs.build_command }}
-                  environment: production
-
-            - name: Update package version
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
-              with:
-                  new-version: ${{ steps.version.outputs.new-version }}
-                  package-manager: ${{ inputs.package_manager }}
-
-            - name: Restore src/ deleted by build
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              run: |
-                  if git ls-files --deleted -- src/ | grep -q .; then
-                    echo "🔄 Restoring src/ deleted by build step..."
-                    git checkout HEAD -- src/
-                    echo "✅ src/ restored"
-                  else
-                    echo "ℹ️ No src/ deletions detected — skipping restore"
-                  fi
-
-            - name: Create signed commit
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/github/api/commit@v2
-              with:
-                  commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
+                  node-version: ${{ inputs.node_version }}
                   github-token: ${{ steps.app-token.outputs.token }}
-
-            - name: Determine display version
-              id: display-version
-              shell: bash
-              run: |
-                  if [ -n "${{ steps.version.outputs.new-version }}" ]; then
-                    echo "version=${{ steps.version.outputs.new-version }}" >> $GITHUB_OUTPUT
-                  else
-                    echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-                  fi
-
-            - name: Get PR commit range
-              id: get-pr-range
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-              run: |
-                  # Get the repository info
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-
-                  # Get current PR details
-                  CURRENT_PR=$(gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER)
-
-                  # Get the base branch and commit from the PR
-                  BASE_SHA=$(echo "$CURRENT_PR" | jq -r '.base.sha')
-                  HEAD_SHA=$(echo "$CURRENT_PR" | jq -r '.head.sha')
-
-                  # Create commit range
-                  COMMIT_RANGE="${BASE_SHA}..${HEAD_SHA}"
-                  echo "commit-range=${COMMIT_RANGE}" >> $GITHUB_OUTPUT
-                  echo "🔍 Using commit range: ${COMMIT_RANGE}"
-
-            - name: Generate updated changelog
-              id: changelog
-              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
-              with:
-                  commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
-
-            - name: Update PR title and description
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-                  CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog-content }}
-                  NEW_VERSION: ${{ steps.display-version.outputs.version }}
-              run: |
-                  echo "📝 Updating PR #$PR_NUMBER title and description..."
-
-                  # Get the repository info
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-                                    TMP_DIR="tmp/pr-update"
-                                    mkdir -p "$TMP_DIR"
-
-                                    # Get the generated changelog from env and write to file safely
-                                    printf "%s\n" "$CHANGELOG_CONTENT" > "$TMP_DIR/changelog.md"
-
-                                    if [ ! -s "$TMP_DIR/changelog.md" ]; then
-                                        echo "⚠️ No changelog generated, using fallback message"
-                                        printf "%s\n" \
-                                            "## 🚀 What's Changed" \
-                                            "" \
-                                            "_Changelog generation in progress. The PR has been updated with the latest commits._" \
-                                            "" \
-                                            "Please check the commit history for details of the changes included in this release." \
-                                            > "$TMP_DIR/changelog.md"
-                  fi
-
-                  # Update the PR title and description
-                  echo "📝 Updating PR title to: release: v${NEW_VERSION}"
-                                    jq -n --rawfile body "$TMP_DIR/changelog.md" --arg title "release: v${NEW_VERSION}" \
-                                        '{title: $title, body: $body}' > "$TMP_DIR/pr-patch.json"
-
-                  gh api repos/$REPO_OWNER/$REPO_NAME/pulls/$PR_NUMBER \
-                    --method PATCH \
-                                        --input "$TMP_DIR/pr-patch.json"
-
-                  echo "✅ PR #$PR_NUMBER has been updated with title 'release: v${NEW_VERSION}' and latest changelog"
-                  echo "ℹ️ Skipped full release workflow since PR already exists"
-
-            - name: Compute raw label aliases
-              id: raw-labels
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              env:
-                  BUMP_TYPE: ${{ steps.release-check.outputs.version-bump }}
-              run: |
-                  ALIASES="release,${BUMP_TYPE}"
-                  [ "$BUMP_TYPE" = "patch" ] && ALIASES="${ALIASES},bug"
-                  echo "labels=${ALIASES}" >> $GITHUB_OUTPUT
-
-            - name: Resolve PR label aliases
-              id: resolved-labels
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
-              with:
-                  aliases: ${{ steps.raw-labels.outputs.labels }}
-
-            - name: Sync PR labels
-              if: steps.release-check.outputs.should-create-pr == 'true'
-              shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-                  PR_NUMBER: ${{ needs.check-existing-pr.outputs.pr-number }}
-                  LABELS: ${{ steps.resolved-labels.outputs.labels }}
-              run: |
-                  REPO_OWNER="${{ github.repository_owner }}"
-                  REPO_NAME="${{ github.event.repository.name }}"
-                  echo "🏷️ Syncing labels: ${LABELS}"
-                  LABELS_JSON=$(echo "$LABELS" | tr ',' '\n' | jq -R . | jq -s .)
-                  gh api repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels \
-                    --method PUT \
-                    --input <(echo "{\"labels\": $LABELS_JSON}")
-                  echo "✅ Labels synced: ${LABELS}"
+                  debug: ${{ inputs.debug && 'true' || 'false' }}
 
     build-and-test:
         name: "🏗️ Build and Test"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release]
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v3
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -433,7 +244,7 @@ jobs:
         name: "🚀 Release Management"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release, build-and-test]
-        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v2
+        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v3
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -464,66 +275,16 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate Release Summary
-              run: |
-                  if [ "${{ inputs.dry_run }}" = "true" ]; then
-                    echo "## 🧪 Dry Run - Release Workflow Validation" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "## 🚀 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
-                  fi
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Package**: \`${{ inputs.package_name }}\`" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-
-                  # Check if PR was updated (existing PR path)
-                  if [ "${{ needs.update-existing-pr.result }}" = "success" ]; then
-                    echo "✅ **Overall Status**: Existing release PR updated successfully" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**PR Number**: [#${{ needs.check-existing-pr.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.check-existing-pr.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "📝 **Updated**: The PR description has been updated with the latest commits and changelog." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "🔄 **Next Steps**: Review the updated PR and merge when ready to publish the package." >> $GITHUB_STEP_SUMMARY
-                  # Check if release was detected
-                  elif [ "${{ needs.detect-release.outputs.should-release }}" != "true" ]; then
-                    echo "ℹ️ **Overall Status**: No release needed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "This commit was not detected as a release trigger." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**Automatic release detection:** The workflow detects conventional commits (\`feat:\`, \`fix:\`, breaking changes) and creates release PRs automatically." >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "**Manual release:** Use \`release:\` or \`release!:\` prefix to explicitly trigger releases with custom versioning." >> $GITHUB_STEP_SUMMARY
-                  elif [ "${{ needs.release.result }}" = "success" ]; then
-                    if [ "${{ needs.release.outputs.pr-created }}" = "true" ]; then
-                      if [ "${{ inputs.dry_run }}" = "true" ]; then
-                        echo "✅ **Overall Status**: Dry run validation successful" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🧪 **Dry Run Complete**: All validations passed! No changes were made." >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "### ✅ Validation Results:" >> $GITHUB_STEP_SUMMARY
-                        echo "- Release commit detected successfully" >> $GITHUB_STEP_SUMMARY
-                        echo "- Version calculation completed" >> $GITHUB_STEP_SUMMARY
-                        echo "- Build and tests passed" >> $GITHUB_STEP_SUMMARY
-                        echo "- Changelog generation successful" >> $GITHUB_STEP_SUMMARY
-                        echo "- All prerequisites met for release PR creation" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🚀 **Ready to Release**: Re-run with \`dry_run: false\` to create the actual release PR." >> $GITHUB_STEP_SUMMARY
-                      else
-                        echo "✅ **Overall Status**: Release PR created successfully" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "**New Version**: \`${{ needs.release.outputs.new-version }}\`" >> $GITHUB_STEP_SUMMARY
-                        echo "**PR Number**: [#${{ needs.release.outputs.pr-number }}](${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.release.outputs.pr-number }})" >> $GITHUB_STEP_SUMMARY
-                        echo "" >> $GITHUB_STEP_SUMMARY
-                        echo "🔄 **Next Steps**: Review and merge the release PR to publish the package." >> $GITHUB_STEP_SUMMARY
-                      fi
-                    else
-                      echo "ℹ️ **Overall Status**: No release PR created" >> $GITHUB_STEP_SUMMARY
-                      echo "" >> $GITHUB_STEP_SUMMARY
-                      echo "Release was detected but no PR was created." >> $GITHUB_STEP_SUMMARY
-                    fi
-                  else
-                    echo "❌ **Overall Status**: Release workflow failed" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    echo "Check the detailed progress above and workflow logs for specific failure details." >> $GITHUB_STEP_SUMMARY
-                  fi
+              uses: CLDMV/.github/.github/actions/workflows/release-summary@v3
+              with:
+                  dry-run: ${{ inputs.dry_run }}
+                  package-name: ${{ inputs.package_name }}
+                  update-existing-pr-result: ${{ needs.update-existing-pr.result }}
+                  existing-pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  should-release: ${{ needs.detect-release.outputs.should-release }}
+                  release-result: ${{ needs.release.result }}
+                  release-pr-created: ${{ needs.release.outputs.pr-created }}
+                  release-new-version: ${{ needs.release.outputs.new-version }}
+                  release-pr-number: ${{ needs.release.outputs.pr-number }}
+                  server-url: ${{ github.server_url }}
+                  repository: ${{ github.repository }}

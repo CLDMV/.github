@@ -8,15 +8,5 @@ inputs:
     default: "npm"
 
 runs:
-  using: "composite"
-  steps:
-    - name: Install dependencies
-      shell: bash
-      env:
-        PACKAGE_MANAGER: ${{ inputs.package-manager }}
-      run: |
-        if [ "$PACKAGE_MANAGER" = "yarn" ]; then
-          yarn install --frozen-lockfile
-        else
-          npm ci
-        fi
+  using: "node24"
+  main: "action.mjs"

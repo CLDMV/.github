@@ -1,0 +1,17 @@
+name: "Find Latest Semantic Version Tag"
+description: "Find the highest vX.Y.Z tag from a detailed tags JSON array"
+
+inputs:
+  tags-json:
+    description: "JSON array of detailed tag objects (each with a `name` field)"
+    required: true
+
+outputs:
+  tag-name:
+    description: "The latest semantic version tag found"
+  has-tag:
+    description: "Whether a semantic version tag was found (true/false)"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

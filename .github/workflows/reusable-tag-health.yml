@@ -116,31 +116,31 @@ on:
             # Version tag outputs
             major-version:
                 description: "The major version tag that was updated"
-                value: ${{ jobs.update-version-tags.outputs.major-version || jobs.unified-update-major-minor.outputs.major-version }}
+                value: ${{ jobs.unified-update-major-minor.outputs.major-version }}
             minor-version:
                 description: "The minor version tag that was updated"
-                value: ${{ jobs.update-version-tags.outputs.minor-version || jobs.unified-update-major-minor.outputs.minor-version }}
+                value: ${{ jobs.unified-update-major-minor.outputs.minor-version }}
             tags-updated:
                 description: "Whether version tags were updated"
-                value: ${{ jobs.update-version-tags.outputs.updated || jobs.unified-update-major-minor.outputs.updated }}
+                value: ${{ jobs.unified-update-major-minor.outputs.updated }}
             has-version-tags:
                 description: "Whether the repository has version tags"
-                value: ${{ jobs.update-version-tags.outputs.has-version-tags || jobs.unified-update-major-minor.outputs.has-version-tags }}
+                value: ${{ jobs.unified-update-major-minor.outputs.has-version-tags }}
             should-run:
                 description: "Whether tag updates should run"
-                value: ${{ jobs.update-version-tags.outputs.should-run || jobs.unified-update-major-minor.outputs.should-run }}
+                value: ${{ jobs.unified-update-major-minor.outputs.should-run }}
             fixed-orphans:
                 description: "Orphaned tags that were fixed"
-                value: ${{ jobs.update-version-tags.outputs.fixed-orphans || jobs.unified-update-major-minor.outputs.fixed-orphans }}
+                value: ${{ jobs.unified-update-major-minor.outputs.fixed-orphans }}
             orphans-found:
                 description: "Whether orphaned tags were found"
-                value: ${{ jobs.update-version-tags.outputs.orphans-found || jobs.unified-update-major-minor.outputs.orphans-found }}
+                value: ${{ jobs.unified-update-major-minor.outputs.orphans-found }}
             fixed-bot-signatures:
                 description: "Non-bot tags that were fixed"
-                value: ${{ jobs.fix-bot-signatures.outputs.fixed-tags || jobs.unified-summarize-results.outputs.fixed-bot-signatures }}
+                value: ${{ jobs.unified-summarize-results.outputs.fixed-bot-signatures }}
             non-bot-tags-found:
                 description: "Whether non-bot tags were found"
-                value: ${{ jobs.fix-bot-signatures.outputs.non-bot-tags-found || jobs.unified-summarize-results.outputs.non-bot-tags-found }}
+                value: ${{ jobs.unified-summarize-results.outputs.non-bot-tags-found }}
             # Unified outputs
             total_processed:
                 description: "Total number of tags processed"
@@ -175,59 +175,7 @@ jobs:
 
             - name: Validate tag source branch
               id: validate
-              run: |
-                  # If not a tag push, always proceed
-                  if [[ ! "$GITHUB_REF" =~ ^refs/tags/ ]]; then
-                    echo "should-proceed=true" >> $GITHUB_OUTPUT
-                    echo "message=Not a tag push, proceeding normally" >> $GITHUB_OUTPUT
-                    echo "🟢 Not a tag push, proceeding with workflow"
-                    exit 0
-                  fi
-
-                  # Extract tag name from ref
-                  TAG_NAME="${GITHUB_REF#refs/tags/}"
-                  echo "🏷️ Validating tag: $TAG_NAME"
-
-                  # Get the commit that the tag points to
-                  TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
-                  echo "📍 Tag points to commit: $TAG_COMMIT"
-
-                  # Check if this commit is reachable from main or master
-                  # First try to fetch the latest refs to ensure we have up-to-date information
-                  git fetch origin 2>/dev/null || true
-
-                  MAIN_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/main && echo "true" || echo "false")
-                  MASTER_EXISTS=$(git show-ref --verify --quiet refs/remotes/origin/master && echo "true" || echo "false")
-
-                  REACHABLE_FROM_MAIN="false"
-                  REACHABLE_FROM_MASTER="false"
-
-                  if [[ "$MAIN_EXISTS" == "true" ]]; then
-                    # Check if commit is in the history of origin/main
-                    if git rev-list "origin/main" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
-                      REACHABLE_FROM_MAIN="true"
-                      echo "✅ Tag commit is reachable from main branch"
-                    fi
-                  fi
-
-                  if [[ "$MASTER_EXISTS" == "true" ]]; then
-                    # Check if commit is in the history of origin/master  
-                    if git rev-list "origin/master" | grep -q "^$TAG_COMMIT$" 2>/dev/null; then
-                      REACHABLE_FROM_MASTER="true"
-                      echo "✅ Tag commit is reachable from master branch"
-                    fi
-                  fi
-
-                  # Determine if we should proceed
-                  if [[ "$REACHABLE_FROM_MAIN" == "true" || "$REACHABLE_FROM_MASTER" == "true" ]]; then
-                    echo "should-proceed=true" >> $GITHUB_OUTPUT
-                    echo "message=Tag $TAG_NAME is reachable from main/master branch" >> $GITHUB_OUTPUT
-                    echo "🟢 Validation passed: Tag is from main/master branch"
-                  else
-                    echo "should-proceed=false" >> $GITHUB_OUTPUT
-                    echo "message=Tag $TAG_NAME is not reachable from main/master branch" >> $GITHUB_OUTPUT
-                    echo "🟡 Validation failed: Tag is not from main/master branch, skipping major version tag updates"
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/validate-tag-source@v3
 
     # Auto-detect GPG capability once at the beginning
     detect-gpg:
@@ -240,19 +188,10 @@ jobs:
         steps:
             - name: Detect GPG capability
               id: detect
-              run: |
-                  # Auto-detect based on use_gpg input AND GPG_PRIVATE_KEY availability
-                  if [[ "${{ inputs.use_gpg }}" == "true" && -n "${{ secrets.GPG_PRIVATE_KEY }}" ]]; then
-                    echo "gpg-enabled=true" >> $GITHUB_OUTPUT
-                    echo "✅ GPG signing enabled (use_gpg=true, GPG_PRIVATE_KEY available)"
-                  else
-                    echo "gpg-enabled=false" >> $GITHUB_OUTPUT
-                    if [[ "${{ inputs.use_gpg }}" != "true" ]]; then
-                      echo "🔒 GPG signing disabled (use_gpg=false)"
-                    else
-                      echo "⚠️ GPG signing disabled (GPG_PRIVATE_KEY not available)"
-                    fi
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/detect-gpg@v3
+              with:
+                  use-gpg: ${{ inputs.use_gpg }}
+                  has-gpg-key: ${{ secrets.GPG_PRIVATE_KEY != '' }}
 
     # Shared setup for unified tag health sequence
     setup-shared:
@@ -274,7 +213,7 @@ jobs:
 
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -298,23 +237,12 @@ jobs:
               env:
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
-            - name: Get GitHub App User ID & Setup Git identity
-              id: get-user-id
-              run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-              env:
-                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
-
             - name: Configure Git identity
               id: setup-git
-              run: |
-                  USER_NAME='${{ steps.app-token.outputs.app-slug }}[bot]'
-                  USER_EMAIL='${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
-
-                  git config --global user.name "$USER_NAME"
-                  git config --global user.email "$USER_EMAIL"
-
-                  echo "user-name=$USER_NAME" >> "$GITHUB_OUTPUT"
-                  echo "user-email=$USER_EMAIL" >> "$GITHUB_OUTPUT"
+              uses: CLDMV/.github/.github/actions/github/steps/setup-git-identity@v3
+              with:
+                  app-slug: ${{ steps.app-token.outputs.app-slug }}
+                  github-token: ${{ steps.app-token.outputs.token }}
 
     unified-fix-orphaned-releases:
         name: "📦 Fix Orphaned Releases"
@@ -335,7 +263,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -345,7 +273,7 @@ jobs:
 
             - name: Fix orphaned releases
               id: fix-orphaned-releases
-              uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v2
+              uses: CLDMV/.github/.github/actions/github/steps/fix-orphaned-releases@v3
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -384,7 +312,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -396,28 +324,13 @@ jobs:
 
             - name: Find latest semantic version tag
               id: find-latest
-              shell: bash
-              env:
-                  TAGS_JSON: ${{ steps.get-tags.outputs.tags_detailed }}
-              run: |
-                  # Extract tags from detailed output and find latest semantic version
-                  echo "Processing tags from detailed output..."
-
-                  # Use jq to extract semantic version tags and find the latest
-                  LATEST_TAG=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' | sort -V | tail -n 1)
-
-                  if [ -n "$LATEST_TAG" ] && [ "$LATEST_TAG" != "null" ]; then
-                    echo "Found latest semantic version tag: $LATEST_TAG"
-                    echo "tag-name=$LATEST_TAG" >> "$GITHUB_OUTPUT"
-                    echo "has-tag=true" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "No semantic version tags found"
-                    echo "has-tag=false" >> "$GITHUB_OUTPUT"
-                  fi
+              uses: CLDMV/.github/.github/actions/git/steps/find-latest-semver-tag@v3
+              with:
+                  tags-json: ${{ steps.get-tags.outputs.tags_detailed }}
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -428,11 +341,10 @@ jobs:
             - name: Update major/minor version tags
               id: update-major-tags
               if: steps.find-latest.outputs.has-tag == 'true'
-              uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v2
-              env:
-                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+              uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v3
               with:
                   debug: ${{ inputs.debug }}
+                  github_token: ${{ steps.app-token.outputs.token }}
                   gpg_enabled: ${{ needs.detect-gpg.outputs.gpg-enabled }}
                   tag-name: ${{ steps.find-latest.outputs.tag-name }}
                   tagger-name: ${{ secrets.TAGGER_NAME }}
@@ -442,54 +354,12 @@ jobs:
 
             - name: Generate summary for major/minor updates
               id: generate-summary
-              run: |
-                  # Generate complete summary JSON with rich display data
-                  node -e "
-                    const updated = '${{ steps.update-major-tags.outputs.updated }}' === 'true';
-                    const majorVersion = '${{ steps.update-major-tags.outputs.major-version }}';
-                    const minorVersion = '${{ steps.update-major-tags.outputs.minor-version }}';
-                    const sourceTag = '${{ steps.find-latest.outputs.tag-name }}';
-                    const fixedCount = updated ? 1 : 0;
-                    
-                    const summary = {
-                      title: '🔧 Update Major/Minor Version Tags',
-                      description: 'Updates major and minor version tags to point to the latest semantic version.',
-                      lines: updated ? [
-                        \`- ✅ **Updated major tag**: \\\`\${majorVersion}\\\` → \\\`\${sourceTag}\\\`\`,
-                        \`- ✅ **Updated minor tag**: \\\`\${minorVersion}\\\` → \\\`\${sourceTag}\\\`\`,
-                        \`- 📋 **Source tag**: \\\`\${sourceTag}\\\`\`
-                      ] : [
-                        '- ℹ️ **No updates needed**: Version tags are already current'
-                      ],
-                      stats_template: '🏷️ Major/Minor Updates: {count}',
-                      notes: updated ? [
-                        \`Version tags \\\`\${majorVersion}\\\` and \\\`\${minorVersion}\\\` now point to \\\`\${sourceTag}\\\`\`
-                      ] : [
-                        'All version tags are already pointing to the correct targets'
-                      ],
-                      fixed_count: fixedCount,
-                      updated: updated,
-                      major_version: majorVersion,
-                      minor_version: minorVersion,
-                      source_tag: sourceTag,
-                      tags: updated ? [
-                        {tag: majorVersion, target: sourceTag},
-                        {tag: minorVersion, target: sourceTag}
-                      ] : []
-                    };
-                    
-                    const fs = require('fs');
-                    const output = 'summary-json=' + JSON.stringify(summary) + '\n';
-                    
-                    console.log('🔍 DEBUG: Major/Minor update summary data:');
-                    console.log(JSON.stringify(summary, null, 2));
-                    
-                    if (process.env.GITHUB_OUTPUT) {
-                      fs.appendFileSync(process.env.GITHUB_OUTPUT, output);
-                    }
-                    
-                    console.log('🔍 DEBUG: Generated major/minor summary JSON:', JSON.stringify(summary, null, 2));
-                  "
+              uses: CLDMV/.github/.github/actions/git/steps/generate-tag-update-summary@v3
+              with:
+                  updated: ${{ steps.update-major-tags.outputs.updated }}
+                  major-version: ${{ steps.update-major-tags.outputs.major-version }}
+                  minor-version: ${{ steps.update-major-tags.outputs.minor-version }}
+                  source-tag: ${{ steps.find-latest.outputs.tag-name }}
 
     unified-fix-bot-signatures:
         name: "🤖 Fix Bot Signatures"
@@ -510,7 +380,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -522,7 +392,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -532,7 +402,7 @@ jobs:
 
             - name: Fix non-bot signatures
               id: fix-bot-sigs
-              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/fix-non-bot-tags@v3
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -567,7 +437,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -579,7 +449,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -589,7 +459,7 @@ jobs:
 
             - name: Fix unsigned tags
               id: fix-unsigned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/fix-unsigned-tags@v3
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -624,7 +494,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -636,7 +506,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -646,7 +516,7 @@ jobs:
 
             - name: Fix misaligned major/minor version tags
               id: fix-misaligned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/fix-misaligned-major-tags@v3
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -681,7 +551,7 @@ jobs:
 
             - name: Get tags to process
               id: get-tags
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -693,7 +563,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -703,7 +573,7 @@ jobs:
 
             - name: Fix orphaned tags
               id: fix-orphaned
-              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/fix-orphaned-tags@v3
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   CI_DEBUG: ${{ inputs.debug && 'true' || 'false' }}
@@ -757,7 +627,7 @@ jobs:
 
             - name: Final tag scan for summary
               id: final-scan
-              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v2
+              uses: CLDMV/.github/.github/actions/git/steps/get-detailed-tags@v3
               with:
                   debug: ${{ inputs.debug }}
                   max_tags: ${{ inputs.max_tags }}
@@ -769,7 +639,7 @@ jobs:
 
             - name: Build comprehensive summary
               id: summarize
-              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-summary@v2
+              uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-summary@v3
               with:
                   debug: ${{ inputs.debug }}
                   final_count: ${{ steps.final-scan.outputs.tags_count }}

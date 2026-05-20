@@ -1,0 +1,24 @@
+name: "Docker Publish Summary"
+description: "Render the Docker publish job summary"
+
+inputs:
+  image:
+    description: "Published image reference"
+    required: false
+    default: ""
+  digest:
+    description: "Pushed image digest"
+    required: false
+    default: ""
+  registry-user:
+    description: "Registry username used for the push"
+    required: false
+    default: ""
+  pre-publish-command:
+    description: "Pre-publish command that was run, if any"
+    required: false
+    default: ""
+
+runs:
+  using: "node24"
+  main: "action.mjs"

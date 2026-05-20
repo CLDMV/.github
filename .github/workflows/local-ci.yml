@@ -1,0 +1,277 @@
+#
+# @Project: workflows
+# @Filename: /local-ci.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Local CI for THIS repo (CLDMV/.github) — validates that the Node-action
+# code parses, YAML files load, and workflow expressions are well-formed.
+# Catches the class of bugs we shipped in the v3 prep work (e.g. the
+# nonexistent `split()` expression in reusable-codeql.yml).
+#
+# This is NOT a reusable; it runs on push/PR against this repo only.
+#
+# Failure surfacing:
+# Each check writes a section to $GITHUB_STEP_SUMMARY so every failure is
+# rendered on the run's summary page — no drill-into-step-logs required.
+# Checks use `continue-on-error: true` so a single run reports ALL failures,
+# and the final Summary step exits 1 if any check failed.
+name: 🧪 Local CI
+
+on:
+    push:
+        branches-ignore: [badges, gh-pages]
+        paths:
+            - ".github/**"
+            - "scripts/**"
+            - "data/**"
+            - "package.json"
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches: [master, main]
+        paths:
+            - ".github/**"
+            - "scripts/**"
+            - "data/**"
+            - "package.json"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: local-ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+    validate:
+        name: "🧪 Validate workflows + actions"
+        runs-on: ubuntu-latest
+        # Same fork-PR shape as the example ci.yml — `push` covers same-repo
+        # branches; `pull_request` only does fork PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
+
+            - name: "Setup Node.js (matches `using: node24` runtime)"
+              uses: actions/setup-node@v6
+              with:
+                  node-version: "lts/*"
+
+            - name: Node syntax check (every .mjs)
+              id: node
+              if: always()
+              continue-on-error: true
+              shell: bash
+              run: |
+                  fails=/tmp/node-fails.md
+                  : > "$fails"
+                  count=0
+                  while IFS= read -r f; do
+                      out=$(node --check "$f" 2>&1)
+                      rc=$?
+                      if [ $rc -ne 0 ]; then
+                          echo "::error file=$f::Node syntax check failed"
+                          echo "$out"
+                          {
+                              echo
+                              echo "**\`$f\`**"
+                              echo '```'
+                              echo "$out"
+                              echo '```'
+                          } >> "$fails"
+                          count=$((count + 1))
+                      fi
+                  done < <(find .github/actions scripts -name "*.mjs" 2>/dev/null)
+                  if [ "$count" -eq 0 ]; then
+                      echo "### ✅ Node syntax (\`node --check\`) — all .mjs files clean" >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      {
+                          echo "### ❌ Node syntax (\`node --check\`) — $count file(s) failed"
+                          cat "$fails"
+                      } >> "$GITHUB_STEP_SUMMARY"
+                  fi
+                  echo "count=$count" >> "$GITHUB_OUTPUT"
+                  exit "$count"
+
+            - name: YAML parse (every workflow + action.yml + config)
+              id: yaml
+              if: always()
+              continue-on-error: true
+              shell: bash
+              run: |
+                  python3 - <<'PY'
+                  import os, sys, glob, yaml
+                  patterns = [
+                      ".github/workflows/*.yml",
+                      ".github/actions/**/*.yml",
+                      ".github/labeler.default.yml",
+                      ".github/labeler.yml",
+                      "examples/individual-repo-workflows/**/*.yml",
+                  ]
+                  fails = []
+                  for pat in patterns:
+                      for f in glob.glob(pat, recursive=True):
+                          try:
+                              yaml.safe_load(open(f))
+                          except Exception as e:
+                              print(f"::error file={f}::{e}")
+                              fails.append((f, str(e)))
+                  with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+                      if not fails:
+                          s.write("### ✅ YAML parse — every workflow + action.yml + config parsed cleanly\n")
+                      else:
+                          s.write(f"### ❌ YAML parse — {len(fails)} file(s) failed to parse\n")
+                          for f, err in fails:
+                              s.write(f"\n**`{f}`**\n```\n{err}\n```\n")
+                  with open(os.environ["GITHUB_OUTPUT"], "a") as o:
+                      o.write(f"count={len(fails)}\n")
+                  sys.exit(0 if not fails else 1)
+                  PY
+
+            - name: actionlint (catches split()-style expression bugs)
+              id: actionlint
+              if: always()
+              continue-on-error: true
+              shell: bash
+              # Run actionlint as a downloaded binary (pinned to 1.7.7, matching
+              # the previous docker action) so we can capture stdout into the
+              # job summary. Annotations are still parsed by GitHub from the
+              # default `file:line:col:` output format.
+              run: |
+                  set -e
+                  # 1.7.12 is the first release to recognize `using: node24`.
+                  url='https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz'
+                  curl -sSL "$url" | tar -xzC /tmp actionlint
+                  set +e
+                  # Ignores:
+                  #   SC2002: shellcheck UUOC noise; not a real issue.
+                  #   create-github-app-token: actionlint 1.7.12's bundled metadata
+                  #     for actions/create-github-app-token@v3 is stale — it treats
+                  #     `app-id` as required and `client-id` as undefined, but the
+                  #     upstream action.yml (https://github.com/actions/create-github-app-token/blob/v3/action.yml)
+                  #     marks `app-id` deprecated and uses `client-id` as canonical.
+                  out=$(/tmp/actionlint -no-color \
+                      -ignore 'SC2002' \
+                      -ignore 'actions/create-github-app-token@v3' \
+                      2>&1)
+                  rc=$?
+                  echo "$out"
+                  if [ "$rc" -eq 0 ]; then
+                      echo "### ✅ actionlint — no findings" >> "$GITHUB_STEP_SUMMARY"
+                      echo "count=0" >> "$GITHUB_OUTPUT"
+                  else
+                      lines=$(printf '%s\n' "$out" | grep -c '^[^[:space:]]')
+                      {
+                          echo "### ❌ actionlint — $lines line(s) of findings"
+                          echo
+                          echo '```'
+                          printf '%s\n' "$out"
+                          echo '```'
+                      } >> "$GITHUB_STEP_SUMMARY"
+                      echo "count=$lines" >> "$GITHUB_OUTPUT"
+                      exit 1
+                  fi
+
+            - name: Verify no @v2 references remain in source
+              id: v2refs
+              if: always()
+              continue-on-error: true
+              shell: bash
+              run: |
+                  # After the v3 cut all internal references should be @v3.
+                  # tmp/ is gitignored historical-planning material; skip.
+                  # Exclude this workflow file itself — it contains literal "@v2"
+                  # strings in step names, error messages, and the grep below.
+                  out=$(git grep -nI '@v2\b' \
+                      -- ':!tmp/**' ':!docs/migration/**' ':!CHANGELOG*' \
+                      ':!.github/workflows/local-ci.yml')
+                  if [ -z "$out" ]; then
+                      echo "### ✅ No stale @v2 references" >> "$GITHUB_STEP_SUMMARY"
+                      echo "count=0" >> "$GITHUB_OUTPUT"
+                  else
+                      lines=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
+                      echo "$out"
+                      echo "::error::Found stale @v2 references in source. Update to @v3."
+                      {
+                          echo "### ❌ Stale @v2 references — $lines line(s)"
+                          echo
+                          echo '```'
+                          printf '%s\n' "$out"
+                          echo '```'
+                      } >> "$GITHUB_STEP_SUMMARY"
+                      echo "count=$lines" >> "$GITHUB_OUTPUT"
+                      exit 1
+                  fi
+
+            - name: 🧪 Summary
+              if: always()
+              shell: bash
+              # Render the overall pass/fail table at the top of $GITHUB_STEP_SUMMARY
+              # and fail the job if any check failed. A "?" means the step never
+              # produced an output — usually because checkout/setup failed.
+              run: |
+                  node="${{ steps.node.outputs.count }}"
+                  yaml="${{ steps.yaml.outputs.count }}"
+                  al="${{ steps.actionlint.outputs.count }}"
+                  v2="${{ steps.v2refs.outputs.count }}"
+                  node="${node:-?}"
+                  yaml="${yaml:-?}"
+                  al="${al:-?}"
+                  v2="${v2:-?}"
+                  total_failed=0
+                  for n in "$node" "$yaml" "$al" "$v2"; do
+                      case "$n" in
+                          0|"?") ;;
+                          *) total_failed=$((total_failed + 1));;
+                      esac
+                  done
+                  status_for() {
+                      case "$1" in
+                          "0") echo "✅ pass";;
+                          "?") echo "⚠️ skipped (prior step failed)";;
+                          *) echo "❌ fail ($1)";;
+                      esac
+                  }
+                  {
+                      echo
+                      if [ "$total_failed" -eq 0 ]; then
+                          echo "## 🧪 Local CI — ✅ all checks passed"
+                      else
+                          echo "## 🧪 Local CI — ❌ $total_failed check(s) failed"
+                          echo
+                          echo "Failure details are in the per-check sections below."
+                      fi
+                      echo
+                      echo "| Check | Result |"
+                      echo "|---|---|"
+                      echo "| Node syntax (\`node --check\`) | $(status_for "$node") |"
+                      echo "| YAML parse | $(status_for "$yaml") |"
+                      echo "| actionlint | $(status_for "$al") |"
+                      echo "| Stale @v2 references | $(status_for "$v2") |"
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  if [ "$total_failed" -gt 0 ]; then
+                      exit 1
+                  fi
+
+    required-check:
+        name: ✅ Required PR Check
+        needs: validate
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Mirror validate result
+              shell: bash
+              run: |
+                  if [ "${{ needs.validate.result }}" = "success" ]; then
+                      echo "validate passed"
+                      exit 0
+                  fi
+                  echo "validate did not pass (${{ needs.validate.result }})"
+                  exit 1

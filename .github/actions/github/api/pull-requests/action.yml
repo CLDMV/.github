@@ -6,7 +6,7 @@
 # @Email: <Shinrai@users.noreply.github.com>
 # -----
 # @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
-# @Last modified time: 2026-04-11 08:05:46 -07:00 (1775919946)
+# @Last modified time: 2026-05-19 00:00:00 -07:00 (1779519600)
 # -----
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
@@ -31,205 +31,17 @@ inputs:
     description: "Comma-separated list of labels"
     required: false
     default: "release"
+  github-token:
+    description: "GitHub token for API access (overridden by the GITHUB_TOKEN env var if set)"
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   pr-number:
     description: "Number of the created/existing PR"
-    value: ${{ steps.create-pr.outputs.pr-number }}
   pr-created:
     description: "Whether a new PR was created (false if existing PR was found)"
-    value: ${{ steps.create-pr.outputs.pr-created }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Create PR body file
-      shell: bash
-      run: |
-        cat > PR_BODY.md << 'EOF'
-        ${{ inputs.body-content }}
-        EOF
-
-    - name: Create or update pull request
-      id: create-pr
-      shell: bash
-      run: |
-        # Set the token - prefer passed GITHUB_TOKEN, fallback to default github.token
-        if [ -n "$GITHUB_TOKEN" ]; then
-          TOKEN="$GITHUB_TOKEN"
-          echo "🔑 Using passed GITHUB_TOKEN for GitHub API"
-        else
-          TOKEN="${{ github.token }}"
-          echo "🔑 Using default github.token for GitHub API"
-        fi
-
-        # Debug: Check token and repository info
-        echo "🔍 Repository: ${{ github.repository }}"
-        echo "🔍 Repository Owner: ${{ github.repository_owner }}"
-        echo "🔍 Head Branch: ${{ inputs.head-branch }}"
-        echo "🔍 Base Branch: ${{ inputs.base-branch }}"
-
-        # Test token permissions
-        echo "🔍 Testing token permissions..."
-        REPO_INFO=$(curl -s -H "Authorization: token $TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}")
-
-        REPO_PERMISSIONS=$(echo "$REPO_INFO" | jq -r '.permissions // "null"')
-        echo "🔍 Repository permissions: $REPO_PERMISSIONS"
-
-        # Check if PR already exists using GitHub API
-        echo "🔍 Checking for existing PR..."
-        EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ inputs.head-branch }}&base=${{ inputs.base-branch }}&state=open")
-
-        echo "🔍 Existing PR check response: $EXISTING_PR_RESPONSE"
-        EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
-
-        if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
-          echo "📋 PR already exists: #$EXISTING_PR_NUMBER — updating title, body, and labels"
-
-          # Read current PR body for update
-          PR_BODY=$(cat PR_BODY.md)
-
-          PATCH_JSON=$(jq -n \
-            --arg title "${{ inputs.title }}" \
-            --arg body "$PR_BODY" \
-            '{title: $title, body: $body}')
-
-          curl -s -X PATCH \
-            -H "Authorization: token $TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/$EXISTING_PR_NUMBER" \
-            -d "$PATCH_JSON" > /dev/null
-
-          # Sync labels: replace all labels with the current set
-          if [ -n "${{ inputs.labels }}" ]; then
-            echo "🏷️ Syncing labels: ${{ inputs.labels }}"
-            LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
-            curl -s -X PUT \
-              -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/repos/${{ github.repository }}/issues/$EXISTING_PR_NUMBER/labels" \
-              -d "{\"labels\": $LABELS_JSON}" > /dev/null
-          fi
-
-          echo "✅ Updated PR: #$EXISTING_PR_NUMBER"
-          echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr-created=false" >> $GITHUB_OUTPUT
-        else
-          # Create new PR using GitHub API
-          echo "📋 Creating new PR..."
-          
-          # Read PR body content
-          PR_BODY=$(cat PR_BODY.md)
-          
-          # Create PR JSON payload
-          PR_JSON=$(jq -n \
-            --arg title "${{ inputs.title }}" \
-            --arg head "${{ inputs.head-branch }}" \
-            --arg base "${{ inputs.base-branch }}" \
-            --arg body "$PR_BODY" \
-            '{
-              title: $title,
-              head: $head,
-              base: $base,
-              body: $body
-            }')
-
-          echo "🔍 PR JSON payload: $PR_JSON"
-
-          # Create PR via API
-          PR_RESPONSE=$(curl -s -X POST \
-            -H "Authorization: token $TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls" \
-            -d "$PR_JSON")
-
-          echo "🔍 PR creation response: $PR_RESPONSE"
-
-          # Extract PR number and check for errors
-          PR_NUMBER=$(echo "$PR_RESPONSE" | jq -r '.number // empty')
-          PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // empty')
-          
-          # Check for validation error indicating PR already exists
-          ERROR_MESSAGE=$(echo "$PR_RESPONSE" | jq -r '.message // empty')
-          VALIDATION_ERRORS=$(echo "$PR_RESPONSE" | jq -r '.errors[0].message // empty')
-
-          if [ "$ERROR_MESSAGE" = "Validation Failed" ] && echo "$VALIDATION_ERRORS" | grep -qi "pull request already exists"; then
-            echo "⚠️ PR already exists (detected during creation attempt)"
-            echo "🔍 Re-checking for existing PR to get the number..."
-            
-            # Re-check for existing PR to get the number
-            EXISTING_PR_RESPONSE=$(curl -s -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ inputs.head-branch }}&base=${{ inputs.base-branch }}&state=open")
-            
-            EXISTING_PR_NUMBER=$(echo "$EXISTING_PR_RESPONSE" | jq -r '.[0].number // empty')
-            
-            if [ -n "$EXISTING_PR_NUMBER" ] && [ "$EXISTING_PR_NUMBER" != "null" ]; then
-              echo "📋 Found existing PR: #$EXISTING_PR_NUMBER — updating title, body, and labels"
-
-              PR_BODY=$(cat PR_BODY.md)
-              PATCH_JSON=$(jq -n \
-                --arg title "${{ inputs.title }}" \
-                --arg body "$PR_BODY" \
-                '{title: $title, body: $body}')
-
-              curl -s -X PATCH \
-                -H "Authorization: token $TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                -H "Content-Type: application/json" \
-                "https://api.github.com/repos/${{ github.repository }}/pulls/$EXISTING_PR_NUMBER" \
-                -d "$PATCH_JSON" > /dev/null
-
-              if [ -n "${{ inputs.labels }}" ]; then
-                LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
-                curl -s -X PUT \
-                  -H "Authorization: token $TOKEN" \
-                  -H "Accept: application/vnd.github.v3+json" \
-                  -H "Content-Type: application/json" \
-                  "https://api.github.com/repos/${{ github.repository }}/issues/$EXISTING_PR_NUMBER/labels" \
-                  -d "{\"labels\": $LABELS_JSON}" > /dev/null
-              fi
-
-              echo "✅ Updated PR: #$EXISTING_PR_NUMBER"
-              echo "pr-number=$EXISTING_PR_NUMBER" >> $GITHUB_OUTPUT
-              echo "pr-created=false" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Could not find existing PR after creation failed"
-              echo "Response: $PR_RESPONSE"
-              exit 1
-            fi
-          elif [ "$PR_NUMBER" != "null" ] && [ -n "$PR_NUMBER" ]; then
-            echo "✅ Created PR: #$PR_NUMBER"
-            echo "🔗 URL: $PR_URL"
-            
-            # Add labels if specified
-            if [ -n "${{ inputs.labels }}" ]; then
-              echo "🏷️ Adding labels: ${{ inputs.labels }}"
-              LABELS_JSON=$(echo "${{ inputs.labels }}" | tr ',' '\n' | jq -R . | jq -s .)
-              echo "🔍 Labels JSON: $LABELS_JSON"
-              curl -s -X POST \
-                -H "Authorization: token $TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                -H "Content-Type: application/json" \
-                "https://api.github.com/repos/${{ github.repository }}/issues/$PR_NUMBER/labels" \
-                -d "{\"labels\": $LABELS_JSON}" > /dev/null
-            fi
-            
-            echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr-created=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Failed to create PR"
-            echo "Response: $PR_RESPONSE"
-            echo ""
-            echo "🔍 This may indicate a permissions issue or GitHub App configuration problem."
-            echo "🔍 Check the app permissions at: https://github.com/settings/apps"
-            exit 1
-          fi
-        fi
+  using: "node24"
+  main: "action.mjs"

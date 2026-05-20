@@ -70,90 +70,68 @@ inputs:
 outputs:
   release-id:
     description: "ID of the created GitHub release"
-    value: ${{ (inputs.dry-run == 'true' && steps.create-release-dry.outputs.release-id) || steps.create-release.outputs.release_id }}
+    value: ${{ (inputs.dry-run == 'true' && steps.dry-run.outputs.release-id) || steps.create-release.outputs.release_id }}
   commit-sha:
     description: "Commit SHA used for the release tag"
-    value: ${{ steps.get-sha.outputs.commit-sha }}
+    value: ${{ steps.prepare.outputs.commit-sha }}
   tag-sha:
     description: "SHA of the created tag"
-    value: ${{ (inputs.dry-run == 'true' && steps.create-tag-dry.outputs.tag-sha) || steps.create-tag.outputs.tag-sha }}
+    value: ${{ (inputs.dry-run == 'true' && steps.dry-run.outputs.tag-sha) || steps.create-tag.outputs.tag-sha }}
   tag-verified:
     description: "Whether the tag is GPG verified"
-    value: ${{ (inputs.dry-run == 'true' && steps.verify-tag-dry.outputs.verified) || steps.verify-tag.outputs.verified }}
+    value: ${{ (inputs.dry-run == 'true' && steps.dry-run.outputs.verified) || steps.verify-tag.outputs.verified }}
   tag-verification-reason:
     description: "Reason for tag verification result"
-    value: ${{ (inputs.dry-run == 'true' && steps.verify-tag-dry.outputs.reason) || steps.verify-tag.outputs.reason }}
+    value: ${{ (inputs.dry-run == 'true' && steps.dry-run.outputs.reason) || steps.verify-tag.outputs.reason }}
 
 runs:
   using: composite
   steps:
-    - name: Update Summary - Release Start
-      shell: bash
-      run: |
-        if [ "${{ inputs.dry-run }}" = "true" ]; then
-          echo "## 🧪 Dry Run - GitHub Release Validation" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 Validating GitHub release creation for ${{ inputs.package-name }} (NO RELEASE WILL BE CREATED)" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "## 🚀 GitHub Release Progress" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔄 Starting release creation for ${{ inputs.package-name }}" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
       with:
         fetch-depth: 0
 
-    - name: Auto-detect version if not provided
-      id: detect-version
+    - name: Prepare release metadata
+      id: prepare
       shell: bash
-      run: |
-        if [ -z "${{ inputs.version }}" ]; then
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "🔍 Auto-detected version from package.json: $VERSION"
-        else
-          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          echo "📋 Using provided version: ${{ inputs.version }}"
-        fi
+      run: node "${{ github.action_path }}/prepare.mjs"
+      env:
+        DRY_RUN: ${{ inputs.dry-run }}
+        PACKAGE_NAME: ${{ inputs.package-name }}
+        INPUT_VERSION: ${{ inputs.version }}
 
     - name: Get commits for changelog
       id: get-commits
-      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v3
       with:
-        exclude-version: v${{ steps.detect-version.outputs.version }}
+        exclude-version: v${{ steps.prepare.outputs.version }}
 
     - name: Generate comprehensive changelog for release notes
       id: release-notes
-      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v3
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.get-commits.outputs.commits-file }}
         use-single-commit-message: "true"
 
-    - name: Get current commit SHA
-      id: get-sha
-      shell: bash
-      run: |
-        echo "commit-sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-
     - name: Calculate artifact and release names
       id: names
-      uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v2
+      uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v3
       with:
         node-version: ${{ inputs.node-version }}
         package-name: ${{ inputs.package-name }}
-        version: ${{ steps.detect-version.outputs.version }}
+        version: ${{ steps.prepare.outputs.version }}
 
     - name: Create tag if needed
       if: inputs.dry-run != 'true'
       id: create-tag
-      uses: CLDMV/.github/.github/actions/github/api/tag/create@v2
+      uses: CLDMV/.github/.github/actions/github/api/tag/create@v3
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag: v${{ steps.detect-version.outputs.version }}
-        sha: ${{ steps.get-sha.outputs.commit-sha }}
+        tag: v${{ steps.prepare.outputs.version }}
+        sha: ${{ steps.prepare.outputs.commit-sha }}
         message: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
@@ -161,39 +139,21 @@ runs:
         gpg_private_key: ${{ inputs.gpg_private_key }}
         gpg_passphrase: ${{ inputs.gpg_passphrase }}
 
-    - name: Dry Run - Tag Creation Validation
-      if: inputs.dry-run == 'true'
-      id: create-tag-dry
-      shell: bash
-      run: |
-        echo "🧪 **DRY RUN**: Tag creation validation" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ Tag name: v${{ steps.detect-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ Commit SHA: ${{ steps.get-sha.outputs.commit-sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ GPG configuration: ${{ inputs.gpg_enabled == 'true' && 'Enabled' || 'Disabled' }}" >> $GITHUB_STEP_SUMMARY
-        # Set outputs for dry run
-        echo "tag-sha=DRY-RUN-TAG-SHA" >> $GITHUB_OUTPUT
-
-    - name: Update Summary - Tag Created
-      if: inputs.dry-run != 'true'
-      shell: bash
-      run: |
-        echo "- ✅ Git tag v${{ steps.detect-version.outputs.version }} created" >> $GITHUB_STEP_SUMMARY
-
     - name: Setup Node.js (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Build package (if no artifacts available)
       if: inputs.release-source-only == 'false'
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v3
       with:
         build-command: ${{ inputs.build-command || 'npm run build:ci' }}
         environment: production
@@ -201,7 +161,7 @@ runs:
     - name: Create npm package (if no artifacts available)
       if: inputs.release-source-only == 'false'
       id: create-package
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v3
       with:
         package-manager: ${{ inputs.package-manager }}
         package-name: ${{ inputs.package-name }}
@@ -209,18 +169,18 @@ runs:
     - name: Create package files for release
       if: inputs.release-source-only == 'false'
       id: package-files
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v2
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package-files@v3
       with:
         package-path: ${{ steps.create-package.outputs.package-path }}
 
     - name: Create GitHub release
       if: inputs.dry-run != 'true'
       id: create-release
-      uses: CLDMV/.github/.github/actions/github/api/release/create@v2
+      uses: CLDMV/.github/.github/actions/github/api/release/create@v3
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag_name: v${{ steps.detect-version.outputs.version }}
+        tag_name: v${{ steps.prepare.outputs.version }}
         name: ${{ steps.names.outputs.release-name }}
         body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
@@ -230,156 +190,44 @@ runs:
     - name: Enforce published release state
       if: inputs.dry-run != 'true' && inputs.is-draft != 'true'
       shell: bash
+      run: node "${{ github.action_path }}/enforce-published.mjs"
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
-      run: |
-        set -euo pipefail
-
-        REPO="${{ github.repository }}"
-        VERSION="v${{ steps.detect-version.outputs.version }}"
-
-        if [ -z "${RELEASE_ID:-}" ]; then
-          RELEASE_ID=$(curl -fsSL \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2026-03-10" \
-            "https://api.github.com/repos/$REPO/releases/tags/$VERSION" | jq -r '.id // empty')
-        fi
-
-        if [ -z "${RELEASE_ID:-}" ]; then
-          echo "❌ Could not resolve release ID for $VERSION"
-          exit 1
-        fi
-
-        echo "ℹ️ Enforcing non-draft state for release ID $RELEASE_ID"
-
-        curl -fsSL -X PATCH \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2026-03-10" \
-          -H "Content-Type: application/json" \
-          -d '{"draft":false}' \
-          "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" > /dev/null
-
-        DRAFT_STATE=$(curl -fsSL \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2026-03-10" \
-          "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" | jq -r '.draft')
-
-        if [ "$DRAFT_STATE" != "false" ]; then
-          echo "❌ Release $VERSION is still draft after enforcement"
-          exit 1
-        fi
-
-        echo "✅ Release $VERSION verified as published (draft=false)"
-
-    - name: Dry Run - GitHub Release Validation
-      if: inputs.dry-run == 'true'
-      id: create-release-dry
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-      run: |
-        echo "🧪 DRY RUN MODE: Validating GitHub release creation"
-        echo ""
-        echo "✅ Validation Results:"
-        echo "  - Tag name: v${{ steps.detect-version.outputs.version }}"
-        echo "  - Release name: ${{ steps.names.outputs.release-name }}"
-        echo "  - Prerelease: ${{ inputs.is-prerelease }}"
-        echo "  - GitHub token: Available and authenticated"
-        echo "  - Repository: ${{ github.repository }}"
-        echo ""
-
-        # Test GitHub API access
-        if curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               -H "X-GitHub-Api-Version: 2026-03-10" \
-               "https://api.github.com/repos/${{ github.repository }}" > /dev/null; then
-          echo "  - GitHub API access: ✅ Verified"
-        else
-          echo "  - GitHub API access: ❌ Failed"
-          exit 1
-        fi
-
-        # Check if tag already exists
-        if git tag -l "v${{ steps.detect-version.outputs.version }}" | grep -q "v${{ steps.detect-version.outputs.version }}"; then
-          echo "  - Tag v${{ steps.detect-version.outputs.version }}: ⚠️ Already exists (will be updated)"
-        else
-          echo "  - Tag v${{ steps.detect-version.outputs.version }}: ✅ Will be created"
-        fi
-
-        # Check if release already exists
-        RELEASE_EXISTS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                              -H "Accept: application/vnd.github+json" \
-                              -H "X-GitHub-Api-Version: 2026-03-10" \
-                              "https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ steps.detect-version.outputs.version }}" \
-                              | jq -r '.id // "null"')
-
-        if [ "$RELEASE_EXISTS" != "null" ]; then
-          echo "  - Release v${{ steps.detect-version.outputs.version }}: ⚠️ Already exists (will be updated)"
-        else
-          echo "  - Release v${{ steps.detect-version.outputs.version }}: ✅ Will be created"
-        fi
-
-        if [ "${{ inputs.release-source-only }}" != "true" ]; then
-          echo "  - Package assets: ✅ Will be attached (.tar.gz and .zip)"
-        else
-          echo "  - Package assets: ⏭️ Source-only release (no assets)"
-        fi
-
-        echo ""
-        echo "💡 In real run, would create release at:"
-        echo "   ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }}"
-
-        # Set outputs for dry run (simulate successful creation)
-        echo "release-id=DRY-RUN" >> $GITHUB_OUTPUT
-        echo "release-url=${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }}" >> $GITHUB_OUTPUT
-
-    - name: Update Summary - Release Created
-      if: steps.create-release.outputs.release-id != '' && inputs.dry-run != 'true'
-      shell: bash
-      run: |
-        echo "- ✅ GitHub Release [v${{ steps.detect-version.outputs.version }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }}) created successfully" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ inputs.release-source-only }}" != "true" ]; then
-          echo "- ✅ Package assets (.tar.gz and .zip) attached to release" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Update Summary - Dry Run Complete
-      if: inputs.dry-run == 'true'
-      shell: bash
-      run: |
-        echo "- 🧪 **DRY RUN**: GitHub Release validation successful" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ Tag and release naming validated" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ GitHub API access confirmed" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ Release notes generated successfully" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ All prerequisites met for release creation" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "💡 **Would create**: [v${{ steps.detect-version.outputs.version }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+        VERSION: v${{ steps.prepare.outputs.version }}
 
     - name: Verify tag signature
       if: inputs.dry-run != 'true'
       id: verify-tag
-      uses: CLDMV/.github/.github/actions/github/api/tag/verify@v2
+      uses: CLDMV/.github/.github/actions/github/api/tag/verify@v3
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag: v${{ steps.detect-version.outputs.version }}
+        tag: v${{ steps.prepare.outputs.version }}
 
-    - name: Dry Run - Tag Signature Validation
+    - name: Dry run validation
       if: inputs.dry-run == 'true'
-      id: verify-tag-dry
+      id: dry-run
       shell: bash
-      run: |
-        echo "🧪 **DRY RUN**: Tag signature validation skipped" >> $GITHUB_STEP_SUMMARY
-        echo "  - ✅ GPG configuration would be verified in real run" >> $GITHUB_STEP_SUMMARY
-        # Set outputs for dry run
-        echo "verified=true" >> $GITHUB_OUTPUT
-        echo "reason=dry-run-validation" >> $GITHUB_OUTPUT
+      run: node "${{ github.action_path }}/dry-run.mjs"
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        VERSION: ${{ steps.prepare.outputs.version }}
+        COMMIT_SHA: ${{ steps.prepare.outputs.commit-sha }}
+        RELEASE_NAME: ${{ steps.names.outputs.release-name }}
+        IS_PRERELEASE: ${{ inputs.is-prerelease }}
+        GPG_ENABLED: ${{ inputs.gpg_enabled }}
+        RELEASE_SOURCE_ONLY: ${{ inputs.release-source-only }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}
 
-    - name: Update Summary - Final
+    - name: Release summary
       shell: bash
-      run: |
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 **GitHub Release Complete** - [Release v${{ steps.detect-version.outputs.version }} is now available →](${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.detect-version.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+      run: node "${{ github.action_path }}/summary.mjs"
+      env:
+        DRY_RUN: ${{ inputs.dry-run }}
+        VERSION: ${{ steps.prepare.outputs.version }}
+        RELEASE_SOURCE_ONLY: ${{ inputs.release-source-only }}
+        RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}

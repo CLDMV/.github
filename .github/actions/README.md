@@ -1,185 +1,68 @@
-# CLDMV Workflow Packages 📦
+# CLDMV Actions 📦
 
-This repository contains modular, reusable GitHub Actions workflows and components for the CLDMV organization.
+Reusable GitHub Actions for the CLDMV organization. They are the building
+blocks behind the org-level workflows in [`../workflows/`](../workflows/).
 
-## 🏗️ Architecture
+## 🏗️ Layout
+
+Actions live under `.github/actions/`, grouped by technology layer:
 
 ```
-.github/workflow-packages/
-├── common/                    # Universal components
-│   └── steps/                # Reusable steps for all technologies
-├── git/                      # Git operations and analysis
-│   ├── jobs/                 # Complete git workflows
-│   ├── steps/                # Individual git operations
-│   └── utilities/            # Git helper functions
-├── github/                   # GitHub platform operations
-│   ├── jobs/                 # Complete GitHub workflows
-│   ├── steps/                # Individual GitHub operations
-│   ├── api/                  # GitHub API interactions
-│   └── utilities/            # GitHub helper functions
-├── npm/                      # NPM ecosystem operations
-│   ├── jobs/                 # Complete NPM workflows
-│   ├── steps/                # Individual NPM operations
-│   └── api/                  # NPM registry interactions
-└── publish-package/          # Universal package publishing action
+.github/actions/
+├── common/      # Cross-cutting steps + the shared lib (common/common/core.mjs)
+├── git/         # Local git operations and analysis (audit-commit-subject, branch-retention)
+├── github/      # GitHub platform operations
+│   └── api/     #   thin REST API wrappers (api/_api/core.mjs is fetch + paginate)
+├── npm/         # NPM ecosystem operations (bundle-size)
+├── node/        # Node.js environment helpers
+├── docker/      # Container image build/publish helpers
+├── coverage/    # Coverage badge / PR-comment helpers
+├── community/   # 🆕 v3: CLA bot, release notifier — contributor/community-facing actions
+├── testing/     # Test-only actions
+└── workflows/   # Workflow-level helpers (job summaries, etc.)
 ```
 
-## 🚀 Org-Level Workflows
+Within a layer, actions are filed by kind: `steps/` (a single operation),
+`jobs/` (a multi-step composite), `api/` (a REST call), `utilities/`.
 
-### CI Workflow (`ci.yml`)
+## ⚙️ How the actions are built
 
-Comprehensive testing and building for NPM packages.
+- **Logic lives in Node.** Almost every action is `using: node24` with an
+  `action.mjs` entrypoint. The repo ships **no npm dependencies and has no
+  build step** — actions use Node built-ins only (`node:fs`, `node:child_process`,
+  global `fetch`, …).
+- **Composite actions are the exception, not the rule.** An action stays
+  `using: composite` only when it must `uses:` another action (a Node action
+  cannot). That covers the `checkout-code` / `setup-node` marketplace wrappers,
+  `create-app-token` (wraps `actions/create-github-app-token`), and the
+  orchestrators in `*/jobs/` that chain several actions together. Even then,
+  each orchestrator's own logic is a Node delegation script
+  (`run: node "${{ github.action_path }}/<name>.mjs"`), not inline shell.
 
-**Features:**
+### Shared library
 
-- Primary Node.js version testing with full test suite
-- Multi-version Node.js matrix testing
-- Linting, building, entry point tests, performance tests
-- Configurable test commands and Node.js versions
-- Optional skipping of specific test types
+Import shared helpers rather than duplicating logic:
 
-### Release Workflow (`release.yml`)
+- `common/common/core.mjs` — `getInput`, `getBooleanInput`, `setOutput`,
+  `setOutputs`, `appendSummary`, `getEventPayload`, `exec`, `sh`, `debugLog`.
+- `github/api/_api/core.mjs` — `api(method, path, body, { token, owner, repo })`
+  (a `fetch` wrapper), `paginate(path, ctx)` (paginated GET with rate-limit
+  awareness), and `parseRepo`.
+- `git/utilities/git-utils.mjs`, `common/utilities/bot-detection.mjs`, and the
+  `github/api/_api/{gpg,tag}.mjs` modules.
 
-Creates release PRs when release commits are detected.
+`core.mjs`'s `getInput` mirrors `@actions/core`: it reads `INPUT_<NAME>`
+(name upper-cased, spaces → `_`), so `using: node24` actions get their declared
+inputs for free. Composite delegation steps must instead pass values to the
+`.mjs` script via an explicit `env:` block.
 
-**Features:**
+## 🔧 Adding or changing an action
 
-- Detects `release:` and `release!:` commits
-- Automatic version bump calculation (major/minor/patch)
-- Comprehensive changelog generation
-- Signed commit creation via GitHub API
-- Automatic PR creation with release notes
-
-### Publish Workflow (`publish.yml`)
-
-Publishes packages when release PRs are merged.
-
-**Features:**
-
-- Release detection from PR titles and labels
-- Build and test before publishing
-- GitHub release creation with signed tags
-- NPM and GitHub Packages publishing
-- Repository configuration auto-detection
-- Success notifications
-
-## 📋 Usage in Individual Repositories
-
-### 1. CI Workflow
-
-```yaml
-# .github/workflows/ci.yml
-name: 🧪 CI Tests & Build
-
-on:
-  pull_request:
-    branches: [master, main]
-  push:
-    branches: ["**"]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-
-jobs:
-  ci:
-    uses: CLDMV/.github/.github/workflows/ci.yml@v2
-    with:
-      package_name: "@cldmv/your-package" # Required
-      node_version: "lts/*"
-      test_command: "npm test"
-      build_command: "npm run build:ci"
-      test_matrix_versions: '["18", "20", "21"]'
-```
-
-### 2. Release Workflow
-
-```yaml
-# .github/workflows/release.yml
-name: 🚀 Release PR Creation
-
-on:
-  push:
-    branches-ignore: [master, main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-
-jobs:
-  create-release-pr:
-    uses: CLDMV/.github/.github/workflows/release.yml@v2
-    with:
-      package_name: "@cldmv/your-package" # Required
-      node_version: "lts/*"
-      test_command: "npm test"
-      build_command: "npm run build:ci"
-    secrets: inherit
-```
-
-### 3. Publish Workflow
-
-```yaml
-# .github/workflows/publish.yml
-name: 📦 Release and Publish
-
-on:
-  pull_request:
-    types: [closed]
-    branches: [master]
-
-jobs:
-  publish-package:
-    uses: CLDMV/.github/.github/workflows/publish.yml@v2
-    with:
-      package_name: "@cldmv/your-package" # Required
-      node_version: "lts/*"
-      test_command: "npm test"
-      build_command: "npm run build:ci"
-    secrets: inherit
-```
-
-## 🔄 Workflow Sequence
-
-1. **Development**: Push commits to feature branches → **CI Workflow** runs
-2. **Release Preparation**: Push `release:` commit → **Release Workflow** creates release PR
-3. **Release Publishing**: Merge release PR → **Publish Workflow** publishes package
-
-## ⚙️ Configuration Options
-
-### CI Workflow Options
-
-- `skip_lint`: Skip linting step
-- `skip_entry_tests`: Skip entry point tests
-- `skip_performance_tests`: Skip performance tests
-- `skip_matrix_tests`: Skip multi-version testing
-- `test_matrix_versions`: JSON array of Node.js versions to test
-
-### Release Workflow Options
-
-- `package_manager`: npm or yarn
-- `test_command`: Custom test command
-- `build_command`: Custom build command
-
-### Publish Workflow Options
-
-- `publish_to_npm`: Enable/disable NPM publishing
-- `publish_to_github_packages`: Enable/disable GitHub Packages publishing
-- `dry_run`: Validate everything but don't publish or create releases (recommended for testing)
-- `publish_command`: Custom NPM publish command
-- `github_packages_publish_command`: Custom GitHub Packages command
-
-## 🎯 Benefits
-
-- **Consistency**: All repos use the same tested workflows
-- **Maintenance**: Update workflows in one place
-- **Flexibility**: Configurable for different project needs
-- **Modularity**: Components can be reused across workflows
-- **Reliability**: Centralized testing and validation
-
-## 🔧 Development
-
-To add new components:
-
-1. Create in appropriate technology folder (`common/`, `git/`, `github/`, `npm/`)
-2. Follow the established patterns for inputs/outputs
-3. Update this README with usage examples
-4. Test with a sample repository before organization-wide deployment
+1. Put it in the right layer/kind (`common/`, `git/`, `github/`, `npm/`, …).
+2. Prefer `using: node24` + `action.mjs`. Use `composite` only if the action
+   genuinely needs to `uses:` another action.
+3. Import shared helpers from `core.mjs` instead of reimplementing them.
+4. Keep `action.yml` inputs/outputs stable — consumers pin these actions by
+   tag, and other actions reference them as `@v3`.
+5. See [`../instructions/repo-conventions.instructions.md`](../instructions/repo-conventions.instructions.md)
+   for tag, signing, API-version, and secret-naming rules.

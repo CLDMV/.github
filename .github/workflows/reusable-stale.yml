@@ -1,0 +1,77 @@
+#
+# @Project: workflows
+# @Filename: /reusable-stale.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Stale issue / PR closer (org-level, reusable).
+# Roll-our-own implementation; no dependency on actions/stale.
+# Batch 2.3 from tmp/plan-future-workflows.md.
+name: 🍂 Stale Sweep (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            days_before_issue_stale: { required: false, type: number, default: 60 }
+            days_before_issue_close: { required: false, type: number, default: 14 }
+            stale_issue_label: { required: false, type: string, default: "stale" }
+            stale_issue_message: { required: false, type: string, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, or close if no longer relevant." }
+            close_issue_message: { required: false, type: string, default: "Closed due to inactivity. Reopen if this is still relevant." }
+            days_before_pr_stale: { required: false, type: number, default: 30 }
+            days_before_pr_close: { required: false, type: number, default: 7 }
+            stale_pr_label: { required: false, type: string, default: "stale" }
+            stale_pr_message: { required: false, type: string, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open." }
+            close_pr_message: { required: false, type: string, default: "Closed due to inactivity. Reopen the branch and PR when ready to resume." }
+            exempt_issue_labels: { required: false, type: string, default: "pinned,security,help-wanted,good-first-issue,blocked" }
+            exempt_pr_labels: { required: false, type: string, default: "pinned,work-in-progress,dependencies,blocked" }
+            exempt_all_milestones: { required: false, type: boolean, default: true }
+            exempt_all_assignees: { required: false, type: boolean, default: true }
+            operations_per_run: { required: false, type: number, default: 100 }
+            dry_run: { required: false, type: boolean, default: false }
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+
+permissions:
+    issues: write
+    pull-requests: write
+
+jobs:
+    sweep:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Run stale sweep
+              uses: CLDMV/.github/.github/actions/github/jobs/stale-sweep@v3
+              with:
+                  days_before_issue_stale: ${{ inputs.days_before_issue_stale }}
+                  days_before_issue_close: ${{ inputs.days_before_issue_close }}
+                  stale_issue_label: ${{ inputs.stale_issue_label }}
+                  stale_issue_message: ${{ inputs.stale_issue_message }}
+                  close_issue_message: ${{ inputs.close_issue_message }}
+                  days_before_pr_stale: ${{ inputs.days_before_pr_stale }}
+                  days_before_pr_close: ${{ inputs.days_before_pr_close }}
+                  stale_pr_label: ${{ inputs.stale_pr_label }}
+                  stale_pr_message: ${{ inputs.stale_pr_message }}
+                  close_pr_message: ${{ inputs.close_pr_message }}
+                  exempt_issue_labels: ${{ inputs.exempt_issue_labels }}
+                  exempt_pr_labels: ${{ inputs.exempt_pr_labels }}
+                  exempt_all_milestones: ${{ inputs.exempt_all_milestones }}
+                  exempt_all_assignees: ${{ inputs.exempt_all_assignees }}
+                  operations_per_run: ${{ inputs.operations_per_run }}
+                  dry_run: ${{ inputs.dry_run }}
+                  github_token: ${{ steps.app-token.outputs.token }}

@@ -1,0 +1,27 @@
+#
+# @Project: cla-record
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "CLA Record"
+description: "On issue_comment: created, if the comment is on an open PR and exactly matches the required CLA text, validate that the commenter is one of the PR's commit authors and record the signature. For same-repo PRs: create an empty signed commit on the PR branch. For fork PRs: post an acknowledgment comment. Then re-run cla-check to flip the status. Batch 1.1."
+
+inputs:
+  cla_version:
+    required: true
+  cla_path:
+    required: false
+    default: "CLA.md"
+  required_text_template:
+    required: false
+    default: "I have read and I agree to the CLA v${cla_version}"
+  github_token:
+    required: true
+
+runs:
+  using: node24
+  main: action.mjs

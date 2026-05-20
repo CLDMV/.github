@@ -1,0 +1,22 @@
+name: "Publish Workflow Summary"
+description: "Render the publish workflow job summary"
+
+inputs:
+  dry-run:
+    description: "Whether the workflow ran in dry-run mode"
+    required: false
+    default: "false"
+  package-name:
+    description: "NPM package name"
+    required: true
+  version:
+    description: "Version that was (or would be) published"
+    required: false
+    default: ""
+  publish-result:
+    description: "Result of the publish job"
+    required: true
+
+runs:
+  using: "node24"
+  main: "action.mjs"

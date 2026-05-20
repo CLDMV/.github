@@ -1,0 +1,34 @@
+name: "Resolve Registry Auth Identity"
+description: "Choose the container-registry login identity: the GitHub App bot, or the workflow token"
+
+inputs:
+  using-app-token:
+    description: "Whether a GitHub App token is available"
+    required: false
+    default: "false"
+  app-token:
+    description: "GitHub App installation token"
+    required: false
+    default: ""
+  app-slug:
+    description: "GitHub App slug (bot is <slug>[bot])"
+    required: false
+    default: ""
+  actor:
+    description: "Workflow actor, used as the fallback username"
+    required: false
+    default: ""
+  github-token:
+    description: "Workflow token, used as the fallback token"
+    required: false
+    default: ""
+
+outputs:
+  username:
+    description: "Resolved registry username"
+  token:
+    description: "Resolved registry token"
+
+runs:
+  using: "node24"
+  main: "action.mjs"

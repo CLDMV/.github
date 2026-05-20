@@ -1,0 +1,37 @@
+#
+# @Project: workflows
+# @Filename: /local-sync-release-prs.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# When any PR merges to master/main, fan out and refresh every open release
+# PR so its version bump and changelog stay in sync with the new master state.
+# Companion to P3.1's calculate-version-from-master fix.
+name: 🔄 Local Sync Open Release PRs
+
+on:
+    pull_request:
+        types: [closed]
+        branches: [master, main]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    sync:
+        # Only on actual merges; skip bot-authored merges to avoid recursion
+        # (the sync flow itself ends up merging the bumped release commit).
+        if: |
+            github.event.pull_request.merged == true &&
+            github.event.pull_request.user.login != 'cldmv-bot[bot]' &&
+            github.event.pull_request.user.login != 'github-actions[bot]'
+        uses: ./.github/workflows/workflow-sync-open-release-prs.yml
+        with:
+            package_name: "@cldmv/.github"
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

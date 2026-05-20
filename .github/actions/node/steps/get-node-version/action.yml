@@ -10,24 +10,9 @@ inputs:
 outputs:
   node-version:
     description: "Normalized Node.js version (e.g., 20.11.1)"
-    value: ${{ steps.getver.outputs.node_version }}
   node-label:
     description: "Label for this version (e.g., lts, 18.x, etc.)"
-    value: ${{ steps.label.outputs.label }}
 
 runs:
-  using: "composite"
-  steps:
-    - id: getver
-      shell: bash
-      run: |
-        VER=$(node --version | sed 's/^v//')
-        echo "node_version=$VER" >> $GITHUB_OUTPUT
-    - id: label
-      shell: bash
-      run: |
-        if [ -n "${{ inputs.label }}" ]; then
-          echo "label=${{ inputs.label }}" >> $GITHUB_OUTPUT
-        else
-          echo "label=${{ steps.getver.outputs.node_version }}" >> $GITHUB_OUTPUT
-        fi
+  using: "node24"
+  main: "action.mjs"
