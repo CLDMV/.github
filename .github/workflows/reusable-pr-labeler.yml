@@ -27,11 +27,19 @@ on:
             default_config_ref:
                 required: false
                 type: string
-                default: "v2"
+                default: "v3"
             default_config_path:
                 required: false
                 type: string
                 default: ".github/labeler.default.yml"
+        secrets:
+            # Optional. When provided, label operations are attributed to the
+            # consumer's bot App instead of github-actions[bot]. Falls back to
+            # GITHUB_TOKEN via create-app-token's auto-detect.
+            BOT_APP_CLIENT_ID:
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                required: false
 
 permissions:
     contents: read
@@ -41,12 +49,22 @@ jobs:
     label:
         runs-on: ubuntu-latest
         steps:
+            - name: Create App token (falls back to GITHUB_TOKEN)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Compute path-based label aliases
               id: compute
               uses: CLDMV/.github/.github/actions/github/steps/compute-path-labels@v3
               with:
                   pr-number: ${{ github.event.pull_request.number }}
-                  github-token: ${{ github.token }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   config-path: ${{ inputs.config_path }}
                   default-config-repo: ${{ inputs.default_config_repo }}
                   default-config-ref: ${{ inputs.default_config_ref }}
@@ -63,7 +81,7 @@ jobs:
               if: steps.compute.outputs.labels != '' && steps.resolved.outputs.labels != ''
               uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v3
               with:
-                  github-token: ${{ github.token }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   pr-number: ${{ github.event.pull_request.number }}
                   labels: ${{ steps.resolved.outputs.labels }}
                   mode: add

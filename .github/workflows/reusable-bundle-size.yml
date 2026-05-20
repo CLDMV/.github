@@ -44,6 +44,14 @@ on:
                 required: false
                 type: string
                 default: "update"
+        secrets:
+            # Optional. When provided, the PR size-diff comment is posted by
+            # the consumer's bot App instead of github-actions[bot]. Falls back
+            # to GITHUB_TOKEN via create-app-token's auto-detect.
+            BOT_APP_CLIENT_ID:
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                required: false
 
 permissions:
     contents: read
@@ -117,6 +125,16 @@ jobs:
         runs-on: ubuntu-latest
         needs: [build-head, build-base]
         steps:
+            - name: Create App token (falls back to GITHUB_TOKEN)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Download head sizes
               uses: actions/download-artifact@v7
               with:
@@ -137,4 +155,4 @@ jobs:
                   warning_pct: ${{ inputs.warning_pct }}
                   warning_bytes: ${{ inputs.warning_bytes }}
                   comment_mode: ${{ inputs.comment_mode }}
-                  github_token: ${{ github.token }}
+                  github_token: ${{ steps.app-token.outputs.token }}
