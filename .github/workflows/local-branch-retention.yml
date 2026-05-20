@@ -1,0 +1,33 @@
+#
+# @Project: workflows
+# @Filename: /local-branch-retention.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Prune merged head branches on this repo. Keeps last 5 release/* and 3
+# hotfix/*; everything else (feat/*, fix/*, chore/*, etc.) deleted on merge.
+# master/main/badges/gh-pages/dev never touched.
+name: 🌿 Local Branch Retention
+
+on:
+    pull_request:
+        types: [closed]
+        branches: [master, main]
+
+permissions:
+    contents: write
+    pull-requests: read
+
+jobs:
+    retain:
+        if: github.event.pull_request.merged == true
+        uses: ./.github/workflows/reusable-branch-retention.yml
+        with:
+            # `dev` is an exempt long-lived integration branch in this repo.
+            exempt_patterns: '["master","main","badges","gh-pages","dev"]'
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

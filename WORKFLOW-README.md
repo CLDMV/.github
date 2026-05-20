@@ -12,21 +12,26 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## 🏗️ Architecture Overview
 
-The repo has three layers:
+The repo has four layers in `.github/workflows/`:
 
-- **Org entry points** — `.github/workflows/workflow-*.yml`. `workflow_call`
-  workflows that individual repos reference (e.g. `workflow-ci.yml@v3`). They
-  map inputs/secrets and delegate.
-- **Reusable orchestrators** — `.github/workflows/reusable-*.yml`. Each bundles
-  a set of jobs gated by `run_*` boolean inputs; the entry points call them.
-- **Actions** — `.github/actions/`, grouped by technology layer. Almost all
-  are Node (`using: node24`); see [`.github/actions/README.md`](.github/actions/README.md).
+- **Org entry points** — `workflow-*.yml`. `workflow_call` only; consumer repos reference via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v3`. Thin layer; maps inputs/secrets and delegates.
+- **Reusable building blocks** — `reusable-*.yml`. `workflow_call` only; called by entry points or other reusables. Each bundles a set of jobs gated by `run_*` boolean inputs.
+- **Local dogfood** — `local-*.yml`. Runs on THIS repo's events (push, PR, schedule, release). Calls the org's own reusables via **relative** `uses: ./.github/workflows/reusable-X.yml` so PRs test against the PR's version of the reusable, not the published `@v3` tag.
+- **Actions** — `.github/actions/`, grouped by technology layer. Almost all are Node (`using: node24`); see [`.github/actions/README.md`](.github/actions/README.md).
+
+The `*-` prefix is convention, not enforced by GitHub Actions. What matters technically is the `on:` block: anything with non-`workflow_call` triggers actually runs on this repo's events.
 
 ## 📂 Repository Structure
 
 ```
 .github/
 ├── workflows/
+│   ├── local-*.yml                              # 🆕 v3: dogfood — runs on this repo's events
+│   │     local-ci.yml, local-codeql.yml, local-tag-health.yml,
+│   │     local-stale.yml, local-labeler.yml, local-welcome.yml,
+│   │     local-branch-retention.yml, local-master-commit-audit.yml,
+│   │     local-update-major-version-tags.yml
+│   │
 │   ├── workflow-ci.yml                          # CI entry point
 │   ├── workflow-release.yml                     # Release-PR entry point
 │   ├── workflow-publish.yml                     # Publish entry point

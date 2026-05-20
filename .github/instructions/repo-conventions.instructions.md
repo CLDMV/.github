@@ -9,6 +9,18 @@ tooling for the CLDMV organization.
 
 ---
 
+## Workflow Naming Convention
+
+Files in `.github/workflows/` are grouped by what they DO:
+
+| Prefix | Trigger | Purpose |
+|---|---|---|
+| `local-*.yml` | `push` / `pull_request` / `schedule` / `release` / `workflow_dispatch` | Runs on THIS repo's events. Dogfoods the reusables against this repo's own changes. Use **relative** `uses: ./.github/workflows/reusable-X.yml` so PRs test against the PR's version of the reusable. |
+| `workflow-*.yml` | `workflow_call` only | Org-level entry point that consumer repos invoke via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v3`. Maps inputs/secrets and delegates to `reusable-*.yml`. Thin layer. |
+| `reusable-*.yml` | `workflow_call` only | Lower-level building block called by other workflows (entry points OR other reusables). Bundles a set of jobs gated by `run_*` boolean inputs. |
+
+The naming prefix is convention, not enforced by GitHub Actions. What matters technically is the `on:` block: anything with non-`workflow_call` triggers runs on this repo's own events; pure `workflow_call` files are library code.
+
 ## Node Actions
 
 Actions under `.github/actions/` are **Node** (`using: node24` with an `action.mjs`

@@ -1,0 +1,28 @@
+#
+# @Project: workflows
+# @Filename: /local-labeler.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Path-based PR labels for this repo. Uses .github/labeler.yml (per-repo
+# override; structure-specific to this repo).
+name: 🏷️ Local PR Labeler
+
+# SECURITY NOTE: pull_request_target runs in the BASE repo's context with
+# WRITE permissions. SAFE for THIS workflow because it's API-only — never
+# checks out the PR head, never executes PR content.
+# DO NOT add a checkout step.
+on:
+    pull_request_target:
+        types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    label:
+        uses: ./.github/workflows/reusable-pr-labeler.yml

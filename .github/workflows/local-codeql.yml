@@ -1,0 +1,66 @@
+#
+# @Project: workflows
+# @Filename: /local-codeql.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# CodeQL SAST on THIS repo's Node-action code.
+#
+# This repo is JavaScript/TypeScript only, no build step, no native langs;
+# we call github/codeql-action directly rather than going through the
+# reusable-codeql.yml + parse-csv-list dance. Avoids the chicken-and-egg
+# where the reusable references @v3 actions before v3 is cut.
+name: 🔍 Local CodeQL
+
+on:
+    push:
+        branches: [master, main]
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches: [master, main]
+    schedule:
+        - cron: "37 14 * * 1" # weekly Monday 14:37 UTC
+    workflow_dispatch:
+
+permissions:
+    security-events: write
+    contents: read
+    actions: read
+
+concurrency:
+    group: local-codeql-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+    analyze:
+        name: "🔍 Analyze javascript-typescript"
+        runs-on: ubuntu-latest
+        # Fork-PR-friendly: SARIF upload will fail with read-only token,
+        # workflow status reflects the analysis result. Push-to-master
+        # analysis after merge catches anything missed.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: javascript-typescript
+                  queries: security-extended,security-and-quality
+                  paths-ignore: |
+                      node_modules/
+                      tmp/
+                      backup/
+                      .archive/
+                      examples/
+
+            - name: Analyze
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:javascript-typescript"

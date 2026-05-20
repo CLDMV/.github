@@ -1,0 +1,136 @@
+#
+# @Project: workflows
+# @Filename: /local-ci.yml
+# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Local CI for THIS repo (CLDMV/.github) — validates that the Node-action
+# code parses, YAML files load, and workflow expressions are well-formed.
+# Catches the class of bugs we shipped in the v3 prep work (e.g. the
+# nonexistent `split()` expression in reusable-codeql.yml).
+#
+# This is NOT a reusable; it runs on push/PR against this repo only.
+name: 🧪 Local CI
+
+on:
+    push:
+        branches-ignore: [badges, gh-pages]
+        paths:
+            - ".github/**"
+            - "scripts/**"
+            - "data/**"
+            - "package.json"
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches: [master, main]
+        paths:
+            - ".github/**"
+            - "scripts/**"
+            - "data/**"
+            - "package.json"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: local-ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+    validate:
+        name: "🧪 Validate workflows + actions"
+        runs-on: ubuntu-latest
+        # Same fork-PR shape as the example ci.yml — `push` covers same-repo
+        # branches; `pull_request` only does fork PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
+
+            - name: "Setup Node.js (matches `using: node24` runtime)"
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "lts/*"
+
+            - name: Node syntax check (every .mjs)
+              shell: bash
+              run: |
+                  set -e
+                  fail=0
+                  while IFS= read -r f; do
+                      if ! node --check "$f" 2>&1; then
+                          echo "::error file=$f::Node syntax check failed"
+                          fail=1
+                      fi
+                  done < <(find .github/actions scripts -name "*.mjs" 2>/dev/null)
+                  exit "$fail"
+
+            - name: YAML parse (every workflow + action.yml + config)
+              shell: bash
+              run: |
+                  set -e
+                  python3 - <<'PY'
+                  import yaml, sys, glob, os
+                  err = 0
+                  patterns = [
+                      ".github/workflows/*.yml",
+                      ".github/actions/**/*.yml",
+                      ".github/labeler.default.yml",
+                      "examples/individual-repo-workflows/*.yml",
+                  ]
+                  for pattern in patterns:
+                      for f in glob.glob(pattern, recursive=True):
+                          try:
+                              yaml.safe_load(open(f))
+                          except Exception as e:
+                              print(f"::error file={f}::{e}")
+                              err = 1
+                  sys.exit(err)
+                  PY
+
+            - name: actionlint (catches split()-style expression bugs)
+              uses: docker://rhysd/actionlint:1.7.7
+              with:
+                  args: -color -ignore 'SC2002'
+
+            - name: Verify no @v2 references remain in source
+              shell: bash
+              run: |
+                  # After the v3 cut all internal references should be @v3.
+                  # tmp/ is gitignored historical-planning material; skip.
+                  if git grep -nI '@v2\b' -- ':!tmp/**' ':!docs/migration/**' ':!CHANGELOG*'; then
+                      echo "::error::Found stale @v2 references in source (above). Update to @v3."
+                      exit 1
+                  fi
+                  echo "✅ No stale @v2 references."
+
+            - name: Summary
+              shell: bash
+              run: |
+                  echo "✅ Local CI passed"
+                  echo "- Node files validated"
+                  echo "- YAML files parsed"
+                  echo "- actionlint clean"
+                  echo "- No stale @v2 references"
+
+    required-check:
+        name: ✅ Required PR Check
+        needs: validate
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Mirror validate result
+              shell: bash
+              run: |
+                  if [ "${{ needs.validate.result }}" = "success" ]; then
+                      echo "validate passed"
+                      exit 0
+                  fi
+                  echo "validate did not pass (${{ needs.validate.result }})"
+                  exit 1
