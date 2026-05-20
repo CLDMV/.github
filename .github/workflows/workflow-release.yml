@@ -255,6 +255,7 @@ jobs:
             # Build parameters
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
+            build_command: ${{ inputs.build_command }}
             version_bump: ${{ needs.detect-release.outputs.version-bump }}
             version: ${{ inputs.version }}
         secrets:
