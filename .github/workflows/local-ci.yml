@@ -179,6 +179,27 @@ jobs:
                       exit 1
                   fi
 
+            - name: Validate action refs (input names + remote versions)
+              id: actionrefs
+              if: always()
+              continue-on-error: true
+              shell: bash
+              # Custom validator (scripts/validate-action-refs.mjs) catches two
+              # classes of bug that actionlint and YAML parse miss:
+              #   1. Invalid input names passed to local composite actions
+              #      (e.g. passing `ref:` to a wrapper that only accepts
+              #      `fetch-depth`).
+              #   2. Nonexistent remote action versions (e.g. pinning
+              #      `aquasecurity/trivy-action@0.28.0` when no such tag
+              #      exists — first valid is `v0.36.0`).
+              # Each finding is emitted as `::error file=...,line=...::` AND
+              # appended to $GITHUB_STEP_SUMMARY by the script itself.
+              run: |
+                  node scripts/validate-action-refs.mjs
+                  rc=$?
+                  echo "count=$rc" >> "$GITHUB_OUTPUT"
+                  exit "$rc"
+
             - name: Verify no @v2 references remain in source
               id: v2refs
               if: always()
@@ -223,13 +244,15 @@ jobs:
                   node="${{ steps.node.outputs.count }}"
                   yaml="${{ steps.yaml.outputs.count }}"
                   al="${{ steps.actionlint.outputs.count }}"
+                  ar="${{ steps.actionrefs.outputs.count }}"
                   v2="${{ steps.v2refs.outputs.count }}"
                   node="${node:-?}"
                   yaml="${yaml:-?}"
                   al="${al:-?}"
+                  ar="${ar:-?}"
                   v2="${v2:-?}"
                   total_failed=0
-                  for n in "$node" "$yaml" "$al" "$v2"; do
+                  for n in "$node" "$yaml" "$al" "$ar" "$v2"; do
                       case "$n" in
                           0|"?") ;;
                           *) total_failed=$((total_failed + 1));;
@@ -257,6 +280,7 @@ jobs:
                       echo "| Node syntax (\`node --check\`) | $(status_for "$node") |"
                       echo "| YAML parse | $(status_for "$yaml") |"
                       echo "| actionlint | $(status_for "$al") |"
+                      echo "| Action refs (inputs + remote versions) | $(status_for "$ar") |"
                       echo "| Stale @v2 references | $(status_for "$v2") |"
                   } >> "$GITHUB_STEP_SUMMARY"
                   if [ "$total_failed" -gt 0 ]; then

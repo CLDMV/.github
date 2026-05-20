@@ -1,11 +1,15 @@
 name: "Checkout Code"
-description: "Checkout repository code with configurable fetch depth"
+description: "Checkout repository code with configurable fetch depth and ref"
 
 inputs:
   fetch-depth:
     description: "Number of commits to fetch. 0 indicates all history for all branches and tags"
     required: false
     default: "1"
+  ref:
+    description: "The branch, tag, or SHA to checkout. Empty (default) uses the workflow's triggering ref."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -14,3 +18,4 @@ runs:
       uses: actions/checkout@v6
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
+        ref: ${{ inputs.ref }}
