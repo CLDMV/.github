@@ -1,0 +1,47 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/master-commit-audit.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/master-commit-audit.yml
+#
+# Post-merge safety net: when any commit lands on the default branch, verify
+# its subject matches the expected release-flow patterns. On miss, auto-file
+# a GitHub Issue (deduped by SHA) so the alert is persistent and assignable
+# — not just a red ❌ that dies in inbox.
+#
+# Catches: release-workflow title-generation regressions, branch-protection
+# bypasses, unexpected bot commits, direct emergency pushes.
+#
+# Batch 5.1 from tmp/plan-future-workflows.md.
+name: 🧾 Master Commit Audit
+
+on:
+    push:
+        branches: [master, main]
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Audit commit subject
+              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v2
+              with:
+                  commit_sha: ${{ github.sha }}
+                  # Allow release commits (from the release workflow), maintenance
+                  # commits, and standard merge commits. Customize per repo if
+                  # your conventions differ.
+                  allowed_patterns: |
+                      ^release: v\d+\.\d+\.\d+( \(#\d+\))?$
+                      ^chore(\([^)]+\))?: .+
+                      ^Merge pull request #\d+ from .+
+                  issue_labels: "bot:audit,priority:high"
+                  # issue_assignee: "shinrai"   # uncomment to auto-assign

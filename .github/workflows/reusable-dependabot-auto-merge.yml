@@ -1,0 +1,68 @@
+#
+# @Project: workflows
+# @Filename: /reusable-dependabot-auto-merge.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Dependabot Auto-Merge (org-level, reusable).
+# Batch 3.2 from tmp/plan-future-workflows.md.
+name: 🤖 Dependabot Auto-Merge (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            bump_types:
+                description: "Comma-sep allowed bump types: patch, minor, major"
+                required: false
+                type: string
+                default: "patch,minor"
+            merge_method:
+                description: "squash | merge | rebase"
+                required: false
+                type: string
+                default: "squash"
+            also_for_actors:
+                description: "Comma-sep additional bot logins to auto-merge"
+                required: false
+                type: string
+                default: ""
+            require_branch_protection:
+                description: "Refuse if no required status checks (safety)"
+                required: false
+                type: boolean
+                default: true
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    automerge:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Approve + enable auto-merge
+              uses: CLDMV/.github/.github/actions/github/jobs/dependabot-auto-merge@v2
+              with:
+                  bump_types: ${{ inputs.bump_types }}
+                  merge_method: ${{ inputs.merge_method }}
+                  also_for_actors: ${{ inputs.also_for_actors }}
+                  require_branch_protection: ${{ inputs.require_branch_protection }}
+                  github_token: ${{ steps.app-token.outputs.token }}

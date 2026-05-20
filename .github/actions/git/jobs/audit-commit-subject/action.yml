@@ -1,0 +1,35 @@
+#
+# @Project: audit-commit-subject
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Audit Commit Subject (post-merge)"
+description: "Check a commit's subject against a list of allowed patterns. On miss, auto-file a GitHub Issue (deduped by SHA) so non-conforming commits don't die silently in the Actions tab."
+
+inputs:
+  commit_sha:
+    description: "Full commit SHA to audit"
+    required: true
+  allowed_patterns:
+    description: "Multi-line list of JS-regex patterns. Match-any semantics: if ANY pattern matches the subject, the audit passes."
+    required: true
+  issue_labels:
+    description: "Comma-sep labels to apply to auto-filed issues"
+    required: false
+    default: "bot:audit,priority:high"
+  issue_assignee:
+    description: "Optional GitHub login to assign to auto-filed issues. Empty = unassigned."
+    required: false
+    default: ""
+  github_token:
+    description: "Token with `issues: write`. Defaults to GITHUB_TOKEN."
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: node24
+  main: action.mjs

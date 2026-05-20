@@ -1,0 +1,36 @@
+#
+# @Project: dependabot-auto-merge
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Dependabot Auto-Merge"
+description: "Auto-approve and enable auto-merge on Dependabot PRs whose semver bump type is in the allowed list. Branch protection still gates the actual merge (CI must pass)."
+
+inputs:
+  bump_types:
+    description: "Comma-sep allowed bump types: patch, minor, major. Default = patch,minor."
+    required: false
+    default: "patch,minor"
+  merge_method:
+    description: "squash | merge | rebase"
+    required: false
+    default: "squash"
+  also_for_actors:
+    description: "Comma-sep additional bot logins to auto-merge (e.g. 'renovate[bot]')"
+    required: false
+    default: ""
+  github_token:
+    description: "App token (must have pull-requests: write + contents: write)"
+    required: true
+  require_branch_protection:
+    description: "Refuse to enable auto-merge if no required status checks are configured on the base branch. Default true (safety)."
+    required: false
+    default: "true"
+
+runs:
+  using: node24
+  main: action.mjs
