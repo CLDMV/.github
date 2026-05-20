@@ -28,7 +28,8 @@ name: 🚀 Create Release PR
 
 on:
   push:
-    branches-ignore: [master, main, badges]
+    # Bot-managed branches (badges, gh-pages) carry no source to release.
+    branches-ignore: [master, main, badges, gh-pages]
     paths-ignore:
       - "**.md"
       - "docs/**"

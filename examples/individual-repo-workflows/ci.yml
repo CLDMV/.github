@@ -20,7 +20,8 @@ on:
   # commit SHA, so this single trigger covers both pre-PR pushes and PR head
   # updates without duplicating runs.
   push:
-    branches: ["**"]
+    # Bot-managed branches (badges, gh-pages) carry no source to test.
+    branches-ignore: [badges, gh-pages]
     paths-ignore:
       - "**.md"
       - "docs/**"
