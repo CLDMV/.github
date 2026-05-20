@@ -1,0 +1,39 @@
+#
+# @Project: publish-gh-pages
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Publish to gh-pages branch"
+description: "Push the contents of a directory to a gh-pages branch as a single replacement commit (orphan-creates the branch if missing). Bot-attributed via App token. Batch 6.1."
+
+inputs:
+  output_dir:
+    description: "Directory whose contents will become the new gh-pages tree"
+    required: true
+  target_branch:
+    description: "Branch to push to"
+    required: false
+    default: "gh-pages"
+  cname:
+    description: "Custom-domain CNAME content; written to CNAME file each publish"
+    required: false
+    default: ""
+  include_nojekyll:
+    description: "Write .nojekyll so GitHub Pages doesn't skip _-prefixed files"
+    required: false
+    default: "true"
+  commit_message:
+    description: "Commit message for the publish commit"
+    required: false
+    default: "docs: update docs site"
+  github_token:
+    description: "App token with contents:write"
+    required: true
+
+runs:
+  using: node24
+  main: action.mjs

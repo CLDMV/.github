@@ -1,0 +1,41 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/docs.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/docs.yml
+#
+# Builds docs and pushes to gh-pages branch on master push. Only adopt this
+# template in repos that actually publish docs (e.g. @cldmv/slothlet).
+#
+# Batch 6.1 from tmp/plan-future-workflows.md.
+name: 📖 Publish Docs
+
+on:
+    push:
+        branches: [master, main]
+        paths:
+            - "docs/**"
+            - "src/**/*.{js,mjs,ts}" # if docs are generated from source (JSDoc/TypeDoc)
+            - "**/*.md"
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    publish:
+        uses: CLDMV/.github/.github/workflows/reusable-docs-publish.yml@v2
+        with:
+            build_command: "npm run docs:build"
+            output_dir: "docs/dist"
+            # cname: "docs.cldmv.net"   # uncomment for custom domain
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

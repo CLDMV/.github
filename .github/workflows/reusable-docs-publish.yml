@@ -1,0 +1,108 @@
+#
+# @Project: workflows
+# @Filename: /reusable-docs-publish.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# gh-pages docs publisher (org-level, reusable).
+# Batch 6.1 from tmp/plan-future-workflows.md.
+name: 📖 Docs Publish (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            build_command:
+                required: true
+                type: string
+            output_dir:
+                required: true
+                type: string
+            target_branch:
+                required: false
+                type: string
+                default: "gh-pages"
+            cname:
+                required: false
+                type: string
+                default: ""
+            include_nojekyll:
+                required: false
+                type: boolean
+                default: true
+            package_manager:
+                required: false
+                type: string
+                default: "npm"
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+            commit_message:
+                required: false
+                type: string
+                default: "docs: update docs site"
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+            TAGGER_NAME:
+                required: false
+            TAGGER_EMAIL:
+                required: false
+
+permissions:
+    contents: write
+
+concurrency:
+    group: docs-publish-${{ github.repository }}
+    cancel-in-progress: false
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+              with:
+                  node-version: ${{ inputs.node_version }}
+
+            - name: Install
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
+            - name: Build docs
+              shell: bash
+              run: ${{ inputs.build_command }}
+
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Publish to gh-pages
+              uses: CLDMV/.github/.github/actions/common/jobs/publish-gh-pages@v2
+              with:
+                  output_dir: ${{ inputs.output_dir }}
+                  target_branch: ${{ inputs.target_branch }}
+                  cname: ${{ inputs.cname }}
+                  include_nojekyll: ${{ inputs.include_nojekyll }}
+                  commit_message: ${{ inputs.commit_message }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+              env:
+                  TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
+                  TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}

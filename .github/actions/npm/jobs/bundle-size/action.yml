@@ -1,0 +1,58 @@
+#
+# @Project: bundle-size
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Bundle Size Diff"
+description: "Two-mode action: 'measure' walks dist files and emits per-file raw/gzip/brotli sizes as JSON; 'compare' loads two such JSONs and posts a PR comment with the delta table. Batch 5.4."
+
+inputs:
+  mode:
+    description: "'measure' or 'compare'"
+    required: true
+  # measure mode
+  dist_paths:
+    description: "Comma-sep globs (relative to repo root) of files to measure"
+    required: false
+    default: "dist/**"
+  output_file:
+    description: "Path to write JSON sizes (measure mode)"
+    required: false
+    default: "sizes.json"
+  # compare mode
+  head_sizes:
+    description: "Path to head sizes JSON"
+    required: false
+    default: "head-sizes/sizes.json"
+  base_sizes:
+    description: "Path to base sizes JSON"
+    required: false
+    default: "base-sizes/sizes.json"
+  pr_number:
+    description: "PR number to comment on (compare mode)"
+    required: false
+    default: ""
+  warning_pct:
+    description: "Warn if any file grows by this percent (compare mode)"
+    required: false
+    default: "5"
+  warning_bytes:
+    description: "Warn if any file grows by this many raw bytes (compare mode)"
+    required: false
+    default: "500"
+  comment_mode:
+    description: "'update' edits prior comment; 'new' always posts (compare mode)"
+    required: false
+    default: "update"
+  github_token:
+    description: "Token for compare mode (pull-requests:write)"
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: node24
+  main: action.mjs
