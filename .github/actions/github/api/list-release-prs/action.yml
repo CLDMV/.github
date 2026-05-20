@@ -1,0 +1,38 @@
+#
+# @Project: list-release-prs
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "List Open Release PRs"
+description: "Find open PRs whose title matches a release-version pattern. Used by workflow-sync-open-release-prs to fan out updates after a sibling PR merges to master."
+
+inputs:
+  title-pattern:
+    description: "JavaScript regex pattern (string, no slashes). Defaults to 'release: vX.Y.Z' shape."
+    required: false
+    default: '^release: v\d+\.\d+\.\d+$'
+  github-token:
+    description: "GitHub token (App-token preferred for org-aware enumeration)"
+    required: true
+  owner:
+    description: "Repository owner. Defaults to current repo owner."
+    required: false
+    default: ${{ github.repository_owner }}
+  repo:
+    description: "Repository name. Defaults to current repo."
+    required: false
+    default: ${{ github.event.repository.name }}
+
+outputs:
+  prs:
+    description: 'JSON array of {number, head_ref} objects. Stable schema; safe to use in matrix.'
+  count:
+    description: "Decimal string count of matching PRs (use for if-conditions)."
+
+runs:
+  using: node24
+  main: list.mjs

@@ -1,0 +1,169 @@
+#
+# @Project: update-release-pr
+# @Filename: /action.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Update Release PR"
+description: "Refresh an open release PR: re-evaluate version against current default branch, regenerate changelog, force-push the version-bump commit, update PR title and labels. Used by both workflow-release.yml (when push to release branch lands) and workflow-sync-open-release-prs.yml (when a sibling PR merges to master)."
+
+inputs:
+  head-ref:
+    description: "The release branch to refresh (must have an open release PR)"
+    required: true
+  pr-number:
+    description: "The PR number to update"
+    required: true
+  package-name:
+    description: "NPM package name"
+    required: true
+  package-manager:
+    description: "Package manager (npm or yarn)"
+    required: false
+    default: "npm"
+  build-command:
+    description: "Build command"
+    required: false
+    default: "npm run build:ci"
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "lts/*"
+  github-token:
+    description: "App-token bearer (contents:write + pull-requests:write required)"
+    required: true
+  debug:
+    description: "Enable debug logging"
+    required: false
+    default: "false"
+
+outputs:
+  new-version:
+    description: "The recalculated version that the PR now targets (empty if no release-worthy commit was found)"
+    value: ${{ steps.version.outputs.new-version }}
+  should-update:
+    description: "'true' if a release-worthy commit was found and the PR was updated; 'false' otherwise"
+    value: ${{ steps.release-check.outputs.should-create-pr }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout PR branch
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+      with:
+        ref: ${{ inputs.head-ref }}
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v2
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Get branch divergence point
+      id: divergence
+      uses: CLDMV/.github/.github/actions/git/steps/find-divergence@v2
+
+    - name: Check release commit type
+      id: release-check
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v2
+      with:
+        base-ref: ${{ steps.divergence.outputs.merge-base }}
+        base-version: ${{ steps.divergence.outputs.base-version }}
+      env:
+        DEBUG: ${{ inputs.debug }}
+
+    - name: Calculate new version
+      id: version
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v2
+      with:
+        version-bump: ${{ steps.release-check.outputs.version-bump }}
+        explicit-version: ${{ steps.release-check.outputs.explicit-version }}
+        base-version: ${{ steps.divergence.outputs.base-version }}
+
+    - name: Install dependencies
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v2
+      with:
+        package-manager: ${{ inputs.package-manager }}
+
+    - name: Build package
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v2
+      with:
+        build-command: ${{ inputs.build-command }}
+        environment: production
+
+    - name: Update package version
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v2
+      with:
+        new-version: ${{ steps.version.outputs.new-version }}
+        package-manager: ${{ inputs.package-manager }}
+
+    - name: Restore src/ deleted by build
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v2
+
+    - name: Create signed commit
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/api/commit@v2
+      with:
+        commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
+        github-token: ${{ inputs.github-token }}
+
+    - name: Determine display version
+      id: display-version
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/npm/steps/resolve-version@v2
+      with:
+        new-version: ${{ steps.version.outputs.new-version }}
+
+    - name: Get PR commit range
+      id: get-pr-range
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/get-pr-commit-range@v2
+      with:
+        github-token: ${{ inputs.github-token }}
+        pr-number: ${{ inputs.pr-number }}
+
+    - name: Generate updated changelog
+      id: changelog
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v2
+      with:
+        commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
+
+    - name: Update PR title and description
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/update-pr-changelog@v2
+      with:
+        github-token: ${{ inputs.github-token }}
+        pr-number: ${{ inputs.pr-number }}
+        new-version: ${{ steps.display-version.outputs.version }}
+        changelog-content: ${{ steps.changelog.outputs.changelog-content }}
+
+    - name: Compute raw label aliases
+      id: raw-labels
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v2
+      with:
+        bump-type: ${{ steps.release-check.outputs.version-bump }}
+
+    - name: Resolve PR label aliases
+      id: resolved-labels
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v2
+      with:
+        aliases: ${{ steps.raw-labels.outputs.labels }}
+
+    - name: Sync PR labels
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v2
+      with:
+        github-token: ${{ inputs.github-token }}
+        pr-number: ${{ inputs.pr-number }}
+        labels: ${{ steps.resolved-labels.outputs.labels }}
