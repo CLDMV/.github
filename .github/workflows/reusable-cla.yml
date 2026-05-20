@@ -1,0 +1,116 @@
+#
+# @Project: workflows
+# @Filename: /reusable-cla.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# CLA bot (org-level, reusable).
+# Per-PR signing model. Org members are exempt via /orgs/{org}/members lookup.
+# Same-repo PRs get an empty signed commit recording the signature; fork PRs
+# get an acknowledgment comment (since the bot can't push to the fork).
+# Batch 1.1 from tmp/plan-future-workflows.md.
+name: 📜 CLA (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            cla_version:
+                required: true
+                type: string
+            cla_path:
+                required: false
+                type: string
+                default: "CLA.md"
+            exempt_users:
+                required: false
+                type: string
+                default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
+            exempt_org_members:
+                required: false
+                type: boolean
+                default: true
+            exempt_org:
+                required: false
+                type: string
+                default: ${{ github.repository_owner }}
+            required_text_template:
+                required: false
+                type: string
+                default: "I have read and I agree to the CLA v${cla_version}"
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+            TAGGER_NAME:
+                required: false
+            TAGGER_EMAIL:
+                required: false
+
+permissions:
+    contents: write
+    pull-requests: write
+    statuses: write
+    issues: write
+
+jobs:
+    check:
+        # Runs on PR events (opened/synchronize/reopened/etc)
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: CLA check
+              uses: CLDMV/.github/.github/actions/community/jobs/cla-check@v2
+              with:
+                  cla_version: ${{ inputs.cla_version }}
+                  cla_path: ${{ inputs.cla_path }}
+                  exempt_users: ${{ inputs.exempt_users }}
+                  exempt_org_members: ${{ inputs.exempt_org_members }}
+                  exempt_org: ${{ inputs.exempt_org }}
+                  required_text_template: ${{ inputs.required_text_template }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+
+    record:
+        # Runs on issue_comment events
+        if: github.event_name == 'issue_comment' && github.event.action == 'created'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v2
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            # Need git for signing same-repo PRs (the record action pushes a commit)
+            - name: Checkout (default; refs fetched in action)
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v2
+              with:
+                  fetch-depth: 0
+
+            - name: CLA record
+              uses: CLDMV/.github/.github/actions/community/jobs/cla-record@v2
+              with:
+                  cla_version: ${{ inputs.cla_version }}
+                  cla_path: ${{ inputs.cla_path }}
+                  required_text_template: ${{ inputs.required_text_template }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+              env:
+                  TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
+                  TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}

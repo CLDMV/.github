@@ -1,0 +1,46 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/cla.yml
+# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/cla.yml
+#
+# Per-PR CLA signing. Each commit author must either:
+#   - Be in the org (silent pass via /orgs/CLDMV/members lookup)
+#   - Be in the exempt-bots list
+#   - Reply on this PR with the exact required text
+#
+# Required setup:
+#   - Bot App must have `Organization permissions → Members: read` so
+#     the org-member exemption works.
+#   - CLA.md must exist in this repo (or in the org repo + linked).
+#
+# Batch 1.1 from tmp/plan-future-workflows.md.
+name: 📜 CLA
+
+on:
+    pull_request_target:
+        types: [opened, synchronize, reopened, ready_for_review]
+    issue_comment:
+        types: [created]
+
+permissions:
+    contents: write
+    pull-requests: write
+    statuses: write
+    issues: write
+
+jobs:
+    cla:
+        uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v2
+        with:
+            cla_version: "1.0.0"
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
