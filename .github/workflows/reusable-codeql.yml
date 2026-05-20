@@ -61,6 +61,12 @@ permissions:
     contents: read
     actions: read # required for private repos
 
+# Opt in early to Node 24 for github/codeql-action/*@v3 (which still runs on
+# Node 20). Silences the Node-20-deprecation warning until codeql-action v4
+# ships in December 2026.
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
     # GitHub Actions expressions have no `split()` builtin, so we round-trip
     # the comma-sep `languages` input through a small Node action that emits
@@ -95,6 +101,8 @@ jobs:
             # `paths` / `paths-ignore` are not direct inputs to codeql-action/init —
             # they belong in a codeql-config.yml referenced via `config-file:`. Write
             # one from our inputs unless the caller already supplied their own.
+            # CodeQL requires the config file to live INSIDE the workspace; writing
+            # to /tmp fails with "configuration file ... is outside of the workspace".
             - name: Write CodeQL config
               if: inputs.config_file == ''
               id: codeql_cfg
@@ -103,7 +111,7 @@ jobs:
                   PATHS: ${{ inputs.paths }}
                   PATHS_IGNORE: ${{ inputs.paths_ignore }}
               run: |
-                  cfg=/tmp/codeql-config.yml
+                  cfg="${GITHUB_WORKSPACE}/.codeql-config-generated.yml"
                   : > "$cfg"
                   emit_list() {
                       local key="$1" csv="$2"
@@ -118,7 +126,8 @@ jobs:
                   emit_list paths "$PATHS"
                   emit_list paths-ignore "$PATHS_IGNORE"
                   if [ -s "$cfg" ]; then
-                      echo "path=$cfg" >> "$GITHUB_OUTPUT"
+                      # Path passed to init must be RELATIVE to the workspace root.
+                      echo "path=.codeql-config-generated.yml" >> "$GITHUB_OUTPUT"
                   fi
 
             - name: Initialize CodeQL

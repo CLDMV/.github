@@ -186,12 +186,15 @@ jobs:
               shell: bash
               run: |
                   # After the v3 cut all internal references should be @v3.
-                  # tmp/ is gitignored historical-planning material; skip.
-                  # Exclude this workflow file itself — it contains literal "@v2"
-                  # strings in step names, error messages, and the grep below.
+                  # Exclusions:
+                  #   tmp/                                       — gitignored planning material
+                  #   docs/migration/                            — historical migration guide(s)
+                  #   docs/changelogs/                           — historical version references
+                  #   CHANGELOG*                                 — same
+                  #   .github/workflows/local-ci.yml             — this file (contains the grep + literal @v2 strings)
                   out=$(git grep -nI '@v2\b' \
-                      -- ':!tmp/**' ':!docs/migration/**' ':!CHANGELOG*' \
-                      ':!.github/workflows/local-ci.yml')
+                      -- ':!tmp/**' ':!docs/migration/**' ':!docs/changelogs/**' \
+                      ':!CHANGELOG*' ':!.github/workflows/local-ci.yml')
                   if [ -z "$out" ]; then
                       echo "### ✅ No stale @v2 references" >> "$GITHUB_STEP_SUMMARY"
                       echo "count=0" >> "$GITHUB_OUTPUT"
