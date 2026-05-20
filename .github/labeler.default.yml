@@ -1,0 +1,44 @@
+# CLDMV org-default PR labels.
+# Each key is an ALIAS that resolves to a canonical label via data/github-labels.json.
+# Per-repo override: place .github/labeler.yml in the consumer repo (same shape).
+# Multi-label mode: every alias whose patterns match at least one file is emitted.
+
+"area:core":
+  - "src/**"
+  - "lib/**"
+
+"area:cli":
+  - "bin/**"
+  - "cli/**"
+
+"area:tests":
+  - "test/**"
+  - "tests/**"
+  - "**/*.test.*"
+  - "**/*.spec.*"
+
+docs: # → type: documentation
+  - "**.md"
+  - "docs/**"
+  - "examples/**"
+
+ci: # → type: ci
+  - ".github/workflows/**"
+  - ".github/actions/**"
+  - ".github/labeler.yml"
+
+dependencies: # → type: dependencies
+  - "package.json"
+  - "package-lock.json"
+  - "yarn.lock"
+  - "pnpm-lock.yaml"
+
+config: # → type: config
+  - ".github/**"
+  - ".editorconfig"
+  - ".gitignore"
+  - ".npmrc"
+  - "tsconfig*.json"
+  - "SECURITY.md"
+  - ".github/dependabot.yml"
+  - ".github/codeql.yml"

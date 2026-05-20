@@ -154,5 +154,35 @@
 		"color": "8b5cf6",
 		"description": "This release uses an explicitly specified version rather than an auto-detected bump",
 		"aliases": ["explicit", "explicit version", "manual version", "pinned"]
+	},
+	{
+		"name": "type: ci",
+		"color": "78909c",
+		"description": "Changes to CI workflows, actions, or build pipelines",
+		"aliases": ["ci", "workflows", "actions", "pipeline"]
+	},
+	{
+		"name": "type: config",
+		"color": "546e7a",
+		"description": "Changes to repository or project configuration files",
+		"aliases": ["config", "configuration", "settings"]
+	},
+	{
+		"name": "area: core",
+		"color": "6a1b9a",
+		"description": "Touches core library / runtime source code",
+		"aliases": ["area:core", "core", "library", "runtime"]
+	},
+	{
+		"name": "area: cli",
+		"color": "0277bd",
+		"description": "Touches CLI / executable / bin entry points",
+		"aliases": ["area:cli", "cli", "executable", "bin"]
+	},
+	{
+		"name": "area: tests",
+		"color": "2e7d32",
+		"description": "Touches test files, fixtures, or test infrastructure",
+		"aliases": ["area:tests", "tests", "testing", "spec"]
 	}
 ]
