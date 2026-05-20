@@ -191,7 +191,8 @@ jobs:
               #      `fetch-depth`).
               #   2. Nonexistent remote action versions (e.g. pinning
               #      `aquasecurity/trivy-action@0.28.0` when no such tag
-              #      exists — first valid is `v0.36.0`).
+              #      exists). Also verifies 40-char SHA pins resolve to a
+              #      real object on the remote.
               # Each finding is emitted as `::error file=...,line=...::` AND
               # appended to $GITHUB_STEP_SUMMARY by the script itself.
               run: |

@@ -10,9 +10,9 @@
  *    Example: passing `ref:` to a wrapper that only accepts `fetch-depth`.
  *
  * 2. **Nonexistent remote action versions** — when a workflow references
- *    `owner/repo@<version>` and that tag doesn't exist on GitHub.
- *    Example: `aquasecurity/trivy-action@0.28.0` (no such tag — `v0.36.0`
- *    is current).
+ *    `owner/repo@<version>` and that ref doesn't resolve on GitHub. Handles
+ *    both tags and 40-char SHA pins (verified via `git ls-remote`).
+ *    Example: `aquasecurity/trivy-action@0.28.0` (no such tag).
  *
  * Designed to run as a step in local-ci.yml. Exits 1 on any finding; writes
  * a per-finding section to $GITHUB_STEP_SUMMARY when running under Actions.
@@ -153,9 +153,21 @@ function declaredInputs(actionYmlPath) {
 	return inputs;
 }
 
-/** HEAD-check that a remote action tag exists on GitHub. */
+/**
+ * Verify that a remote `uses:` ref's `@<version>` resolves to a real object
+ * on GitHub. Handles three formats:
+ *   - 40-char hex SHA pin (verify the commit object exists in the remote)
+ *   - Tag (vX.Y.Z, X.Y, latest, etc.) via /releases/tag/ + ls-remote fallback
+ *   - Branch — not validated here (rare for `uses:`; would need ls-remote heads)
+ */
 function remoteTagExists(owner, repo, version) {
 	try {
+		// SHA pin (40-char hex): verify the commit is reachable via ls-remote.
+		// `git ls-remote` by itself returns ALL refs; grep for the SHA.
+		if (/^[0-9a-f]{40}$/i.test(version)) {
+			const out = execSync(`git ls-remote 'https://github.com/${owner}/${repo}.git'`, { encoding: "utf8" });
+			return out.toLowerCase().includes(version.toLowerCase());
+		}
 		const url = `https://github.com/${owner}/${repo}/releases/tag/${version}`;
 		// Use curl: shorter than fetch + handles redirects; available everywhere
 		const code = execSync(`curl -sSL -o /dev/null -w '%{http_code}' '${url}'`, { encoding: "utf8" }).trim();
