@@ -18,7 +18,7 @@ Real-world friction observed across the v3 cut:
 
 - **Cascade churn.** Three approved patch PRs that should ship as one v3.2.4 ended up as v3.2.4 / v3.2.5 / v3.2.6 — three separate releases for what was conceptually one batch.
 - **Race conditions.** `update-major-version-tags` and `sync-fan-out` fire in parallel; if sync resolves `@v3` first, it runs against the previous release's action code (see commit `608f621`).
-- **State drift.** The persistent release PR's title/body update path silently bypassed the version-bump path when target was "already bumped on branch" — observable bug #1.
+- **State drift.** The persistent release PR's title/body update path silently bypassed the version-bump path when target was "already bumped on branch" — observable bug 1.
 - **Discovery brittleness.** Any change to release-PR title format (e.g., adding `- <subject>` suffix) silently broke the regex sync uses to find them.
 
 The common thread: **per-PR release PRs encode too much state on each contributor's branch**, and that state diverges in messy ways when more than one PR is open.
@@ -373,7 +373,7 @@ Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflo
    - **Idempotent:** running twice should be a no-op.
    - **Reversible:** does NOT delete existing v3 workflows. Repo can run v3 and v4 in parallel until ready to fully cut over.
 
-<!-- (resolved: docs/migration/v3-to-v4.md is written all-at-once as part of §11 PR #6 — see §11) -->
+<!-- (resolved: docs/migration/v3-to-v4.md is written all-at-once as part of §11 PR 6 — see §11) -->
 
 ## 11. Migration plan
 
@@ -390,9 +390,9 @@ Six PRs in sequence, each independently shippable:
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
 
-**`@v4` stability between migration PRs:** PRs #3 through #5 are additive but incomplete — `@v4` during that window is an unstable preview. Do not migrate production consumer repos until PR #6 lands and v4.0.0 is formally cut. After PR #6, `@v4` is considered stable.
+**`@v4` stability between migration PRs:** PRs 3 through 5 are additive but incomplete — `@v4` during that window is an unstable preview. Do not migrate production consumer repos until PR 6 lands and v4.0.0 is formally cut. After PR 6, `@v4` is considered stable.
 
-Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR #6 — written for internal institutional memory, not external consumer hand-holding.
+Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR 6 — written for internal institutional memory, not external consumer hand-holding.
 
 ## 12. Out of scope (deferred)
 
