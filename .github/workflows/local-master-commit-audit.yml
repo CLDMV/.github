@@ -39,7 +39,7 @@ jobs:
               with:
                   commit_sha: ${{ github.sha }}
                   allowed_patterns: |
-                      ^release: v\d+\.\d+\.\d+( \(#\d+\))?$
+                      ^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$
                       ^chore(\([^)]+\))?: .+
                       ^Merge pull request #\d+ from .+
                       ^feat(\([^)]+\))?: .+
