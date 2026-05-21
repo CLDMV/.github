@@ -148,32 +148,57 @@ Job:
 
 ### 6.4 `local-pr-title-normalizer.yml` (new)
 
-Trigger: `pull_request` (opened, synchronize, edited).
+Trigger: `pull_request` (`opened`, `synchronize`). **Not** `edited` — contributors editing their own title should not trigger a re-normalize loop.
+
+**Skip conditions** (early-exit before any rewrite logic):
+- PR author is a bot (`user.login` ends in `[bot]`) — release PRs that the bot itself creates are not normalized.
+- PR base ref is `master` and head ref is `next` or `hotfix` — the long-running release PRs own their own title format via the release flow.
 
 Job:
 1. Fetch the PR's commits.
 2. Determine highest conventional type from those commits.
-3. If PR title doesn't conform, rewrite via `PATCH /pulls/{n}` with a new title.
-4. Post a one-line comment (idempotent via hidden HTML marker) explaining the rewrite.
+3. **Idempotency check:** read the PR body for the hidden marker `<!-- pr-title-normalized:<hash> -->`. If marker exists AND its hash matches the current highest-type computation, exit (we've already normalized this state — don't re-edit).
+4. If PR title already matches a valid `<type>(<scope>)?(!): <summary>` pattern with the correct or-higher type, exit. (Contributor manually wrote a conforming title; respect it.)
+5. Otherwise, rewrite via `PATCH /pulls/{n}` with a new title built from the highest-type commit subject.
+6. On `opened` only: post a one-line comment explaining the rewrite (idempotent via hidden marker `<!-- pr-title-normalize-comment -->`). On `synchronize` rewrites: silent — assume contributor saw the original comment.
+7. Update body to include `<!-- pr-title-normalized:<hash> -->` marker so future synchronize events can short-circuit.
 
-### 6.5 `local-hotfix-redirector.yml` (new)
+This means: rewrite happens on PR open. After that it only re-fires if commits are added AND the new highest-type would change the title's type prefix. No infinite churn.
+
+### 6.5 `local-pr-target-redirector.yml` (new)
 
 Trigger: `pull_request opened`.
 
+This single workflow handles both the "default PRs to `next`" and "redirect `hotfix/*` to `hotfix`" cases, so the repo default branch can stay `master` (no need to change it from the universal convention).
+
 Job:
-1. If PR base ref is not `next`, exit (manual override respected).
-2. If PR head branch matches `^(hotfix|security)/`, call `PATCH /pulls/{n}` to change base to `hotfix`.
-3. Post a comment explaining the redirect.
+1. Determine intended base from head branch name:
+   - `^(hotfix|security)/` → intended base = `hotfix`
+   - anything else → intended base = `next`
+2. If PR's current base ref differs from intended AND wasn't explicitly set by the contributor, call `PATCH /pulls/{n}` to change base.
+3. Post a comment explaining the redirect (idempotent via hidden marker `<!-- pr-target-redirected -->`).
+4. **Respect manual override.** If the contributor explicitly set the target via the GitHub UI (we can't perfectly detect this), they can change it back — the workflow won't re-fire on `edited` events.
+
+Default-branch decision: **keep `master` as the repo's default branch.** This workflow handles redirection invisibly so contributors don't need to know about `next`. Alternative (change default to `next`) is documented in §10 if preferred.
 
 ### 6.6 `local-pending-release-reminder.yml` (new)
 
-Trigger: scheduled (daily, e.g., 09:00 UTC).
+Trigger: scheduled (daily, e.g., 09:00 UTC). Schedule cron is a workflow input so consumer repos can adjust.
+
+Inputs (with defaults, configurable per consumer repo):
+
+| Input | Default | Meaning |
+|---|---|---|
+| `next_threshold_days` | `14` | Days since last release before `next → master` PR triggers a reminder |
+| `hotfix_threshold_days` | `3` | Days since last release before `hotfix → master` PR triggers a reminder |
+| `issue_labels` | `"priority: high,type: release"` | Labels applied to the filed reminder issue |
+| `dedup_window` | `"week"` | Bucket for dedup: `week` (default) / `day` / `month` |
 
 Job:
 1. Find the persistent `next → master` and `hotfix → master` PRs.
 2. For each: compute `last_release_to_master_age_days` from master's last release commit timestamp.
-3. If age > threshold (default 14 days for `next`, 3 days for `hotfix`) AND the PR has commits to ship:
-   - File an issue (dedup by week-bucket: `release-reminder-{branch}-{ISO-week}`)
+3. If age > threshold AND the PR has commits to ship:
+   - File an issue (dedup by `dedup_window` bucket: `release-reminder-{branch}-{ISO-bucket}`)
    - Post a comment on the release PR linking the issue
 4. Use existing audit-style dedup so we don't re-file daily.
 
@@ -284,15 +309,26 @@ GitHub's "Allow auto-merge" (repo-level toggle) = **ON**. The branch protection 
 - PRs targeting `master`: 1 review + Local CI + Local CodeQL → fires only when all satisfied (effectively manual since maintainer review is the bottleneck)
 - PRs targeting `hotfix`: 1 reviewer + codeowner + all checks → manual
 
-## 10. Open questions
+## 10. Resolved questions + remaining open ones
 
-1. **PR title normalizer scope.** Does it run on PRs targeting `hotfix` too? (Probably yes.) On PRs targeting `master`? (No — those are release PRs, format is owned by the release flow.)
-2. **Contributors who merge their own PRs.** GitHub branch protection can require "review from someone other than the author". For solo maintainers in their own repos, this needs an opt-out. Configurable per-repo?
-3. **Pending-release reminder thresholds.** Default 14 days for `next`, 3 days for `hotfix`. Override via repo-level config?
-4. **First-time bootstrap.** When migrating a v3 repo to v4: how do we create `next` and `hotfix` branches and set protection rules with one workflow run? Probably a `local-v4-bootstrap.yml` one-shot workflow that runs on dispatch.
-5. **Co-author trailer stripping.** Side quest from v3.2.4 — strip `cldmv-bot[bot]` co-author from squash merge commits. Easiest to do as part of `update-release-pr@v4`'s post-merge logic since v4 owns the merge title/body more directly.
-6. **What about `release!:` commits to escape the bump algorithm?** Should still work — `check-release-commit` already honors explicit `release[!]?:` commits. Document that for `next` it overrides the calculated bump.
-7. **Documentation lookahead.** Should we update `docs/migration/v3-to-v4.md` proactively as we land each migration PR, or write it once at the end?
+### 10.1 Resolved
+
+| Question | Decision | Notes |
+|---|---|---|
+| PR title normalizer scope | Runs on all contributor PRs to `next` AND `hotfix`. Skips bot-authored PRs. Skips PRs already targeting `master` (release PRs own their own title). | §6.4 |
+| Title normalizer re-fire prevention | Fires on `opened` + `synchronize` only. Idempotent via hidden HTML markers. No re-fire if title already conforms. Silent on `synchronize` rewrites (no comment spam). | §6.4 |
+| Default branch | **Stays as `master`.** PR target redirection handled invisibly by `local-pr-target-redirector.yml` (§6.5). Alternative (change default to `next`) is supported but not required. | §6.5 |
+| Solo-maintainer opt-out for "review from non-author" | **No workflow change needed** — GitHub's branch protection has a "Require approval from someone other than the last pusher" toggle. Solo maintainers leave it off and set required reviewers to 0. Per-repo setting. | §9 |
+| Pending-release reminder thresholds | **Configurable via workflow inputs** in `local-pending-release-reminder.yml`. Defaults: 14 days (next), 3 days (hotfix). | §6.6 |
+| Co-author trailer in squash commits | **Accept it.** No automatic way to strip co-authors for GitHub-UI-clicked merges. Manual edit of the squash dialog is the only suppression path. Bot co-author is redundant but not wrong. Documented in CONTRIBUTING. | This section |
+| Auto-merge enabled? | Repo-level "Allow auto-merge" = ON. Per-branch effective gating via branch protection (§9). PRs to `next` can auto-merge; PRs to `master` / `hotfix` effectively can't (require manual maintainer review). | §9 |
+
+### 10.2 Still open
+
+1. **First-time bootstrap.** When migrating a v3 repo to v4: how do we create `next` and `hotfix` branches and set protection rules with one workflow run? Probably a `local-v4-bootstrap.yml` one-shot workflow that runs on dispatch. Spec needs detail.
+2. **`release!:` and `release:` commits to escape the bump algorithm.** Should still work — `check-release-commit` already honors explicit `release[!]?:` commits. Document the explicit-version escape hatch for `next` and `hotfix` in CONTRIBUTING.
+3. **Documentation lookahead.** Should we update `docs/migration/v3-to-v4.md` proactively as we land each migration PR, or write it once at the end? Lean: incrementally — each migration PR appends to the guide.
+4. **What if `next` already has accumulated work when a contributor's PR introduces a conflict with a sibling that just merged?** GitHub's "out of date" UI handles this — contributor rebases their branch. Verify the existing branch-protection flow doesn't auto-merge a stale PR.
 
 ## 11. Migration plan
 
@@ -320,8 +356,9 @@ Each step ships against `@v4` (rolling major tag). Existing v3 consumers stay on
 
 Before any PR for this work begins:
 
-- [ ] Branch names confirmed (`next`, `hotfix`)
-- [ ] Section 7.2 hotfix-while-next-has-work resolution: **option B (merge master into next)** approved
+- [x] Branch names confirmed (`next`, `hotfix`)
+- [x] §7.2 hotfix-while-next-has-work resolution: option B (merge master into next) approved
+- [x] §10.1 questions resolved
 - [ ] Branch protection JSON shape (§9) approved
 - [ ] Migration sequence (§11) approved
-- [ ] Open questions (§10) resolved
+- [ ] §10.2 remaining open questions resolved
