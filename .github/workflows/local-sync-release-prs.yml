@@ -23,11 +23,19 @@ permissions:
 
 jobs:
     sync:
-        # Only on actual merges; skip bot-authored merges to avoid recursion
-        # (the sync flow itself ends up merging the bumped release commit).
+        # Fire on every merged PR — including release PRs auto-opened by
+        # cldmv-bot. The earlier "skip bot-authored merges to avoid recursion"
+        # comment was wrong: sync-fan-out only UPDATES open release PRs
+        # (force-pushes a bumped chore commit onto each), it never merges
+        # anything. A force-push triggers other workflows (Local Release PR,
+        # Local CI) but NOT local-sync-release-prs (which fires on PR close).
+        # Excluding cldmv-bot defeats the whole point — every release PR is
+        # auto-opened by that bot, so the sync flow never fired on the merges
+        # it was built for. github-actions[bot] is still excluded as a
+        # defensive guard against any workflow that posts merges under that
+        # identity.
         if: |
             github.event.pull_request.merged == true &&
-            github.event.pull_request.user.login != 'cldmv-bot[bot]' &&
             github.event.pull_request.user.login != 'github-actions[bot]'
         uses: ./.github/workflows/workflow-sync-open-release-prs.yml
         with:
