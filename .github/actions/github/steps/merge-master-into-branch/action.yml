@@ -1,0 +1,48 @@
+name: "Merge Master Into Branch"
+description: "Merge master (or another source ref) into a target branch via the GitHub Merges API. Used by §7.2 of the v4 design: after a hotfix lands on master, merge master into next so accumulated feature work is preserved (rather than force-reset and lost). Handles the three GitHub-defined outcomes: 201 created merge commit, 204 already-up-to-date, 409 merge conflict."
+
+inputs:
+  target-branch:
+    description: "Branch to receive the merge (the base of the API call). E.g., 'next'."
+    required: true
+  source-ref:
+    description: "Ref being merged in (the head of the API call)."
+    required: false
+    default: "master"
+  github-token:
+    description: "GitHub token with write access to the target branch."
+    required: false
+    default: ${{ github.token }}
+  commit-message:
+    description: "Override merge commit message. Default is 'Merge <source-ref> into <target-branch>'."
+    required: false
+  dry-run:
+    description: "When 'true', log what would happen but do not make the API call."
+    required: false
+    default: "false"
+
+outputs:
+  merge-sha:
+    description: "SHA of the new merge commit (201). Empty when nothing was merged (204)."
+    value: ${{ steps.merge.outputs.merge-sha }}
+  merge-performed:
+    description: "'true' when a merge commit was created; 'false' on no-op (204 already up-to-date)."
+    value: ${{ steps.merge.outputs.merge-performed }}
+  had-conflict:
+    description: "'true' when the API returned 409 (merge conflict). On conflict, the step also fails."
+    value: ${{ steps.merge.outputs.had-conflict }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Merge via GitHub API
+      id: merge
+      shell: bash
+      env:
+        INPUT_TARGET_BRANCH: ${{ inputs.target-branch }}
+        INPUT_SOURCE_REF: ${{ inputs.source-ref }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        node "${{ github.action_path }}/action.mjs"
