@@ -1,0 +1,54 @@
+name: "Normalize PR Title"
+description: "Rewrite a contributor PR's title to conform to Conventional Commits format, derived from the highest-priority commit in the PR. Skips bot-authored PRs, the long-running release PRs (next/hotfix → master), and titles starting with 'release:'."
+
+inputs:
+  pr-number:
+    description: "PR number to inspect / rewrite"
+    required: true
+  github-token:
+    description: "GitHub token with PR write access (App installation token preferred)"
+    required: false
+    default: ${{ github.token }}
+  base-ref:
+    description: "PR base branch (e.g., 'next', 'master'). When empty, fetched from API."
+    required: false
+  head-ref:
+    description: "PR head branch. When empty, fetched from API."
+    required: false
+  user-type:
+    description: "PR author's `user.type` from the event payload ('User' or 'Bot'). When empty, fetched from API."
+    required: false
+  dry-run:
+    description: "When 'true', compute and log the would-be title but do not PATCH the PR or post any comment."
+    required: false
+    default: "false"
+
+outputs:
+  rewritten:
+    description: "'true' when the PR title was actually rewritten"
+    value: ${{ steps.normalize.outputs.rewritten }}
+  new-title:
+    description: "The title after normalization (or the unchanged current title)"
+    value: ${{ steps.normalize.outputs.new-title }}
+  skipped:
+    description: "'true' when the action exited early due to a skip condition"
+    value: ${{ steps.normalize.outputs.skipped }}
+  skip-reason:
+    description: "Human-readable reason when skipped is 'true'"
+    value: ${{ steps.normalize.outputs.skip-reason }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Normalize PR title
+      id: normalize
+      shell: bash
+      env:
+        INPUT_PR_NUMBER: ${{ inputs.pr-number }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_HEAD_REF: ${{ inputs.head-ref }}
+        INPUT_USER_TYPE: ${{ inputs.user-type }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        node "${{ github.action_path }}/action.mjs"

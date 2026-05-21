@@ -1,0 +1,33 @@
+name: "Compute Highest Commit Type"
+description: "Parse a JSON array of commits in Conventional Commits format and return the highest-priority type plus the implied semver bump. Used by normalize-pr-title and check-release-commit to pick the dominant type across a range."
+
+inputs:
+  commits-file:
+    description: "Path to a JSON file containing an array of commit objects with at least { subject, body } fields. Mutually exclusive with commits-json."
+    required: false
+  commits-json:
+    description: "Inline JSON array of commit objects with at least { subject, body } fields. Mutually exclusive with commits-file."
+    required: false
+
+outputs:
+  highest-type:
+    description: "Highest-priority conventional type found (e.g. 'feat', 'fix', 'chore'). Empty string when no commit parses as conventional."
+    value: ${{ steps.compute.outputs.highest-type }}
+  is-breaking:
+    description: "'true' when any commit declares a breaking change (via '!' marker or 'BREAKING CHANGE:' footer)."
+    value: ${{ steps.compute.outputs.is-breaking }}
+  bump:
+    description: "Implied semver bump: 'major' / 'minor' / 'patch' / 'none'."
+    value: ${{ steps.compute.outputs.bump }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compute highest commit type
+      id: compute
+      shell: bash
+      env:
+        INPUT_COMMITS_FILE: ${{ inputs.commits-file }}
+        INPUT_COMMITS_JSON: ${{ inputs.commits-json }}
+      run: |
+        node "${{ github.action_path }}/action.mjs"
