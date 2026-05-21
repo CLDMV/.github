@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLDMV/.github v4 — Ruleset Generator</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-bg: #1f6feb;
+    --warn: #d29922;
+    --warn-bg: rgba(210, 153, 34, 0.1);
+    --info: #58a6ff;
+    --info-bg: rgba(56, 139, 253, 0.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.5rem; margin-top: 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+  a { color: var(--accent); }
+  code { background: var(--panel); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+  fieldset {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    border-radius: 6px;
+  }
+  legend { padding: 0 0.5rem; font-weight: 600; }
+  label { display: block; margin: 0.75rem 0; }
+  label small { display: block; color: var(--muted); margin-top: 0.25rem; }
+  input[type="number"], select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    width: 6rem;
+  }
+  input[type="checkbox"] { transform: scale(1.1); margin-right: 0.5rem; }
+  .branch-block {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 6px;
+  }
+  button {
+    background: var(--accent-bg);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+  button:hover { filter: brightness(1.15); }
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    overflow: auto;
+    max-height: 240px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+  }
+  .note {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .step {
+    background: var(--info-bg);
+    border-left: 3px solid var(--info);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  ul { padding-left: 1.5rem; }
+  li { margin: 0.25rem 0; }
+</style>
+</head>
+<body>
+<h1>CLDMV/.github v4 — Ruleset Generator</h1>
+
+<p>Generates GitHub Ruleset JSON for the three v4 branches. After downloading, import each in your consumer repo: <strong>Settings → Rules → Rulesets → New ruleset → "Import a ruleset"</strong>.</p>
+
+<p>See <a href="https://github.com/CLDMV/.github/blob/master/docs/conventions/release-flow-v4.md#9-branch-protection-rules">§9 of the v4 design doc</a> for what each setting does.</p>
+
+<fieldset>
+<legend>Repo settings</legend>
+
+<label>
+  <strong>Team size (optional)</strong>
+  <select id="team-size">
+    <option value="">— skip (use manual count below) —</option>
+    <option value="1">1 (solo maintainer)</option>
+    <option value="2">2-4 (small team) → 1 approval</option>
+    <option value="5">5-9 (mid team) → 2 approvals</option>
+    <option value="10">10+ (large team) → 2 approvals</option>
+  </select>
+  <small>Selecting a team size pre-fills the approvals count below. You can override.</small>
+</label>
+
+<label>
+  <strong>Required approvals</strong>
+  <input type="number" id="approvals" min="0" max="6" value="1">
+  <small>Number of approving reviews required before a PR can be merged. Default 1.</small>
+</label>
+
+<label>
+  <input type="checkbox" id="hotfix-codeowner" checked>
+  <strong>Require Code Owner reviews on hotfix</strong>
+  <small>Requires a <code>.github/CODEOWNERS</code> file in your repo. Affects the hotfix ruleset only.</small>
+</label>
+</fieldset>
+
+<div class="step">
+<strong>After importing each ruleset, you must add your bot to the Bypass list of <code>next</code> and <code>hotfix</code>.</strong>
+The v4 reset workflows (§6.3, §7.2) push as the bot and would be blocked by <code>non_fast_forward</code> otherwise.
+Open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> does NOT need bot bypass.
+</div>
+
+<div class="branch-block">
+<h2><code>master.json</code> — production branch</h2>
+<button data-branch="master">Download master.json</button>
+<pre id="preview-master"></pre>
+</div>
+
+<div class="branch-block">
+<h2><code>next.json</code> — integration branch</h2>
+<button data-branch="next">Download next.json</button>
+<pre id="preview-next"></pre>
+</div>
+
+<div class="branch-block">
+<h2><code>hotfix.json</code> — hotfix lane</h2>
+<button data-branch="hotfix">Download hotfix.json</button>
+<pre id="preview-hotfix"></pre>
+</div>
+
+<div class="note">
+<strong>Notes:</strong>
+<ul>
+<li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
+<li>Templates use <code>allowed_merge_methods: ["squash"]</code> across all three branches — matches the v4 squash-merge convention.</li>
+<li><code>next.json</code> intentionally omits <code>required_linear_history</code> so §7.2's master-into-next API merge can produce a merge commit when needed.</li>
+<li>The bot is NOT pre-added to <code>bypass_actors</code> — see the highlighted step above.</li>
+</ul>
+</div>
+
+<script src="generator.js"></script>
+</body>
+</html>
