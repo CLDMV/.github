@@ -60,7 +60,14 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Trivy scan
-              uses: aquasecurity/trivy-action@0.28.0
+              # Pinned by SHA to v0.35.0 — the only tag the March 2026 supply-
+              # chain advisory confirms safe. The attacker force-pushed 76 of
+              # 77 version tags to credential-stealing payloads; v0.35.0 was
+              # protected by GitHub's immutable releases feature (enabled
+              # before publish). SHA-pin (not mutable tag) per the advisory's
+              # explicit guidance: https://github.com/aquasecurity/trivy-action/security/advisories
+              # Re-verify this SHA against the upstream advisory before any future bump.
+              uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
               with:
                   image-ref: ${{ inputs.image }}
                   format: ${{ inputs.sarif_upload && 'sarif' || 'table' }}
