@@ -255,11 +255,17 @@ function truncateForTitle(s) {
  *
  * Priority:
  *   1. Explicit `release[!]?:` commit on the branch → use that commit's body.
- *   2. Otherwise, pick the first commit matching the calculated bump:
- *        major → first breaking commit
- *        minor → first feat
- *        patch → first fix
- *   3. Fall back to the first actionable commit if nothing matched.
+ *   2. Otherwise, pick the OLDEST commit matching the calculated bump:
+ *        major → oldest breaking commit
+ *        minor → oldest feat
+ *        patch → oldest fix
+ *      "Oldest" = the commit that originally triggered the PR. Newer follow-up
+ *      commits don't push the suffix around — readers expect the title to stay
+ *      pinned to what the PR is fundamentally about.
+ *   3. Fall back to the oldest actionable commit if nothing matched.
+ *
+ * Note on order: get-commit-range returns commits newest-first (git log default),
+ * so we use findLast/[len-1] to reach the chronologically oldest match.
  *
  * @param {object} releaseAnalysis - Output of findReleaseCommits().
  * @param {Array} actionableCommits - Non-bot-bump commits on the branch.
@@ -275,13 +281,13 @@ function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis)
 	const bump = versionAnalysis.versionBump;
 	let firstMatch;
 	if (bump === "major") {
-		firstMatch = actionableCommits.find((c) => c.isBreaking || c.category === "breaking");
+		firstMatch = actionableCommits.findLast((c) => c.isBreaking || c.category === "breaking");
 	} else if (bump === "minor") {
-		firstMatch = actionableCommits.find((c) => c.category === "feature");
+		firstMatch = actionableCommits.findLast((c) => c.category === "feature");
 	} else if (bump === "patch") {
-		firstMatch = actionableCommits.find((c) => c.category === "fix");
+		firstMatch = actionableCommits.findLast((c) => c.category === "fix");
 	}
-	if (!firstMatch && actionableCommits.length > 0) firstMatch = actionableCommits[0];
+	if (!firstMatch && actionableCommits.length > 0) firstMatch = actionableCommits[actionableCommits.length - 1];
 	if (!firstMatch) return "";
 
 	return truncateForTitle(stripConventionalPrefix(firstMatch.subject));
