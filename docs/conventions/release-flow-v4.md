@@ -298,20 +298,22 @@ A static generator at [`docs/tools/ruleset-generator/`](../tools/ruleset-generat
 
 1. **Required approvals** — number (default 1). Optional "team size" pre-fill that auto-sets the number.
 2. **Require Code Owner reviews on hotfix?** — yes/no (default yes). Hotfix-only — master and next don't require code-owner review.
+3. **Require Copilot Code Review (master + hotfix)?** — yes/no (default **no**). Each PR triggers a Copilot review against the org's Copilot subscription quota; off by default to avoid surprise cost increases. Enable only with a paid Copilot tier.
 
 Everything else is hardcoded into the templates from v4's intended flow:
 
 | Setting | master | next | hotfix |
 |---|---|---|---|
-| `non_fast_forward` (block force-push) | yes | **no** (bot resets allowed) | yes |
+| `non_fast_forward` (block force-push) | yes | yes (bot bypass added manually) | yes (bot bypass added manually) |
 | `required_signatures` (GPG) | yes | yes | yes |
 | `required_linear_history` | yes | **no** (allows §7.2 API merge commits) | yes |
 | `required_status_checks: ["✅ Required PR Check"]` | yes | yes | yes |
 | `code_scanning` (CodeQL `high_or_higher`) | yes | yes | yes |
-| `copilot_code_review` | yes | no | yes |
+| `copilot_code_review` (asked) | optional | no | optional |
 | `allowed_merge_methods: ["squash"]` | yes | yes | yes |
 | `required_review_thread_resolution` | yes | yes | yes |
 | `dismiss_stale_reviews_on_push` | yes | yes | yes |
+| `require_last_push_approval` | no | no | no |
 | `deletion` (block branch deletion) | yes | yes | yes |
 
 Consumers whose actual check names differ from `"✅ Required PR Check"` edit the imported ruleset post-import.
@@ -326,10 +328,11 @@ CLDMV consumers using `cldmv-bot`: add the App via the ruleset's Bypass list (th
 
 ### 9.3 Auto-merge
 
-Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflow). Per-branch effective gating via rulesets:
-- PRs targeting `next`: 1 approval + required checks → auto-merge fires when satisfied.
-- PRs targeting `master`: 1 approval + required checks + Copilot review → effectively manual via Copilot-review bottleneck.
-- PRs targeting `hotfix`: 1 approval + codeowner gate + required checks → effectively manual via codeowner gate (§4).
+Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflow). Auto-merge is opt-in per PR — each PR's author clicks "Enable auto-merge" to activate it. Effective gating per branch:
+
+- **PRs targeting `next`** (contributor PRs): author enables auto-merge → fires when required approvals + checks pass.
+- **PRs targeting `master`** (release PRs from `next`): maintainer leaves auto-merge OFF — releases are always a manual click (see §3 non-goals). Rulesets enforce the prerequisites (required approvals + checks, plus Copilot review if enabled in the generator).
+- **PRs targeting `hotfix`**: codeowner gate makes auto-merge unsatisfiable in practice when the codeowner can't be the PR author. Maintainer can also leave auto-merge off.
 
 ## 10. Resolved questions + remaining open ones
 
@@ -405,6 +408,6 @@ Before any PR for this work begins:
 - [x] Branch names confirmed (`next`, `hotfix`)
 - [x] §7.2 hotfix-while-next-has-work resolution: option B (merge master into next) approved
 - [x] §10.1 questions resolved
-- [ ] Branch protection JSON shape (§9) approved
-- [ ] Migration sequence (§11) approved
-- [ ] §10.3 still-open questions resolved
+- [x] Branch protection JSON shape (§9) approved
+- [x] Migration sequence (§11) approved
+- [x] §10.3 still-open questions resolved

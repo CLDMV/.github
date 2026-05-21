@@ -46,8 +46,7 @@
 					{ "context": "✅ Required PR Check" }
 				]
 			}
-		},
-		{ "type": "copilot_code_review" }
+		}
 	],
 	"bypass_actors": [
 		{

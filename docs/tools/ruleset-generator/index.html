@@ -129,7 +129,13 @@
 <label>
   <input type="checkbox" id="hotfix-codeowner" checked>
   <strong>Require Code Owner reviews on hotfix</strong>
-  <small>Requires a <code>.github/CODEOWNERS</code> file in your repo. Affects the hotfix ruleset only.</small>
+  <small>Requires a <code>CODEOWNERS</code> file at <code>.github/</code>, the repo root, or <code>docs/</code>. Without that file the rule is a silent no-op. Affects the hotfix ruleset only.</small>
+</label>
+
+<label>
+  <input type="checkbox" id="copilot-review">
+  <strong>Require Copilot Code Review (master + hotfix)</strong>
+  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfix. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
 </label>
 </fieldset>
 

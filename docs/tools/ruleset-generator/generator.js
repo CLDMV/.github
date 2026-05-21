@@ -55,21 +55,22 @@
 	}
 
 	function buildMaster(opts) {
+		const rules = [
+			{ type: "deletion" },
+			{ type: "non_fast_forward" },
+			{ type: "required_signatures" },
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
+			{ type: "required_linear_history" },
+			codeScanningRule(),
+			requiredStatusChecksRule()
+		];
+		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Master",
 			target: "branch",
 			enforcement: "active",
 			conditions: { ref_name: { exclude: [], include: ["~DEFAULT_BRANCH"] } },
-			rules: [
-				{ type: "deletion" },
-				{ type: "non_fast_forward" },
-				{ type: "required_signatures" },
-				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
-				{ type: "required_linear_history" },
-				codeScanningRule(),
-				requiredStatusChecksRule(),
-				{ type: "copilot_code_review" }
-			],
+			rules: rules,
 			bypass_actors: bypassDefault()
 		};
 	}
@@ -93,21 +94,22 @@
 	}
 
 	function buildHotfix(opts) {
+		const rules = [
+			{ type: "deletion" },
+			{ type: "non_fast_forward" },
+			{ type: "required_signatures" },
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner }),
+			{ type: "required_linear_history" },
+			codeScanningRule(),
+			requiredStatusChecksRule()
+		];
+		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Hotfix",
 			target: "branch",
 			enforcement: "active",
 			conditions: { ref_name: { exclude: [], include: ["refs/heads/hotfix"] } },
-			rules: [
-				{ type: "deletion" },
-				{ type: "non_fast_forward" },
-				{ type: "required_signatures" },
-				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner }),
-				{ type: "required_linear_history" },
-				codeScanningRule(),
-				requiredStatusChecksRule(),
-				{ type: "copilot_code_review" }
-			],
+			rules: rules,
 			bypass_actors: bypassDefault()
 		};
 	}
@@ -123,7 +125,8 @@
 	function readOpts() {
 		const approvals = Math.max(0, parseInt(document.getElementById("approvals").value, 10) || 0);
 		const hotfixCodeOwner = document.getElementById("hotfix-codeowner").checked;
-		return { approvals, hotfixCodeOwner };
+		const copilotReview = document.getElementById("copilot-review").checked;
+		return { approvals, hotfixCodeOwner, copilotReview };
 	}
 
 	function refresh() {
@@ -151,6 +154,7 @@
 	document.addEventListener("DOMContentLoaded", function () {
 		document.getElementById("approvals").addEventListener("input", refresh);
 		document.getElementById("hotfix-codeowner").addEventListener("change", refresh);
+		document.getElementById("copilot-review").addEventListener("change", refresh);
 		document.getElementById("team-size").addEventListener("change", function (e) {
 			const size = parseInt(e.target.value, 10);
 			if (size > 0) {
