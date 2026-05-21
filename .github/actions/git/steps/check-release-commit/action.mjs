@@ -224,6 +224,75 @@ function analyzeVersionBump(commits) {
 	};
 }
 
+/**
+ * Strip the conventional-commit prefix (`type(scope)?:` or `type(scope)?!:`)
+ * from a subject line, leaving just the human-readable summary.
+ * @param {string} subject - Raw commit subject line.
+ * @returns {string} Subject with the conventional prefix removed.
+ */
+function stripConventionalPrefix(subject) {
+	return (subject || "").replace(/^[a-z][a-z0-9_-]*(\([^)]*\))?!?:\s*/i, "");
+}
+
+/**
+ * Cap a string at ~55 chars, breaking on a word boundary when possible.
+ * Used to keep generated PR titles readable in GitHub's list views.
+ * @param {string} s - Input string.
+ * @returns {string} Truncated string, with ellipsis if shortened.
+ */
+function truncateForTitle(s) {
+	const cleaned = (s || "").replace(/[\r\n]+/g, " ").trim();
+	if (cleaned.length <= 55) return cleaned;
+	const slice = cleaned.slice(0, 55);
+	const lastSpace = slice.lastIndexOf(" ");
+	const cut = lastSpace > 30 ? slice.slice(0, lastSpace) : slice;
+	return cut + "…";
+}
+
+/**
+ * Derive the "- <subject>" suffix for the PR title, distinguishing release PRs
+ * that share the same target version (e.g. two open patch PRs for v3.1.2).
+ *
+ * Priority:
+ *   1. Explicit `release[!]?:` commit on the branch → use that commit's body.
+ *   2. Otherwise, pick the OLDEST commit matching the calculated bump:
+ *        major → oldest breaking commit
+ *        minor → oldest feat
+ *        patch → oldest fix
+ *      "Oldest" = the commit that originally triggered the PR. Newer follow-up
+ *      commits don't push the suffix around — readers expect the title to stay
+ *      pinned to what the PR is fundamentally about.
+ *   3. Fall back to the oldest actionable commit if nothing matched.
+ *
+ * Note on order: get-commit-range returns commits newest-first (git log default),
+ * so we use findLast/[len-1] to reach the chronologically oldest match.
+ *
+ * @param {object} releaseAnalysis - Output of findReleaseCommits().
+ * @param {Array} actionableCommits - Non-bot-bump commits on the branch.
+ * @param {object} versionAnalysis - Output of analyzeVersionBump().
+ * @returns {string} The (possibly truncated) summary suffix; "" when nothing fits.
+ */
+function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis) {
+	const explicit = releaseAnalysis.breakingRelease || releaseAnalysis.normalRelease;
+	if (explicit) {
+		return truncateForTitle(stripConventionalPrefix(explicit.subject));
+	}
+
+	const bump = versionAnalysis.versionBump;
+	let firstMatch;
+	if (bump === "major") {
+		firstMatch = actionableCommits.findLast((c) => c.isBreaking || c.category === "breaking");
+	} else if (bump === "minor") {
+		firstMatch = actionableCommits.findLast((c) => c.category === "feature");
+	} else if (bump === "patch") {
+		firstMatch = actionableCommits.findLast((c) => c.category === "fix");
+	}
+	if (!firstMatch && actionableCommits.length > 0) firstMatch = actionableCommits[actionableCommits.length - 1];
+	if (!firstMatch) return "";
+
+	return truncateForTitle(stripConventionalPrefix(firstMatch.subject));
+}
+
 // Main logic - only run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
 	console.log(`🔍 DEBUG: HAS_COMMITS = ${HAS_COMMITS}`);
@@ -296,8 +365,33 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		console.log(`🔍 Base version: ${baseVersion} → target: ${targetVersion}`);
 
 		if (alreadyBumpedVersions.has(targetVersion)) {
-			console.log(`⏭️ Version ${targetVersion} was already bumped on this branch — skipping`);
-			appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+			// Two paths here:
+			//   - Callers that *create* (create-release-pr, create-release) want
+			//     us to short-circuit — there's nothing new to do.
+			//   - Callers that *update* an existing release PR (update-release-pr)
+			//     still need downstream steps (changelog regen, PR body refresh,
+			//     label sync) to run on subsequent commits, even when the version
+			//     target hasn't changed. They opt in via ALLOW_ALREADY_BUMPED=true.
+			const allowAlreadyBumped = (process.env.ALLOW_ALREADY_BUMPED || "").trim().toLowerCase() === "true";
+			if (!allowAlreadyBumped) {
+				console.log(`⏭️ Version ${targetVersion} was already bumped on this branch — skipping`);
+				appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+				process.exit(0);
+			}
+			console.log(`🔁 Version ${targetVersion} already bumped — body/changelog refresh only (bump-already-applied=true)`);
+			const titleSuffix = computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis);
+			const outputs = [
+				"should-create-pr=true",
+				"bump-already-applied=true",
+				`commit-message=${commitMessage}`,
+				`version-bump=${versionAnalysis.versionBump}`,
+				`has-breaking=${versionAnalysis.hasBreaking || false}`,
+				`title-suffix=${titleSuffix}`
+			];
+			if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
+				outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
+			}
+			appendFileSync(process.env.GITHUB_OUTPUT, outputs.join("\n") + "\n");
 			process.exit(0);
 		}
 
@@ -305,11 +399,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	}
 
 	// ── Step 4: Output results ─────────────────────────────────────────────────
+	const titleSuffix = computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis);
 	const outputs = [
 		"should-create-pr=true",
+		"bump-already-applied=false",
 		`commit-message=${commitMessage}`,
 		`version-bump=${versionAnalysis.versionBump}`,
-		`has-breaking=${versionAnalysis.hasBreaking || false}`
+		`has-breaking=${versionAnalysis.hasBreaking || false}`,
+		`title-suffix=${titleSuffix}`
 	];
 
 	if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {

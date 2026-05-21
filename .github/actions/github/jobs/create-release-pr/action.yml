@@ -147,7 +147,10 @@ runs:
       id: create-pr
       uses: CLDMV/.github/.github/actions/github/api/pull-requests@v3
       with:
-        title: "release: v${{ steps.version.outputs.new-version }}"
+        # Suffix differentiates PRs that share the same target version (e.g.
+        # two open patch PRs both bumping to vX.Y.Z). Empty suffix falls back
+        # to the plain "release: vX.Y.Z" form.
+        title: "release: v${{ steps.version.outputs.new-version }}${{ steps.commit-check.outputs.title-suffix && format(' - {0}', steps.commit-check.outputs.title-suffix) || '' }}"
         base-branch: ${{ steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}

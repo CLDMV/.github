@@ -72,8 +72,17 @@ runs:
       with:
         base-ref: ${{ steps.divergence.outputs.merge-base }}
         base-version: ${{ steps.divergence.outputs.base-version }}
+        # Opt-in: when the target version's bot bump is already on the branch,
+        # still emit should-create-pr=true (with bump-already-applied=true) so
+        # we can refresh the changelog/body/labels for the new commit without
+        # re-pushing a duplicate version-bump commit.
+        allow-already-bumped: "true"
       env:
         DEBUG: ${{ inputs.debug }}
+
+    # Steps gated only on should-create-pr run regardless of whether the bump
+    # has already been applied — they only read state. Version-mutating steps
+    # below ALSO gate on bump-already-applied != 'true'.
 
     - name: Calculate new version
       id: version
@@ -85,31 +94,31 @@ runs:
         base-version: ${{ steps.divergence.outputs.base-version }}
 
     - name: Install dependencies
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Build package
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v3
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
 
     - name: Update package version
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v3
       with:
         new-version: ${{ steps.version.outputs.new-version }}
         package-manager: ${{ inputs.package-manager }}
 
     - name: Restore src/ deleted by build
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v3
 
     - name: Create signed commit
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/github/api/commit@v3
       with:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
@@ -144,6 +153,7 @@ runs:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
         new-version: ${{ steps.display-version.outputs.version }}
+        title-suffix: ${{ steps.release-check.outputs.title-suffix }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
 
     - name: Compute raw label aliases

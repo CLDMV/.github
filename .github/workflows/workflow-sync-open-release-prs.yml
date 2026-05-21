@@ -45,8 +45,15 @@ on:
             pr_title_pattern:
                 required: false
                 type: string
-                default: '^release: v\d+\.\d+\.\d+$'
-                description: "Regex matching titles of PRs eligible for auto-sync"
+                # Match both the bare form and the suffixed form:
+                #   release: v3.2.1
+                #   release: v3.2.1 - <descriptive subject from check-release-commit>
+                # The original anchored '$' broke discovery after title-suffix
+                # landed — every release PR now carries the ' - <subject>' tail,
+                # so the strict pattern matched zero PRs and sync-fan-out
+                # silently did nothing.
+                default: '^release: v\d+\.\d+\.\d+(?:$| - )'
+                description: "Regex matching titles of PRs eligible for auto-sync. Accepts either 'release: vX.Y.Z' or 'release: vX.Y.Z - <subject>'."
             debug:
                 required: false
                 type: boolean

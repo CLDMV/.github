@@ -2,6 +2,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
+import { filterBotCommits } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
 // Get inputs from environment.
@@ -667,7 +668,19 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	let changelog = "## 🚀 What's Changed\n\n";
 
-	// Don't filter out release commits - they may contain useful information
+	// Strip ALL bot-authored / automated commits from the human-facing
+	// changelog. filterBotCommits checks two things:
+	//   1. isBotAuthor — author or email matches a known bot pattern
+	//      (cldmv-bot, github-actions, dependabot, renovate, snyk, etc.;
+	//      any '[bot]' substring catches GitHub App identities generically).
+	//   2. isAutomatedCommit — subject matches known automation patterns
+	//      ('chore: bump version', 'chore(release):', 'release:',
+	//      'merge branch', 'merge pull request', auto-generated dep updates).
+	// Together this drops every bot-trail commit the release flow itself
+	// produces (version bumps, release commits, merge commits) plus any
+	// upstream bot bumps. The PR title communicates the version; the section
+	// bodies should describe the human-authored changes, nothing else.
+	commits = filterBotCommits(commits);
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
