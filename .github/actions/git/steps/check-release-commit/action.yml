@@ -11,11 +11,18 @@ inputs:
   exclude-version:
     description: "Version to exclude when finding latest tag (e.g., 'v2.0.1' to find previous version)"
     required: false
+  allow-already-bumped:
+    description: "When 'true', if the target version is already bumped on the branch, still emit should-create-pr=true (with bump-already-applied=true) so downstream PR-body/changelog updates can run without re-pushing the version-bump commit. update-release-pr opts in; create-release-pr / create-release do not."
+    required: false
+    default: "false"
 
 outputs:
   should-create-pr:
     description: "Whether a release PR should be created"
     value: ${{ steps.check.outputs.should-create-pr }}
+  bump-already-applied:
+    description: "'true' when the target version's bot bump commit is already on the branch — body/changelog/label updates should still run, but version-pushing steps should skip"
+    value: ${{ steps.check.outputs.bump-already-applied }}
   version-bump:
     description: "Type of version bump (major, minor, patch, explicit)"
     value: ${{ steps.check.outputs.version-bump }}
@@ -56,6 +63,7 @@ runs:
         COMMITS_FILE: ${{ steps.commit-range.outputs.commits-file }}
         HAS_COMMITS: ${{ steps.commit-range.outputs.has-commits }}
         BASE_VERSION: ${{ inputs.base-version }}
+        ALLOW_ALREADY_BUMPED: ${{ inputs.allow-already-bumped }}
       run: |
         # Run the Node.js script
         node "${{ github.action_path }}/action.mjs"
