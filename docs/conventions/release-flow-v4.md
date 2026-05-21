@@ -62,7 +62,7 @@ hotfix   ───────────────────────�
 |---|---|---|---|---|
 | `master` | Production. Tagged releases live here. | Release commits only | Never. Protected. | **No** — manual review + green checks |
 | `next` | Integration for unreleased features/fixes. | Free-form (squashed contributor commits) | Force-reset to master HEAD after each `next → master` release | **Yes** — contributor PRs with required reviews + green checks |
-| `hotfix` | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits) | Force-reset to master HEAD after each `hotfix → master` release | **No** — effectively manual via codeowner-required gate (§9); GitHub's repo-level auto-merge toggle is on, but the codeowner approval requirement makes auto-merge unsatisfiable in practice |
+| `hotfix` | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits) | Force-reset to master HEAD after each `hotfix → master` release | **No, by convention** — maintainer doesn't enable auto-merge on hotfix PRs; rulesets enforce required checks + approvals as prerequisites but don't hard-block auto-merge unless Code Owner review is enabled in the generator |
 | `feature/*`, `fix/*` | Contributor work. | Whatever they want. | Deleted on merge to `next`. | N/A |
 | `hotfix/*`, `security/*` | Hotfix work. | Whatever they want. | Deleted on merge to `hotfix`. | N/A |
 
@@ -297,7 +297,7 @@ A static generator at [`docs/tools/ruleset-generator/`](../tools/ruleset-generat
 ### 9.1 Generator questions
 
 1. **Required approvals** — number (default 1). Optional "team size" pre-fill that auto-sets the number.
-2. **Require Code Owner reviews on hotfix?** — yes/no (default yes). Hotfix-only — master and next don't require code-owner review.
+2. **Require Code Owner reviews on hotfix?** — yes/no (default **no**). Requires a `CODEOWNERS` file in the consumer repo to do anything; without one, the rule is a silent no-op. Affects the hotfix ruleset only.
 3. **Require Copilot Code Review (master + hotfix)?** — yes/no (default **no**). Each PR triggers a Copilot review against the org's Copilot subscription quota; off by default to avoid surprise cost increases. Enable only with a paid Copilot tier.
 
 Everything else is hardcoded into the templates from v4's intended flow:
@@ -332,7 +332,7 @@ Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflo
 
 - **PRs targeting `next`** (contributor PRs): author enables auto-merge → fires when required approvals + checks pass.
 - **PRs targeting `master`** (release PRs from `next`): maintainer leaves auto-merge OFF — releases are always a manual click (see §3 non-goals). Rulesets enforce the prerequisites (required approvals + checks, plus Copilot review if enabled in the generator).
-- **PRs targeting `hotfix`**: codeowner gate makes auto-merge unsatisfiable in practice when the codeowner can't be the PR author. Maintainer can also leave auto-merge off.
+- **PRs targeting `hotfix`**: maintainer leaves auto-merge OFF — hotfix work is reviewed manually. If the consumer enables Code Owner review (§9.1 question 2) and maintains a `CODEOWNERS` file, that adds a hard gate; otherwise it's convention only.
 
 ## 10. Resolved questions + remaining open ones
 
