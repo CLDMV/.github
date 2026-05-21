@@ -21,6 +21,7 @@ try {
 	const token = process.env.GITHUB_TOKEN || getInput("github-token", { required: true });
 	const prNumber = getInput("pr-number", { required: true });
 	const newVersion = getInput("new-version", { required: true });
+	const titleSuffix = (getInput("title-suffix") || "").trim();
 	const changelog = getInput("changelog-content");
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 
@@ -29,7 +30,7 @@ try {
 	const body = changelog.trim() ? changelog : FALLBACK_BODY;
 	if (!changelog.trim()) console.log("⚠️ No changelog generated, using fallback message");
 
-	const title = `release: v${newVersion}`;
+	const title = titleSuffix ? `release: v${newVersion} - ${titleSuffix}` : `release: v${newVersion}`;
 	console.log(`📝 Updating PR title to: ${title}`);
 	await api("PATCH", `/pulls/${prNumber}`, { title, body }, { token, owner, repo });
 

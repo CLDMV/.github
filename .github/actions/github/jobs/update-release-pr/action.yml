@@ -153,6 +153,7 @@ runs:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
         new-version: ${{ steps.display-version.outputs.version }}
+        title-suffix: ${{ steps.release-check.outputs.title-suffix }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
 
     - name: Compute raw label aliases

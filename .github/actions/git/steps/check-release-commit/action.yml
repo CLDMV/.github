@@ -35,6 +35,9 @@ outputs:
   explicit-version:
     description: "Explicit version when version-bump is explicit"
     value: ${{ steps.check.outputs.explicit-version }}
+  title-suffix:
+    description: "Suffix to append after 'release: vX.Y.Z - ' so PRs sharing the same target version are visually distinct. Derived from an explicit release: commit, else the first feat/fix/breaking commit per the calculated bump type."
+    value: ${{ steps.check.outputs.title-suffix }}
   commits:
     description: "JSON array of categorized commits"
     value: ${{ steps.commit-range.outputs.commits }}
