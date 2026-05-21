@@ -1,0 +1,81 @@
+#
+# @Project: workflows
+# @Filename: /local-next-reset.yml
+# @Date: 2026-05-21 00:00:00 -07:00 (1779692400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# v4 core: after a release lands on master, force-reset `next` to master HEAD
+# so the persistent `next → master` PR auto-closes (head == base) and the
+# next contributor merge re-opens a fresh one (docs/conventions/
+# release-flow-v4.md §6.3, §7.1).
+#
+# Scope (PR 3): resets `next` only. The hotfix lane (PR 4) adds hotfix reset
+# and the §7.2 "merge master into next after a hotfix" nuance — deliberately
+# out of scope here since no `hotfix` branch exists yet.
+#
+# STATUS: v4 preview. Guarded to no-op when `next` doesn't exist, so it is
+# safe to ship into a repo that hasn't cut over to v4. NOT yet exercised
+# end-to-end.
+name: ♻️ Local Next Reset (v4)
+
+on:
+    push:
+        branches: [master, main]
+
+permissions:
+    contents: write
+
+concurrency:
+    group: local-next-reset-${{ github.repository }}
+    cancel-in-progress: false
+
+jobs:
+    reset-next:
+        # Only fire on a release commit (the squash-merge of a release PR).
+        if: startsWith(github.event.head_commit.message, 'release:')
+        name: "♻️ Reset next → master"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+                  # Pushing master's tree (which includes .github/workflows/**)
+                  # onto next requires both contents and workflows write scopes.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Checkout master
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              with:
+                  fetch-depth: 0
+
+            - name: Guard — does next exist?
+              id: guard
+              shell: bash
+              run: |
+                  if git ls-remote --exit-code --heads origin next >/dev/null 2>&1; then
+                      echo "exists=true" >> "$GITHUB_OUTPUT"
+                      # Make origin/next available locally so --force-with-lease
+                      # has a base to compare against on the first attempt.
+                      git fetch origin next:refs/remotes/origin/next --quiet || true
+                  else
+                      echo "exists=false" >> "$GITHUB_OUTPUT"
+                      echo "ℹ️ No 'next' branch — repo not on v4 yet; nothing to reset."
+                  fi
+
+            - name: Force-reset next to master HEAD
+              if: steps.guard.outputs.exists == 'true'
+              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              with:
+                  target-branch: next
+                  source-ref: master
+                  github-token: ${{ steps.app-token.outputs.token }}
