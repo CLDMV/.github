@@ -19,6 +19,8 @@
  *
  * Self-contained. Uses Node built-ins only — no `npm install` required.
  *
+ * Local run for ad-hoc validation: `node scripts/validate-action-refs.mjs`.
+ *
  * @module @cldmv/.github.scripts.validate-action-refs
  */
 
