@@ -256,11 +256,12 @@ All resets use `--force-with-lease` (or equivalent API headers when going throug
 
 ### 8.1 Modified
 
-| Action | Change |
-|---|---|
-| `check-release-commit` | Already supports `allow-already-bumped`. Add support for `range-override` so it can be told to use `master..next` directly instead of merge-base. |
-| `update-release-pr` | Add `mode: persistent` input. In persistent mode the range is `master..next` (not the per-branch divergence point) and it targets the one long-running `next → master` PR. It **still pushes a `chore: bump version` commit to `next`** — see the note below; the earlier "no bump on the integration branch" idea is unworkable. Title/body/label refresh still runs. |
-| `find-divergence` | Add `head-branch` and `base-branch` inputs to override the automatic detection. |
+| Action | Change | PR 3 outcome |
+|---|---|---|
+| `check-release-commit` | Planned: add `range-override` for `master..next`. | **Not needed.** Reused as-is — when `update-release-pr` runs on `next`, the merge-base it already computes against `origin/master` *is* the `master..next` base. |
+| `update-release-pr` | Planned: add `mode: persistent` input. | **Not needed.** Reused as-is with `head-ref: next`. It already computes `master..next` semantics (merge-base vs `origin/master`, base-version from master HEAD) and pushes the `chore: bump version` commit to `next` — which is **required** (see note below). |
+| `find-divergence` | Planned: add `head-branch` / `base-branch` overrides. | **Not needed for PR 3.** Defaults (HEAD vs `origin/master`) are correct when the workflow runs on `next`. May still be added for the hotfix lane (PR 4) if useful. |
+| `force-reset-branch` | **Done in PR 3** (the one real action change): added optional `github-token` so the reset can push as the bot via an `x-access-token` URL — required to bypass `next`'s `non_fast_forward` rule. | ✅ shipped on the PR 3 branch |
 
 **Why the `chore: bump version` commit must stay on `next` (correction to an earlier draft).** An earlier version of this doc claimed persistent mode could skip the bump commit and let "master's package.json update via the squash." That is impossible under this design:
 
