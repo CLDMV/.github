@@ -259,8 +259,16 @@ All resets use `--force-with-lease` (or equivalent API headers when going throug
 | Action | Change |
 |---|---|
 | `check-release-commit` | Already supports `allow-already-bumped`. Add support for `range-override` so it can be told to use `master..next` directly instead of merge-base. |
-| `update-release-pr` | Add `mode: persistent` input. In persistent mode, doesn't push a `chore: bump version` commit to the integration branch (the integration branch's package.json doesn't auto-update; only master's does, via the squash). Title/body/label refresh still runs. |
+| `update-release-pr` | Add `mode: persistent` input. In persistent mode the range is `master..next` (not the per-branch divergence point) and it targets the one long-running `next → master` PR. It **still pushes a `chore: bump version` commit to `next`** — see the note below; the earlier "no bump on the integration branch" idea is unworkable. Title/body/label refresh still runs. |
 | `find-divergence` | Add `head-branch` and `base-branch` inputs to override the automatic detection. |
+
+**Why the `chore: bump version` commit must stay on `next` (correction to an earlier draft).** An earlier version of this doc claimed persistent mode could skip the bump commit and let "master's package.json update via the squash." That is impossible under this design:
+
+- The `master` ruleset (§9) **requires a PR**, **blocks non-fast-forward**, and the **bot is not in master's bypass list** (§9.2). So master's `package.json` can only change through a PR squash-merge — never a direct or amended push.
+- A squash-merge can only carry content that already exists on `next`. GitHub can't inject a `package.json` change at squash time.
+- The v3 publish flow (`reusable-publishing.yml` → `detect-version` → `extract-version`) reads `package.json` **as-is** from master HEAD and trusts that version. Nothing derives the version from the commit subject.
+
+Therefore the version bump must be present on `next` before the squash, exactly as v3 carries it on per-PR branches. **v4's batching benefit is independent of this** — the win is the single persistent `next → master` PR collapsing many feature commits into one release; where the bump commit lives doesn't change that. `next` is force-reset after every release (§7.1), so accumulated bump commits there are throwaway.
 
 ### 8.2 New
 
