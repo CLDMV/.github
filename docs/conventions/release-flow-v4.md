@@ -151,19 +151,23 @@ Job:
 Trigger: `pull_request` (`opened`, `synchronize`). **Not** `edited` — contributors editing their own title should not trigger a re-normalize loop.
 
 **Skip conditions** (early-exit before any rewrite logic):
-- PR author is a bot (`user.login` ends in `[bot]`) — release PRs that the bot itself creates are not normalized.
-- PR base ref is `master` and head ref is `next` or `hotfix` — the long-running release PRs own their own title format via the release flow.
+- `pull_request.user.type == "Bot"` — any bot-created PR (cldmv-bot, github-actions, dependabot, renovate, etc.) is exempt. This catches every automated PR-creation path without needing markers, since GitHub stamps the property itself.
+- PR base ref is `master` AND head ref is `next` or `hotfix` — the long-running release PRs own their own title format via the release flow.
+
+**No markers in PR body.** Markers in the body would leak into the squash-merge commit message when the PR lands. Idempotency is achieved by:
+
+1. **Title rewrite is idempotent by construction.** If the current title already matches `^<type>(\(<scope>\))?(!)?:\s+.+` AND the type is the highest from contained commits (or higher), no rewrite happens. So a re-fire on `synchronize` against an already-conforming title is a no-op.
+2. **Comment dedup via comment query.** Before commenting, query `GET /issues/{n}/comments` and check if a comment from the bot starting with a known sentinel phrase (e.g., `"_Auto-normalized PR title:_"`) already exists. If yes, skip.
 
 Job:
-1. Fetch the PR's commits.
-2. Determine highest conventional type from those commits.
-3. **Idempotency check:** read the PR body for the hidden marker `<!-- pr-title-normalized:<hash> -->`. If marker exists AND its hash matches the current highest-type computation, exit (we've already normalized this state — don't re-edit).
-4. If PR title already matches a valid `<type>(<scope>)?(!): <summary>` pattern with the correct or-higher type, exit. (Contributor manually wrote a conforming title; respect it.)
+1. Skip if `user.type == "Bot"` or base/head ref matches the release-PR pattern.
+2. Fetch the PR's commits.
+3. Determine highest conventional type from those commits.
+4. If PR title already conforms (matches a valid conventional format with the current-or-higher type), exit. (Contributor's manually-written title respected.)
 5. Otherwise, rewrite via `PATCH /pulls/{n}` with a new title built from the highest-type commit subject.
-6. On `opened` only: post a one-line comment explaining the rewrite (idempotent via hidden marker `<!-- pr-title-normalize-comment -->`). On `synchronize` rewrites: silent — assume contributor saw the original comment.
-7. Update body to include `<!-- pr-title-normalized:<hash> -->` marker so future synchronize events can short-circuit.
+6. Query existing comments for the sentinel. If absent, post a one-line explanatory comment. If present, skip — the contributor was already informed.
 
-This means: rewrite happens on PR open. After that it only re-fires if commits are added AND the new highest-type would change the title's type prefix. No infinite churn.
+This means: rewrite happens on first non-conforming evaluation. After that it only re-fires if commits change the highest type AND the title isn't still acceptable. No infinite churn. No marker pollution.
 
 ### 6.5 `local-pr-target-redirector.yml` (new)
 
@@ -176,8 +180,9 @@ Job:
    - `^(hotfix|security)/` → intended base = `hotfix`
    - anything else → intended base = `next`
 2. If PR's current base ref differs from intended AND wasn't explicitly set by the contributor, call `PATCH /pulls/{n}` to change base.
-3. Post a comment explaining the redirect (idempotent via hidden marker `<!-- pr-target-redirected -->`).
+3. Post an explanatory comment, deduped by querying existing comments for a sentinel phrase (e.g., `"_Auto-redirected PR base:_"`) — same comment-query approach as §6.4 (no body markers, no commit leak).
 4. **Respect manual override.** If the contributor explicitly set the target via the GitHub UI (we can't perfectly detect this), they can change it back — the workflow won't re-fire on `edited` events.
+5. **Skip bot-created PRs** via `user.type == "Bot"` (consistent with §6.4).
 
 Default-branch decision: **keep `master` as the repo's default branch.** This workflow handles redirection invisibly so contributors don't need to know about `next`. Alternative (change default to `next`) is documented in §10 if preferred.
 
@@ -323,12 +328,32 @@ GitHub's "Allow auto-merge" (repo-level toggle) = **ON**. The branch protection 
 | Co-author trailer in squash commits | **Accept it.** No automatic way to strip co-authors for GitHub-UI-clicked merges. Manual edit of the squash dialog is the only suppression path. Bot co-author is redundant but not wrong. Documented in CONTRIBUTING. | This section |
 | Auto-merge enabled? | Repo-level "Allow auto-merge" = ON. Per-branch effective gating via branch protection (§9). PRs to `next` can auto-merge; PRs to `master` / `hotfix` effectively can't (require manual maintainer review). | §9 |
 
-### 10.2 Still open
+### 10.2 Resolved in this revision
 
-1. **First-time bootstrap.** When migrating a v3 repo to v4: how do we create `next` and `hotfix` branches and set protection rules with one workflow run? Probably a `local-v4-bootstrap.yml` one-shot workflow that runs on dispatch. Spec needs detail.
-2. **`release!:` and `release:` commits to escape the bump algorithm.** Should still work — `check-release-commit` already honors explicit `release[!]?:` commits. Document the explicit-version escape hatch for `next` and `hotfix` in CONTRIBUTING.
-3. **Documentation lookahead.** Should we update `docs/migration/v3-to-v4.md` proactively as we land each migration PR, or write it once at the end? Lean: incrementally — each migration PR appends to the guide.
-4. **What if `next` already has accumulated work when a contributor's PR introduces a conflict with a sibling that just merged?** GitHub's "out of date" UI handles this — contributor rebases their branch. Verify the existing branch-protection flow doesn't auto-merge a stale PR.
+| Question | Decision |
+|---|---|
+| Bot-detection mechanism (no markers) | Use `pull_request.user.type == "Bot"` from the event payload. GitHub already stamps every bot account with this property. No PR-body marker needed. |
+| Title-rewrite idempotency (no markers) | Check current title against the conventional-commit regex. If it already matches with the correct-or-higher type, exit. Re-fires on `synchronize` become no-ops once the title conforms. |
+| Comment dedup (no markers) | Query the PR's comments via `GET /issues/{n}/comments`, scan for a sentinel phrase from a prior bot comment. If present, skip. |
+| `release[!]?:` escape hatch | Keep existing v3 semantics: if a `release: vX.Y.Z` commit is present and a version parses out, use that explicit version; if it doesn't parse, fall back to the automatic bump algorithm. Document in CONTRIBUTING for v4. |
+| Conflict with sibling during auto-merge | GitHub's auto-merge holds the PR open when there's a merge conflict — it can't fire. Contributor must resolve (rebase or merge) before auto-merge can complete. No special handling needed in our workflows. |
+
+### 10.3 Still open
+
+1. **First-time bootstrap workflow (`local-v4-bootstrap.yml`).** Concrete sketch:
+   - **Trigger:** `workflow_dispatch` (manual, run once per repo migration)
+   - **Inputs:** `next_branch_name` (default `next`), `hotfix_branch_name` (default `hotfix`), `dry_run` (default `true`)
+   - **Steps:**
+     1. Create `next` branch from master HEAD (no-op if exists)
+     2. Create `hotfix` branch from master HEAD (no-op if exists)
+     3. Apply branch protection rules to `master` / `next` / `hotfix` from a `data/v4-branch-protection.json` template (per §9), via `PUT /repos/{owner}/{repo}/branches/{branch}/protection`
+     4. Enable "Allow auto-merge" at the repo level via `PATCH /repos/{owner}/{repo}` (`allow_auto_merge: true`)
+     5. Optionally check in v4 workflow stubs to `.github/workflows/` (skip if already present)
+     6. Summary report: what was created, what was skipped, what was changed
+   - **Idempotent:** running twice should be a no-op.
+   - **Reversible:** does NOT delete existing v3 workflows. Repo can run v3 and v4 in parallel until ready to fully cut over.
+
+2. **Documentation lookahead.** Lean: incrementally — each migration PR appends to `docs/migration/v3-to-v4.md`. By the time PR #6 (§11) lands, the guide is complete and the v4 release publishes alongside it.
 
 ## 11. Migration plan
 
