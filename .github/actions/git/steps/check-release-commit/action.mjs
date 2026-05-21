@@ -296,8 +296,31 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		console.log(`🔍 Base version: ${baseVersion} → target: ${targetVersion}`);
 
 		if (alreadyBumpedVersions.has(targetVersion)) {
-			console.log(`⏭️ Version ${targetVersion} was already bumped on this branch — skipping`);
-			appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+			// Two paths here:
+			//   - Callers that *create* (create-release-pr, create-release) want
+			//     us to short-circuit — there's nothing new to do.
+			//   - Callers that *update* an existing release PR (update-release-pr)
+			//     still need downstream steps (changelog regen, PR body refresh,
+			//     label sync) to run on subsequent commits, even when the version
+			//     target hasn't changed. They opt in via ALLOW_ALREADY_BUMPED=true.
+			const allowAlreadyBumped = (process.env.ALLOW_ALREADY_BUMPED || "").trim().toLowerCase() === "true";
+			if (!allowAlreadyBumped) {
+				console.log(`⏭️ Version ${targetVersion} was already bumped on this branch — skipping`);
+				appendFileSync(process.env.GITHUB_OUTPUT, "should-create-pr=false\n");
+				process.exit(0);
+			}
+			console.log(`🔁 Version ${targetVersion} already bumped — body/changelog refresh only (bump-already-applied=true)`);
+			const outputs = [
+				"should-create-pr=true",
+				"bump-already-applied=true",
+				`commit-message=${commitMessage}`,
+				`version-bump=${versionAnalysis.versionBump}`,
+				`has-breaking=${versionAnalysis.hasBreaking || false}`
+			];
+			if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
+				outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
+			}
+			appendFileSync(process.env.GITHUB_OUTPUT, outputs.join("\n") + "\n");
 			process.exit(0);
 		}
 
@@ -307,6 +330,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	// ── Step 4: Output results ─────────────────────────────────────────────────
 	const outputs = [
 		"should-create-pr=true",
+		"bump-already-applied=false",
 		`commit-message=${commitMessage}`,
 		`version-bump=${versionAnalysis.versionBump}`,
 		`has-breaking=${versionAnalysis.hasBreaking || false}`
