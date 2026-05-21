@@ -62,7 +62,7 @@ hotfix   ───────────────────────�
 |---|---|---|---|---|
 | `master` | Production. Tagged releases live here. | Release commits only | Never. Protected. | **No** — manual review + green checks |
 | `next` | Integration for unreleased features/fixes. | Free-form (squashed contributor commits) | Force-reset to master HEAD after each `next → master` release | **Yes** — contributor PRs with required reviews + green checks |
-| `hotfix` | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits) | Force-reset to master HEAD after each `hotfix → master` release | **No** — security-class work; manual review only |
+| `hotfix` | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits) | Force-reset to master HEAD after each `hotfix → master` release | **No** — effectively manual via codeowner-required gate (§9); GitHub's repo-level auto-merge toggle is on, but the codeowner approval requirement makes auto-merge unsatisfiable in practice |
 | `feature/*`, `fix/*` | Contributor work. | Whatever they want. | Deleted on merge to `next`. | N/A |
 | `hotfix/*`, `security/*` | Hotfix work. | Whatever they want. | Deleted on merge to `hotfix`. | N/A |
 
@@ -153,6 +153,7 @@ Trigger: `pull_request` (`opened`, `synchronize`). **Not** `edited` — contribu
 **Skip conditions** (early-exit before any rewrite logic):
 - `pull_request.user.type == "Bot"` — any bot-created PR (cldmv-bot, github-actions, dependabot, renovate, etc.) is exempt. This catches every automated PR-creation path without needing markers, since GitHub stamps the property itself.
 - PR base ref is `master` AND head ref is `next` or `hotfix` — the long-running release PRs own their own title format via the release flow.
+- PR title starts with `release:` — escape-hatch override (matches v3's emergency-release commit semantics, see §10.2); contributor or maintainer is asserting explicit control of the title, pass through unchanged.
 
 **No markers in PR body.** Markers in the body would leak into the squash-merge commit message when the PR lands. Idempotency is achieved by:
 
@@ -227,7 +228,7 @@ After `next → master` merges:
 Solution: `local-next-reset.yml` force-pushes `next` → `master`. After reset:
 - `next` HEAD == master HEAD
 - Persistent release PR auto-closes (GitHub closes PRs whose head and base have converged)
-- Next push to `next` (next contributor PR merge) re-opens / re-creates it
+- Next push to `next` (next contributor PR merge) re-fires §6.1, whose `resolve-or-create-pr` step finds no open `next → master` PR and creates a fresh one
 
 ### 7.2 `hotfix` reset
 
@@ -244,6 +245,8 @@ Options:
 - **C. Block hotfix releases while next has accumulated work.** Force-close-and-restart-from-scratch model.
 
 **Picking B.** Merge master into next via API (allow-merge-commit on next is fine, since next isn't user-facing). Simple, idempotent, no force-push risk. The release PR's diff against master cleanly shows only feature work.
+
+The API merge counts as a push to `next`, which triggers §6.1's existing `on: push: next` pathway — the persistent release PR refreshes automatically, recalculating bump and changelog against the new master base. No separate trigger needed.
 
 ### 7.3 Race protection
 
@@ -370,6 +373,8 @@ Six PRs in sequence, each independently shippable:
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
 
+**`@v4` stability between migration PRs:** PRs #3 through #5 are additive but incomplete — `@v4` during that window is an unstable preview. Do not migrate production consumer repos until PR #6 lands and v4.0.0 is formally cut. After PR #6, `@v4` is considered stable.
+
 Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR #6 — written for internal institutional memory, not external consumer hand-holding.
 
 ## 12. Out of scope (deferred)
@@ -388,4 +393,4 @@ Before any PR for this work begins:
 - [x] §10.1 questions resolved
 - [ ] Branch protection JSON shape (§9) approved
 - [ ] Migration sequence (§11) approved
-- [ ] §10.2 remaining open questions resolved
+- [ ] §10.3 still-open questions resolved
