@@ -284,38 +284,52 @@ All resets use `--force-with-lease` (or equivalent API headers when going throug
 
 ## 9. Branch protection rules
 
-Configured per-repo in `data/branch-protection.json` (new file consumed by the repo-setup workflow).
+v4 uses **GitHub Rulesets**, not the legacy branch-protection API. Rulesets are imported as JSON via Settings → Rules → Rulesets → New ruleset → "Import a ruleset".
 
-```json
-{
-  "master": {
-    "required_status_checks": ["Local CI", "Local CodeQL"],
-    "required_pull_request_reviews": { "required_approving_review_count": 1 },
-    "enforce_admins": false,
-    "restrictions": null,
-    "required_linear_history": true,
-    "allow_force_pushes": false,
-    "allow_deletions": false
-  },
-  "next": {
-    "required_status_checks": ["Local CI"],
-    "required_pull_request_reviews": { "required_approving_review_count": 1 },
-    "allow_force_pushes": { "users": ["cldmv-bot[bot]"] },
-    "allow_deletions": false
-  },
-  "hotfix": {
-    "required_status_checks": ["Local CI", "Local CodeQL"],
-    "required_pull_request_reviews": { "required_approving_review_count": 1, "require_code_owner_reviews": true },
-    "allow_force_pushes": { "users": ["cldmv-bot[bot]"] },
-    "allow_deletions": false
-  }
-}
-```
+Canonical templates live in [`data/rulesets/`](../../data/rulesets/):
 
-GitHub's "Allow auto-merge" (repo-level toggle) = **ON**. The branch protection rules above determine which PRs can effectively auto-merge:
-- PRs targeting `next`: 1 review + Local CI → auto-merge fires
-- PRs targeting `master`: 1 review + Local CI + Local CodeQL → fires only when all satisfied (effectively manual since maintainer review is the bottleneck)
-- PRs targeting `hotfix`: 1 reviewer + codeowner + all checks → manual
+- [`master.json`](../../data/rulesets/master.json) — production branch
+- [`next.json`](../../data/rulesets/next.json) — integration branch
+- [`hotfix.json`](../../data/rulesets/hotfix.json) — hotfix lane
+
+A static generator at [`docs/tools/ruleset-generator/`](../tools/ruleset-generator/index.html) (hosted via GitHub Pages from this repo) prompts for repo-specific values and emits ready-to-import JSON for each branch. Consumers download the three files and import each in the repo's Settings → Rules → Rulesets UI.
+
+### 9.1 Generator questions
+
+1. **Required approvals** — number (default 1). Optional "team size" pre-fill that auto-sets the number.
+2. **Require Code Owner reviews on hotfix?** — yes/no (default yes). Hotfix-only — master and next don't require code-owner review.
+
+Everything else is hardcoded into the templates from v4's intended flow:
+
+| Setting | master | next | hotfix |
+|---|---|---|---|
+| `non_fast_forward` (block force-push) | yes | **no** (bot resets allowed) | yes |
+| `required_signatures` (GPG) | yes | yes | yes |
+| `required_linear_history` | yes | **no** (allows §7.2 API merge commits) | yes |
+| `required_status_checks: ["✅ Required PR Check"]` | yes | yes | yes |
+| `code_scanning` (CodeQL `high_or_higher`) | yes | yes | yes |
+| `copilot_code_review` | yes | no | yes |
+| `allowed_merge_methods: ["squash"]` | yes | yes | yes |
+| `required_review_thread_resolution` | yes | yes | yes |
+| `dismiss_stale_reviews_on_push` | yes | yes | yes |
+| `deletion` (block branch deletion) | yes | yes | yes |
+
+Consumers whose actual check names differ from `"✅ Required PR Check"` edit the imported ruleset post-import.
+
+### 9.2 bypass_actors (manual, post-import)
+
+Templates ship with `bypass_actors: [{ actor_type: "OrganizationAdmin", bypass_mode: "always" }]` only. After importing each ruleset, consumers manually add their bot to the ruleset's Bypass list via the GitHub UI.
+
+For `next` and `hotfix`, the bot **must** be in `bypass_actors` — the v4 reset workflows (§6.3, §7.2) push as the bot and would be blocked otherwise. For `master`, the bot does NOT need bypass; master only changes via merged PRs.
+
+CLDMV consumers using `cldmv-bot`: add the App via the ruleset's Bypass list (the UI lets you pick from installed Apps).
+
+### 9.3 Auto-merge
+
+Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflow). Per-branch effective gating via rulesets:
+- PRs targeting `next`: 1 approval + required checks → auto-merge fires when satisfied.
+- PRs targeting `master`: 1 approval + required checks + Copilot review → effectively manual via Copilot-review bottleneck.
+- PRs targeting `hotfix`: 1 approval + codeowner gate + required checks → effectively manual via codeowner gate (§4).
 
 ## 10. Resolved questions + remaining open ones
 
@@ -343,16 +357,16 @@ GitHub's "Allow auto-merge" (repo-level toggle) = **ON**. The branch protection 
 
 ### 10.3 Still open
 
-1. **First-time bootstrap workflow (`local-v4-bootstrap.yml`).** Concrete sketch:
+1. **First-time bootstrap workflow (`local-v4-bootstrap.yml`).** Slimmer scope now that branch protection is handled by the static ruleset generator (§9). Concrete sketch:
    - **Trigger:** `workflow_dispatch` (manual, run once per repo migration)
    - **Inputs:** `next_branch_name` (default `next`), `hotfix_branch_name` (default `hotfix`), `dry_run` (default `true`)
    - **Steps:**
      1. Create `next` branch from master HEAD (no-op if exists)
      2. Create `hotfix` branch from master HEAD (no-op if exists)
-     3. Apply branch protection rules to `master` / `next` / `hotfix` from a `data/v4-branch-protection.json` template (per §9), via `PUT /repos/{owner}/{repo}/branches/{branch}/protection`
-     4. Enable "Allow auto-merge" at the repo level via `PATCH /repos/{owner}/{repo}` (`allow_auto_merge: true`)
-     5. Optionally check in v4 workflow stubs to `.github/workflows/` (skip if already present)
-     6. Summary report: what was created, what was skipped, what was changed
+     3. Enable "Allow auto-merge" at the repo level via `PATCH /repos/{owner}/{repo}` (`allow_auto_merge: true`)
+     4. Optionally check in v4 workflow stubs to `.github/workflows/` (skip if already present)
+     5. Summary report with a link to the ruleset generator (§9) and the post-import bypass-list step
+   - **Branch protection is NOT applied by this workflow.** §9's static generator emits the JSONs; consumer imports them manually via the GitHub UI and adds the bot to the bypass list of `next` and `hotfix`.
    - **Idempotent:** running twice should be a no-op.
    - **Reversible:** does NOT delete existing v3 workflows. Repo can run v3 and v4 in parallel until ready to fully cut over.
 
@@ -369,7 +383,7 @@ Six PRs in sequence, each independently shippable:
 | 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in |
 | 4 | **v4 hotfix lane** | `local-hotfix-release.yml`, `local-hotfix-redirector.yml`. | Yes — additive on @v4 |
 | 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml`. | Yes — additive on @v4 |
-| 6 | **v4 bootstrap + migration guide** | `local-v4-bootstrap.yml` for one-shot migration. `docs/migration/v3-to-v4.md`. Decommission `workflow-sync-open-release-prs.yml` from @v4. | Final v4 cut |
+| 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfix}.json` templates. `docs/tools/ruleset-generator/` static site (HTML + JS, hosted via Pages from `docs/`). `docs/migration/v3-to-v4.md`. Decommission `workflow-sync-open-release-prs.yml` from @v4. | Final v4 cut |
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
 
