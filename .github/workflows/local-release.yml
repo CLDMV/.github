@@ -26,11 +26,14 @@ on:
         # Don't fire on bot-managed or special branches.
         branches-ignore: [master, main, badges, gh-pages, dev]
         paths-ignore:
-            - "**.md"
-            - "docs/**"
-            - "*.md"
+            # Pure metadata files — never warrant a release.
             - "LICENSE"
             - ".gitignore"
+            - ".gitattributes"
+            # NB: do NOT add `**.md` or `docs/**` here. For this repo, docs
+            # (changelogs, migration guides, agent-scaffolding guide, etc.)
+            # ship with the @v3 tag — consumers fetch them — so a docs-only
+            # change is releasable and should trigger this flow.
 
 permissions:
     contents: write

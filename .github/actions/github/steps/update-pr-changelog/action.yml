@@ -12,6 +12,10 @@ inputs:
   new-version:
     description: "New release version (used for the PR title)"
     required: true
+  title-suffix:
+    description: "Optional suffix appended after 'release: vX.Y.Z - ' to distinguish PRs that share the same target version. When empty, the plain 'release: vX.Y.Z' form is used."
+    required: false
+    default: ""
   changelog-content:
     description: "Generated changelog markdown for the PR body"
     required: false
