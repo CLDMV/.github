@@ -1,0 +1,64 @@
+name: "Redirect Hotfix PR"
+description: "Change a PR's base branch from the default ('next' under v4) to 'hotfix' when the head branch matches a hotfix/security pattern. Idempotent; skips bot-created PRs and PRs already targeting the hotfix branch."
+
+inputs:
+  pr-number:
+    description: "PR number to inspect / redirect"
+    required: true
+  github-token:
+    description: "GitHub token with PR write access"
+    required: false
+    default: ${{ github.token }}
+  head-ref:
+    description: "PR head branch. When empty, fetched from API."
+    required: false
+  base-ref:
+    description: "PR base branch. When empty, fetched from API."
+    required: false
+  user-type:
+    description: "PR author's `user.type` ('User'|'Bot'). When empty, fetched from API."
+    required: false
+  target-base:
+    description: "Branch to redirect hotfix/security PRs to."
+    required: false
+    default: "hotfix"
+  hotfix-branch-pattern:
+    description: "Regex (no anchors needed; matched against the start of the head ref) for branches that should be redirected."
+    required: false
+    default: "^(hotfix|security)/"
+  dry-run:
+    description: "When 'true', log the would-be redirection but do not PATCH the PR or post a comment."
+    required: false
+    default: "false"
+
+outputs:
+  redirected:
+    description: "'true' if the PR base was changed"
+    value: ${{ steps.redirect.outputs.redirected }}
+  new-base:
+    description: "Base branch after the action (possibly unchanged)"
+    value: ${{ steps.redirect.outputs.new-base }}
+  skipped:
+    description: "'true' if the action exited early due to a skip condition"
+    value: ${{ steps.redirect.outputs.skipped }}
+  skip-reason:
+    description: "Human-readable reason when skipped is 'true'"
+    value: ${{ steps.redirect.outputs.skip-reason }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Redirect hotfix PR base
+      id: redirect
+      shell: bash
+      env:
+        INPUT_PR_NUMBER: ${{ inputs.pr-number }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_HEAD_REF: ${{ inputs.head-ref }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_USER_TYPE: ${{ inputs.user-type }}
+        INPUT_TARGET_BASE: ${{ inputs.target-base }}
+        INPUT_HOTFIX_BRANCH_PATTERN: ${{ inputs.hotfix-branch-pattern }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        node "${{ github.action_path }}/action.mjs"
