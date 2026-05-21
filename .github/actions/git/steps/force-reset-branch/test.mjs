@@ -4,7 +4,7 @@
  * Run: `node test.mjs`. Does not invoke git.
  */
 
-import { buildPushArgs, isLeaseFailure, parseLsRemoteSha } from "./action.mjs";
+import { buildPushArgs, isLeaseFailure, parseLsRemoteSha, buildRemoteUrl, redactToken } from "./action.mjs";
 
 let failures = 0;
 
@@ -81,6 +81,31 @@ eq(
 );
 eq(parseLsRemoteSha("", "next"), "", "empty output");
 eq(parseLsRemoteSha(sample, ""), "", "empty ref");
+
+console.log("\nbuildRemoteUrl:");
+eq(
+	buildRemoteUrl("CLDMV/.github", "ghs_abc123"),
+	"https://x-access-token:ghs_abc123@github.com/CLDMV/.github.git",
+	"composes x-access-token URL"
+);
+eq(
+	buildRemoteUrl("owner/repo", "tok"),
+	"https://x-access-token:tok@github.com/owner/repo.git",
+	"generic owner/repo"
+);
+
+console.log("\nredactToken:");
+eq(
+	redactToken("git push https://x-access-token:ghs_secret@github.com/o/r.git master:refs/heads/next --force-with-lease"),
+	"git push https://x-access-token:***@github.com/o/r.git master:refs/heads/next --force-with-lease",
+	"masks the token in a push command"
+);
+eq(
+	redactToken("! [rejected] (stale info)"),
+	"! [rejected] (stale info)",
+	"leaves token-free strings unchanged"
+);
+eq(redactToken(null), null, "null passthrough");
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);

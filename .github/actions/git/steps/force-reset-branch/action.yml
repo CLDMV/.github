@@ -17,6 +17,13 @@ inputs:
     description: "Number of times to retry on lease failure (re-fetch + push). 0 disables retry."
     required: false
     default: "1"
+  github-token:
+    description: "When set, push via an x-access-token URL so the push is attributed to the token's identity (the CLDMV bot) — required to force-push a protected branch whose ruleset only bypasses the bot. When empty, pushes to the plain `remote` using the ambient git credentials."
+    required: false
+  repository:
+    description: "owner/repo for the authenticated push URL. Defaults to the current repository."
+    required: false
+    default: ${{ github.repository }}
 
 outputs:
   reset-sha:
@@ -37,5 +44,7 @@ runs:
         INPUT_SOURCE_REF: ${{ inputs.source-ref }}
         INPUT_REMOTE: ${{ inputs.remote }}
         INPUT_MAX_RETRIES: ${{ inputs.max-retries }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
       run: |
         node "${{ github.action_path }}/action.mjs"
