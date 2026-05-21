@@ -30,7 +30,7 @@ The common thread: **per-PR release PRs encode too much state on each contributo
 - **Hotfix path stays independent** of feature development — security work doesn't queue behind unreleased features.
 - **Forgotten releases get noticed** — a pending release sitting unmerged for too long files a tracking issue.
 - **Contributor friction stays low** — no changeset files, no special commit message rituals beyond conventional commits.
-- **Downstream consumers** get a clear migration path; existing v3 stays supported until v4 has settled.
+- **Internal migration is captured** so future-you can reconstruct the design intent. CLDMV is the only consumer; there's no external user base to support — the v3 tag stays available indefinitely (tags are immutable), but no active maintenance promise.
 
 ## 3. Non-goals
 
@@ -353,7 +353,7 @@ GitHub's "Allow auto-merge" (repo-level toggle) = **ON**. The branch protection 
    - **Idempotent:** running twice should be a no-op.
    - **Reversible:** does NOT delete existing v3 workflows. Repo can run v3 and v4 in parallel until ready to fully cut over.
 
-2. **Documentation lookahead.** Lean: incrementally — each migration PR appends to `docs/migration/v3-to-v4.md`. By the time PR #6 (§11) lands, the guide is complete and the v4 release publishes alongside it.
+<!-- (resolved: docs/migration/v3-to-v4.md is written all-at-once as part of §11 PR #6 — see §11) -->
 
 ## 11. Migration plan
 
@@ -368,7 +368,9 @@ Six PRs in sequence, each independently shippable:
 | 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml`. | Yes — additive on @v4 |
 | 6 | **v4 bootstrap + migration guide** | `local-v4-bootstrap.yml` for one-shot migration. `docs/migration/v3-to-v4.md`. Decommission `workflow-sync-open-release-prs.yml` from @v4. | Final v4 cut |
 
-Each step ships against `@v4` (rolling major tag). Existing v3 consumers stay on `@v3` until they choose to migrate. v3 stays supported for a minimum of 6 months after v4.0.0 publishes.
+Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
+
+Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR #6 — written for internal institutional memory, not external consumer hand-holding.
 
 ## 12. Out of scope (deferred)
 
