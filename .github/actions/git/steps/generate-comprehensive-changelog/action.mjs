@@ -669,6 +669,14 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Don't filter out release commits - they may contain useful information
 
+	// Drop bot-authored 'chore: bump version to X.Y.Z' commits from every
+	// section before categorization. They're an internal artifact of the
+	// release flow (the version is already communicated by the PR title) and
+	// only add noise to the human-facing changelog. Regex mirrors
+	// check-release-commit's botBumpRe so the two stay in sync.
+	const botBumpRe = /^chore(\([^)]*\))?:\s*bump version to v?(\d+\.\d+\.\d+)/i;
+	commits = commits.filter((c) => !botBumpRe.test(c.subject || ""));
+
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
 	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
