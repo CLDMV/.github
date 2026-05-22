@@ -282,6 +282,7 @@ Therefore the version bump must be present on `next` before the squash, exactly 
 | `normalize-pr-title` | Implements §6.4's PR title rewrite. |
 | `redirect-hotfix-pr` | Implements §6.5's PR target change. |
 | `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`). |
+| `pending-release-reminder` | Implements §6.6 — ages master's last release, finds open `next`/`hotfixes` release PRs, files a deduped tracking issue + comment when stale. |
 
 ### 8.3 Unchanged (reused as-is)
 
@@ -396,7 +397,7 @@ Six PRs in sequence, each independently shippable:
 | 2 | **`@v3` parallel: PR title normalizer** | Add `local-pr-title-normalizer.yml` for v3 repos. Backportable feature. | Yes — useful even pre-v4 | ✅ shipped v3.4.0 |
 | 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in | 🚧 in progress |
 | 4 | **v4 hotfix lane** | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next. | Yes — additive | 🚧 in progress |
-| 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml`. | Yes — additive on @v4 | ⬜ pending |
+| 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml` + the `pending-release-reminder` action. | Yes — additive | 🚧 in progress |
 | 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site (HTML + JS, hosted via Pages from `docs/`). `docs/migration/v3-to-v4.md`. Decommission `workflow-sync-open-release-prs.yml` from @v4. Plus: generate a top-level `README.md` and remove stray root dev/test files (`debug-tags.js`, `test-*.mjs`). | Final v4 cut | ⬜ pending |
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
