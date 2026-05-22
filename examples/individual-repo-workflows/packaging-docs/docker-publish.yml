@@ -33,7 +33,7 @@ on:
 
 jobs:
   docker-publish:
-    uses: CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v3
+    uses: CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v4
     with:
       debug: ${{ github.event.inputs.debug == 'true' }}
       registry: ghcr.io

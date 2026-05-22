@@ -12,7 +12,8 @@
 # This repo is JavaScript/TypeScript only, no build step, no native langs;
 # we call github/codeql-action directly rather than going through the
 # reusable-codeql.yml + parse-csv-list dance. Avoids the chicken-and-egg
-# where the reusable references @v3 actions before v3 is cut.
+# where the reusable would reference the org's own actions at a major tag
+# that isn't published yet during a cut.
 name: 🔍 Local CodeQL
 
 on:

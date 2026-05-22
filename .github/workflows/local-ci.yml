@@ -201,31 +201,40 @@ jobs:
                   echo "count=$rc" >> "$GITHUB_OUTPUT"
                   exit "$rc"
 
-            - name: Verify no @v2 references remain in source
-              id: v2refs
+            - name: Verify no stale internal @v2/@v3 refs remain
+              id: stalerefs
               if: always()
               continue-on-error: true
               shell: bash
               run: |
-                  # After the v3 cut all internal references should be @v3.
-                  # Exclusions:
-                  #   tmp/                                       — gitignored planning material
-                  #   docs/migration/                            — historical migration guide(s)
-                  #   docs/changelogs/                           — historical version references
-                  #   CHANGELOG*                                 — same
-                  #   .github/workflows/local-ci.yml             — this file (contains the grep + literal @v2 strings)
-                  out=$(git grep -nI '@v2\b' \
-                      -- ':!tmp/**' ':!docs/migration/**' ':!docs/changelogs/**' \
+                  # After the v4 cut, every INTERNAL ref to this org's own
+                  # workflows/actions must be @v4. Flag anything still pinned at
+                  # @v2 or @v3. Two internal ref shapes are matched:
+                  #   - full:  uses: CLDMV/.github/.github/{workflows,actions}/…@vN
+                  #   - short: <workflow|reusable|local>-NAME.yml@vN  (docs / guides)
+                  # Third-party actions (github/*, actions/*, ossf/*, …) keep their
+                  # own @v3 and are deliberately NOT matched — the patterns target
+                  # CLDMV-internal refs only, so bare prose like "@v3 (legacy,
+                  # frozen)" in the README / design docs is fine too.
+                  # Exclusions (pathspec — historical or literal):
+                  #   tmp/                            — gitignored planning material
+                  #   .archive/                       — frozen pre-refactor workflow snapshots
+                  #   docs/migration/, docs/changelogs/, CHANGELOG*  — historical refs
+                  #   .github/workflows/local-ci.yml  — this file (holds the literal patterns)
+                  out=$(git grep -nIE \
+                      -e 'uses:[[:space:]]*CLDMV/\.github/[^[:space:]]*@v[23]\b' \
+                      -e '(workflow|reusable|local)-[a-z0-9-]+\.yml@v[23]\b' \
+                      -- ':!tmp/**' ':!.archive/**' ':!docs/migration/**' ':!docs/changelogs/**' \
                       ':!CHANGELOG*' ':!.github/workflows/local-ci.yml')
                   if [ -z "$out" ]; then
-                      echo "### ✅ No stale @v2 references" >> "$GITHUB_STEP_SUMMARY"
+                      echo "### ✅ No stale internal @v2/@v3 refs" >> "$GITHUB_STEP_SUMMARY"
                       echo "count=0" >> "$GITHUB_OUTPUT"
                   else
                       lines=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
                       echo "$out"
-                      echo "::error::Found stale @v2 references in source. Update to @v3."
+                      echo "::error::Found stale internal @v2/@v3 refs. Update them to @v4."
                       {
-                          echo "### ❌ Stale @v2 references — $lines line(s)"
+                          echo "### ❌ Stale internal @v2/@v3 refs — $lines line(s)"
                           echo
                           echo '```'
                           printf '%s\n' "$out"
@@ -246,14 +255,14 @@ jobs:
                   yaml="${{ steps.yaml.outputs.count }}"
                   al="${{ steps.actionlint.outputs.count }}"
                   ar="${{ steps.actionrefs.outputs.count }}"
-                  v2="${{ steps.v2refs.outputs.count }}"
+                  stale="${{ steps.stalerefs.outputs.count }}"
                   node="${node:-?}"
                   yaml="${yaml:-?}"
                   al="${al:-?}"
                   ar="${ar:-?}"
-                  v2="${v2:-?}"
+                  stale="${stale:-?}"
                   total_failed=0
-                  for n in "$node" "$yaml" "$al" "$ar" "$v2"; do
+                  for n in "$node" "$yaml" "$al" "$ar" "$stale"; do
                       case "$n" in
                           0|"?") ;;
                           *) total_failed=$((total_failed + 1));;
@@ -282,7 +291,7 @@ jobs:
                       echo "| YAML parse | $(status_for "$yaml") |"
                       echo "| actionlint | $(status_for "$al") |"
                       echo "| Action refs (inputs + remote versions) | $(status_for "$ar") |"
-                      echo "| Stale @v2 references | $(status_for "$v2") |"
+                      echo "| Stale internal @v2/@v3 refs | $(status_for "$stale") |"
                   } >> "$GITHUB_STEP_SUMMARY"
                   if [ "$total_failed" -gt 0 ]; then
                       exit 1

@@ -206,8 +206,8 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             # Refresh logic lives in the update-release-pr composite action so
-            # it can be reused by workflow-sync-open-release-prs.yml (fan-out
-            # from master merges) without duplication. P3.2.
+            # the v4 integration-branch release workflows (local-next-release.yml /
+            # local-hotfixes-release.yml) share it without duplication.
             - name: Refresh release PR
               uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:

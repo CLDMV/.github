@@ -63,6 +63,6 @@ inputs for free. Composite delegation steps must instead pass values to the
    genuinely needs to `uses:` another action.
 3. Import shared helpers from `core.mjs` instead of reimplementing them.
 4. Keep `action.yml` inputs/outputs stable — consumers pin these actions by
-   tag, and other actions reference them as `@v3`.
+   tag, and other actions reference them as `@v4`.
 5. See [`../instructions/repo-conventions.instructions.md`](../instructions/repo-conventions.instructions.md)
    for tag, signing, API-version, and secret-naming rules.

@@ -30,7 +30,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   │     local-ci.yml, local-codeql.yml, local-tag-health.yml,
 │   │     local-stale.yml, local-labeler.yml, local-welcome.yml,
 │   │     local-branch-retention.yml, local-master-commit-audit.yml,
-│   │     local-update-major-version-tags.yml,
+│   │     local-update-major-version-tags.yml, local-publish.yml,
 │   │     # v4 staging-branch flow:
 │   │     local-next-release.yml, local-next-reset.yml, local-hotfixes-release.yml,
 │   │     local-hotfix-redirector.yml, local-pr-title-normalizer.yml,
@@ -71,7 +71,7 @@ examples/
 ├── guides/                                      # 🆕 v3: setup / dry-run / rolling-tag guides
 └── individual-repo-workflows/                   # copy-paste templates for consumers, grouped:
     ├── core-cicd/         (ci, release, publish, update-major-version-tags)
-    ├── release-companions/(sync-release-prs, tag-health, release-notify, master-commit-audit)
+    ├── release-companions/(tag-health, release-notify, master-commit-audit)
     ├── security/          (codeql, dependency-review, scorecard, cla)
     ├── automation/        (dependabot-auto-merge, labeler, welcome, stale, branch-retention)
     └── packaging-docs/    (docker-publish, bundle-size, docs, sync-org-labels)
@@ -90,6 +90,24 @@ examples/
 **`@v3` (legacy, frozen):** the previous per-PR flow — every release-eligible PR carried its own `release: vX.Y.Z` version bump with an auto-pushed `chore: bump version` commit. Frozen at v3.8.1, unmaintained but available indefinitely; new repos should adopt `@v4`.
 
 **Tags:** pin **`@v4`** (recommended) for the staging-branch flow — a rolling-major tag tracking the latest release. `@v3` stays pinned to the last v3 release for repos not yet migrated.
+
+## ⚙️ v4 automation (this repo's dogfood)
+
+These `local-*.yml` workflows run the v4 flow **on this repo itself** — the engine behind the release flow above. Consumers don't copy them (they adopt the flow via the ruleset generator + `local-v4-bootstrap.yml`); they're listed here so maintainers can see what fires when.
+
+| Workflow | Trigger | Role |
+|---|---|---|
+| `local-next-release.yml` | push to `next` | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range. |
+| `local-hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
+| `local-hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs onto the `hotfixes` lane. |
+| `local-pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
+| `local-next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via the **REST API** (gated on the released major tag); merges master into `next` after a hotfix release to preserve in-flight work. |
+| `local-publish.yml` | push to `master` (release merge) | Creates the signed `vX.Y.Z` tag + GitHub Release — no npm publish (this repo isn't a package) — which in turn fires the tag roller. |
+| `local-update-major-version-tags.yml` | `release: published` / tag push | Rolls the floating `@vN` / `@vN.Y` major/minor tags onto the new release. |
+| `local-pending-release-reminder.yml` | daily cron | Files an issue when a release PR has sat unshipped past a threshold. |
+| `local-v4-bootstrap.yml` | manual dispatch | One-time: creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. |
+
+The other `local-*.yml` (`local-ci`, `local-codeql`, `local-labeler`, `local-welcome`, `local-stale`, `local-branch-retention`, `local-master-commit-audit`, `local-tag-health`) dogfood the reusable building blocks below, calling the matching `reusable-*.yml` (or an inline equivalent) on this repo's own events.
 
 ## 🔧 Available Workflows
 
@@ -152,9 +170,9 @@ tag creation.
 6. **📈 Major/Minor Updates** — maintains rolling version references.
 7. **🔄 Token Management** — coordinates App-token authentication throughout.
 
-## 🆕 v3 Workflows
+## 🧩 Reusable building blocks (consumer-facing)
 
-Added to v3. Each has a copy-paste template in `examples/individual-repo-workflows/`.
+Reusable `workflow_call` jobs — introduced in v3, current on `@v4`. Each has a copy-paste template in `examples/individual-repo-workflows/`.
 
 | Workflow | Purpose |
 |---|---|

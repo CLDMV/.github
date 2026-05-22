@@ -36,7 +36,7 @@ permissions:
 
 jobs:
     label:
-        uses: CLDMV/.github/.github/workflows/reusable-pr-labeler.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-pr-labeler.yml@v4
         # Optional. Without these, labels are attributed to github-actions[bot].
         # With these, they're attributed to your CLDMV bot App.
         secrets:

@@ -12,7 +12,7 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 
 ## Template Catalog
 
-Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into five subfolders. Each one references the matching org workflow via `@v3`. Copy what you need; you don't need to adopt all of them.
+Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into five subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them.
 
 ### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD (most repos want all four)
 
@@ -27,7 +27,6 @@ Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), gr
 
 | Template | Triggers | What it does |
 |---|---|---|
-| `sync-release-prs.yml` | PR merged to default | Re-evaluates every open release PR's version + changelog. Closes the silent-regression bug (P3.1/P3.2). |
 | `tag-health.yml` | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags. |
 | `release-notify.yml` | `release: published` | Posts to configured Discord/Slack/generic webhook channels. |
 | `master-commit-audit.yml` | push to default | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern. |

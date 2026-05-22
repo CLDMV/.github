@@ -34,7 +34,7 @@ Ask the user these questions before touching any files. Use a single batched que
 
 | # | Question | Type | Why it matters |
 |---|---|---|---|
-| 1 | What's the npm package name (e.g. `@your-org/your-package`)? | string | Required by `ci.yml`, `release.yml`, `publish.yml`, `sync-release-prs.yml`, `docker-publish.yml` |
+| 1 | What's the npm package name (e.g. `@your-org/your-package`)? | string | Required by `ci.yml`, `release.yml`, `publish.yml`, `docker-publish.yml` |
 | 2 | Is this an npm-published package, or a meta-package (workflows/actions only, no npm publish)? | enum (`npm` / `meta`) | Determines whether `publish.yml` is needed and what `release_source_only` should be |
 | 3 | Does this repo ship a runtime bundle (`dist/`)? | bool | If yes, adopt `bundle-size.yml` |
 | 4 | Does this repo publish docs to a `gh-pages` branch? | bool | If yes, adopt `docs.yml` |
@@ -65,7 +65,6 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the four
 
 | Template | From | Note |
 |---|---|---|
-| `sync-release-prs.yml` | `release-companions/sync-release-prs.yml` | Customize `package_name` |
 | `master-commit-audit.yml` | `release-companions/master-commit-audit.yml` | No customization needed for default patterns |
 | `tag-health.yml` | `release-companions/tag-health.yml` | No customization needed |
 
@@ -244,7 +243,7 @@ curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionli
 
 ```bash
 git add .github/ CLA.md   # CLA.md only if you added it
-git commit -m "feat(ci): scaffold CLDMV org workflows (@v3)"
+git commit -m "feat(ci): scaffold CLDMV org workflows (@v4)"
 git push -u origin chore/scaffold-workflows
 ```
 
