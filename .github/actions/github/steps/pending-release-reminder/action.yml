@@ -1,0 +1,32 @@
+name: "Pending Release Reminder"
+description: "When a release has been sitting unmerged too long, file a deduped tracking issue and comment on the release PR. Implements §6.6 of the v4 design. Reads the last release date from `git log` (the workflow must check out master first)."
+
+inputs:
+  next-threshold-days:
+    description: "Days since the last release before a pending next → master PR triggers a reminder."
+    required: false
+    default: "14"
+  hotfixes-threshold-days:
+    description: "Days since the last release before a pending hotfixes → master PR triggers a reminder."
+    required: false
+    default: "3"
+  issue-labels:
+    description: "Comma-separated labels applied to the filed reminder issue."
+    required: false
+    default: "priority: high,type: release"
+  dedup-window:
+    description: "Dedup bucket granularity: 'week' (default), 'day', or 'month'. One reminder per branch per bucket."
+    required: false
+    default: "week"
+  github-token:
+    description: "GitHub token with issues:write + pull-requests:write."
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  reminders-filed:
+    description: "Count of reminder issues filed this run (0 when nothing was stale or all were already deduped)."
+
+runs:
+  using: "node24"
+  main: "action.mjs"

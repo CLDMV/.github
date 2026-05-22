@@ -1,0 +1,80 @@
+#
+# @Project: workflows
+# @Filename: /local-pending-release-reminder.yml
+# @Date: 2026-05-22 00:00:00 -07:00 (1779778800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# v4: nudge when a release sits unmerged too long (§6.6).
+#
+# Runs daily. If it's been longer than the per-lane threshold since the last
+# release on master AND a `next → master` / `hotfixes → master` PR is still
+# open, file a deduped tracking issue and comment on the release PR. Dedup is
+# per-lane per-bucket (default: ISO week), so it won't re-file every day.
+#
+# Thresholds / labels / dedup window are workflow_dispatch inputs (with the
+# §6.6 defaults), so a manual run can override them.
+#
+# STATUS: v4 preview.
+name: ⏰ Local Pending Release Reminder (v4)
+
+on:
+    schedule:
+        - cron: "0 9 * * *" # daily 09:00 UTC
+    workflow_dispatch:
+        inputs:
+            next_threshold_days:
+                description: "Days since last release before a pending next → master PR is flagged"
+                required: false
+                default: "14"
+            hotfixes_threshold_days:
+                description: "Days since last release before a pending hotfixes → master PR is flagged"
+                required: false
+                default: "3"
+            dedup_window:
+                description: "Dedup bucket: week / day / month"
+                required: false
+                default: "week"
+
+permissions:
+    contents: read
+    issues: write
+    pull-requests: write
+
+concurrency:
+    group: pending-release-reminder-${{ github.repository }}
+    cancel-in-progress: false
+
+jobs:
+    remind:
+        name: "⏰ Check for stale releases"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              # Full-permission mode (no permission_* flags) so the token gets
+              # both issues:write and pull-requests:write from the App.
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Checkout master
+              # fetch-depth 0 so `git log --grep '^release:'` can find the last
+              # release commit to age against.
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              with:
+                  fetch-depth: 0
+
+            - name: Pending release reminder
+              uses: CLDMV/.github/.github/actions/github/steps/pending-release-reminder@v3
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  next-threshold-days: ${{ github.event.inputs.next_threshold_days || '14' }}
+                  hotfixes-threshold-days: ${{ github.event.inputs.hotfixes_threshold_days || '3' }}
+                  dedup-window: ${{ github.event.inputs.dedup_window || 'week' }}
