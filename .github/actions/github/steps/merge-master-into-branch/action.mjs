@@ -3,6 +3,13 @@
  * Merges API. Implements §7.2 of the v4 design — after a hotfix lands on
  * master, run this to preserve accumulated feature work on `next`.
  *
+ * Why the API and not a `git push`: a push authenticated as the bot App is
+ * rejected by a protected branch's ruleset (GH013 "Changes must be made
+ * through a pull request") even when the App is in the bypass list with mode
+ * Always — GitHub honors an App's ruleset bypass on the REST API path but not
+ * on raw git. force-reset-branch hit the same wall and switched to the Git
+ * Refs API for exactly this reason.
+ *
  * Pure helpers are exported for test.mjs; side-effecting main is gated to
  * script entry.
  *
