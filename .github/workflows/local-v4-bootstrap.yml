@@ -1,0 +1,106 @@
+#
+# @Project: workflows
+# @Filename: /local-v4-bootstrap.yml
+# @Date: 2026-05-22 00:00:00 -07:00 (1779778800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# v4 one-shot migration bootstrap (§10.3). Run once per repo via the Actions
+# tab. Idempotent — running twice is a no-op.
+#
+# It does the parts that genuinely benefit from automation:
+#   - creates the `next` and `hotfixes` integration branches from master HEAD
+#   - enables the repo-level "Allow auto-merge" toggle
+#
+# It deliberately does NOT apply branch protection — import the rulesets from
+# the generator (docs/tools/ruleset-generator/) and add the bot to the
+# next/hotfixes bypass lists by hand (§9). The run summary links both steps.
+name: 🚀 Local v4 Bootstrap
+
+on:
+    workflow_dispatch:
+        inputs:
+            next_branch:
+                description: "Integration branch for features/fixes"
+                required: false
+                default: "next"
+            hotfixes_branch:
+                description: "Integration branch for hotfixes"
+                required: false
+                default: "hotfixes"
+            dry_run:
+                description: "Log actions without making changes"
+                type: boolean
+                required: false
+                default: true
+
+permissions:
+    contents: write
+
+jobs:
+    bootstrap:
+        name: "🚀 Bootstrap v4 branches + settings"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              # Full-permission mode: branch creation needs contents:write and
+              # the auto-merge toggle needs repo administration:write.
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Create integration branches + enable auto-merge
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  REPO: ${{ github.repository }}
+                  NEXT: ${{ github.event.inputs.next_branch || 'next' }}
+                  HOTFIXES: ${{ github.event.inputs.hotfixes_branch || 'hotfixes' }}
+                  DRY_RUN: ${{ github.event.inputs.dry_run }}
+              run: |
+                  set -euo pipefail
+                  master_sha=$(gh api "repos/$REPO/git/ref/heads/master" --jq '.object.sha')
+                  echo "master HEAD: $master_sha"
+
+                  create_branch() {
+                      local branch="$1"
+                      if gh api "repos/$REPO/git/ref/heads/$branch" >/dev/null 2>&1; then
+                          echo "✅ $branch already exists — skipping"
+                          return
+                      fi
+                      if [ "$DRY_RUN" = "true" ]; then
+                          echo "🔸 [dry-run] would create $branch at $master_sha"
+                      else
+                          gh api -X POST "repos/$REPO/git/refs" \
+                              -f "ref=refs/heads/$branch" -f "sha=$master_sha" >/dev/null
+                          echo "🌱 created $branch at $master_sha"
+                      fi
+                  }
+                  create_branch "$NEXT"
+                  create_branch "$HOTFIXES"
+
+                  if [ "$DRY_RUN" = "true" ]; then
+                      echo "🔸 [dry-run] would enable repo allow_auto_merge"
+                  else
+                      gh api -X PATCH "repos/$REPO" -F allow_auto_merge=true >/dev/null \
+                          && echo "🔀 enabled allow_auto_merge" \
+                          || echo "⚠️ could not enable allow_auto_merge (App may lack admin) — enable it in Settings → General"
+                  fi
+
+                  {
+                      echo "## 🚀 v4 bootstrap"
+                      echo ""
+                      echo "Branches: \`$NEXT\`, \`$HOTFIXES\` (dry-run: \`$DRY_RUN\`)"
+                      echo ""
+                      echo "### Still to do by hand (§9)"
+                      echo "1. Import \`master\` / \`next\` / \`hotfixes\` rulesets — generate them at the [ruleset generator](https://github.com/$REPO/blob/master/docs/tools/ruleset-generator/index.html) or use \`data/rulesets/*.json\`."
+                      echo "2. Add the **bot App** (not the bot user/team) to the **Bypass list** of the \`next\` + \`hotfixes\` rulesets."
+                      echo "3. Re-run with \`dry_run: false\` if this was a dry run."
+                  } >> "$GITHUB_STEP_SUMMARY"
