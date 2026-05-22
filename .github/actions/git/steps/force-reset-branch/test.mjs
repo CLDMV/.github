@@ -4,7 +4,18 @@
  * Run: `node test.mjs`. Does not invoke git.
  */
 
-import { buildPushArgs, isLeaseFailure, parseLsRemoteSha, buildRemoteUrl, redactToken } from "./action.mjs";
+import {
+	buildPushArgs,
+	isLeaseFailure,
+	parseLsRemoteSha,
+	buildRemoteUrl,
+	redactToken,
+	isFullSha,
+	buildRefUpdatePayload,
+	buildRefCreatePayload,
+	parseRefObjectSha,
+	isRefNotFound
+} from "./action.mjs";
 
 let failures = 0;
 
@@ -111,6 +122,36 @@ eq(
 	"leaves token-free strings unchanged"
 );
 eq(redactToken(null), null, "null passthrough");
+
+console.log("\nisFullSha:");
+eq(isFullSha("deadbeef1234567890123456789012345678abcd"), true, "40-char hex");
+eq(isFullSha("DEADBEEF1234567890123456789012345678ABCD"), true, "uppercase hex");
+eq(isFullSha("deadbeef"), false, "short sha");
+eq(isFullSha("master"), false, "branch name");
+eq(isFullSha("g".repeat(40)), false, "non-hex 40 chars");
+eq(isFullSha(null), false, "null");
+
+console.log("\nbuildRefUpdatePayload:");
+eq(buildRefUpdatePayload("deadbeef"), { sha: "deadbeef", force: true }, "force update body");
+
+console.log("\nbuildRefCreatePayload:");
+eq(
+	buildRefCreatePayload("hotfixes", "cafe1234"),
+	{ ref: "refs/heads/hotfixes", sha: "cafe1234" },
+	"create body has fully-qualified ref"
+);
+
+console.log("\nparseRefObjectSha:");
+eq(parseRefObjectSha({ ref: "refs/heads/next", object: { sha: "abc123", type: "commit" } }), "abc123", "extracts object.sha");
+eq(parseRefObjectSha({ ref: "refs/heads/next" }), "", "missing object → empty");
+eq(parseRefObjectSha(null), "", "null → empty");
+
+console.log("\nisRefNotFound:");
+eq(isRefNotFound("GET /git/ref/heads/missing -> 404: {\"message\":\"Not Found\"}"), true, "404 status");
+eq(isRefNotFound("PATCH /git/refs/heads/x -> 422: Not Found somewhere"), true, "'Not Found' phrase");
+eq(isRefNotFound("PATCH /git/refs/heads/x -> 422: {\"message\":\"Changes must be made through a pull request\"}"), false, "rule violation is NOT not-found");
+eq(isRefNotFound("PATCH /git/refs/heads/x -> 403: forbidden"), false, "403 is not not-found");
+eq(isRefNotFound(null), false, "null");
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);

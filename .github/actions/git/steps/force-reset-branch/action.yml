@@ -1,5 +1,5 @@
 name: "Force-Reset Branch"
-description: "Force-reset a target branch to a source ref via `git push --force-with-lease`. Used by v4's local-next-reset.yml and local-hotfixes-reset.yml (§6.3 / §7) to bring next/hotfixes back to master HEAD after a release lands. Retries once on lease failure (re-fetches then retries) so a concurrent push from the bot itself doesn't race the reset."
+description: "Force-reset a target branch to a source ref. PRIMARY path is the REST Git Refs API (PATCH …/git/refs/heads/<branch> force:true); a raw git push as the bot App is rejected by a require-PR/block-force-push ruleset (GH013) even when the App is in the bypass list, whereas the API path honors the bypass (same reason merge-master-into-branch uses the Merges API). FALLBACK is `git push --force-with-lease`. Used by v4's local-next-reset.yml / local-hotfixes-reset.yml (§6.3 / §7) to bring next/hotfixes back to master HEAD after a release lands."
 
 inputs:
   target-branch:
@@ -29,7 +29,9 @@ outputs:
   reset-sha:
     description: "SHA the target branch now points to on the remote."
   retries-used:
-    description: "How many retries were needed (0 on first-try success)."
+    description: "How many retries were needed (0 on first-try success; always 0 on the API path)."
+  method:
+    description: "Which path performed the reset: 'api' (REST Git Refs) or 'cli' (git push fallback)."
 
 runs:
   using: "node24"
