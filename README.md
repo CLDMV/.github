@@ -74,6 +74,20 @@ examples/
     └── packaging-docs/    (docker-publish, bundle-size, docs, sync-org-labels)
 ```
 
+## 🔀 Release flow — v3 (current) and v4 (rolling out)
+
+**v3 (`@v3`, current):** every release-eligible PR carries its own version bump. A `feat`/`fix` PR gets a `release: vX.Y.Z` PR with an auto-pushed `chore: bump version` commit; merging it publishes.
+
+**v4 (rolling out — full design in [docs/conventions/release-flow-v4.md](docs/conventions/release-flow-v4.md)):** a staging-branch model that batches work into single releases and keeps `master` a clean, release-only history.
+
+- Contributors branch off **`next`** (features/fixes); urgent work goes on `hotfix/*` / `security/*` branches whose PRs are auto-redirected to the **`hotfixes`** lane.
+- One **persistent `next → master` release PR** (and one `hotfixes → master`) batches all accumulated commits into a single release; a maintainer clicks merge when ready.
+- After each release the integration branches auto-reset to `master` HEAD (hotfix releases merge `master` back into `next` to preserve in-flight work).
+- Branch protection is configured per-repo by importing rulesets from the **[ruleset generator](docs/tools/ruleset-generator/)** (`master` / `next` / `hotfixes`), then adding the bot to the `next` + `hotfixes` bypass lists.
+- Bootstrap a repo with **`local-v4-bootstrap.yml`** (creates the integration branches, enables auto-merge). Cutover steps: [docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md).
+
+**Tags:** pin `@v3` for the current per-PR flow or `@v4` for the staging-branch flow — both rolling-major tags track the latest release on their line.
+
 ## 🔧 Available Workflows
 
 ### CI Workflow (`workflow-ci.yml`)
