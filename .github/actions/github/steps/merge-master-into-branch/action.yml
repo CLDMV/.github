@@ -24,25 +24,11 @@ inputs:
 outputs:
   merge-sha:
     description: "SHA of the new merge commit (201). Empty when nothing was merged (204)."
-    value: ${{ steps.merge.outputs.merge-sha }}
   merge-performed:
     description: "'true' when a merge commit was created; 'false' on no-op (204 already up-to-date)."
-    value: ${{ steps.merge.outputs.merge-performed }}
   had-conflict:
     description: "'true' when the API returned 409 (merge conflict). On conflict, the step also fails."
-    value: ${{ steps.merge.outputs.had-conflict }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Merge via GitHub API
-      id: merge
-      shell: bash
-      env:
-        INPUT_TARGET_BRANCH: ${{ inputs.target-branch }}
-        INPUT_SOURCE_REF: ${{ inputs.source-ref }}
-        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
-        INPUT_DRY_RUN: ${{ inputs.dry-run }}
-      run: |
-        node "${{ github.action_path }}/action.mjs"
+  using: "node24"
+  main: "action.mjs"

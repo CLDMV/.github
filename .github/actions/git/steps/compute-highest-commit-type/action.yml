@@ -12,22 +12,11 @@ inputs:
 outputs:
   highest-type:
     description: "Highest-priority conventional type found (e.g. 'feat', 'fix', 'chore'). Empty string when no commit parses as conventional."
-    value: ${{ steps.compute.outputs.highest-type }}
   is-breaking:
     description: "'true' when any commit declares a breaking change (via '!' marker or 'BREAKING CHANGE:' footer)."
-    value: ${{ steps.compute.outputs.is-breaking }}
   bump:
     description: "Implied semver bump: 'major' / 'minor' / 'patch' / 'none'."
-    value: ${{ steps.compute.outputs.bump }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Compute highest commit type
-      id: compute
-      shell: bash
-      env:
-        INPUT_COMMITS_FILE: ${{ inputs.commits-file }}
-        INPUT_COMMITS_JSON: ${{ inputs.commits-json }}
-      run: |
-        node "${{ github.action_path }}/action.mjs"
+  using: "node24"
+  main: "action.mjs"

@@ -105,16 +105,16 @@
 		];
 		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
-			name: "Protect Hotfix",
+			name: "Protect Hotfixes",
 			target: "branch",
 			enforcement: "active",
-			conditions: { ref_name: { exclude: [], include: ["refs/heads/hotfix"] } },
+			conditions: { ref_name: { exclude: [], include: ["refs/heads/hotfixes"] } },
 			rules: rules,
 			bypass_actors: bypassDefault()
 		};
 	}
 
-	const BUILDERS = { master: buildMaster, next: buildNext, hotfix: buildHotfix };
+	const BUILDERS = { master: buildMaster, next: buildNext, hotfixes: buildHotfix };
 
 	function teamSizeToApprovals(size) {
 		if (size === 1) return 1;

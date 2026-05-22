@@ -55,13 +55,13 @@ eq(
 );
 eq(
 	shouldSkip({ userType: "User", baseRef: "master", headRef: "next", title: "release: v3.3.0" }),
-	{ skip: true, reason: "Release PR (next/hotfix → master) — owned by the release flow" },
+	{ skip: true, reason: "Release PR (next/hotfixes → master) — owned by the release flow" },
 	"next → master → skip"
 );
 eq(
-	shouldSkip({ userType: "User", baseRef: "master", headRef: "hotfix", title: "release: v3.2.5" }),
-	{ skip: true, reason: "Release PR (next/hotfix → master) — owned by the release flow" },
-	"hotfix → master → skip"
+	shouldSkip({ userType: "User", baseRef: "master", headRef: "hotfixes", title: "release: v3.2.5" }),
+	{ skip: true, reason: "Release PR (next/hotfixes → master) — owned by the release flow" },
+	"hotfixes → master → skip"
 );
 eq(
 	shouldSkip({ userType: "User", baseRef: "next", headRef: "feat/x", title: "release: emergency override" }),

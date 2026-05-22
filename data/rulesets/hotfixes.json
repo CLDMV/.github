@@ -1,11 +1,11 @@
 {
-	"name": "Protect Hotfix",
+	"name": "Protect Hotfixes",
 	"target": "branch",
 	"enforcement": "active",
 	"conditions": {
 		"ref_name": {
 			"exclude": [],
-			"include": ["refs/heads/hotfix"]
+			"include": ["refs/heads/hotfixes"]
 		}
 	},
 	"rules": [

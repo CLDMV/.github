@@ -76,7 +76,7 @@ async function postComment(owner, repo, prNumber, body, token) {
 async function main() {
 	const token = process.env.GITHUB_TOKEN || getInput("github-token", { required: true });
 	const prNumber = getInput("pr-number", { required: true });
-	const targetBase = getInput("target-base") || "hotfix";
+	const targetBase = getInput("target-base") || "hotfixes";
 	const headPattern = compilePattern(getInput("hotfix-branch-pattern"));
 	const dryRun = getBooleanInput("dry-run", false);
 	let headRef = getInput("head-ref");

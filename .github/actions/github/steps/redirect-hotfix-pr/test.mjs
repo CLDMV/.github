@@ -34,41 +34,41 @@ eq(customPattern.test("hotfix/foo"), false, "custom pattern rejects original hot
 console.log("\nshouldSkip:");
 const pat = compilePattern("");
 eq(
-	shouldSkip({ userType: "Bot", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfix", headPattern: pat }),
+	shouldSkip({ userType: "Bot", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat }),
 	{ skip: true, reason: "PR author is a Bot" },
 	"bot → skip"
 );
 eq(
-	shouldSkip({ userType: "User", headRef: "feat/x", baseRef: "next", targetBase: "hotfix", headPattern: pat }),
+	shouldSkip({ userType: "User", headRef: "feat/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat }),
 	{ skip: true, reason: `Head 'feat/x' does not match hotfix pattern ${pat}` },
 	"non-hotfix head → skip"
 );
 eq(
-	shouldSkip({ userType: "User", headRef: "hotfix/x", baseRef: "hotfix", targetBase: "hotfix", headPattern: pat }),
-	{ skip: true, reason: "PR already targets 'hotfix'" },
+	shouldSkip({ userType: "User", headRef: "hotfix/x", baseRef: "hotfixes", targetBase: "hotfixes", headPattern: pat }),
+	{ skip: true, reason: "PR already targets 'hotfixes'" },
 	"already on target base → skip"
 );
 eq(
-	shouldSkip({ userType: "User", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfix", headPattern: pat }),
+	shouldSkip({ userType: "User", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat }),
 	{ skip: false, reason: "" },
 	"hotfix branch, not yet redirected → proceed"
 );
 eq(
-	shouldSkip({ userType: "User", headRef: "security/cve-1234", baseRef: "next", targetBase: "hotfix", headPattern: pat }),
+	shouldSkip({ userType: "User", headRef: "security/cve-1234", baseRef: "next", targetBase: "hotfixes", headPattern: pat }),
 	{ skip: false, reason: "" },
 	"security/ branch also redirected"
 );
 eq(
-	shouldSkip({ userType: "User", headRef: "", baseRef: "next", targetBase: "hotfix", headPattern: pat }),
+	shouldSkip({ userType: "User", headRef: "", baseRef: "next", targetBase: "hotfixes", headPattern: pat }),
 	{ skip: true, reason: `Head '' does not match hotfix pattern ${pat}` },
 	"empty head → skip"
 );
 
 console.log("\nbuildCommentBody:");
-const body = buildCommentBody("next", "hotfix");
+const body = buildCommentBody("next", "hotfixes");
 eq(body.startsWith(COMMENT_SENTINEL), true, "comment starts with sentinel");
 eq(body.includes("`next`"), true, "comment includes old base");
-eq(body.includes("`hotfix`"), true, "comment includes new base");
+eq(body.includes("`hotfixes`"), true, "comment includes new base");
 
 console.log("\nCOMMENT_SENTINEL:");
 eq(typeof COMMENT_SENTINEL === "string" && COMMENT_SENTINEL.length > 0, true, "sentinel is non-empty");

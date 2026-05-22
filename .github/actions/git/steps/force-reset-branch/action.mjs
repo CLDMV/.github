@@ -46,6 +46,35 @@ export function isLeaseFailure(stderr) {
 }
 
 /**
+ * Build an authenticated push URL for a given repo + token. Used so the
+ * force-push is attributed to the token's identity (the CLDMV bot), which is
+ * required when the target branch's ruleset only grants force-push bypass to
+ * the bot. Mirrors the x-access-token pattern used elsewhere in this repo
+ * (e.g. coverage/steps/push-badge).
+ *
+ * @public
+ * @param {string} repository - "owner/repo"
+ * @param {string} token
+ * @returns {string}
+ */
+export function buildRemoteUrl(repository, token) {
+	return `https://x-access-token:${token}@github.com/${repository}.git`;
+}
+
+/**
+ * Redact an x-access-token URL so the token never reaches the log. Replaces
+ * the credential portion with ***.
+ *
+ * @public
+ * @param {string} cmd
+ * @returns {string}
+ */
+export function redactToken(cmd) {
+	if (typeof cmd !== "string") return cmd;
+	return cmd.replace(/x-access-token:[^@]+@/g, "x-access-token:***@");
+}
+
+/**
  * Parse the `<sha>\t<ref>` line(s) emitted by `git ls-remote` and return the
  * SHA matching the given ref (full or short). Returns "" when not found.
  *
@@ -82,12 +111,18 @@ function runCapturingStderr(cmd) {
 async function main() {
 	const targetBranch = getInput("target-branch", { required: true });
 	const sourceRef = getInput("source-ref") || "master";
-	const remote = getInput("remote") || "origin";
 	const maxRetries = Math.max(0, parseInt(getInput("max-retries") || "1", 10) || 0);
+	const token = process.env.GITHUB_TOKEN || getInput("github-token");
+	const repository = getInput("repository") || process.env.GITHUB_REPOSITORY || "";
+
+	// When a token is supplied, push/fetch/ls-remote against an x-access-token
+	// URL so the operations are attributed to the bot (needed to bypass the
+	// target branch's non_fast_forward rule). Otherwise use the plain remote.
+	const remote = token && repository ? buildRemoteUrl(repository, token) : getInput("remote") || "origin";
 
 	const pushArgs = buildPushArgs({ remote, sourceRef, targetBranch });
 	const pushCmd = `git ${pushArgs.join(" ")}`;
-	console.log(`▶️  ${pushCmd}`);
+	console.log(`▶️  ${redactToken(pushCmd)}`);
 
 	let attempts = 0;
 	let result = runCapturingStderr(pushCmd);
@@ -95,21 +130,21 @@ async function main() {
 	while (!result.ok && attempts < maxRetries && isLeaseFailure(result.stderr)) {
 		attempts++;
 		console.log(`⚠️  Lease failure on attempt ${attempts}:`);
-		console.log(result.stderr.trim());
-		console.log(`🔄 Fetching ${remote} ${targetBranch} and retrying…`);
+		console.log(redactToken(result.stderr.trim()));
+		console.log(`🔄 Re-fetching ${targetBranch} and retrying…`);
 		try {
 			run(`git fetch ${remote} ${targetBranch} --quiet`);
 		} catch (e) {
 			// Fetch failure is reported but doesn't preempt the retry — push will
 			// fail again with a clearer message if it's genuinely broken.
-			console.log(`(non-fatal) git fetch failed: ${e.message}`);
+			console.log(`(non-fatal) git fetch failed: ${redactToken(e.message)}`);
 		}
 		result = runCapturingStderr(pushCmd);
 	}
 
 	if (!result.ok) {
 		console.error(`::error::Force-reset of '${targetBranch}' failed after ${attempts} retry attempt(s)`);
-		console.error(result.stderr.trim());
+		console.error(redactToken(result.stderr.trim()));
 		process.exit(1);
 	}
 

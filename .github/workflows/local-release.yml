@@ -24,7 +24,10 @@ name: 🚀 Local Release PR
 on:
     push:
         # Don't fire on bot-managed or special branches.
-        branches-ignore: [master, main, badges, gh-pages, dev]
+        # `next` / `hotfixes` are the v4 integration branches — their release
+        # PRs are owned by local-next-release.yml / the hotfixes lane, so the
+        # v3 per-branch flow must NOT also fire on them (would double-create).
+        branches-ignore: [master, main, badges, gh-pages, dev, next, hotfixes]
         paths-ignore:
             # Pure metadata files — never warrant a release.
             - "LICENSE"

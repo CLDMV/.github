@@ -128,19 +128,19 @@
 
 <label>
   <input type="checkbox" id="hotfix-codeowner">
-  <strong>Require Code Owner reviews on hotfix</strong>
-  <small>Off by default. Requires a <code>CODEOWNERS</code> file at <code>.github/</code>, the repo root, or <code>docs/</code> — without that file the rule is a silent no-op. Affects the hotfix ruleset only.</small>
+  <strong>Require Code Owner reviews on hotfixes</strong>
+  <small>Off by default. Requires a <code>CODEOWNERS</code> file at <code>.github/</code>, the repo root, or <code>docs/</code> — without that file the rule is a silent no-op. Affects the hotfixes ruleset only.</small>
 </label>
 
 <label>
   <input type="checkbox" id="copilot-review">
-  <strong>Require Copilot Code Review (master + hotfix)</strong>
-  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfix. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
+  <strong>Require Copilot Code Review (master + hotfixes)</strong>
+  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfixes. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
 </label>
 </fieldset>
 
 <div class="step">
-<strong>After importing each ruleset, you must add your bot to the Bypass list of <code>next</code> and <code>hotfix</code>.</strong>
+<strong>After importing each ruleset, you must add your bot to the Bypass list of <code>next</code> and <code>hotfixes</code>.</strong>
 The v4 reset workflows (§6.3, §7.2) push as the bot and would be blocked by <code>non_fast_forward</code> otherwise.
 Open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> does NOT need bot bypass.
 </div>
@@ -158,9 +158,9 @@ Open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypas
 </div>
 
 <div class="branch-block">
-<h2><code>hotfix.json</code> — hotfix lane</h2>
-<button data-branch="hotfix">Download hotfix.json</button>
-<pre id="preview-hotfix"></pre>
+<h2><code>hotfixes.json</code> — hotfixes lane</h2>
+<button data-branch="hotfixes">Download hotfixes.json</button>
+<pre id="preview-hotfixes"></pre>
 </div>
 
 <div class="note">

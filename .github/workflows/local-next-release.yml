@@ -1,0 +1,155 @@
+#
+# @Project: workflows
+# @Filename: /local-next-release.yml
+# @Date: 2026-05-21 00:00:00 -07:00 (1779692400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# v4 core: maintain the ONE persistent `next → master` release PR.
+#
+# Fires on every push to `next` (contributor PR squash-merges land here).
+# Resolves the existing release PR and refreshes it, or creates it the first
+# time `next` diverges from master. The release PR batches all accumulated
+# feature commits into a single release — that batching is v4's whole point
+# (see docs/conventions/release-flow-v4.md §5.3, §6.1).
+#
+# The version bump still lives on `next` as a `chore: bump version` commit
+# (pushed by create/update-release-pr), carried to master through the squash
+# — see §8.1 of the design doc for why this is required (master accepts
+# changes only via PR squash, and the publish flow reads package.json as-is).
+#
+# STATUS: v4 preview. Dormant in this repo until a `next` branch exists; it
+# is shipped at @v4 for consumers to adopt at cutover. NOT yet exercised
+# end-to-end — first live run will be against a real `next` branch.
+name: 🚀 Local Next Release (v4)
+
+on:
+    push:
+        branches: [next]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+# Serialize: each run re-resolves the current PR state, so queueing (not
+# cancelling) avoids a create/refresh race when pushes land back-to-back.
+concurrency:
+    group: local-next-release-${{ github.repository }}
+    cancel-in-progress: false
+
+jobs:
+    plan:
+        # Loop guard: the refresh/create steps push a `chore: bump version`
+        # commit to `next` (as the bot), and local-next-reset.yml force-pushes
+        # `next` (as the bot). Neither should re-trigger a release-PR refresh.
+        if: |
+            github.actor != 'cldmv-bot[bot]' &&
+            github.actor != 'github-actions[bot]' &&
+            !startsWith(github.event.head_commit.message, 'chore: bump version')
+        name: "🔍 Plan (detect changes + resolve PR)"
+        runs-on: ubuntu-latest
+        outputs:
+            has-changes: ${{ steps.detect.outputs.has-changes }}
+            pr-number: ${{ steps.resolve.outputs.pr-number }}
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Checkout next
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              with:
+                  ref: next
+                  fetch-depth: 0
+
+            - name: Detect master..next changes
+              id: detect
+              shell: bash
+              run: |
+                  git fetch origin master --quiet
+                  count=$(git rev-list --count origin/master..HEAD)
+                  echo "📊 commits on next not yet on master: $count"
+                  if [ "$count" -gt 0 ]; then
+                      echo "has-changes=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "has-changes=false" >> "$GITHUB_OUTPUT"
+                      echo "ℹ️ next is in sync with master — nothing to release."
+                  fi
+
+            - name: Resolve persistent next→master PR
+              id: resolve
+              if: steps.detect.outputs.has-changes == 'true'
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  # The persistent release PR is the open PR with head=next,
+                  # base=master. There is at most one (concurrency-serialized).
+                  pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head next --base master \
+                       --state open --json number --jq '.[0].number // ""')
+                  echo "pr-number=$pr" >> "$GITHUB_OUTPUT"
+                  if [ -n "$pr" ]; then
+                      echo "🔁 existing release PR: #$pr — will refresh"
+                  else
+                      echo "🆕 no release PR yet — will create"
+                  fi
+
+    create:
+        name: "🆕 Create release PR"
+        needs: plan
+        if: needs.plan.outputs.has-changes == 'true' && needs.plan.outputs.pr-number == ''
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            # Runs on the `next` ref → create-release-pr opens next → master and
+            # pushes the chore-bump commit to next. package-name / build-command
+            # are repo-specific; a consumer adopting this file edits them. This
+            # repo is a workflows+actions package with no build, hence the stub.
+            - name: Create release PR
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v3
+              with:
+                  package-name: "@cldmv/.github"
+                  build-command: "echo '✓ No build step for a workflows + actions package.'"
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+    refresh:
+        name: "🔁 Refresh release PR #${{ needs.plan.outputs.pr-number }}"
+        needs: plan
+        if: needs.plan.outputs.has-changes == 'true' && needs.plan.outputs.pr-number != ''
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Refresh release PR
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
+              with:
+                  head-ref: next
+                  pr-number: ${{ needs.plan.outputs.pr-number }}
+                  package-name: "@cldmv/.github"
+                  build-command: "echo '✓ No build step for a workflows + actions package.'"
+                  github-token: ${{ steps.app-token.outputs.token }}
