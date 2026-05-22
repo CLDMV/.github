@@ -87,11 +87,14 @@ jobs:
                   create_branch "$HOTFIXES"
 
                   if [ "$DRY_RUN" = "true" ]; then
-                      echo "🔸 [dry-run] would enable repo allow_auto_merge"
+                      echo "🔸 [dry-run] would set allow_auto_merge=true, delete_branch_on_merge=false"
                   else
-                      gh api -X PATCH "repos/$REPO" -F allow_auto_merge=true >/dev/null \
-                          && echo "🔀 enabled allow_auto_merge" \
-                          || echo "⚠️ could not enable allow_auto_merge (App may lack admin) — enable it in Settings → General"
+                      # delete_branch_on_merge MUST be false: next/hotfixes are the
+                      # PR HEADS of the persistent release PRs, so GitHub auto-delete
+                      # would remove the integration branch on every release.
+                      gh api -X PATCH "repos/$REPO" -F allow_auto_merge=true -F delete_branch_on_merge=false >/dev/null \
+                          && echo "🔀 allow_auto_merge=true, delete_branch_on_merge=false" \
+                          || echo "⚠️ could not update repo settings (App may lack admin) — set 'Allow auto-merge' ON and 'Automatically delete head branches' OFF in Settings → General"
                   fi
 
                   {
