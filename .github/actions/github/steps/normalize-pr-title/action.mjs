@@ -65,8 +65,8 @@ export function extractTitleParts(title) {
  */
 export function shouldSkip({ userType, baseRef, headRef, title }) {
 	if (userType === "Bot") return { skip: true, reason: "PR author is a Bot" };
-	if (baseRef === "master" && (headRef === "next" || headRef === "hotfix")) {
-		return { skip: true, reason: "Release PR (next/hotfix → master) — owned by the release flow" };
+	if (baseRef === "master" && (headRef === "next" || headRef === "hotfixes")) {
+		return { skip: true, reason: "Release PR (next/hotfixes → master) — owned by the release flow" };
 	}
 	if (typeof title === "string" && /^release:\s/i.test(title)) {
 		return { skip: true, reason: "Title starts with 'release:' — escape-hatch override" };

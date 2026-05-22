@@ -12,9 +12,10 @@
 # next contributor merge re-opens a fresh one (docs/conventions/
 # release-flow-v4.md §6.3, §7.1).
 #
-# Scope (PR 3): resets `next` only. The hotfix lane (PR 4) adds hotfix reset
-# and the §7.2 "merge master into next after a hotfix" nuance — deliberately
-# out of scope here since no `hotfix` branch exists yet.
+# Scope (PR 3): resets `next` only. The hotfixes lane (PR 4) adds the
+# hotfixes reset and the §7.2 "merge master into next after a hotfix"
+# nuance — deliberately out of scope here. (The `hotfixes` branch may
+# already exist from bootstrap; PR 3 simply doesn't touch it yet.)
 #
 # STATUS: v4 preview. Guarded to no-op when `next` doesn't exist, so it is
 # safe to ship into a repo that hasn't cut over to v4. NOT yet exercised
