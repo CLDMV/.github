@@ -137,12 +137,24 @@
   <strong>Require Copilot Code Review (master + hotfixes)</strong>
   <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfixes. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
 </label>
+
+<label>
+  <input type="checkbox" id="include-bot-bypass" checked>
+  <strong>Add the bot App to <code>next</code> + <code>hotfixes</code> bypass (recommended)</strong>
+  <small>The v4 reset/merge workflows (§6.3, §7.2) push to <code>next</code>/<code>hotfixes</code> as your bot's GitHub App; without bypass GitHub blocks them (<code>GH013</code> / <code>non_fast_forward</code>). Checked = the bot is pre-added to those two rulesets so you skip the manual UI step. <strong>Uncheck to opt out</strong> — e.g. you'll add the bot by hand, or your flow doesn't reset those branches as the App. <code>master</code> is never given bot bypass.</small>
+</label>
+
+<label>
+  <strong>Bot GitHub App ID</strong>
+  <input type="number" id="bot-app-id" min="0" value="1910694">
+  <small>The bot App's numeric <strong>App ID</strong> (Org → Settings → Developer settings → GitHub Apps → your bot → "App ID"). Defaults to CLDMV's bot. If this is blank or non-numeric, the bot is <strong>not</strong> added even when the box above is checked.</small>
+</label>
 </fieldset>
 
 <div class="step">
-<strong>After importing each ruleset, you must add your bot to the Bypass list of <code>next</code> and <code>hotfixes</code>.</strong>
-The v4 reset workflows (§6.3, §7.2) push as the bot and would be blocked by <code>non_fast_forward</code> otherwise.
-Open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> does NOT need bot bypass.
+<strong>Bot bypass is pre-added by default.</strong> With the checkbox above left on, the generated <code>next.json</code> / <code>hotfixes.json</code> already list your bot App in <code>bypass_actors</code> — no manual step needed. The v4 reset/merge workflows (§6.3, §7.2) push as the bot and would otherwise be blocked by <code>non_fast_forward</code> / require-PR.
+<br><br>
+<strong>If you opted out</strong> (or left the App ID blank), add it after import: open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> never needs bot bypass.
 </div>
 
 <div class="branch-block">
@@ -169,7 +181,7 @@ Open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypas
 <li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
 <li>Templates use <code>allowed_merge_methods: ["squash"]</code> across all three branches — matches the v4 squash-merge convention.</li>
 <li><code>next.json</code> intentionally omits <code>required_linear_history</code> so §7.2's master-into-next API merge can produce a merge commit when needed.</li>
-<li>The bot is NOT pre-added to <code>bypass_actors</code> — see the highlighted step above.</li>
+<li>The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or blank the App ID, to opt out). It is never added to <code>master</code>.</li>
 </ul>
 </div>
 
