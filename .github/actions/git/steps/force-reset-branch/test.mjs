@@ -22,14 +22,19 @@ function eq(actual, expected, label) {
 
 console.log("buildPushArgs:");
 eq(
-	buildPushArgs({ remote: "origin", sourceRef: "master", targetBranch: "next" }),
-	["push", "origin", "master:refs/heads/next", "--force-with-lease"],
-	"master → next"
+	buildPushArgs({ remote: "origin", sourceRef: "master", targetBranch: "next", expectedSha: "deadbeef" }),
+	["push", "origin", "master:refs/heads/next", "--force-with-lease=refs/heads/next:deadbeef"],
+	"explicit lease with expected SHA"
 );
 eq(
-	buildPushArgs({ remote: "upstream", sourceRef: "abc123", targetBranch: "hotfix" }),
-	["push", "upstream", "abc123:refs/heads/hotfix", "--force-with-lease"],
-	"upstream remote + SHA source"
+	buildPushArgs({ remote: "upstream", sourceRef: "abc123", targetBranch: "hotfixes", expectedSha: "cafe1234" }),
+	["push", "upstream", "abc123:refs/heads/hotfixes", "--force-with-lease=refs/heads/hotfixes:cafe1234"],
+	"upstream remote + SHA source + explicit lease"
+);
+eq(
+	buildPushArgs({ remote: "origin", sourceRef: "master", targetBranch: "next", expectedSha: "" }),
+	["push", "origin", "master:refs/heads/next", "--force-with-lease=refs/heads/next:"],
+	"empty expected SHA → must-not-exist lease (new branch)"
 );
 
 console.log("\nisLeaseFailure:");

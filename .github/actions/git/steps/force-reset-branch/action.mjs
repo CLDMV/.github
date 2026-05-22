@@ -17,15 +17,24 @@ import { getInput, setOutputs } from "../../../common/common/core.mjs";
  * Build the argv for the force-push command. Kept pure so the test can
  * verify shape without invoking git.
  *
+ * Uses an EXPLICIT lease (`--force-with-lease=<ref>:<sha>`). A bare
+ * `--force-with-lease` derives its expected value from the remote-tracking
+ * ref, which doesn't exist when pushing to an x-access-token URL — git then
+ * reports "stale info" and refuses. Passing the SHA we just read from
+ * `git ls-remote` makes the lease deterministic. An empty `expectedSha`
+ * yields `…:<ref>:` (the ref must not exist yet — creating a new branch).
+ *
  * @public
  * @param {object} args
  * @param {string} args.remote
  * @param {string} args.sourceRef
  * @param {string} args.targetBranch
+ * @param {string} [args.expectedSha] - Current remote SHA of the target.
  * @returns {string[]} argv for execFile/spawn (or join(' ') for execSync)
  */
-export function buildPushArgs({ remote, sourceRef, targetBranch }) {
-	return ["push", remote, `${sourceRef}:refs/heads/${targetBranch}`, "--force-with-lease"];
+export function buildPushArgs({ remote, sourceRef, targetBranch, expectedSha }) {
+	const lease = `--force-with-lease=refs/heads/${targetBranch}:${expectedSha || ""}`;
+	return ["push", remote, `${sourceRef}:refs/heads/${targetBranch}`, lease];
 }
 
 /**
@@ -108,6 +117,15 @@ function runCapturingStderr(cmd) {
 	}
 }
 
+/** Read the target branch's current remote SHA via ls-remote ("" if absent/error). */
+function remoteSha(remote, targetBranch) {
+	try {
+		return parseLsRemoteSha(run(`git ls-remote ${remote} refs/heads/${targetBranch}`), targetBranch);
+	} catch {
+		return "";
+	}
+}
+
 async function main() {
 	const targetBranch = getInput("target-branch", { required: true });
 	const sourceRef = getInput("source-ref") || "master";
@@ -115,31 +133,27 @@ async function main() {
 	const token = process.env.GITHUB_TOKEN || getInput("github-token");
 	const repository = getInput("repository") || process.env.GITHUB_REPOSITORY || "";
 
-	// When a token is supplied, push/fetch/ls-remote against an x-access-token
-	// URL so the operations are attributed to the bot (needed to bypass the
-	// target branch's non_fast_forward rule). Otherwise use the plain remote.
+	// When a token is supplied, push/ls-remote against an x-access-token URL so
+	// the operations are attributed to the bot (needed to bypass the target
+	// branch's non_fast_forward rule). Otherwise use the plain remote.
 	const remote = token && repository ? buildRemoteUrl(repository, token) : getInput("remote") || "origin";
 
-	const pushArgs = buildPushArgs({ remote, sourceRef, targetBranch });
-	const pushCmd = `git ${pushArgs.join(" ")}`;
-	console.log(`▶️  ${redactToken(pushCmd)}`);
+	// Read the current remote SHA up front for the explicit lease. (A bare
+	// --force-with-lease can't resolve a remote-tracking ref for a URL push.)
+	let expectedSha = remoteSha(remote, targetBranch);
 
 	let attempts = 0;
-	let result = runCapturingStderr(pushCmd);
-
-	while (!result.ok && attempts < maxRetries && isLeaseFailure(result.stderr)) {
-		attempts++;
-		console.log(`⚠️  Lease failure on attempt ${attempts}:`);
-		console.log(redactToken(result.stderr.trim()));
-		console.log(`🔄 Re-fetching ${targetBranch} and retrying…`);
-		try {
-			run(`git fetch ${remote} ${targetBranch} --quiet`);
-		} catch (e) {
-			// Fetch failure is reported but doesn't preempt the retry — push will
-			// fail again with a clearer message if it's genuinely broken.
-			console.log(`(non-fatal) git fetch failed: ${redactToken(e.message)}`);
-		}
+	let result;
+	while (true) {
+		const pushCmd = `git ${buildPushArgs({ remote, sourceRef, targetBranch, expectedSha }).join(" ")}`;
+		console.log(`▶️  ${redactToken(pushCmd)}`);
 		result = runCapturingStderr(pushCmd);
+		if (result.ok) break;
+		if (attempts >= maxRetries || !isLeaseFailure(result.stderr)) break;
+		attempts++;
+		console.log(`⚠️  Lease failure on attempt ${attempts} — the target moved; re-reading its SHA and retrying…`);
+		console.log(redactToken(result.stderr.trim()));
+		expectedSha = remoteSha(remote, targetBranch);
 	}
 
 	if (!result.ok) {
@@ -148,10 +162,7 @@ async function main() {
 		process.exit(1);
 	}
 
-	// Read back the new remote SHA so the caller has it for summary/output.
-	const lsOut = run(`git ls-remote ${remote} refs/heads/${targetBranch}`);
-	const resetSha = parseLsRemoteSha(lsOut, targetBranch);
-
+	const resetSha = remoteSha(remote, targetBranch);
 	console.log(`✅ Force-reset complete. ${targetBranch} → ${resetSha || "(could not verify SHA)"}`);
 	setOutputs({ "reset-sha": resetSha, "retries-used": String(attempts) });
 }
