@@ -7,20 +7,29 @@
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# v4 core: after a release lands on master, force-reset `next` to master HEAD
-# so the persistent `next → master` PR auto-closes (head == base) and the
-# next contributor merge re-opens a fresh one (docs/conventions/
-# release-flow-v4.md §6.3, §7.1).
+# v4 core: after a release lands on master, re-sync the integration branches
+# (docs/conventions/release-flow-v4.md §6.3, §7).
 #
-# Scope (PR 3): resets `next` only. The hotfixes lane (PR 4) adds the
-# hotfixes reset and the §7.2 "merge master into next after a hotfix"
-# nuance — deliberately out of scope here. (The `hotfixes` branch may
-# already exist from bootstrap; PR 3 simply doesn't touch it yet.)
+#   - `hotfixes` is ALWAYS force-reset to master HEAD after any release.
+#   - `next` depends on which lane released:
+#       * normal release (next → master, or a v3-style feat → master):
+#         force-reset `next` to master HEAD (§7.1).
+#       * hotfix release (hotfixes → master): MERGE master into `next`
+#         instead, so next's accumulated feature work is preserved (§7.2,
+#         option B). The merge is a no-op (204) when next has no extra work.
 #
-# STATUS: v4 preview. Guarded to no-op when `next` doesn't exist, so it is
-# safe to ship into a repo that hasn't cut over to v4. NOT yet exercised
-# end-to-end.
-name: ♻️ Local Next Reset (v4)
+# The released lane is detected from the PR head ref behind the squash
+# commit's trailing "(#N)".
+#
+# wait-for-tags gate: a release also fires `update-major-version-tags`, which
+# rolls @v3. Jobs resolve `uses: ...@v3` at job start, so without this gate
+# the sync job can run the PREVIOUS release's action code (this exact race
+# made the v3.5.0 reset fail against the old force-reset-branch). The gate
+# job polls @v3 until it matches the release commit, then releases the sync.
+#
+# Guarded to no-op when next/hotfixes don't exist, so it's safe pre-cutover.
+# STATUS: v4 preview.
+name: ♻️ Local Next/Hotfixes Reset (v4)
 
 on:
     push:
@@ -34,10 +43,37 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
-    reset-next:
+    wait-for-tags:
         # Only fire on a release commit (the squash-merge of a release PR).
         if: startsWith(github.event.head_commit.message, 'release:')
-        name: "♻️ Reset next → master"
+        name: "⏳ Wait for @v3 to roll forward"
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Poll refs/tags/v3 until it matches the release commit
+              shell: bash
+              env:
+                  TARGET_SHA: ${{ github.sha }}
+                  REPO: ${{ github.repository }}
+              run: |
+                  echo "🔍 Release commit: $TARGET_SHA"
+                  max_attempts=24   # 24 * 5s = 120s
+                  for attempt in $(seq 1 $max_attempts); do
+                      v3_sha=$(git ls-remote "https://github.com/${REPO}.git" 'refs/tags/v3^{}' 2>/dev/null | awk '{print $1}')
+                      [ -z "$v3_sha" ] && v3_sha=$(git ls-remote "https://github.com/${REPO}.git" 'refs/tags/v3' 2>/dev/null | awk '{print $1}')
+                      echo "Attempt $attempt/$max_attempts: @v3 → ${v3_sha:-<not found>}"
+                      if [ "$v3_sha" = "$TARGET_SHA" ]; then
+                          echo "✅ @v3 matches the release commit — safe to proceed"
+                          exit 0
+                      fi
+                      [ "$attempt" -lt "$max_attempts" ] && sleep 5
+                  done
+                  echo "⚠️ Timed out waiting for @v3 to roll forward — proceeding anyway."
+
+    sync-branches:
+        name: "♻️ Sync next + hotfixes to master"
+        needs: wait-for-tags
+        if: startsWith(github.event.head_commit.message, 'release:')
         runs-on: ubuntu-latest
         steps:
             - name: Create App token
@@ -46,8 +82,8 @@ jobs:
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-                  # Pushing master's tree (which includes .github/workflows/**)
-                  # onto next requires both contents and workflows write scopes.
+                  # Pushing/merging master's tree (which includes
+                  # .github/workflows/**) requires contents + workflows write.
                   permission_contents: "true"
                   permission_workflows: "true"
               env:
@@ -59,23 +95,66 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Guard — does next exist?
+            - name: Determine released lane
+              id: lane
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  COMMIT_MSG: ${{ github.event.head_commit.message }}
+              run: |
+                  # The squash commit ends with "(#N)" — the merged PR number.
+                  prnum=$(printf '%s' "$COMMIT_MSG" | grep -oE '#[0-9]+' | tail -1 | tr -d '#')
+                  head=""
+                  if [ -n "$prnum" ]; then
+                      head=$(gh pr view "$prnum" --repo "$GITHUB_REPOSITORY" \
+                             --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+                  fi
+                  echo "released PR #${prnum:-?} head ref: ${head:-<unknown>}"
+                  if [ "$head" = "hotfixes" ]; then
+                      echo "lane=hotfix" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "lane=other" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Guard — which integration branches exist?
               id: guard
               shell: bash
               run: |
+                  next_exists=false; hotfixes_exists=false
                   if git ls-remote --exit-code --heads origin next >/dev/null 2>&1; then
-                      echo "exists=true" >> "$GITHUB_OUTPUT"
-                      # Make origin/next available locally so --force-with-lease
-                      # has a base to compare against on the first attempt.
+                      next_exists=true
                       git fetch origin next:refs/remotes/origin/next --quiet || true
-                  else
-                      echo "exists=false" >> "$GITHUB_OUTPUT"
-                      echo "ℹ️ No 'next' branch — repo not on v4 yet; nothing to reset."
                   fi
+                  if git ls-remote --exit-code --heads origin hotfixes >/dev/null 2>&1; then
+                      hotfixes_exists=true
+                      git fetch origin hotfixes:refs/remotes/origin/hotfixes --quiet || true
+                  fi
+                  echo "next-exists=$next_exists" >> "$GITHUB_OUTPUT"
+                  echo "hotfixes-exists=$hotfixes_exists" >> "$GITHUB_OUTPUT"
+                  echo "ℹ️ next=$next_exists hotfixes=$hotfixes_exists lane=${{ steps.lane.outputs.lane }}"
 
-            - name: Force-reset next to master HEAD
-              if: steps.guard.outputs.exists == 'true'
+            # hotfixes always tracks master after a release.
+            - name: Force-reset hotfixes to master HEAD
+              if: steps.guard.outputs.hotfixes-exists == 'true'
               uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              with:
+                  target-branch: hotfixes
+                  source-ref: master
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+            # Normal release → next is force-reset (its work just shipped).
+            - name: Force-reset next to master HEAD
+              if: steps.guard.outputs.next-exists == 'true' && steps.lane.outputs.lane != 'hotfix'
+              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              with:
+                  target-branch: next
+                  source-ref: master
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+            # Hotfix release → merge master into next (preserve next's features).
+            - name: Merge master into next (§7.2 option B)
+              if: steps.guard.outputs.next-exists == 'true' && steps.lane.outputs.lane == 'hotfix'
+              uses: CLDMV/.github/.github/actions/github/steps/merge-master-into-branch@v3
               with:
                   target-branch: next
                   source-ref: master
