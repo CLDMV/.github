@@ -135,16 +135,18 @@ Mirror of §6.1 but for the `hotfixes` branch.
 
 ### 6.3 `local-next-reset.yml` (new)
 
-Trigger: `push` to `master` (after release merge).
+Trigger: `push` to `master` (only when the head commit is a `release:` commit).
 
-Job:
-1. Detect whether the push is a release commit (`release: vX.Y.Z` subject).
-2. Force-push `next` to match master HEAD (`git push origin master:next --force-with-lease`).
-3. Force-push `hotfixes` to match master HEAD (same).
-4. The persistent `next → master` and `hotfixes → master` PRs auto-close (no diff).
-5. Workflow logs the reset SHAs to the run summary.
+Job graph:
+1. **wait-for-tags** — polls `@v3` until it matches the release commit. A release also fires `update-major-version-tags` (which rolls `@v3`); since jobs resolve `uses: ...@v3` at job start, this gate prevents the sync job from running the *previous* release's action code. (This race is exactly what made the first v3.5.0 reset fail against the old `force-reset-branch`.)
+2. **sync-branches** (needs wait-for-tags) — re-syncs the integration branches by lane:
+   - **`hotfixes` is always force-reset** to master HEAD after any release.
+   - **`next` depends on the released lane** (detected from the PR head ref behind the squash commit's trailing `(#N)`):
+     - normal release (`next → master`, or a v3-style `feat → master`): **force-reset `next`** to master HEAD (§7.1).
+     - hotfix release (`hotfixes → master`): **merge master into `next`** instead (§7.2 option B), preserving next's accumulated feature work; a no-op (204) when next has nothing extra.
+3. The persistent `next → master` / `hotfixes → master` PRs auto-close once their head == base.
 
-**Safety:** uses `--force-with-lease` so a contributor PR landing mid-reset doesn't get blown away — the lease fails, reset is retried after a brief wait.
+**Safety:** force-resets use `force-reset-branch` (`--force-with-lease` + retry-on-lease-failure, pushing as the bot via x-access-token so the branch ruleset's bot bypass applies). Branches that don't exist are skipped, so it's safe pre-cutover.
 
 ### 6.4 `local-pr-title-normalizer.yml` (new)
 
@@ -393,7 +395,7 @@ Six PRs in sequence, each independently shippable:
 | 1 | **Foundation actions** | Add `compute-highest-commit-type`, `normalize-pr-title`, `redirect-hotfix-pr`, `force-reset-branch`, `merge-master-into-branch`. Wire none of them yet. | Yes — additive | ✅ shipped v3.3.0 |
 | 2 | **`@v3` parallel: PR title normalizer** | Add `local-pr-title-normalizer.yml` for v3 repos. Backportable feature. | Yes — useful even pre-v4 | ✅ shipped v3.4.0 |
 | 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in | 🚧 in progress |
-| 4 | **v4 hotfix lane** | `local-hotfix-release.yml`, `local-hotfix-redirector.yml`. | Yes — additive on @v4 | ⬜ pending |
+| 4 | **v4 hotfix lane** | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next. | Yes — additive | 🚧 in progress |
 | 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml`. | Yes — additive on @v4 | ⬜ pending |
 | 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site (HTML + JS, hosted via Pages from `docs/`). `docs/migration/v3-to-v4.md`. Decommission `workflow-sync-open-release-prs.yml` from @v4. Plus: generate a top-level `README.md` and remove stray root dev/test files (`debug-tags.js`, `test-*.mjs`). | Final v4 cut | ⬜ pending |
 
