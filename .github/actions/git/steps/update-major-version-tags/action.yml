@@ -56,7 +56,7 @@ runs:
 
     - name: Update tags with proper signing
       if: ${{ steps.update.outputs.updated == 'true' }}
-      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v3
+      uses: CLDMV/.github/.github/actions/github/api/tag/upsert-batch@v4
       env:
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
       with:

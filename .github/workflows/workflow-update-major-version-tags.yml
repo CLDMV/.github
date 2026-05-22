@@ -79,7 +79,7 @@ concurrency:
 jobs:
     version-tag-operations:
         name: Version Tag Operations
-        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-tag-health.yml@v4
         permissions:
             contents: write
         with:
@@ -115,7 +115,7 @@ jobs:
 #           fetch-depth: 0
 
 #       - name: Generate Detailed Version Tag Update Summary
-#         uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v3
+#         uses: CLDMV/.github/.github/actions/workflows/workflow-update-major-version-tags-summary@v4
 #         with:
 #           debug: ${{ inputs.debug }}
 #           summary_json: ${{ needs.version-tag-operations.outputs.summary_json || '{}' }}

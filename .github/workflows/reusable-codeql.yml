@@ -80,7 +80,7 @@ jobs:
         steps:
             - name: Parse languages CSV
               id: parse
-              uses: CLDMV/.github/.github/actions/common/utilities/parse-csv-list@v3
+              uses: CLDMV/.github/.github/actions/common/utilities/parse-csv-list@v4
               with:
                   csv: ${{ inputs.languages }}
 
@@ -94,7 +94,7 @@ jobs:
                 language: ${{ fromJson(needs.setup.outputs.languages) }}
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   fetch-depth: 0
 

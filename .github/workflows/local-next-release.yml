@@ -56,7 +56,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -65,7 +65,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Checkout next
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   ref: next
                   fetch-depth: 0
@@ -110,7 +110,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -123,7 +123,7 @@ jobs:
             # are repo-specific; a consumer adopting this file edits them. This
             # repo is a workflows+actions package with no build, hence the stub.
             - name: Create release PR
-              uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v4
               with:
                   package-name: "@cldmv/.github"
                   build-command: "echo '✓ No build step for a workflows + actions package.'"
@@ -137,7 +137,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -146,7 +146,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Refresh release PR
-              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: next
                   pr-number: ${{ needs.plan.outputs.pr-number }}

@@ -229,7 +229,7 @@ on:
 jobs:
     build-and-test:
         name: "🏗️ Build and Test"
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -252,7 +252,7 @@ jobs:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: write
             packages: write # Required to publish to GitHub Packages
-        uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -293,7 +293,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate Publish Summary
-              uses: CLDMV/.github/.github/actions/workflows/publish-summary@v3
+              uses: CLDMV/.github/.github/actions/workflows/publish-summary@v4
               with:
                   dry-run: ${{ inputs.dry_run }}
                   package-name: ${{ inputs.package_name }}

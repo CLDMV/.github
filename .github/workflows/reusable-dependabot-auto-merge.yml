@@ -50,7 +50,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -59,7 +59,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Approve + enable auto-merge
-              uses: CLDMV/.github/.github/actions/github/jobs/dependabot-auto-merge@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/dependabot-auto-merge@v4
               with:
                   bump_types: ${{ inputs.bump_types }}
                   merge_method: ${{ inputs.merge_method }}

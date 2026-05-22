@@ -71,7 +71,7 @@ runs:
   using: composite
   steps:
     - name: Checkout code (full history for tags)
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
       with:
         fetch-depth: 0
 
@@ -92,11 +92,11 @@ runs:
 
     - name: Check for version tags
       id: check-tags
-      uses: CLDMV/.github/.github/actions/git/steps/check-version-tags@v3
+      uses: CLDMV/.github/.github/actions/git/steps/check-version-tags@v4
 
     - name: Fix orphaned major/minor version tags (detect+fix via reusable job)
       id: fix-orphans
-      uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v3
+      uses: CLDMV/.github/.github/actions/github/jobs/fix-orphaned-version-tags@v4
       with:
         debug: ${{ inputs.debug }}
         repo: ${{ inputs.repo || github.repository }}
@@ -109,7 +109,7 @@ runs:
 
     - name: Fix non-bot-signed version tags
       id: fix-bot-signatures
-      uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v3
+      uses: CLDMV/.github/.github/actions/git/jobs/fix-non-bot-tags@v4
       with:
         debug: ${{ inputs.debug }}
         github_token: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
@@ -153,7 +153,7 @@ runs:
     - name: Update major/minor version tags to this release
       id: update-tags
       if: steps.should-run.outputs.result == 'true'
-      uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v3
+      uses: CLDMV/.github/.github/actions/git/steps/update-major-version-tags@v4
       with:
         debug: ${{ inputs.debug }}
         github_token: ${{ inputs.github_token || env.GITHUB_TOKEN || github.token }}
@@ -162,7 +162,7 @@ runs:
 
     - name: Generate version documentation
       if: inputs.create-documentation == 'true' && steps.update-tags.outputs.updated == 'true'
-      uses: CLDMV/.github/.github/actions/git/steps/generate-version-documentation@v3
+      uses: CLDMV/.github/.github/actions/git/steps/generate-version-documentation@v4
       with:
         create-documentation: ${{ inputs.create-documentation }}
 

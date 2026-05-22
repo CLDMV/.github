@@ -56,7 +56,7 @@ try {
 		"```yaml",
 		"jobs:",
 		"  ci:",
-		"    uses: CLDMV/.github/workflows/ci.yml@v3",
+		"    uses: CLDMV/.github/workflows/ci.yml@v4",
 		"```",
 		"",
 		"Or use specific versions for stability:",
@@ -64,7 +64,7 @@ try {
 		"```yaml",
 		"jobs:",
 		"  ci:",
-		"    uses: CLDMV/.github/workflows/ci.yml@v3.0.1",
+		"    uses: CLDMV/.github/workflows/ci.yml@v4.0.1",
 		"```",
 		"",
 		"Major version tags are automatically updated when new patch/minor releases are published."

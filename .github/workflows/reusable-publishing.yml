@@ -226,7 +226,7 @@ jobs:
 
             - name: Extract and validate version
               id: extract
-              uses: CLDMV/.github/.github/actions/npm/steps/extract-version@v3
+              uses: CLDMV/.github/.github/actions/npm/steps/extract-version@v4
               with:
                   package-name: ${{ inputs.package_name }}
                   version-override: ${{ inputs.version }}
@@ -253,7 +253,7 @@ jobs:
         steps:
             - name: Detect Repository Config
               id: detect
-              uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/detect-repo-config@v4
               with:
                   package-manager: ${{ inputs.package_manager }}
                   custom-npm-command: ${{ inputs.publish_command_npm }}
@@ -283,7 +283,7 @@ jobs:
 
             - name: Calculate artifact names
               id: names
-              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v3
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
               with:
                   node-version: ${{ inputs.node_version }}
                   package-name: ${{ inputs.package_name }}
@@ -291,7 +291,7 @@ jobs:
 
             - name: Publish to NPM
               id: publish
-              uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v3
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v4
               with:
                   package-name: ${{ inputs.package_name }}
                   version: ${{ needs.detect-version.outputs.version }}
@@ -324,7 +324,7 @@ jobs:
 
             # - name: Create App token
             #   id: app-token
-            #   uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+            #   uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
             #   with:
             #       client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
             #       private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -334,7 +334,7 @@ jobs:
 
             - name: Calculate artifact names
               id: names
-              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v3
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
               with:
                   node-version: ${{ inputs.node_version }}
                   package-name: ${{ inputs.package_name }}
@@ -342,7 +342,7 @@ jobs:
 
             - name: Publish to GitHub Packages
               id: publish
-              uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v3
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v4
               with:
                   package-name: ${{ inputs.package_name }}
                   version: ${{ needs.detect-version.outputs.version }}
@@ -370,7 +370,7 @@ jobs:
         steps:
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -380,7 +380,7 @@ jobs:
 
             - name: Create GitHub Release
               id: create
-              uses: CLDMV/.github/.github/actions/github/jobs/create-release@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release@v4
               with:
                   version: ${{ needs.detect-version.outputs.version }}
                   package-name: ${{ inputs.package_name }}
@@ -459,7 +459,7 @@ jobs:
             # hold. The GitHub App must also be granted Workflows: write on the repo.
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -469,7 +469,7 @@ jobs:
 
             - name: Update Major Version Tags
               id: update
-              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v3
+              uses: CLDMV/.github/.github/actions/git/jobs/update-major-version-tags@v4
               with:
                   debug: ${{ inputs.debug }}
                   github_token: ${{ steps.app-token.outputs.token }}

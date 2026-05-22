@@ -57,17 +57,17 @@ runs:
   using: composite
   steps:
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
       with:
         fetch-depth: 0
 
     - name: Setup Node.js
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
       with:
         package-manager: ${{ inputs.package-manager }}
 
@@ -81,71 +81,71 @@ runs:
 
     - name: Check release commit for auto-detection
       id: commit-check
-      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v3
+      uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v4
       with:
         base-ref: ${{ steps.divergence.outputs.merge-base }}
         base-version: ${{ steps.divergence.outputs.base-version }}
 
     - name: Calculate new version
       id: version
-      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v3
+      uses: CLDMV/.github/.github/actions/npm/steps/calculate-version@v4
       with:
         version-bump: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
         explicit-version: ${{ steps.commit-check.outputs.explicit-version }}
         base-version: ${{ steps.divergence.outputs.base-version }}
 
     - name: Build package
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v3
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
 
     - name: Update package version
       if: inputs.dry-run != 'true'
-      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v3
+      uses: CLDMV/.github/.github/actions/npm/steps/update-package-version@v4
       with:
         new-version: ${{ steps.version.outputs.new-version }}
         package-manager: ${{ inputs.package-manager }}
 
     - name: Generate comprehensive changelog
       id: changelog
-      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v3
+      uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v4
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.commit-check.outputs.commits-file }}
 
     - name: Detect default branch
       id: default-branch
-      uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v3
+      uses: CLDMV/.github/.github/actions/git/utilities/detect-default-branch@v4
 
     - name: Restore src/ deleted by build
       if: inputs.dry-run != 'true'
-      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v3
+      uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v4
 
     - name: Create signed commit
       if: inputs.dry-run != 'true'
       id: commit
-      uses: CLDMV/.github/.github/actions/github/api/commit@v3
+      uses: CLDMV/.github/.github/actions/github/api/commit@v4
       with:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
         github-token: ${{ inputs.github-token }}
 
     - name: Compute raw label aliases
       id: raw-labels
-      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v3
+      uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v4
       with:
         bump-type: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
 
     - name: Resolve PR label aliases
       id: pr-labels
-      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v3
+      uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v4
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
     - name: Create pull request
       if: inputs.dry-run != 'true'
       id: create-pr
-      uses: CLDMV/.github/.github/actions/github/api/pull-requests@v3
+      uses: CLDMV/.github/.github/actions/github/api/pull-requests@v4
       with:
         # Suffix differentiates PRs that share the same target version (e.g.
         # two open patch PRs both bumping to vX.Y.Z). Empty suffix falls back

@@ -92,7 +92,7 @@ jobs:
 
             - name: Create App token (auto-detect)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -102,7 +102,7 @@ jobs:
 
             - name: Resolve registry auth identity
               id: auth
-              uses: CLDMV/.github/.github/actions/docker/steps/resolve-auth@v3
+              uses: CLDMV/.github/.github/actions/docker/steps/resolve-auth@v4
               with:
                   using-app-token: ${{ steps.app-token.outputs.using_app_token }}
                   app-token: ${{ steps.app-token.outputs.token }}
@@ -161,7 +161,7 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
 
             - name: Summary
-              uses: CLDMV/.github/.github/actions/docker/steps/publish-summary@v3
+              uses: CLDMV/.github/.github/actions/docker/steps/publish-summary@v4
               with:
                   image: ${{ steps.resolve-image.outputs.image }}
                   digest: ${{ steps.build.outputs.digest }}
