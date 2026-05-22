@@ -32,12 +32,32 @@ try {
 		return Array.isArray(prs) && prs[0]?.number ? prs[0].number : null;
 	}
 
-	/** Update an existing PR's title/body and replace its labels. */
+	/**
+	 * Update an existing PR's title/body, then sync labels by DELTA. A full
+	 * `PUT /labels` is semantically correct but GitHub logs a remove+add for
+	 * EVERY label — so each release-PR refresh churned "added X Y Z and removed
+	 * X Y Z" even when the set was unchanged. Diffing (only DELETE removed, only
+	 * POST added) keeps the activity log quiet. Mirrors steps/sync-pr-labels.
+	 */
 	async function updatePr(number) {
 		await api("PATCH", `/pulls/${number}`, { title, body: bodyContent }, { token, owner, repo });
-		if (labels.length > 0) {
-			console.log(`🏷️ Syncing labels: ${labels.join(",")}`);
-			await api("PUT", `/issues/${number}/labels`, { labels }, { token, owner, repo });
+		if (labels.length === 0) return;
+		const currentArr = await api("GET", `/issues/${number}/labels`, null, { token, owner, repo });
+		const current = new Set((currentArr || []).map((l) => l?.name).filter(Boolean));
+		const desired = new Set(labels);
+		const toAdd = [...desired].filter((l) => !current.has(l));
+		const toRemove = [...current].filter((l) => !desired.has(l));
+		if (toAdd.length === 0 && toRemove.length === 0) {
+			console.log(`🏷️ Labels already in sync (${labels.join(",")}) — no changes`);
+			return;
+		}
+		if (toRemove.length) console.log(`🏷️ Removing labels: ${toRemove.join(",")}`);
+		if (toAdd.length) console.log(`🏷️ Adding labels: ${toAdd.join(",")}`);
+		for (const name of toRemove) {
+			await api("DELETE", `/issues/${number}/labels/${encodeURIComponent(name)}`, null, { token, owner, repo });
+		}
+		if (toAdd.length) {
+			await api("POST", `/issues/${number}/labels`, { labels: toAdd }, { token, owner, repo });
 		}
 	}
 

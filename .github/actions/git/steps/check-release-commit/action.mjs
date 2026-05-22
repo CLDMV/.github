@@ -235,6 +235,19 @@ function stripConventionalPrefix(subject) {
 }
 
 /**
+ * Strip a leading `vX.Y.Z` (and an optional `-`/`–`/`:` separator) from a
+ * string. Applied to an explicit `release: vX.Y.Z - <desc>` subject AFTER the
+ * conventional prefix is removed, so the title-suffix is just `<desc>` and not
+ * `vX.Y.Z - <desc>` — otherwise the assembled title doubles up as
+ * `release: vX.Y.Z - vX.Y.Z - <desc>`.
+ * @param {string} s - Subject with the conventional prefix already removed.
+ * @returns {string} Subject with any leading version token removed.
+ */
+function stripLeadingVersion(s) {
+	return (s || "").replace(/^v?\d+\.\d+\.\d+\s*[-–:]?\s*/i, "");
+}
+
+/**
  * Cap a string at ~55 chars, breaking on a word boundary when possible.
  * Used to keep generated PR titles readable in GitHub's list views.
  * @param {string} s - Input string.
@@ -275,7 +288,9 @@ function truncateForTitle(s) {
 function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis) {
 	const explicit = releaseAnalysis.breakingRelease || releaseAnalysis.normalRelease;
 	if (explicit) {
-		return truncateForTitle(stripConventionalPrefix(explicit.subject));
+		// strip the conventional prefix AND any leading vX.Y.Z so the title isn't
+		// "release: vX.Y.Z - vX.Y.Z - <desc>".
+		return truncateForTitle(stripLeadingVersion(stripConventionalPrefix(explicit.subject)));
 	}
 
 	const bump = versionAnalysis.versionBump;
@@ -422,4 +437,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 } // End main execution block
 
 // Export functions for testing
-export { findReleaseCommits, analyzeVersionBump, extractExplicitVersion, hasConventionalCommits };
+export { findReleaseCommits, analyzeVersionBump, extractExplicitVersion, hasConventionalCommits, stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix };
