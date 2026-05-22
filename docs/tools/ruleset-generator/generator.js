@@ -54,6 +54,23 @@
 		];
 	}
 
+	// next/hotfixes also bypass the bot App (the v4 reset/merge workflows mutate
+	// those branches as the App). master deliberately does NOT — it only changes
+	// via a reviewed squash. The bot actor is added ONLY when opted in AND a valid
+	// positive integer App ID is supplied; opting out, or a blank/non-numeric ID,
+	// yields admin-only bypass.
+	function bypassWithBot(includeBot, botAppId) {
+		const actors = bypassDefault();
+		if (includeBot && Number.isInteger(botAppId) && botAppId > 0) {
+			actors.push({
+				actor_id: botAppId,
+				actor_type: "Integration",
+				bypass_mode: "always"
+			});
+		}
+		return actors;
+	}
+
 	function buildMaster(opts) {
 		const rules = [
 			{ type: "deletion" },
@@ -89,7 +106,7 @@
 				codeScanningRule(),
 				requiredStatusChecksRule()
 			],
-			bypass_actors: bypassDefault()
+			bypass_actors: bypassWithBot(opts.includeBot, opts.botAppId)
 		};
 	}
 
@@ -110,7 +127,7 @@
 			enforcement: "active",
 			conditions: { ref_name: { exclude: [], include: ["refs/heads/hotfixes"] } },
 			rules: rules,
-			bypass_actors: bypassDefault()
+			bypass_actors: bypassWithBot(opts.includeBot, opts.botAppId)
 		};
 	}
 
@@ -126,7 +143,11 @@
 		const approvals = Math.max(0, parseInt(document.getElementById("approvals").value, 10) || 0);
 		const hotfixCodeOwner = document.getElementById("hotfix-codeowner").checked;
 		const copilotReview = document.getElementById("copilot-review").checked;
-		return { approvals, hotfixCodeOwner, copilotReview };
+		const includeBot = document.getElementById("include-bot-bypass").checked;
+		// parseInt of "" or non-numeric → NaN; bypassWithBot rejects anything not a
+		// positive integer, so a blank/garbage field simply omits the bot actor.
+		const botAppId = parseInt(document.getElementById("bot-app-id").value, 10);
+		return { approvals, hotfixCodeOwner, copilotReview, includeBot, botAppId };
 	}
 
 	function refresh() {
@@ -155,6 +176,8 @@
 		document.getElementById("approvals").addEventListener("input", refresh);
 		document.getElementById("hotfix-codeowner").addEventListener("change", refresh);
 		document.getElementById("copilot-review").addEventListener("change", refresh);
+		document.getElementById("include-bot-bypass").addEventListener("change", refresh);
+		document.getElementById("bot-app-id").addEventListener("input", refresh);
 		document.getElementById("team-size").addEventListener("change", function (e) {
 			const size = parseInt(e.target.value, 10);
 			if (size > 0) {
