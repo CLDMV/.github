@@ -31,41 +31,41 @@ runs:
   using: composite
   steps:
     - name: Checkout code
-      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+      uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
 
     - name: Setup Node.js
-      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
+      uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
 
     - name: Install dependencies
-      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
+      uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
       with:
         package-manager: ${{ inputs.package-manager }}
 
     - name: Get Node.js Version
       id: get_node_version
-      uses: CLDMV/.github/.github/actions/node/steps/get-node-version@v3
+      uses: CLDMV/.github/.github/actions/node/steps/get-node-version@v4
       with:
         label: ${{ (inputs.node-version == 'lts/*' || inputs.node-version == 'lts') && 'lts' || '' }}
 
     - name: Run pre-build tests
       id: pre-tests
-      uses: CLDMV/.github/.github/actions/common/steps/run-tests@v3
+      uses: CLDMV/.github/.github/actions/common/steps/run-tests@v4
       with:
         test-command: ${{ inputs.test-command }}
         environment: ${{ inputs.test-environment }}
 
     - name: Build package
       id: build
-      uses: CLDMV/.github/.github/actions/common/steps/build-project@v3
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
 
     - name: Create npm package
       id: create-package
-      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v3
+      uses: CLDMV/.github/.github/actions/npm/steps/create-package@v4
       with:
         package-manager: ${{ inputs.package-manager }}
 
@@ -74,7 +74,7 @@ runs:
       run: node "${{ github.action_path }}/extract-contents.mjs"
 
     - name: Upload build artifacts
-      uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v3
+      uses: CLDMV/.github/.github/actions/common/steps/upload-artifacts@v4
       with:
         artifact-name: build-artifacts-${{ steps.get_node_version.outputs.node-label }}
         artifact-path: |

@@ -45,7 +45,7 @@ jobs:
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -54,7 +54,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Welcome contributor
-              uses: CLDMV/.github/.github/actions/github/jobs/welcome-contributor@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/welcome-contributor@v4
               with:
                   pr_message_path: ${{ inputs.pr_message_path }}
                   issue_message_path: ${{ inputs.issue_message_path }}

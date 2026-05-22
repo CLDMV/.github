@@ -96,7 +96,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -109,7 +109,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Checkout master
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   fetch-depth: 0
 
@@ -163,7 +163,7 @@ jobs:
             # hotfixes always tracks master after a release — created if missing.
             - name: Ensure hotfixes = master HEAD (reset; create if missing)
               if: steps.guard.outputs.v4-adopted == 'true'
-              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
               with:
                   target-branch: hotfixes
                   source-ref: master
@@ -173,7 +173,7 @@ jobs:
             # recreated if it was deleted on merge.
             - name: Ensure next = master HEAD (normal release; create if missing)
               if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane != 'hotfix'
-              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
               with:
                   target-branch: next
                   source-ref: master
@@ -183,7 +183,7 @@ jobs:
             # preserve its accumulated feature work (§7.2 option B).
             - name: Merge master into next (hotfix release; next exists)
               if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'true'
-              uses: CLDMV/.github/.github/actions/github/steps/merge-master-into-branch@v3
+              uses: CLDMV/.github/.github/actions/github/steps/merge-master-into-branch@v4
               with:
                   target-branch: next
                   source-ref: master
@@ -193,7 +193,7 @@ jobs:
             # HEAD; there's no accumulated work to preserve.
             - name: Recreate next at master HEAD (hotfix release; next missing)
               if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'false'
-              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v3
+              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
               with:
                   target-branch: next
                   source-ref: master

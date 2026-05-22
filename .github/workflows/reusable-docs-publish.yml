@@ -66,17 +66,17 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   fetch-depth: 0
 
             - name: Setup Node
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
               with:
                   node-version: ${{ inputs.node_version }}
 
             - name: Install
-              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v3
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
               with:
                   package-manager: ${{ inputs.package_manager }}
 
@@ -86,7 +86,7 @@ jobs:
 
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -95,7 +95,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Publish to gh-pages
-              uses: CLDMV/.github/.github/actions/common/jobs/publish-gh-pages@v3
+              uses: CLDMV/.github/.github/actions/common/jobs/publish-gh-pages@v4
               with:
                   output_dir: ${{ inputs.output_dir }}
                   target_branch: ${{ inputs.target_branch }}

@@ -48,7 +48,7 @@ jobs:
               id: app-token
               # Full-permission mode: branch creation needs contents:write and
               # the auto-merge toggle needs repo administration:write.
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

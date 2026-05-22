@@ -103,7 +103,7 @@ jobs:
             node-matrix: ${{ steps.set-matrix.outputs.matrix }}
         steps:
             - id: set-matrix
-              uses: CLDMV/.github/.github/actions/node/steps/generate-matrix@v3
+              uses: CLDMV/.github/.github/actions/node/steps/generate-matrix@v4
               with:
                   skip-matrix-tests: ${{ inputs.skip_matrix_tests }}
                   node-version: ${{ inputs.node_version }}
@@ -121,7 +121,7 @@ jobs:
                 node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
         steps:
             - name: Build and Test
-              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v3
+              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v4
               with:
                   node-version: ${{ matrix.node-version }}
                   package-manager: ${{ inputs.package_manager }}

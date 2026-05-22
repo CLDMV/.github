@@ -26,7 +26,7 @@ jobs:
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
@@ -35,7 +35,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Audit commit subject
-              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v3
+              uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v4
               with:
                   commit_sha: ${{ github.sha }}
                   allowed_patterns: |

@@ -47,7 +47,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -56,7 +56,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Run stale sweep
-              uses: CLDMV/.github/.github/actions/github/jobs/stale-sweep@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/stale-sweep@v4
               with:
                   days_before_issue_stale: ${{ inputs.days_before_issue_stale }}
                   days_before_issue_close: ${{ inputs.days_before_issue_close }}

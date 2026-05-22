@@ -162,7 +162,7 @@ jobs:
         steps:
             - name: Check for existing release PR
               id: check
-              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v3
+              uses: CLDMV/.github/.github/actions/github/steps/check-existing-pr@v4
               with:
                   github-token: ${{ github.token }}
                   head-branch: ${{ github.ref_name }}
@@ -179,13 +179,13 @@ jobs:
             has-breaking: ${{ steps.check.outputs.has-breaking }}
         steps:
             - name: Checkout code
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   fetch-depth: 0
 
             - name: Check Release Commit
               id: check
-              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v3
+              uses: CLDMV/.github/.github/actions/git/steps/check-release-commit@v4
               env:
                   DEBUG: ${{ inputs.debug || 'true' }}
 
@@ -197,7 +197,7 @@ jobs:
         steps:
             - name: Create App token
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -209,7 +209,7 @@ jobs:
             # it can be reused by workflow-sync-open-release-prs.yml (fan-out
             # from master merges) without duplication. P3.2.
             - name: Refresh release PR
-              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: ${{ github.ref_name }}
                   pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
@@ -224,7 +224,7 @@ jobs:
         name: "🏗️ Build and Test"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release]
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -244,7 +244,7 @@ jobs:
         name: "🚀 Release Management"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release, build-and-test]
-        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
@@ -276,7 +276,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Generate Release Summary
-              uses: CLDMV/.github/.github/actions/workflows/release-summary@v3
+              uses: CLDMV/.github/.github/actions/workflows/release-summary@v4
               with:
                   dry-run: ${{ inputs.dry_run }}
                   package-name: ${{ inputs.package_name }}

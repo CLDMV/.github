@@ -39,7 +39,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Dispatch release notifications
-              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v3
+              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
               with:
                   config_path: ${{ inputs.config_path }}
                   default_config_repo: ${{ inputs.default_config_repo }}

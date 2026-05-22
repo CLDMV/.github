@@ -28,21 +28,21 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout .github repo
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
 
             - name: Setup Node.js
-              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v3
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
 
             - name: Create App token (org-wide)
               id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v3
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
                   owner: ${{ github.repository_owner }}
 
             - name: Sync org labels
-              uses: CLDMV/.github/.github/actions/github/jobs/sync-org-labels@v3
+              uses: CLDMV/.github/.github/actions/github/jobs/sync-org-labels@v4
               with:
                   github-token: ${{ steps.app-token.outputs.token }}
                   org: ${{ github.repository_owner }}
