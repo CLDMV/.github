@@ -11,9 +11,9 @@
 # `release!:` commits on non-default branches and opens (or updates) the
 # matching release PR.
 #
-# Companion: local-sync-release-prs.yml fans out to refresh ALL open release
-# PRs whenever any PR merges to master/main (closes the silent-regression
-# gap from P3.1/P3.2).
+# (v4: the local-sync-release-prs.yml fan-out companion was retired at the
+# v4.0.0 cut — v4 keeps ONE persistent release PR per lane, so there is
+# nothing to fan out.)
 #
 # Note: this repo has no `npm test` / `npm run build:ci` scripts — it's a
 # workflows + actions package. Tests are replaced by local-ci.yml as the

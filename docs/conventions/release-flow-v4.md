@@ -1,6 +1,6 @@
 # Release Flow v4 — Design Doc
 
-**Status:** Approved — implementation in progress (see §11 for per-PR status).
+**Status:** Active (v4.0.0) — the staging-branch flow is the official release model. Implementation history in §11.
 
 **Author:** Nate Corcoran <Shinrai@users.noreply.github.com>
 
@@ -146,7 +146,7 @@ Job graph:
      - hotfix release (`hotfixes → master`): **merge master into `next`** instead (§7.2 option B), preserving next's accumulated feature work; a no-op (204) when next has nothing extra.
 3. The persistent `next → master` / `hotfixes → master` PRs auto-close once their head == base.
 
-**Safety:** force-resets use `force-reset-branch` (`--force-with-lease` + retry-on-lease-failure, pushing as the bot via x-access-token so the branch ruleset's bot bypass applies). Branches that don't exist are skipped, so it's safe pre-cutover.
+**Safety:** force-resets use `force-reset-branch`, which updates the ref via the **REST Git Refs API** (`PATCH …/git/refs/heads/<branch>`, `force: true`) — a bot-App `git push` is rejected by the branch ruleset (GH013) even with bypass, whereas the App's bypass is honored on the API path (same reason §7.2 uses the Merges API). A `git push --force-with-lease` is kept as a fallback. Branches that don't exist are skipped, so it's safe pre-cutover.
 
 ### 6.4 `local-pr-title-normalizer.yml` (new)
 
