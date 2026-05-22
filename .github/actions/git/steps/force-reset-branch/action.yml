@@ -1,12 +1,12 @@
 name: "Force-Reset Branch"
-description: "Force-reset a target branch to a source ref via `git push --force-with-lease`. Used by v4's local-next-reset.yml and local-hotfix-reset.yml (§6.3 / §7) to bring next/hotfix back to master HEAD after a release lands. Retries once on lease failure (re-fetches then retries) so a concurrent push from the bot itself doesn't race the reset."
+description: "Force-reset a target branch to a source ref via `git push --force-with-lease`. Used by v4's local-next-reset.yml and local-hotfixes-reset.yml (§6.3 / §7) to bring next/hotfixes back to master HEAD after a release lands. Retries once on lease failure (re-fetches then retries) so a concurrent push from the bot itself doesn't race the reset."
 
 inputs:
   target-branch:
-    description: "Branch to reset (e.g., 'next', 'hotfix'). The local tip of source-ref will be force-pushed to this branch on origin."
+    description: "Branch to reset (e.g., 'next', 'hotfixes'). The local tip of source-ref will be force-pushed to this branch on origin."
     required: true
   source-ref:
-    description: "Ref to reset from. Defaults to 'master' — the typical v4 case is bringing next/hotfix back to master HEAD."
+    description: "Ref to reset from. Defaults to 'master' — the typical v4 case is bringing next/hotfixes back to master HEAD."
     required: false
     default: "master"
   remote:
@@ -28,23 +28,9 @@ inputs:
 outputs:
   reset-sha:
     description: "SHA the target branch now points to on the remote."
-    value: ${{ steps.reset.outputs.reset-sha }}
   retries-used:
     description: "How many retries were needed (0 on first-try success)."
-    value: ${{ steps.reset.outputs.retries-used }}
 
 runs:
-  using: "composite"
-  steps:
-    - name: Force-reset branch
-      id: reset
-      shell: bash
-      env:
-        INPUT_TARGET_BRANCH: ${{ inputs.target-branch }}
-        INPUT_SOURCE_REF: ${{ inputs.source-ref }}
-        INPUT_REMOTE: ${{ inputs.remote }}
-        INPUT_MAX_RETRIES: ${{ inputs.max-retries }}
-        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        INPUT_REPOSITORY: ${{ inputs.repository }}
-      run: |
-        node "${{ github.action_path }}/action.mjs"
+  using: "node24"
+  main: "action.mjs"
