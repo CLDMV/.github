@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
     analyze:
-        uses: CLDMV/.github/.github/workflows/reusable-codeql.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-codeql.yml@v4
         with:
             languages: "javascript-typescript"
             # Override defaults if needed:

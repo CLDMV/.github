@@ -16,7 +16,7 @@ Files in `.github/workflows/` are grouped by what they DO:
 | Prefix | Trigger | Purpose |
 |---|---|---|
 | `local-*.yml` | `push` / `pull_request` / `schedule` / `release` / `workflow_dispatch` | Runs on THIS repo's events. Dogfoods the reusables against this repo's own changes. Use **relative** `uses: ./.github/workflows/reusable-X.yml` so PRs test against the PR's version of the reusable. |
-| `workflow-*.yml` | `workflow_call` only | Org-level entry point that consumer repos invoke via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v3`. Maps inputs/secrets and delegates to `reusable-*.yml`. Thin layer. |
+| `workflow-*.yml` | `workflow_call` only | Org-level entry point that consumer repos invoke via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v4`. Maps inputs/secrets and delegates to `reusable-*.yml`. Thin layer. |
 | `reusable-*.yml` | `workflow_call` only | Lower-level building block called by other workflows (entry points OR other reusables). Bundles a set of jobs gated by `run_*` boolean inputs. |
 
 The naming prefix is convention, not enforced by GitHub Actions. What matters technically is the `on:` block: anything with non-`workflow_call` triggers runs on this repo's own events; pure `workflow_call` files are library code.
@@ -69,25 +69,25 @@ The decision is recorded next to each `*.yml` action either as
 ## Rolling Tag Strategy
 
 This repo uses **three-tier semantic version tags**: `vX.Y.Z` (pinned), `vX.Y` (minor rolling),
-and `vX` (major rolling). Callers reference `@v3` or `@v3.0` to always get the latest patch.
+and `vX` (major rolling). Callers reference `@v4` or `@v4.0` to always get the latest patch.
 
 ### ALWAYS use `--force` push for rolling tags — NEVER delete+recreate
 
 **Wrong (creates a gap where the tag doesn't exist):**
 
 ```bash
-git push origin :refs/tags/v2         # tag is GONE — any workflow resolving @v3 FAILS here
-git push origin v2                    # tag comes back
+git push origin :refs/tags/v4         # tag is GONE — any workflow resolving @v4 FAILS here
+git push origin v4                    # tag comes back
 ```
 
 **Correct (atomic, tag is always reachable):**
 
 ```bash
-git push --force origin v2 v2.0
+git push --force origin v4 v4.0
 ```
 
 The delete+recreate approach causes a race condition: workflows in this repo are triggered by
-`push` to version tags and resolve `@v3` at startup. If `v2` is deleted at that moment, the
+`push` to version tags and resolve `@v4` at startup. If `v4` is deleted at that moment, the
 workflow fails with `failed to fetch workflow: reference to workflow should be either a valid
 branch, tag, or commit`.
 

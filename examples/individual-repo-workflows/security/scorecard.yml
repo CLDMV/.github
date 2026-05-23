@@ -39,7 +39,7 @@ jobs:
             contents: read
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v3
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   persist-credentials: false
 

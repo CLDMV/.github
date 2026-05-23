@@ -21,7 +21,7 @@ permissions:
 
 jobs:
     review:
-        uses: CLDMV/.github/.github/workflows/reusable-dependency-review.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-dependency-review.yml@v4
         with:
             fail_on_severity: "moderate"
             # Per-repo license policy override:

@@ -5,6 +5,10 @@ inputs:
   bump-type:
     description: "Version bump type (major, minor, patch)"
     required: true
+  types-present:
+    description: "Comma-separated conventional-commit types present in the PR range (e.g. 'feat,fix'). When provided, adds a label alias for each release-PR-owned type so a mixed PR (feat+fix) gets BOTH type: feat and type: bug. When empty, falls back to bump-type only (with patch ⇒ also bug)."
+    required: false
+    default: ""
 
 outputs:
   labels:

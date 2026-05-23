@@ -16,6 +16,10 @@ try {
 		.split(",")
 		.map((label) => label.trim())
 		.filter(Boolean);
+	const managedLabels = getInput("managed-labels", { default: "" })
+		.split(",")
+		.map((label) => label.trim())
+		.filter(Boolean);
 
 	// Prefer an explicitly-passed token, falling back to the default.
 	const token = process.env.GITHUB_TOKEN || getInput("github-token", { required: true });
@@ -38,6 +42,13 @@ try {
 	 * EVERY label — so each release-PR refresh churned "added X Y Z and removed
 	 * X Y Z" even when the set was unchanged. Diffing (only DELETE removed, only
 	 * POST added) keeps the activity log quiet. Mirrors steps/sync-pr-labels.
+	 *
+	 * `managed-labels` SCOPE: when set, removals are restricted to that
+	 * allowlist — labels OUTSIDE it (e.g. path-based labels owned by the labeler
+	 * workflow) are left alone. Without this, the delta would still strip them
+	 * each cycle and the labeler would re-add them. Additions still go through
+	 * for any label in `desired` not currently on the PR (caller is trusted to
+	 * only add labels it owns).
 	 */
 	async function updatePr(number) {
 		await api("PATCH", `/pulls/${number}`, { title, body: bodyContent }, { token, owner, repo });
@@ -46,7 +57,8 @@ try {
 		const current = new Set((currentArr || []).map((l) => l?.name).filter(Boolean));
 		const desired = new Set(labels);
 		const toAdd = [...desired].filter((l) => !current.has(l));
-		const toRemove = [...current].filter((l) => !desired.has(l));
+		const removalScope = managedLabels.length > 0 ? new Set(managedLabels) : null;
+		const toRemove = [...current].filter((l) => !desired.has(l) && (removalScope === null || removalScope.has(l)));
 		if (toAdd.length === 0 && toRemove.length === 0) {
 			console.log(`🏷️ Labels already in sync (${labels.join(",")}) — no changes`);
 			return;

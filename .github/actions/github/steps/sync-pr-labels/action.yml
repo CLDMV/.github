@@ -13,9 +13,13 @@ inputs:
     description: "Comma-separated list of labels to apply"
     required: true
   mode:
-    description: "'replace' (default; full sync) or 'add' (additive; preserves existing labels)"
+    description: "'replace' (default; full sync within scope) or 'add' (additive; preserves existing labels)"
     required: false
     default: "replace"
+  managed-labels:
+    description: "Comma-separated allowlist of labels this sync may remove. In 'replace' mode WITH managed-labels set, only labels in this set are removed when not in 'labels' — anything outside the set (e.g. path-based labels added by the labeler workflow) is left alone. Empty (default) = the historical full-replace behavior."
+    required: false
+    default: ""
 
 runs:
   using: "node24"

@@ -31,6 +31,10 @@ inputs:
     description: "Comma-separated list of labels"
     required: false
     default: "release"
+  managed-labels:
+    description: "Comma-separated allowlist of labels the update path may remove. When set on an EXISTING PR, only labels in this set are removed when not in 'labels' — anything outside (e.g. path-based labels from the labeler workflow) is left alone. Empty (default) = the historical full-replace behavior."
+    required: false
+    default: ""
   github-token:
     description: "GitHub token for API access (overridden by the GITHUB_TOKEN env var if set)"
     required: false

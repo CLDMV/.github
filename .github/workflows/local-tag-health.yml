@@ -32,7 +32,7 @@ permissions:
 jobs:
     health:
         # Use a RELATIVE uses: so PRs and branches test against the
-        # current-branch reusable, not the published @v3 tag. True dogfood.
+        # current-branch reusable, not the published @v4 tag. True dogfood.
         uses: ./.github/workflows/reusable-tag-health.yml
         with:
             debug: ${{ github.event.inputs.debug == 'true' }}

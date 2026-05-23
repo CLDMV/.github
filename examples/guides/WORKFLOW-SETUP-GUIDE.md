@@ -12,7 +12,12 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Core CI/CD | [Create Release PR](#-create-release-pr) | `core-cicd/release.yml` | push to non-default | Opens versioned release PRs |
 | Core CI/CD | [Release and Publish](#-release-and-publish) | `core-cicd/publish.yml` | push to master/main | Publishes to NPM / GitHub Packages |
 | Core CI/CD | [Update Major Version Tags](#-update-major-version-tags) | `core-cicd/update-major-version-tags.yml` | release published | Maintains `vX` / `vX.Y` floating tags |
-| Release companions | [Sync Open Release PRs](#-sync-open-release-prs) | `release-companions/sync-release-prs.yml` | PR merged to default | Refreshes every open release PR |
+| Release flow v4 | [Next Release](#-next-release-v4) | `release-flow-v4/next-release.yml` | push to `next` | Refreshes persistent `next → master` release PR |
+| Release flow v4 | [Hotfixes Release](#-hotfixes-release-v4) | `release-flow-v4/hotfixes-release.yml` | push to `hotfixes` | Refreshes persistent `hotfixes → master` release PR |
+| Release flow v4 | [Next/Hotfixes Reset](#-nexthotfixes-reset-v4) | `release-flow-v4/next-reset.yml` | push to `master` (release commit) | Re-syncs integration branches after a release |
+| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs onto `hotfixes` |
+| Release flow v4 | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer) | `release-flow-v4/pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to conventional-commit shape |
+| Release flow v4 | [v4 Bootstrap](#-v4-bootstrap) | `release-flow-v4/v4-bootstrap.yml` | manual dispatch | Creates `next` + `hotfixes`; configures repo for v4 |
 | Release companions | [Tag Health](#-tag-health) | `release-companions/tag-health.yml` | weekly cron + dispatch | Validates / repairs tags |
 | Release companions | [Release Notifier](#-release-notifier) | `release-companions/release-notify.yml` | release published | Notifies Discord / Slack / webhooks |
 | Release companions | [Master Commit Audit](#-master-commit-audit) | `release-companions/master-commit-audit.yml` | push to default | Files Issues on subject-line drift |
@@ -36,7 +41,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 
 ### 🧪 CI Tests & Build
 
-**File:** `core-cicd/ci.yml` &nbsp;·&nbsp; **Calls:** `workflow-ci.yml@v3`
+**File:** `core-cicd/ci.yml` &nbsp;·&nbsp; **Calls:** `workflow-ci.yml@v4`
 
 Runs your test suite and build across a Node.js version matrix. On a push that lands on the default branch → runs coverage and pushes a Shields.io-compatible badge JSON to the `badges` branch (signed bot commit). On a pull request → injects a live coverage badge + breakdown table directly into the PR description body (no files committed).
 
@@ -59,7 +64,7 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 
 ### 🚀 Create Release PR
 
-**File:** `core-cicd/release.yml` &nbsp;·&nbsp; **Calls:** `workflow-release.yml@v3`
+**File:** `core-cicd/release.yml` &nbsp;·&nbsp; **Calls:** `workflow-release.yml@v4`
 
 Watches for conventional commits on non-master branches and automatically opens a versioned release PR. Two modes: **automatic** detects `feat:`/`fix:`/`perf:`/`revert:`/`!` breaking commits and calculates the semver bump; **manual** uses `release:` prefix for patch/minor/major or `release!:` to force a major bump. Bot commits are ignored to prevent loops. Maintenance commits (`chore:`, `docs:`, `ci:`, …) don't trigger releases but are included in changelogs.
 
@@ -73,7 +78,7 @@ Watches for conventional commits on non-master branches and automatically opens 
 
 ### 📦 Release and Publish
 
-**File:** `core-cicd/publish.yml` &nbsp;·&nbsp; **Calls:** `workflow-publish.yml@v3`
+**File:** `core-cicd/publish.yml` &nbsp;·&nbsp; **Calls:** `workflow-publish.yml@v4`
 
 Fires when a release PR is merged into master. Re-runs tests and build, then: creates a GitHub Release with the generated changelog, publishes to the NPM registry, publishes to GitHub Packages. Both registries are toggleable independently via `publish_to_npm` / `publish_to_github_packages`. Supports `dry_run` to validate the full pipeline without publishing. See [DRY-RUN-GUIDE.md](DRY-RUN-GUIDE.md).
 
@@ -87,7 +92,7 @@ Fires when a release PR is merged into master. Re-runs tests and build, then: cr
 
 ### 🏷️ Update Major Version Tags
 
-**File:** `core-cicd/update-major-version-tags.yml` &nbsp;·&nbsp; **Calls:** `workflow-update-major-version-tags.yml@v3`
+**File:** `core-cicd/update-major-version-tags.yml` &nbsp;·&nbsp; **Calls:** `workflow-update-major-version-tags.yml@v4`
 
 After a release, creates or force-updates the floating `vX.Y` and `vX` tags pointing at the new patch tag. Optionally maintains a `VERSION_TAGS.md` file documenting all managed tags. Full details in [UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](UPDATE-MAJOR-VERSION-TAGS-GUIDE.md).
 
@@ -99,25 +104,101 @@ After a release, creates or force-updates the floating `vX.Y` and `vX` tags poin
 
 ---
 
-## 📋 Release-flow companions
+## 🔀 Release flow v4
 
-### 🔄 Sync Open Release PRs
+The v4 staging-branch model. **Adopt as a set** — these workflows depend on each other. After installing, complete the cutover via [docs/migration/v3-to-v4.md](../../docs/migration/v3-to-v4.md): import the rulesets, add the bot App to bypass on `next`/`hotfixes`, retire any existing v3 per-PR release flow.
 
-**File:** `release-companions/sync-release-prs.yml` &nbsp;·&nbsp; **Calls:** `workflow-sync-open-release-prs.yml@v3`
+### 🚀 Next Release (v4)
 
-When any PR merges to master/main, fans out and refreshes every open release PR so its version bump and changelog stay in sync with the new master state. Companion to the version-base fix in P3.1 — without this fan-out, a release PR that gets no new pushes between sibling merges still carries stale data. Skips bot-authored merges to avoid recursion.
+**File:** `release-flow-v4/next-release.yml` &nbsp;·&nbsp; **Calls:** `create-release-pr@v4` / `update-release-pr@v4`
 
-**Required `package.json` scripts** — same as the release workflow above (delegates to the release pipeline).
+Fires on every push to `next` (contributor PR squash-merges land here). Resolves or creates the persistent `next → master` release PR and refreshes its version + changelog from the `master..next` range. The version bump rides as a `chore: bump version` commit on `next` and is carried through the squash on merge.
 
-**Required secrets** — bot App credentials only.
+**Required `package.json` scripts** — `test`, `build:ci` (substitute stub commands like `echo '✓ no build step'` for a meta package with no build).
 
-**Prereqs** — none beyond what the release workflow itself needs.
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `next` branch exists (run `v4-bootstrap.yml` first); ruleset on `next` with bot in bypass; **edit the `package-name` + `build-command` placeholders** in this file.
 
 ---
 
+### 🚑 Hotfixes Release (v4)
+
+**File:** `release-flow-v4/hotfixes-release.yml` &nbsp;·&nbsp; **Calls:** `create-release-pr@v4` / `update-release-pr@v4`
+
+Mirror of `next-release.yml` but for the `hotfixes` integration branch. Patches the current release independently of whatever is pending on `next`.
+
+**Required `package.json` scripts** — same as `next-release.yml`.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `hotfixes` branch exists; ruleset on `hotfixes` with bot in bypass; **edit the `package-name` + `build-command` placeholders** in this file.
+
+---
+
+### ♻️ Next/Hotfixes Reset (v4)
+
+**File:** `release-flow-v4/next-reset.yml` &nbsp;·&nbsp; **Calls:** `force-reset-branch@v4` / `merge-master-into-branch@v4`
+
+After a release lands on master, re-syncs the integration branches. `hotfixes` is always force-reset to master HEAD; `next` is force-reset on a normal release, or master-merged-into-`next` on a hotfix release (preserves in-flight feature work). Uses the **REST API** because a bot-App `git push` is rejected by the ruleset even with bypass. Self-healing — recreates a branch that went missing.
+
+A `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling forward, so the sync job can't run the previous release's action code.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (App must have repo `administration: write` for branch creation).
+
+**Prereqs** — none beyond the bot bypass on `next`/`hotfixes`.
+
+---
+
+### 🔀 Hotfix PR Redirector (v4)
+
+**File:** `release-flow-v4/hotfix-redirector.yml` &nbsp;·&nbsp; **Calls:** `redirect-hotfix-pr@v4`
+
+When a PR opens from a `hotfix/*` or `security/*` head branch, retargets it onto the `hotfixes` integration branch. API-only (`pull_request_target` without checkout — safe).
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `hotfixes` branch exists.
+
+---
+
+### 🏷️ PR Title Normalizer
+
+**File:** `release-flow-v4/pr-title-normalizer.yml` &nbsp;·&nbsp; **Calls:** `normalize-pr-title@v4`
+
+Normalizes contributor PR titles to Conventional Commits format (the release flow expects this shape). API-only via `pull_request_target` — no checkout. Useful even outside v4 (backportable to v3 repos).
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (falls back to `GITHUB_TOKEN`).
+
+**Prereqs** — none.
+
+---
+
+### 🚀 v4 Bootstrap
+
+**File:** `release-flow-v4/v4-bootstrap.yml` &nbsp;·&nbsp; **Calls:** (inline `gh api`)
+
+One-shot setup, run once per repo via the Actions tab. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches" (next/hotfixes must survive PR merges — they're the persistent release-PR heads). Idempotent. Defaults `dry_run: true`.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (App needs `administration: write` for the auto-merge / branch-delete toggle).
+
+**Prereqs** — master branch with at least one commit. Doesn't apply branch protection — import the rulesets by hand after running; the run summary links them.
+
+---
+
+## 📋 Release-flow companions
+
 ### 🏥 Tag Health
 
-**File:** `release-companions/tag-health.yml` &nbsp;·&nbsp; **Calls:** `reusable-tag-health.yml@v3`
+**File:** `release-companions/tag-health.yml` &nbsp;·&nbsp; **Calls:** `reusable-tag-health.yml@v4`
 
 Weekly Sunday 04:04 UTC sweep that runs the unified tag-health pipeline: validation, bot-signature fixes, unsigned-tag fixes, orphaned-release recovery, orphaned-tag relocation, and rolling-tag maintenance. Manual dispatch supported.
 
@@ -131,7 +212,7 @@ Weekly Sunday 04:04 UTC sweep that runs the unified tag-health pipeline: validat
 
 ### 📣 Release Notifier
 
-**File:** `release-companions/release-notify.yml` &nbsp;·&nbsp; **Calls:** `reusable-release-notifier.yml@v3`
+**File:** `release-companions/release-notify.yml` &nbsp;·&nbsp; **Calls:** `reusable-release-notifier.yml@v4`
 
 Fires on `release: published`. Reads per-repo channel config from `.github/release-notifier.yml` (merged with org defaults) and fans out to configured Discord / Slack / generic webhooks.
 
@@ -145,7 +226,7 @@ Fires on `release: published`. Reads per-repo channel config from `.github/relea
 
 ### 🕵️ Master Commit Audit
 
-**File:** `release-companions/master-commit-audit.yml` &nbsp;·&nbsp; **Calls:** the `audit-commit-subject@v3` action directly
+**File:** `release-companions/master-commit-audit.yml` &nbsp;·&nbsp; **Calls:** the `audit-commit-subject@v4` action directly
 
 After every push to default, validates the commit subject against the expected release-flow pattern and files a GitHub Issue if it doesn't match. Catches manual master commits and release-flow regressions.
 
@@ -161,7 +242,7 @@ After every push to default, validates the commit subject against the expected r
 
 ### 🔍 CodeQL
 
-**File:** `security/codeql.yml` &nbsp;·&nbsp; **Calls:** `reusable-codeql.yml@v3`
+**File:** `security/codeql.yml` &nbsp;·&nbsp; **Calls:** `reusable-codeql.yml@v4`
 
 CodeQL SAST. Runs on push to master/main, on PRs against master/main, and weekly Monday 14:37 UTC. SARIF results upload to the repo's Security tab.
 
@@ -175,7 +256,7 @@ CodeQL SAST. Runs on push to master/main, on PRs against master/main, and weekly
 
 ### 🛡️ Dependency Review
 
-**File:** `security/dependency-review.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependency-review.yml@v3`
+**File:** `security/dependency-review.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependency-review.yml@v4`
 
 On every PR against master/main, diffs the dependency manifest and blocks the PR if new deps exceed the configured severity floor. Backed by the GitHub Advisory Database.
 
@@ -203,7 +284,7 @@ Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:
 
 ### ✍️ CLA Bot
 
-**File:** `security/cla.yml` &nbsp;·&nbsp; **Calls:** `reusable-cla.yml@v3`
+**File:** `security/cla.yml` &nbsp;·&nbsp; **Calls:** `reusable-cla.yml@v4`
 
 On every PR (including from forks), checks whether each commit author has signed the CLA. Non-members can sign by commenting `I have read the CLA Document and I hereby sign the CLA` on the PR. Org members and configured bots are exempt.
 
@@ -221,7 +302,7 @@ On every PR (including from forks), checks whether each commit author has signed
 
 ### 🔀 Dependabot Auto-Merge
 
-**File:** `automation/dependabot-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependabot-auto-merge.yml@v3`
+**File:** `automation/dependabot-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependabot-auto-merge.yml@v4`
 
 Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI passes. Major bumps are left for a human.
 
@@ -237,7 +318,7 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
 
 ### 🏷️ Labeler
 
-**File:** `automation/labeler.yml` &nbsp;·&nbsp; **Calls:** `reusable-pr-labeler.yml@v3`
+**File:** `automation/labeler.yml` &nbsp;·&nbsp; **Calls:** `reusable-pr-labeler.yml@v4`
 
 Path-based PR labels. Uses the org-wide [`labeler.default.yml`](../../.github/labeler.default.yml) unless the consumer repo provides a `.github/labeler.yml` to override.
 
@@ -253,7 +334,7 @@ Path-based PR labels. Uses the org-wide [`labeler.default.yml`](../../.github/la
 
 ### 👋 Welcome
 
-**File:** `automation/welcome.yml` &nbsp;·&nbsp; **Calls:** `reusable-welcome.yml@v3`
+**File:** `automation/welcome.yml` &nbsp;·&nbsp; **Calls:** `reusable-welcome.yml@v4`
 
 Posts a friendly welcome comment to first-time contributors on their first issue and first PR. Comment content conditionally links to CONTRIBUTING / CLA / COC based on which files exist in the repo.
 
@@ -267,7 +348,7 @@ Posts a friendly welcome comment to first-time contributors on their first issue
 
 ### 💤 Stale
 
-**File:** `automation/stale.yml` &nbsp;·&nbsp; **Calls:** `reusable-stale.yml@v3`
+**File:** `automation/stale.yml` &nbsp;·&nbsp; **Calls:** `reusable-stale.yml@v4`
 
 Daily 05:13 UTC sweep that marks inactive issues / PRs as stale and closes them after additional inactivity. Reasonable defaults; first-run on a backlog should use `dry_run: true` to preview.
 
@@ -281,7 +362,7 @@ Daily 05:13 UTC sweep that marks inactive issues / PRs as stale and closes them 
 
 ### 🌿 Branch Retention
 
-**File:** `automation/branch-retention.yml` &nbsp;·&nbsp; **Calls:** `reusable-branch-retention.yml@v3`
+**File:** `automation/branch-retention.yml` &nbsp;·&nbsp; **Calls:** `reusable-branch-retention.yml@v4`
 
 On every PR merge to default, deletes most head branches immediately and keeps the last N of `release/*` (default 5) and `hotfix/*` (default 3). `master`, `main`, `badges`, `gh-pages` are always exempt. Backs the branch naming convention in [`docs/conventions/branch-naming.md`](../../docs/conventions/branch-naming.md).
 
@@ -297,7 +378,7 @@ On every PR merge to default, deletes most head branches immediately and keeps t
 
 ### 🐳 Docker Publish
 
-**File:** `packaging-docs/docker-publish.yml` &nbsp;·&nbsp; **Calls:** `workflow-docker-publish.yml@v3`
+**File:** `packaging-docs/docker-publish.yml` &nbsp;·&nbsp; **Calls:** `workflow-docker-publish.yml@v4`
 
 Builds and pushes a Docker image to GHCR on every push to default (and manual dispatch). Runs an optional pre-publish command (default `npm test`), tags with the version from `package.json`, and also pushes a `latest` tag.
 
@@ -313,7 +394,7 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 
 ### 📊 Bundle Size
 
-**File:** `packaging-docs/bundle-size.yml` &nbsp;·&nbsp; **Calls:** `reusable-bundle-size.yml@v3`
+**File:** `packaging-docs/bundle-size.yml` &nbsp;·&nbsp; **Calls:** `reusable-bundle-size.yml@v4`
 
 Runtime-library helper: on every PR against default, builds the package and posts a comment with raw / gzip / brotli size deltas against the base branch. Adopt only for repos that ship a runtime bundle.
 
@@ -329,7 +410,7 @@ Runtime-library helper: on every PR against default, builds the package and post
 
 ### 📚 Docs Publish
 
-**File:** `packaging-docs/docs.yml` &nbsp;·&nbsp; **Calls:** `reusable-docs-publish.yml@v3`
+**File:** `packaging-docs/docs.yml` &nbsp;·&nbsp; **Calls:** `reusable-docs-publish.yml@v4`
 
 On pushes to default touching `docs/`, source, or markdown files, builds docs and pushes the output to the `gh-pages` branch as a signed bot commit.
 
@@ -345,7 +426,7 @@ On pushes to default touching `docs/`, source, or markdown files, builds docs an
 
 ### 🏷️ Sync Org Labels
 
-**File:** `packaging-docs/sync-org-labels.yml` &nbsp;·&nbsp; **Calls:** `workflow-sync-org-labels.yml@v3`
+**File:** `packaging-docs/sync-org-labels.yml` &nbsp;·&nbsp; **Calls:** `workflow-sync-org-labels.yml@v4`
 
 Reads `data/github-labels.json` from the public org repo and applies the catalog to every CLDMV repo. Weekly Monday 06:00 UTC + manual dispatch with `dry_run` support.
 

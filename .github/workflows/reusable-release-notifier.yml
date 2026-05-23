@@ -25,7 +25,7 @@ on:
             default_config_ref:
                 required: false
                 type: string
-                default: "v2"
+                default: "v4"
             default_config_path:
                 required: false
                 type: string

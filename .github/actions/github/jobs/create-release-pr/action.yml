@@ -130,11 +130,31 @@ runs:
         commit-message: "chore: bump version to ${{ steps.version.outputs.new-version }}"
         github-token: ${{ inputs.github-token }}
 
+    # Extract the set of conventional-commit types present in the range so a
+    # mixed PR (e.g. feat: + fix:) gets BOTH type: feature request + type: bug
+    # — not just the label corresponding to the bump-type (the highest).
+    # Filters bot/merge/release commits + the auto chore-bump (loop noise).
+    - name: Compute commit types in range
+      id: pr-types
+      shell: bash
+      env:
+        RANGE: ${{ steps.divergence.outputs.merge-base }}..HEAD
+      run: |
+        types=$(git log --no-merges --format='%s' "$RANGE" \
+            | grep -vE '^(release|chore: bump version)' \
+            | grep -oiE '^[a-z]+(\([^)]+\))?!?:' \
+            | sed -E 's/[(!:].*//' \
+            | tr '[:upper:]' '[:lower:]' \
+            | sort -u | paste -sd,)
+        echo "types=${types:-}" >> "$GITHUB_OUTPUT"
+        echo "📊 commit types in range: ${types:-<none>}"
+
     - name: Compute raw label aliases
       id: raw-labels
       uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v4
       with:
         bump-type: ${{ inputs.version-bump != '' && inputs.version-bump || steps.commit-check.outputs.version-bump }}
+        types-present: ${{ steps.pr-types.outputs.types }}
 
     - name: Resolve PR label aliases
       id: pr-labels
@@ -142,6 +162,10 @@ runs:
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
+    # managed-labels scopes the update path's label diff: only labels in this
+    # allowlist may be removed. Path-based labels owned by the PR labeler
+    # workflow (type: ci / type: documentation / area: *) stay untouched —
+    # avoids the remove-then-re-add churn the unscoped delta produced.
     - name: Create pull request
       if: inputs.dry-run != 'true'
       id: create-pr
@@ -155,6 +179,7 @@ runs:
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
         labels: ${{ steps.pr-labels.outputs.labels }}
+        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request"
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 

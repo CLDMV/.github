@@ -119,7 +119,7 @@ hotfixes ───────────────────────�
 Trigger: `push` to `next`.
 
 Job graph:
-1. **wait-for-tags** — gate from v3.2.4; ensures `@v3` matches master HEAD before downstream resolves
+1. **wait-for-tags** — gate from v3.2.4; ensures the released major tag (`@vN`, parsed from the `release:` commit) matches master HEAD before downstream resolves
 2. **detect-changes** — `git log master..next`; if empty, exit (next has been reset, nothing to do)
 3. **resolve-or-create-pr** — looks up the persistent `next → master` PR; creates if missing
 4. **refresh-pr** — calls a refactored `update-release-pr@v4`:
@@ -129,7 +129,7 @@ Job graph:
    - Title-suffix = oldest matching commit (v3.2.4 logic)
    - Label sync = delta-only (v3.2.4 logic)
 
-### 6.2 `local-hotfix-release.yml` (new)
+### 6.2 `local-hotfixes-release.yml` (new)
 
 Mirror of §6.1 but for the `hotfixes` branch.
 
@@ -138,7 +138,7 @@ Mirror of §6.1 but for the `hotfixes` branch.
 Trigger: `push` to `master` (only when the head commit is a `release:` commit).
 
 Job graph:
-1. **wait-for-tags** — polls `@v3` until it matches the release commit. A release also fires `update-major-version-tags` (which rolls `@v3`); since jobs resolve `uses: ...@v3` at job start, this gate prevents the sync job from running the *previous* release's action code. (This race is exactly what made the first v3.5.0 reset fail against the old `force-reset-branch`.)
+1. **wait-for-tags** — polls the released **major** tag (`@vN`, parsed from the `release: vX.Y.Z` commit — not a hardcoded `@v3`, which never rolls on a major bump) until it matches the release commit. A release also fires `update-major-version-tags` (which rolls `@vN`); since jobs resolve `uses: …@vN` at job start, this gate prevents the sync job from running the *previous* release's action code. (This race is exactly what made the first v3.5.0 reset fail against the old `force-reset-branch`.)
 2. **sync-branches** (needs wait-for-tags) — re-syncs the integration branches by lane:
    - **`hotfixes` is always force-reset** to master HEAD after any release.
    - **`next` depends on the released lane** (detected from the PR head ref behind the squash commit's trailing `(#N)`):
@@ -214,7 +214,7 @@ Job:
 
 - **`workflow-sync-open-release-prs.yml`** — only one release PR per lane now; no fan-out needed.
 - **`local-sync-release-prs.yml`** — same.
-- **`local-release.yml`'s "create release PR" path on contributor branches** — release PRs are not created on contributor branches anymore; they're created on `next`/`hotfixes` integration branches via §6.1/§6.2.
+- **`local-release.yml`** (the whole v3 per-PR dogfood) — removed in the v4.1.x cleanup. Release PRs are created on the `next`/`hotfixes` integration branches via §6.1/§6.2, not on contributor branches. (The v3 per-PR flow itself remains available to consumers on the frozen `@v3` tag.)
 
 The existing per-PR release-PR flow stays available on `@v3` for repos that need it during migration.
 
@@ -395,14 +395,16 @@ Six PRs in sequence, each independently shippable:
 |---|---|---|---|---|
 | 1 | **Foundation actions** | Add `compute-highest-commit-type`, `normalize-pr-title`, `redirect-hotfix-pr`, `force-reset-branch`, `merge-master-into-branch`. Wire none of them yet. | Yes — additive | ✅ shipped v3.3.0 |
 | 2 | **`@v3` parallel: PR title normalizer** | Add `local-pr-title-normalizer.yml` for v3 repos. Backportable feature. | Yes — useful even pre-v4 | ✅ shipped v3.4.0 |
-| 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in | 🚧 in progress |
-| 4 | **v4 hotfix lane** | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next. | Yes — additive | 🚧 in progress |
-| 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml` + the `pending-release-reminder` action. | Yes — additive | 🚧 in progress |
-| 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site. `docs/migration/v3-to-v4.md`. Top-level `README.md` + root dev/test cleanup. **Deferred to the deliberate cut:** decommission `workflow-sync-open-release-prs.yml`, swap this repo's `@v3`→`@v4` refs, and the explicit `release: v4.0.0` commit. | Final v4 cut | 🚧 in progress (additive parts done; cut pending sync validation) |
+| 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 4 | **v4 hotfix lane** | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next. | Yes — additive | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml` + the `pending-release-reminder` action. | Yes — additive | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site. `docs/migration/v3-to-v4.md`. Top-level `README.md` + root dev/test cleanup. **Done at the deliberate cut:** decommissioned `workflow-sync-open-release-prs.yml` + `local-sync-release-prs.yml`; swapped this repo's `@v3`→`@v4` refs (v4.0.2). | Final v4 cut | ✅ shipped — v4.0.0 cut |
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
 
-**`@v4` stability between migration PRs:** PRs 3 through 5 are additive but incomplete — `@v4` during that window is an unstable preview. Do not migrate production consumer repos until PR 6 lands and v4.0.0 is formally cut. After PR 6, `@v4` is considered stable.
+**`@v4` stability:** PRs 3–5 were an additive preview on `@v4`; the line became **stable when PR 6 landed and v4.0.0 was formally cut**. `@v4` now tracks the latest release (the v4.1.x line) and is the recommended pin.
+
+**How the major was cut (learned the hard way):** v4.0.0 was opened with a **`feat!:` breaking commit**, *not* an explicit `release: v4.0.0` escape-hatch commit. A content-bearing `release:` commit double-prefixes the PR title (`release: v4.0.0 - v4.0.0 - …`) and yields an empty changelog — release commits are filtered out of the changelog range. A breaking `feat!:` is the correct way to open a new major: it computes the major bump *and* populates the changelog from the commit itself.
 
 Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR 6 — written for internal institutional memory, not external consumer hand-holding.
 

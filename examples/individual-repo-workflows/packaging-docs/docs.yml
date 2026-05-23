@@ -29,7 +29,7 @@ permissions:
 
 jobs:
     publish:
-        uses: CLDMV/.github/.github/workflows/reusable-docs-publish.yml@v3
+        uses: CLDMV/.github/.github/workflows/reusable-docs-publish.yml@v4
         with:
             build_command: "npm run docs:build"
             output_dir: "docs/dist"
