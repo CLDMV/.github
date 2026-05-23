@@ -156,12 +156,33 @@ runs:
         title-suffix: ${{ steps.release-check.outputs.title-suffix }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
 
+    # Extract the set of conventional-commit types present in the PR range so a
+    # mixed PR (e.g. feat: + fix:) gets BOTH type: feature request + type: bug
+    # — not just the label corresponding to the bump-type (the highest).
+    # Filters bot/merge/release commits + the auto chore-bump (loop noise).
+    - name: Compute commit types in PR range
+      id: pr-types
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      shell: bash
+      env:
+        RANGE: ${{ steps.get-pr-range.outputs.commit-range }}
+      run: |
+        types=$(git log --no-merges --format='%s' "$RANGE" \
+            | grep -vE '^(release|chore: bump version)' \
+            | grep -oiE '^[a-z]+(\([^)]+\))?!?:' \
+            | sed -E 's/[(!:].*//' \
+            | tr '[:upper:]' '[:lower:]' \
+            | sort -u | paste -sd,)
+        echo "types=${types:-}" >> "$GITHUB_OUTPUT"
+        echo "📊 commit types in range: ${types:-<none>}"
+
     - name: Compute raw label aliases
       id: raw-labels
       if: steps.release-check.outputs.should-create-pr == 'true'
       uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v4
       with:
         bump-type: ${{ steps.release-check.outputs.version-bump }}
+        types-present: ${{ steps.pr-types.outputs.types }}
 
     - name: Resolve PR label aliases
       id: resolved-labels
@@ -170,6 +191,11 @@ runs:
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
+    # managed-labels scopes the replace: only labels in this allowlist are
+    # removed when not in `labels`. Path-based labels owned by the PR labeler
+    # workflow (type: ci / type: documentation / type: config / area: *) are
+    # OUTSIDE the allowlist and stay untouched — preventing the remove-then-
+    # re-add churn that bit the v4.0.1 refresh.
     - name: Sync PR labels
       if: steps.release-check.outputs.should-create-pr == 'true'
       uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v4
@@ -177,3 +203,4 @@ runs:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
         labels: ${{ steps.resolved-labels.outputs.labels }}
+        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request"

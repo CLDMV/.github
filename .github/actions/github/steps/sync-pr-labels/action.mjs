@@ -18,6 +18,10 @@ try {
 	if (mode !== "replace" && mode !== "add") {
 		throw new Error(`mode must be 'replace' or 'add', got "${mode}"`);
 	}
+	const managedLabels = getInput("managed-labels", { default: "" })
+		.split(",")
+		.map((l) => l.trim())
+		.filter(Boolean);
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 
 	if (labels.length === 0) {
@@ -40,12 +44,22 @@ try {
 		// even when the net set was unchanged. Diffing client-side avoids
 		// this entirely: when the desired set already equals the current
 		// set, we make zero API calls and the activity log stays quiet.
+		//
+		// `managed-labels` SCOPE: when set, removals are restricted to that
+		// allowlist. Labels OUTSIDE the allowlist (e.g. `type: ci` / `area: *`
+		// added by the path-based PR labeler workflow) are left alone — without
+		// this, the release-PR refresh would strip them every cycle and the
+		// labeler would re-add them, producing the "added X removed X" churn
+		// the delta-diff was supposed to silence. Additions are still based
+		// purely on `desired` minus `current` — the caller is trusted to only
+		// add labels it owns.
 		const desired = new Set(labels);
 		const currentArr = await api("GET", `/issues/${prNumber}/labels`, null, { token, owner, repo });
 		const current = new Set((currentArr || []).map((l) => l?.name).filter(Boolean));
 
 		const toAdd = [...desired].filter((l) => !current.has(l));
-		const toRemove = [...current].filter((l) => !desired.has(l));
+		const removalScope = managedLabels.length > 0 ? new Set(managedLabels) : null;
+		const toRemove = [...current].filter((l) => !desired.has(l) && (removalScope === null || removalScope.has(l)));
 
 		if (toAdd.length === 0 && toRemove.length === 0) {
 			console.log(`🏷️ Labels already in sync (${labels.join(",") || "<none>"}) — no API calls needed`);
