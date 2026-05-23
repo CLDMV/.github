@@ -12,7 +12,7 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 
 ## Template Catalog
 
-Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into five subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them.
+Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into six subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them — except `release-flow-v4/`, which is adopted as a set.
 
 ### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD (most repos want all four)
 
@@ -22,6 +22,21 @@ Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), gr
 | `release.yml` | push to non-default branch | `workflow-release.yml` | Detects `release:`/`release!:` commits → opens/updates a release PR |
 | `publish.yml` | push to default branch | `workflow-publish.yml` | Publishes to NPM + GitHub Packages, creates GitHub release |
 | `update-major-version-tags.yml` | `release: published` | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags |
+
+### 🔀 [`release-flow-v4/`](individual-repo-workflows/release-flow-v4/) — v4 staging-branch release flow (recommended)
+
+The v4 release model: contributors merge into `next` (features) or `hotfixes` (urgent); a persistent `next → master` PR (and `hotfixes → master`) batches everything into a single release; `master` stays a clean, release-only history. Adopt the **whole set together** — these workflows depend on each other.
+
+| Template | Triggers | What it does |
+|---|---|---|
+| `next-release.yml` | push to `next` | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range. |
+| `hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
+| `next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via REST API (gated on the released major tag); merges master into `next` after a hotfix release. |
+| `hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs onto the `hotfixes` lane. |
+| `pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
+| `v4-bootstrap.yml` | manual dispatch (one-time) | Creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. Run once per repo with `dry_run: true` first. |
+
+After installing these, complete the cutover via the [v3→v4 migration guide](../docs/migration/v3-to-v4.md) — rulesets, bot bypass, retire any existing v3 per-PR release flow.
 
 ### 📋 [`release-companions/`](individual-repo-workflows/release-companions/) — Release-flow companions
 

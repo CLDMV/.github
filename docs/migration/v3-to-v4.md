@@ -8,11 +8,12 @@ v3: every release-eligible PR carries its own version bump and its own `release:
 
 ## Cutover checklist
 
-1. **Bootstrap** — run `local-v4-bootstrap.yml` from the Actions tab (`dry_run: true` first, then `false`). Creates `next` + `hotfixes` from master HEAD and enables repo "Allow auto-merge".
-2. **Rulesets** — generate `master` / `next` / `hotfixes` rulesets at `docs/tools/ruleset-generator/` (or import `data/rulesets/*.json`) via Settings → Rules → Rulesets → Import.
-3. **Bot bypass** — add the **bot GitHub App** to the **Bypass list** of the `next` and `hotfixes` rulesets. `master` does NOT get bot bypass.
-4. **Swap workflow refs** — point the repo's workflow files at `@v4` instead of `@v3`. If the repo runs the v3 per-PR release flow (a `release.yml` calling `workflow-release.yml`), retire it or add `next` + `hotfixes` to its `branches-ignore` so it doesn't double-fire against the integration branches.
-5. **Decommission** the v3 fan-out (`workflow-sync-open-release-prs.yml` / `local-sync-release-prs.yml`) — v4 has one persistent PR per lane, so there's nothing to fan out.
+1. **Install the v4-flow workflows** — copy [`examples/individual-repo-workflows/release-flow-v4/*.yml`](../../examples/individual-repo-workflows/release-flow-v4/) into the repo's `.github/workflows/`. Six files: `next-release.yml`, `hotfixes-release.yml`, `next-reset.yml`, `hotfix-redirector.yml`, `pr-title-normalizer.yml`, and `v4-bootstrap.yml`. Edit the placeholder `package-name` / `build-command` in `next-release.yml` and `hotfixes-release.yml` to match the repo. Commit and push.
+2. **Bootstrap** — run `v4-bootstrap.yml` from the Actions tab (`dry_run: true` first, then `false`). Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
+3. **Rulesets** — generate `master` / `next` / `hotfixes` rulesets at the [CLDMV ruleset generator](https://github.com/CLDMV/.github/blob/master/docs/tools/ruleset-generator/index.html) (or copy [`data/rulesets/*.json`](https://github.com/CLDMV/.github/tree/master/data/rulesets)) and import via Settings → Rules → Rulesets → Import.
+4. **Bot bypass** — add the **bot GitHub App** to the **Bypass list** of the `next` and `hotfixes` rulesets. `master` does NOT get bot bypass. (The generator pre-adds CLDMV's bot by default; if you opted out, do it by hand here.)
+5. **Swap existing workflow refs** — if the repo already had v3 workflows installed, point them at `@v4` instead of `@v3`. If the repo runs the v3 per-PR release flow (a `release.yml` calling `workflow-release.yml`), retire it or add `next` + `hotfixes` to its `branches-ignore` so it doesn't double-fire against the integration branches.
+6. **Decommission** the v3 fan-out (`workflow-sync-open-release-prs.yml` / `local-sync-release-prs.yml`) — v4 has one persistent PR per lane, so there's nothing to fan out.
 
 ## Gotchas (learned the hard way)
 

@@ -71,6 +71,7 @@ examples/
 ├── guides/                                      # 🆕 v3: setup / dry-run / rolling-tag guides
 └── individual-repo-workflows/                   # copy-paste templates for consumers, grouped:
     ├── core-cicd/         (ci, release, publish, update-major-version-tags)
+    ├── release-flow-v4/   (next-release, hotfixes-release, next-reset, hotfix-redirector, pr-title-normalizer, v4-bootstrap)
     ├── release-companions/(tag-health, release-notify, master-commit-audit)
     ├── security/          (codeql, dependency-review, scorecard, cla)
     ├── automation/        (dependabot-auto-merge, labeler, welcome, stale, branch-retention)

@@ -1,0 +1,120 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/release-flow-v4/v4-bootstrap.yml
+# @Date: 2026-05-22 00:00:00 -07:00 (1779778800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/v4-bootstrap.yml
+#
+# v4 one-shot migration bootstrap. Run once per repo via the Actions tab.
+# Idempotent — running twice is a no-op. Default `dry_run: true` lets you
+# preview the changes before applying.
+#
+# It does the parts that genuinely benefit from automation:
+#   - creates the `next` and `hotfixes` integration branches from master HEAD
+#   - enables the repo-level "Allow auto-merge" toggle
+#   - disables "Automatically delete head branches" (next/hotfixes are the
+#     PR heads of the persistent release PRs — auto-delete would remove
+#     the integration branch on every release)
+#
+# It deliberately does NOT apply branch protection — import the rulesets
+# from the generator (https://github.com/CLDMV/.github → docs/tools/ruleset-
+# generator/) and add the bot App to the next/hotfixes bypass lists by hand.
+# The run summary links both steps.
+#
+# Full design: CLDMV/.github docs/conventions/release-flow-v4.md §9, §10.3
+# Migration checklist: CLDMV/.github docs/migration/v3-to-v4.md
+name: 🚀 v4 Bootstrap
+
+on:
+    workflow_dispatch:
+        inputs:
+            next_branch:
+                description: "Integration branch for features/fixes"
+                required: false
+                default: "next"
+            hotfixes_branch:
+                description: "Integration branch for hotfixes"
+                required: false
+                default: "hotfixes"
+            dry_run:
+                description: "Log actions without making changes"
+                type: boolean
+                required: false
+                default: true
+
+permissions:
+    contents: write
+
+jobs:
+    bootstrap:
+        name: "🚀 Bootstrap v4 branches + settings"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              # Full-permission mode: branch creation needs contents:write and
+              # the auto-merge toggle needs repo administration:write.
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Create integration branches + enable auto-merge
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  REPO: ${{ github.repository }}
+                  NEXT: ${{ github.event.inputs.next_branch || 'next' }}
+                  HOTFIXES: ${{ github.event.inputs.hotfixes_branch || 'hotfixes' }}
+                  DRY_RUN: ${{ github.event.inputs.dry_run }}
+              run: |
+                  set -euo pipefail
+                  master_sha=$(gh api "repos/$REPO/git/ref/heads/master" --jq '.object.sha')
+                  echo "master HEAD: $master_sha"
+
+                  create_branch() {
+                      local branch="$1"
+                      if gh api "repos/$REPO/git/ref/heads/$branch" >/dev/null 2>&1; then
+                          echo "✅ $branch already exists — skipping"
+                          return
+                      fi
+                      if [ "$DRY_RUN" = "true" ]; then
+                          echo "🔸 [dry-run] would create $branch at $master_sha"
+                      else
+                          gh api -X POST "repos/$REPO/git/refs" \
+                              -f "ref=refs/heads/$branch" -f "sha=$master_sha" >/dev/null
+                          echo "🌱 created $branch at $master_sha"
+                      fi
+                  }
+                  create_branch "$NEXT"
+                  create_branch "$HOTFIXES"
+
+                  if [ "$DRY_RUN" = "true" ]; then
+                      echo "🔸 [dry-run] would set allow_auto_merge=true, delete_branch_on_merge=false"
+                  else
+                      # delete_branch_on_merge MUST be false: next/hotfixes are
+                      # the PR HEADS of the persistent release PRs, so GitHub
+                      # auto-delete would remove the integration branch on every
+                      # release.
+                      gh api -X PATCH "repos/$REPO" -F allow_auto_merge=true -F delete_branch_on_merge=false >/dev/null \
+                          && echo "🔀 allow_auto_merge=true, delete_branch_on_merge=false" \
+                          || echo "⚠️ could not update repo settings (App may lack admin) — set 'Allow auto-merge' ON and 'Automatically delete head branches' OFF in Settings → General"
+                  fi
+
+                  {
+                      echo "## 🚀 v4 bootstrap"
+                      echo ""
+                      echo "Branches: \`$NEXT\`, \`$HOTFIXES\` (dry-run: \`$DRY_RUN\`)"
+                      echo ""
+                      echo "### Still to do by hand"
+                      echo "1. Import \`master\` / \`next\` / \`hotfixes\` rulesets — generate them at the [CLDMV ruleset generator](https://github.com/CLDMV/.github/blob/master/docs/tools/ruleset-generator/index.html) (or copy from \`CLDMV/.github\`'s [\`data/rulesets/*.json\`](https://github.com/CLDMV/.github/tree/master/data/rulesets))."
+                      echo "2. Add the **bot App** (not the bot user/team) to the **Bypass list** of the \`next\` + \`hotfixes\` rulesets."
+                      echo "3. Re-run this workflow with \`dry_run: false\` if this was a dry run."
+                  } >> "$GITHUB_STEP_SUMMARY"

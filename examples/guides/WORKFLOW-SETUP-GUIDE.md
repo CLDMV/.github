@@ -12,6 +12,12 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Core CI/CD | [Create Release PR](#-create-release-pr) | `core-cicd/release.yml` | push to non-default | Opens versioned release PRs |
 | Core CI/CD | [Release and Publish](#-release-and-publish) | `core-cicd/publish.yml` | push to master/main | Publishes to NPM / GitHub Packages |
 | Core CI/CD | [Update Major Version Tags](#-update-major-version-tags) | `core-cicd/update-major-version-tags.yml` | release published | Maintains `vX` / `vX.Y` floating tags |
+| Release flow v4 | [Next Release](#-next-release-v4) | `release-flow-v4/next-release.yml` | push to `next` | Refreshes persistent `next → master` release PR |
+| Release flow v4 | [Hotfixes Release](#-hotfixes-release-v4) | `release-flow-v4/hotfixes-release.yml` | push to `hotfixes` | Refreshes persistent `hotfixes → master` release PR |
+| Release flow v4 | [Next/Hotfixes Reset](#-nexthotfixes-reset-v4) | `release-flow-v4/next-reset.yml` | push to `master` (release commit) | Re-syncs integration branches after a release |
+| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs onto `hotfixes` |
+| Release flow v4 | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer) | `release-flow-v4/pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to conventional-commit shape |
+| Release flow v4 | [v4 Bootstrap](#-v4-bootstrap) | `release-flow-v4/v4-bootstrap.yml` | manual dispatch | Creates `next` + `hotfixes`; configures repo for v4 |
 | Release companions | [Tag Health](#-tag-health) | `release-companions/tag-health.yml` | weekly cron + dispatch | Validates / repairs tags |
 | Release companions | [Release Notifier](#-release-notifier) | `release-companions/release-notify.yml` | release published | Notifies Discord / Slack / webhooks |
 | Release companions | [Master Commit Audit](#-master-commit-audit) | `release-companions/master-commit-audit.yml` | push to default | Files Issues on subject-line drift |
@@ -95,6 +101,96 @@ After a release, creates or force-updates the floating `vX.Y` and `vX` tags poin
 **Required secrets** — bot App credentials, plus GPG signing secrets (default `use_gpg: true`).
 
 **Prereqs** — at least one `vX.Y.Z` tag must exist — this workflow updates floating tags, it doesn't create the initial patch tag.
+
+---
+
+## 🔀 Release flow v4
+
+The v4 staging-branch model. **Adopt as a set** — these workflows depend on each other. After installing, complete the cutover via [docs/migration/v3-to-v4.md](../../docs/migration/v3-to-v4.md): import the rulesets, add the bot App to bypass on `next`/`hotfixes`, retire any existing v3 per-PR release flow.
+
+### 🚀 Next Release (v4)
+
+**File:** `release-flow-v4/next-release.yml` &nbsp;·&nbsp; **Calls:** `create-release-pr@v4` / `update-release-pr@v4`
+
+Fires on every push to `next` (contributor PR squash-merges land here). Resolves or creates the persistent `next → master` release PR and refreshes its version + changelog from the `master..next` range. The version bump rides as a `chore: bump version` commit on `next` and is carried through the squash on merge.
+
+**Required `package.json` scripts** — `test`, `build:ci` (substitute stub commands like `echo '✓ no build step'` for a meta package with no build).
+
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `next` branch exists (run `v4-bootstrap.yml` first); ruleset on `next` with bot in bypass; **edit the `package-name` + `build-command` placeholders** in this file.
+
+---
+
+### 🚑 Hotfixes Release (v4)
+
+**File:** `release-flow-v4/hotfixes-release.yml` &nbsp;·&nbsp; **Calls:** `create-release-pr@v4` / `update-release-pr@v4`
+
+Mirror of `next-release.yml` but for the `hotfixes` integration branch. Patches the current release independently of whatever is pending on `next`.
+
+**Required `package.json` scripts** — same as `next-release.yml`.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `hotfixes` branch exists; ruleset on `hotfixes` with bot in bypass; **edit the `package-name` + `build-command` placeholders** in this file.
+
+---
+
+### ♻️ Next/Hotfixes Reset (v4)
+
+**File:** `release-flow-v4/next-reset.yml` &nbsp;·&nbsp; **Calls:** `force-reset-branch@v4` / `merge-master-into-branch@v4`
+
+After a release lands on master, re-syncs the integration branches. `hotfixes` is always force-reset to master HEAD; `next` is force-reset on a normal release, or master-merged-into-`next` on a hotfix release (preserves in-flight feature work). Uses the **REST API** because a bot-App `git push` is rejected by the ruleset even with bypass. Self-healing — recreates a branch that went missing.
+
+A `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling forward, so the sync job can't run the previous release's action code.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (App must have repo `administration: write` for branch creation).
+
+**Prereqs** — none beyond the bot bypass on `next`/`hotfixes`.
+
+---
+
+### 🔀 Hotfix PR Redirector (v4)
+
+**File:** `release-flow-v4/hotfix-redirector.yml` &nbsp;·&nbsp; **Calls:** `redirect-hotfix-pr@v4`
+
+When a PR opens from a `hotfix/*` or `security/*` head branch, retargets it onto the `hotfixes` integration branch. API-only (`pull_request_target` without checkout — safe).
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs** — `hotfixes` branch exists.
+
+---
+
+### 🏷️ PR Title Normalizer
+
+**File:** `release-flow-v4/pr-title-normalizer.yml` &nbsp;·&nbsp; **Calls:** `normalize-pr-title@v4`
+
+Normalizes contributor PR titles to Conventional Commits format (the release flow expects this shape). API-only via `pull_request_target` — no checkout. Useful even outside v4 (backportable to v3 repos).
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (falls back to `GITHUB_TOKEN`).
+
+**Prereqs** — none.
+
+---
+
+### 🚀 v4 Bootstrap
+
+**File:** `release-flow-v4/v4-bootstrap.yml` &nbsp;·&nbsp; **Calls:** (inline `gh api`)
+
+One-shot setup, run once per repo via the Actions tab. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches" (next/hotfixes must survive PR merges — they're the persistent release-PR heads). Idempotent. Defaults `dry_run: true`.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials (App needs `administration: write` for the auto-merge / branch-delete toggle).
+
+**Prereqs** — master branch with at least one commit. Doesn't apply branch protection — import the rulesets by hand after running; the run summary links them.
 
 ---
 
