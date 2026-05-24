@@ -26,12 +26,24 @@ inputs:
     description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
     required: false
     default: "development"
+  enable-embedded-tests:
+    description: "Fetch and run private tests from embedded anonymous gitlinks via the org bot App. See docs/conventions/embedded-tests-ci.md."
+    required: false
+    default: "false"
 
 runs:
   using: composite
   steps:
     - name: Checkout code
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+
+    # When enabled, detect anonymous gitlinks in HEAD and clone the matching
+    # private repos via the bot App. Runs after checkout (gitlinks must be in
+    # the tree) and before any build/test steps (tests need the files present).
+    # Silently no-ops on fork PRs where the bot App secrets aren't available.
+    - name: Fetch embedded private tests
+      if: inputs.enable-embedded-tests == 'true'
+      uses: CLDMV/.github/.github/actions/github/steps/fetch-embedded-repos@v4
 
     - name: Setup Node.js
       uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
