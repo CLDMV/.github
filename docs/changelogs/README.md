@@ -13,6 +13,9 @@ Per-release changelogs for `@cldmv/.github`. **One file per minor version** (`vX
 
 | Version | Date | Headline |
 |---|---|---|
+| [v4.2.0](v4.2.0.md) | 2026-05-23 | Consumer v4-adoption — `release-flow-v4/` templates, v4-first scaffolding guide, doc reframe, label-sync + commit-type aggregation fixes |
+| [v4.1.0](v4.1.0.md) | 2026-05-22 | Ruleset generator pre-adds bot App to `next`/`hotfixes` bypass lists |
+| [v4.0.0](v4.0.0.md) | 2026-05-22 | Staging-branch release flow (persistent `next → master` and `hotfixes → master` PRs), retire v3 per-PR fan-out |
 | [v3.0.0](v3.0.0.md) | 2026-05-20 | Security baseline, automation suite, dogfood workflows, CLA bot, branch retention |
 | [v2.0.0](v2.0.0.md) | 2026-04-11 | `@v1`→`@v2` ref bump, GitHub App `client-id` migration, coverage badge in PR descriptions, Node 24 runtime |
 | [v1.0.0](v1.0.0.md) | 2025-08-05 | Initial release — CI / release / publish / tag-management workflows |
