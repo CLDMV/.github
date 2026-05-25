@@ -7,12 +7,16 @@
 #
 
 # Local dogfood for THIS repo (CLDMV/.github) — auto-opens (and refreshes)
-# a PR from a feature/fix branch to the right v4 integration branch on every
+# a PR from a code-side branch to the right v4 integration branch on every
 # push.
 #
-# Mapping:
-#   feat/*, feature/*, fix/*, release/*, chore/*, refactor/*  → next
-#   hotfix/*                                                   → hotfixes
+# Mapping (matches docs/conventions/branch-naming.md allowed patterns):
+#   feat/*, feature/*, fix/*, release/*, chore/*, refactor/*,
+#   docs/*, ci/*, perf/*, test/*, style/*           → next
+#   hotfix/*                                         → hotfixes
+#
+# Reserved branches NOT auto-PR'd: dependabot/* and copilot/* (they manage
+# their own PRs); badges, gh-pages (bot-only); master/main (the target).
 #
 # On first push: creates the PR with a categorized changelog body.
 # On subsequent pushes: refreshes the existing PR's body with the latest
@@ -28,12 +32,19 @@ name: 🔀 Local Feature PR (v4)
 on:
     push:
         branches:
+            # CUSTOMIZE: prune this list to whichever branch prefixes your
+            # repo uses. Must align with the `case` statement below.
             - 'feat/**'
             - 'feature/**'
             - 'fix/**'
             - 'release/**'
             - 'chore/**'
             - 'refactor/**'
+            - 'docs/**'
+            - 'ci/**'
+            - 'perf/**'
+            - 'test/**'
+            - 'style/**'
             - 'hotfix/**'
 
 permissions:
@@ -58,11 +69,15 @@ jobs:
               run: |
                   branch="${GITHUB_REF#refs/heads/}"
                   echo "branch=$branch" >> "$GITHUB_OUTPUT"
+                  # CUSTOMIZE: adjust the case arms to match your branch
+                  # conventions. Anything not matched is silently skipped
+                  # (so master/main, badges, gh-pages, dependabot/*, etc.
+                  # are safe regardless of what fires the workflow).
                   case "$branch" in
                       hotfix/*)
                           target="hotfixes"
                           ;;
-                      feat/*|feature/*|fix/*|release/*|chore/*|refactor/*)
+                      feat/*|feature/*|fix/*|release/*|chore/*|refactor/*|docs/*|ci/*|perf/*|test/*|style/*)
                           target="next"
                           ;;
                       *)
