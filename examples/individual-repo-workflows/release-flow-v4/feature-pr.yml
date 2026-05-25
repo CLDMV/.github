@@ -1,0 +1,144 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/release-flow-v4/feature-pr.yml
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/feature-pr.yml
+#
+# v4 ergonomics: auto-opens a PR from a feature / fix branch to the right
+# integration branch on first push, so contributors don't have to.
+#
+# Mapping:
+#   feat/*, feature/*, fix/*, release/*, chore/*, refactor/*  → next
+#   hotfix/*                                                   → hotfixes
+#
+# Idempotent: if a PR already exists with the matching head + base, the
+# workflow no-ops. PR title is taken from the head commit's first line
+# (preserves conventional-commit style — the v4 release-PR machinery's
+# title-normalizer and commit-type aggregator expect this). PR body is
+# a stub the contributor fills in.
+#
+# Skipped automatically: bot pushes (your bot App's login / github-actions[bot])
+# and any push whose head commit starts with 'chore: bump version'
+# (the v4 release-PR machinery's auto-bump commit).
+name: 🔀 Feature PR (v4)
+
+on:
+    push:
+        branches:
+            - 'feat/**'
+            - 'feature/**'
+            - 'fix/**'
+            - 'release/**'
+            - 'chore/**'
+            - 'refactor/**'
+            - 'hotfix/**'
+
+permissions:
+    contents: read
+    pull-requests: write
+
+# Serialize per-branch so a flurry of pushes doesn't race the
+# "does a PR already exist?" check.
+concurrency:
+    group: feature-pr-${{ github.repository }}-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    open-pr:
+        # Loop guard: replace 'cldmv-bot[bot]' with your bot App's login.
+        if: |
+            github.actor != 'cldmv-bot[bot]' &&
+            github.actor != 'github-actions[bot]' &&
+            !startsWith(github.event.head_commit.message, 'chore: bump version')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Determine target branch
+              id: target
+              shell: bash
+              run: |
+                  branch="${GITHUB_REF#refs/heads/}"
+                  echo "branch=$branch" >> "$GITHUB_OUTPUT"
+                  case "$branch" in
+                      hotfix/*)
+                          target="hotfixes"
+                          ;;
+                      feat/*|feature/*|fix/*|release/*|chore/*|refactor/*)
+                          target="next"
+                          ;;
+                      *)
+                          target=""
+                          echo "::notice::Branch '$branch' does not match any auto-PR pattern; skipping."
+                          ;;
+                  esac
+                  echo "target=$target" >> "$GITHUB_OUTPUT"
+
+            - name: Create App token
+              id: app-token
+              if: steps.target.outputs.target != ''
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Check for existing PR
+              id: existing
+              if: steps.target.outputs.target != ''
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  pr=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+                       --head "${{ steps.target.outputs.branch }}" \
+                       --base "${{ steps.target.outputs.target }}" \
+                       --state open \
+                       --json number --jq '.[0].number // ""')
+                  echo "number=$pr" >> "$GITHUB_OUTPUT"
+                  if [ -n "$pr" ]; then
+                      echo "::notice::PR #$pr already exists for ${{ steps.target.outputs.branch }} → ${{ steps.target.outputs.target }}; no action."
+                  fi
+
+            - name: Open PR
+              if: steps.target.outputs.target != '' && steps.existing.outputs.number == ''
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  HEAD_COMMIT_MSG: ${{ github.event.head_commit.message }}
+                  HEAD_BRANCH: ${{ steps.target.outputs.branch }}
+                  BASE_BRANCH: ${{ steps.target.outputs.target }}
+              run: |
+                  # Use the head commit's first line as the PR title — preserves
+                  # conventional-commit style (feat: ..., fix: ...) which the
+                  # release-PR title-normalizer + commit-type aggregator expect.
+                  title=$(printf '%s\n' "$HEAD_COMMIT_MSG" | head -1)
+                  body=$(cat <<EOF
+                  _Auto-opened by feature-pr.yml on first push to \`$HEAD_BRANCH\`._
+
+                  Edit this description with the summary, test plan, and any
+                  reviewer notes. The PR will refresh the persistent \`$BASE_BRANCH → master\` release PR's changelog after merge.
+
+                  <!-- Suggested template:
+                  ## Summary
+                  - …
+
+                  ## Test plan
+                  - [ ] …
+                  -->
+                  EOF
+                  )
+                  pr_url=$(gh pr create \
+                      --repo "$GITHUB_REPOSITORY" \
+                      --base "$BASE_BRANCH" \
+                      --head "$HEAD_BRANCH" \
+                      --title "$title" \
+                      --body "$body")
+                  echo "::notice::Opened $pr_url"
+                  echo "### 🔀 Auto-opened PR" >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "$pr_url" >> "$GITHUB_STEP_SUMMARY"
