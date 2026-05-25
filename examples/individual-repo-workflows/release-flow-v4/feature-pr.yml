@@ -185,6 +185,9 @@ jobs:
                       --title "$title" \
                       --body-file "${{ steps.body.outputs.body_file }}")
                   echo "::notice::Opened $pr_url"
-                  echo "### 🔀 Auto-opened PR" >> "$GITHUB_STEP_SUMMARY"
-                  echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "$pr_url" >> "$GITHUB_STEP_SUMMARY"
+                  # Single-block redirect to keep shellcheck SC2129 quiet.
+                  {
+                      echo "### 🔀 Auto-opened PR"
+                      echo ""
+                      echo "$pr_url"
+                  } >> "$GITHUB_STEP_SUMMARY"
