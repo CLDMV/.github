@@ -78,19 +78,26 @@ jobs:
                   # conventions. Anything not matched is silently skipped
                   # (so master/main, badges, gh-pages, dependabot/*, etc.
                   # are safe regardless of what fires the workflow).
+                  # The flow_label sorts first in the PR's label list
+                  # (the leading `!` precedes every letter alphabetically)
+                  # so a glance at any PR's badges reveals which lane it's in.
                   case "$branch" in
                       hotfix/*)
                           target="hotfixes"
+                          flow_label="! hotfix → hotfixes"
                           ;;
                       feat/*|feature/*|fix/*|release/*|chore/*|refactor/*|docs/*|ci/*|perf/*|test/*|style/*)
                           target="next"
+                          flow_label="! feature → next"
                           ;;
                       *)
                           target=""
+                          flow_label=""
                           echo "::notice::Branch '$branch' does not match any auto-PR pattern; skipping."
                           ;;
                   esac
                   echo "target=$target" >> "$GITHUB_OUTPUT"
+                  echo "flow_label=$flow_label" >> "$GITHUB_OUTPUT"
 
             - name: Create App token
               id: app-token
@@ -178,6 +185,12 @@ jobs:
                       --title "$title" \
                       --body-file /tmp/pr-body.md)
                   echo "::notice::Opened $pr_url"
+                  # Apply the flow label (sorts first in the PR's badge list).
+                  # `|| true` so a missing label in the repo (catalog not yet
+                  # synced) doesn't fail the workflow.
+                  if [ -n "${{ steps.target.outputs.flow_label }}" ]; then
+                      gh pr edit "$pr_url" --add-label "${{ steps.target.outputs.flow_label }}" || true
+                  fi
                   {
                       echo "### 🔀 Auto-opened PR"
                       echo ""
@@ -194,6 +207,13 @@ jobs:
                   gh pr edit "$PR_NUMBER" \
                       --repo "$GITHUB_REPOSITORY" \
                       --body-file /tmp/pr-body.md
+                  # Re-apply the flow label so a manual removal doesn't
+                  # strand the PR without its lane indicator.
+                  if [ -n "${{ steps.target.outputs.flow_label }}" ]; then
+                      gh pr edit "$PR_NUMBER" \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --add-label "${{ steps.target.outputs.flow_label }}" || true
+                  fi
                   echo "::notice::Refreshed PR #${PR_NUMBER} body"
                   {
                       echo "### 🔀 Refreshed PR body"

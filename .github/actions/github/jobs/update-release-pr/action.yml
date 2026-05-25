@@ -191,16 +191,43 @@ runs:
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
+    # Append the v4 flow label based on the head-ref lane:
+    #   head=next     → `! release → master`
+    #   head=hotfixes → `! hotfix release → master`
+    # The leading `!` sorts the label first in GitHub's alphabetical display
+    # so a glance at the PR list shows which lane each release PR is on.
+    - name: Append flow label
+      id: final-labels
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      shell: bash
+      run: |
+        case "${{ inputs.head-ref }}" in
+            next)      flow_label="! release → master" ;;
+            hotfixes)  flow_label="! hotfix release → master" ;;
+            *)         flow_label="" ;;
+        esac
+        labels='${{ steps.resolved-labels.outputs.labels }}'
+        if [ -n "$flow_label" ]; then
+            if [ -n "$labels" ]; then
+                labels="${labels},${flow_label}"
+            else
+                labels="$flow_label"
+            fi
+        fi
+        echo "labels=$labels" >> "$GITHUB_OUTPUT"
+
     # managed-labels scopes the replace: only labels in this allowlist are
     # removed when not in `labels`. Path-based labels owned by the PR labeler
     # workflow (type: ci / type: documentation / type: config / area: *) are
     # OUTSIDE the allowlist and stay untouched — preventing the remove-then-
     # re-add churn that bit the v4.0.1 refresh.
+    # Flow labels are IN the allowlist so the right lane indicator wins if
+    # the head-ref ever changes between refreshes.
     - name: Sync PR labels
       if: steps.release-check.outputs.should-create-pr == 'true'
       uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v4
       with:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
-        labels: ${{ steps.resolved-labels.outputs.labels }}
-        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request"
+        labels: ${{ steps.final-labels.outputs.labels }}
+        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request,! release → master,! hotfix release → master"

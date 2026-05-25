@@ -20,7 +20,13 @@ on:
     # code; dangerous).
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
-        branches: [master, main]
+        # Include the v4 integration branches (`next`, `hotfixes`) so feature
+        # and hotfix PRs trigger CodeQL. Without these, branch protection
+        # rulesets that require the CodeQL check on `next`/`hotfixes` will
+        # sit on "waiting for results" indefinitely. Branches that don't
+        # exist in a given repo simply never trigger the workflow — harmless
+        # for repos that haven't adopted the v4 staging-branch flow.
+        branches: [master, main, next, hotfixes]
     schedule:
         - cron: "37 14 * * 1" # weekly Monday 14:37 UTC; GitHub updates queries over time
 
