@@ -130,24 +130,28 @@ on:
 
 Pass it through to `reusable-build-and-test.yml`.
 
-### Change 2: `reusable-build-and-test.yml` runs the fetch step
+### Change 2: build-and-test composite mints token then fetches
 
-In the build-and-test job, add a step after `actions/checkout` and before the test runner:
+The `build-and-test` composite ([`actions/npm/jobs/build-and-test/action.yml`](../../.github/actions/npm/jobs/build-and-test/action.yml)) adds two steps after checkout and before the test runner — minting the App token, then passing it to the fetch action:
 
 ```yaml
+- name: Create App token (for embedded-tests fetch)
+  if: inputs.enable-embedded-tests == 'true'
+  id: embedded-tests-token
+  uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+
 - name: Fetch embedded private tests
-  if: inputs.enable_embedded_tests == true
+  if: inputs.enable-embedded-tests == 'true'
   uses: CLDMV/.github/.github/actions/github/steps/fetch-embedded-repos@v4
   with:
-    client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-    private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+    token: ${{ steps.embedded-tests-token.outputs.token }}
 ```
 
-The action handles everything: token minting, gitlink detection, URL derivation, multi-repo clone, secret-absence detection (silent skip on fork PRs), and failure reporting.
+`reusable-build-and-test.yml`'s `build-and-test` job exposes the bot App secrets as env vars (`BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY`) at the job level so `create-app-token` picks them up via its existing env fallback. No new secrets plumbing inside the composite itself.
 
-### Change 3: new composite action `fetch-embedded-repos`
+### Change 3: new Node action `fetch-embedded-repos`
 
-Lives at [`actions/github/steps/fetch-embedded-repos/action.yml`](../../.github/actions/github/steps/fetch-embedded-repos/). Scaffolded; implementation to follow when the next release ships. See the inline comments in that file for the step-by-step plan.
+Lives at [`actions/github/steps/fetch-embedded-repos/action.yml`](../../.github/actions/github/steps/fetch-embedded-repos/) + `action.mjs`. Implemented as a `using: node24` action (matching the convention used by `sync-pr-labels`, `audit-commit-subject`, `parse-csv-list`, etc.); uses the shared `sh` / `exec` / `getInput` / `setOutput` / `appendSummary` helpers from `common/common/core.mjs` and the `api` / `parseRepo` helpers from `github/api/_api/core.mjs`. Takes a pre-minted token as the `token` input — token minting is the caller's concern (orchestration layer), not the leaf action's.
 
 ## Consumer adoption
 
