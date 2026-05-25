@@ -38,8 +38,23 @@ The script is idempotent — re-running updates the existing ruleset (matched by
 
 Org admins can bypass the ruleset (configured in the script). Useful for one-off emergency branches that don't fit the convention. Bypass is logged in the audit log.
 
+## Branch retention rules
+
+Branch retention is enforced by [`examples/individual-repo-workflows/automation/branch-retention.yml`](../../examples/individual-repo-workflows/automation/branch-retention.yml), which calls the org-level [`reusable-branch-retention.yml`](../../.github/workflows/reusable-branch-retention.yml). Defaults (set in the reusable; consumer can override via `retention_rules` + `exempt_patterns` inputs):
+
+| Pattern | Behavior |
+|---|---|
+| `release/*` | Keep last **5** (oldest beyond the cap deleted on PR merge) |
+| `hotfix/*` | Keep last **3** |
+| Anything else matched (`feat/*`, `feature/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*`) | Deleted on merge — no retention |
+| `master`, `main`, `badges`, `gh-pages`, `dev`, `next`, `hotfixes` | **Exempt — never touched** |
+
+`next` and `hotfixes` are exempt because they're the persistent HEAD branches of the v4 release PRs — without exemption, a release merge would delete its own integration branch.
+
+The workflow fires on **PR-close events whose base is in the `branches:` filter** — `master`, `main`, `next`, or `hotfixes`. Under v4, contributor PRs merge into `next` (features/fixes) or `hotfixes` (urgent patches), not directly into master, so `next`/`hotfixes` must be in the filter or retention never fires for the bulk of merges.
+
 ## Related
 
-- Branch retention: `examples/individual-repo-workflows/automation/branch-retention.yml` keeps the last N of `release/*` and `hotfix/*` and deletes everything else immediately on merge. The retention `exempt_patterns` align with this convention's `master`/`main`/`badges`/`gh-pages` defaults.
+- Branch retention: see "Branch retention rules" section above.
 - Label catalog: `data/github-labels.json` has prefixed families (`type:`, `status:`, `priority:`, `semver:`, `area:`) that mirror the branch-prefix style.
 - Auto-PR opener: [`examples/individual-repo-workflows/release-flow-v4/feature-pr.yml`](../../examples/individual-repo-workflows/release-flow-v4/feature-pr.yml) implements the Auto-PR target column above — on push to a matched pattern it opens a PR (or refreshes an existing one) to the listed target with the standard categorized-commits body.
