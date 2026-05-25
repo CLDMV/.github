@@ -236,6 +236,19 @@ Job graph:
 
 **Consumer template:** [`examples/individual-repo-workflows/release-flow-v4/feature-pr.yml`](../../examples/individual-repo-workflows/release-flow-v4/feature-pr.yml). The branch-pattern list and the `case` statement carry `# CUSTOMIZE:` markers — consumer trims to whatever prefixes their repo actually uses.
 
+### 6.9 Branch retention under v4
+
+The existing `local-branch-retention.yml` workflow (called via [`reusable-branch-retention.yml`](../../.github/workflows/reusable-branch-retention.yml)) handles branch cleanup with these rules (full table in [`branch-naming.md`](branch-naming.md#branch-retention-rules)):
+
+- `release/*` keeps last 5
+- `hotfix/*` keeps last 3
+- `feat/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*` (and any other matched-non-exempt branches) are deleted on PR merge
+- `master`, `main`, `badges`, `gh-pages`, `dev`, `next`, `hotfixes` are exempt
+
+The **v4-relevant addition** is that the workflow's `pull_request:` trigger filter must include `next` and `hotfixes` in its `branches:` list. Under v4, contributor PRs merge into those integration branches (not directly into master), so without that addition the workflow never fires on the bulk of merges and feature branches pile up on origin indefinitely. The local dogfood + consumer template both list `[master, main, next, hotfixes]` as of v4.3.x.
+
+The exempt list ensures `next` / `hotfixes` themselves are never deleted — without that line, a release squash (head = `next`, base = `master`) would tell branch-retention to delete `next`, which would break the next release cycle.
+
 ### 6.7 Decommissioned
 
 - **`workflow-sync-open-release-prs.yml`** — only one release PR per lane now; no fan-out needed.
