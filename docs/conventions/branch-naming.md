@@ -4,24 +4,27 @@ Branch creation is enforced at the git layer via an org-level GitHub Ruleset (se
 
 ## Allowed patterns
 
-| Pattern | Purpose | What triggers |
-|---|---|---|
-| `release/X.Y.Z` | Release prep | `workflow-release.yml` (minor/major bump path) |
-| `hotfix/X.Y.Z` | Hotfix branches | `workflow-release.yml` (patch path) |
-| `feat/<slug>` | New features | normal CI |
-| `fix/<slug>` | Bug fixes | normal CI |
-| `chore/<slug>` | Maintenance, deps, scripts | normal CI |
-| `docs/<slug>` | Documentation only | normal CI (often skipped via `paths-ignore`) |
-| `ci/<slug>` | CI/workflow changes | normal CI |
-| `refactor/<slug>` | Internal restructuring | normal CI |
-| `perf/<slug>` | Performance | normal CI |
-| `test/<slug>` | Test-only changes | normal CI |
-| `style/<slug>` | Formatting only | normal CI |
-| `dependabot/*` | Reserved for Dependabot | normal CI |
-| `copilot/*` | Reserved for Copilot autofix | normal CI |
-| `master` / `main` | Default branch | publish + tag-health |
-| `badges` | Coverage-badge JSON (bot-published) | excluded from CI / release triggers |
-| `gh-pages` | Docs site (bot-published) | excluded from CI / release triggers |
+The **Auto-PR target** column shows where the v4 [`feature-pr.yml`](../../examples/individual-repo-workflows/release-flow-v4/feature-pr.yml) workflow auto-opens (and refreshes) a PR on push. Empty cell = no auto-PR; the maintainer opens one manually if needed.
+
+| Pattern | Purpose | What triggers | Auto-PR target |
+|---|---|---|---|
+| `release/X.Y.Z` | Release prep | `workflow-release.yml` (minor/major bump path) | `next` |
+| `hotfix/X.Y.Z` | Hotfix branches | `workflow-release.yml` (patch path) | `hotfixes` |
+| `feat/<slug>` | New features | normal CI | `next` |
+| `feature/<slug>` | Same as `feat/<slug>` (alias) | normal CI | `next` |
+| `fix/<slug>` | Bug fixes | normal CI | `next` |
+| `chore/<slug>` | Maintenance, deps, scripts | normal CI | `next` |
+| `docs/<slug>` | Documentation only | normal CI (often skipped via `paths-ignore`) | `next` |
+| `ci/<slug>` | CI/workflow changes | normal CI | `next` |
+| `refactor/<slug>` | Internal restructuring | normal CI | `next` |
+| `perf/<slug>` | Performance | normal CI | `next` |
+| `test/<slug>` | Test-only changes | normal CI | `next` |
+| `style/<slug>` | Formatting only | normal CI | `next` |
+| `dependabot/*` | Reserved for Dependabot | normal CI | — (Dependabot opens its own PRs) |
+| `copilot/*` | Reserved for Copilot autofix | normal CI | — (Copilot opens its own PRs) |
+| `master` / `main` | Default branch | publish + tag-health | — (the target, not a source) |
+| `badges` | Coverage-badge JSON (bot-published) | excluded from CI / release triggers | — |
+| `gh-pages` | Docs site (bot-published) | excluded from CI / release triggers | — |
 
 ## How to install
 
@@ -39,3 +42,4 @@ Org admins can bypass the ruleset (configured in the script). Useful for one-off
 
 - Branch retention: `examples/individual-repo-workflows/automation/branch-retention.yml` keeps the last N of `release/*` and `hotfix/*` and deletes everything else immediately on merge. The retention `exempt_patterns` align with this convention's `master`/`main`/`badges`/`gh-pages` defaults.
 - Label catalog: `data/github-labels.json` has prefixed families (`type:`, `status:`, `priority:`, `semver:`, `area:`) that mirror the branch-prefix style.
+- Auto-PR opener: [`examples/individual-repo-workflows/release-flow-v4/feature-pr.yml`](../../examples/individual-repo-workflows/release-flow-v4/feature-pr.yml) implements the Auto-PR target column above — on push to a matched pattern it opens a PR (or refreshes an existing one) to the listed target with the standard categorized-commits body.

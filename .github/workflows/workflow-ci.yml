@@ -136,6 +136,14 @@ on:
                 type: boolean
                 default: true
                 description: "Post/update a sticky coverage report comment on pull requests"
+            enable_embedded_tests:
+                required: false
+                type: boolean
+                default: false
+                description: "Fetch and run private tests from embedded anonymous gitlinks
+                    via the org bot App. Requires BOT_APP_CLIENT_ID +
+                    BOT_APP_PRIVATE_KEY secrets. Silently no-ops on fork PRs.
+                    See docs/conventions/embedded-tests-ci.md."
 
         secrets:
             NPM_TOKEN:
@@ -200,6 +208,10 @@ jobs:
             skip_performance_tests: ${{ inputs.skip_performance_tests }}
             skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
             test_environment: ${{ inputs.test_environment }}
+            enable_embedded_tests: ${{ inputs.enable_embedded_tests }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
     coverage-badge:
         name: "📊 Coverage & Badge Push"

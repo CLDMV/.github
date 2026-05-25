@@ -1,5 +1,29 @@
 [
 	{
+		"name": "! release → master",
+		"color": "0d47a1",
+		"description": "v4 flow: persistent next → master release PR (carries the next feature release)",
+		"aliases": ["flow: release", "release → master"]
+	},
+	{
+		"name": "! hotfix release → master",
+		"color": "b71c1c",
+		"description": "v4 flow: persistent hotfixes → master release PR (carries an urgent patch release)",
+		"aliases": ["flow: hotfix release", "hotfix release → master"]
+	},
+	{
+		"name": "! feature → next",
+		"color": "33691e",
+		"description": "v4 flow: contributor PR targeting the next integration branch (feat/fix/chore/refactor/docs/ci/perf/test/style/release branches)",
+		"aliases": ["flow: feature", "feature → next", "feat → next"]
+	},
+	{
+		"name": "! hotfix → hotfixes",
+		"color": "e65100",
+		"description": "v4 flow: contributor PR targeting the hotfixes integration branch (hotfix/* source branches)",
+		"aliases": ["flow: hotfix", "hotfix → hotfixes"]
+	},
+	{
 		"name": "good first issue",
 		"color": "7057ff",
 		"description": "A great starting point for new contributors with limited experience",

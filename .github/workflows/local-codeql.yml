@@ -21,7 +21,11 @@ on:
         branches: [master, main]
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
-        branches: [master, main]
+        # Include the v4 integration branches so feature/hotfix PRs (which
+        # target `next` or `hotfixes`, not master) actually trigger CodeQL.
+        # Without `next`/`hotfixes` here, rulesets that require the CodeQL
+        # check on those branches will sit on "waiting for results" forever.
+        branches: [master, main, next, hotfixes]
     schedule:
         - cron: "37 14 * * 1" # weekly Monday 14:37 UTC
     workflow_dispatch:
@@ -45,10 +49,20 @@ jobs:
     analyze:
         name: "🔍 Analyze javascript-typescript"
         runs-on: ubuntu-latest
-        # Fork-PR-friendly: SARIF upload will fail with read-only token,
-        # workflow status reflects the analysis result. Push-to-master
-        # analysis after merge catches anything missed.
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
+        # Run for:
+        #   - non-PR events (push to master/main, schedule, workflow_dispatch)
+        #   - fork PRs (SARIF upload fails with read-only token but workflow
+        #     status reflects the analysis result; original optimization)
+        #   - same-repo PRs targeting v4 integration branches (next/hotfixes)
+        #     — without this, the required-check on those branches would sit
+        #     on "waiting for results" forever, because code flowing into
+        #     master via the persistent release PR never gets analyzed
+        #     pre-merge under the v4 staging-branch model.
+        if: >-
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.fork == true ||
+            github.base_ref == 'next' ||
+            github.base_ref == 'hotfixes'
         steps:
             - name: Checkout
               uses: actions/checkout@v6

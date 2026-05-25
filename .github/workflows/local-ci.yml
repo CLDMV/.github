@@ -221,11 +221,17 @@ jobs:
                   #   .archive/                       — frozen pre-refactor workflow snapshots
                   #   docs/migration/, docs/changelogs/, CHANGELOG*  — historical refs
                   #   .github/workflows/local-ci.yml  — this file (holds the literal patterns)
+                  # `|| true` is load-bearing: git grep exits 1 on no-matches
+                  # (the success case), and bash's `set -eo pipefail` (Actions
+                  # default) propagates that exit code through the assignment,
+                  # killing the script before the if-check. Squash to 0 so the
+                  # absence-of-matches doesn't masquerade as a failure.
                   out=$(git grep -nIE \
                       -e 'uses:[[:space:]]*CLDMV/\.github/[^[:space:]]*@v[23]\b' \
                       -e '(workflow|reusable|local)-[a-z0-9-]+\.yml@v[23]\b' \
                       -- ':!tmp/**' ':!.archive/**' ':!docs/migration/**' ':!docs/changelogs/**' \
-                      ':!CHANGELOG*' ':!.github/workflows/local-ci.yml')
+                      ':!CHANGELOG*' ':!.github/workflows/local-ci.yml' \
+                      || true)
                   if [ -z "$out" ]; then
                       echo "### ✅ No stale internal @v2/@v3 refs" >> "$GITHUB_STEP_SUMMARY"
                       echo "count=0" >> "$GITHUB_OUTPUT"

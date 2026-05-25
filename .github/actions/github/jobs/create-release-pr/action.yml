@@ -162,10 +162,35 @@ runs:
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
 
+    # Append the v4 flow label so the PR shows its lane (`! release → master`
+    # for next → master, `! hotfix release → master` for hotfixes → master).
+    # The label name's leading `!` sorts it first in GitHub's alphabetical
+    # label display, making the PR's lane visible at a glance from any list.
+    - name: Append flow label
+      id: final-labels
+      shell: bash
+      run: |
+        case "${{ github.ref_name }}" in
+            next)      flow_label="! release → master" ;;
+            hotfixes)  flow_label="! hotfix release → master" ;;
+            *)         flow_label="" ;;
+        esac
+        labels='${{ steps.pr-labels.outputs.labels }}'
+        if [ -n "$flow_label" ]; then
+            if [ -n "$labels" ]; then
+                labels="${labels},${flow_label}"
+            else
+                labels="$flow_label"
+            fi
+        fi
+        echo "labels=$labels" >> "$GITHUB_OUTPUT"
+
     # managed-labels scopes the update path's label diff: only labels in this
     # allowlist may be removed. Path-based labels owned by the PR labeler
     # workflow (type: ci / type: documentation / area: *) stay untouched —
     # avoids the remove-then-re-add churn the unscoped delta produced.
+    # The two `! …` flow labels are in the allowlist so a hotfix → release
+    # head-ref change (rare but possible) doesn't strand the wrong label.
     - name: Create pull request
       if: inputs.dry-run != 'true'
       id: create-pr
@@ -178,8 +203,8 @@ runs:
         base-branch: ${{ steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
-        labels: ${{ steps.pr-labels.outputs.labels }}
-        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request"
+        labels: ${{ steps.final-labels.outputs.labels }}
+        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request,! release → master,! hotfix release → master"
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 

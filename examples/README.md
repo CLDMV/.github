@@ -32,6 +32,7 @@ The v4 release model: contributors merge into `next` (features) or `hotfixes` (u
 | `next-release.yml` | push to `next` | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range. |
 | `hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
 | `next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via REST API (gated on the released major tag); merges master into `next` after a hotfix release. |
+| `feature-pr.yml` | push to `feat/*`, `fix/*`, `hotfix/*`, etc. | Auto-opens (and refreshes on every push) a PR from a code-side branch to `next` (or `hotfixes` for `hotfix/*`). Body is the standard categorized changelog. Branch patterns are `# CUSTOMIZE:` markers in the file — trim to your repo's conventions. See [branch-naming.md](../../docs/conventions/branch-naming.md) for the full mapping. |
 | `hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs onto the `hotfixes` lane. |
 | `pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
 | `v4-bootstrap.yml` | manual dispatch (one-time) | Creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. Run once per repo with `dry_run: true` first. |

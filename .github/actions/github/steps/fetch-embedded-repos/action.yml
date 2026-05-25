@@ -1,0 +1,30 @@
+name: "📦 Fetch Embedded Private Repos"
+description: "Detect anonymous gitlinks in the parent's HEAD and clone each into its expected directory using a pre-minted bot App token. See docs/conventions/embedded-tests-ci.md for the design."
+
+inputs:
+  token:
+    description: "Pre-minted GitHub App installation token with contents:read on each embedded private repo. Typically passed from `actions/github/steps/create-app-token`. If empty, the action skips silently (typical for fork-PR runs without secrets)."
+    required: false
+  debug:
+    description: "Enable verbose logging for the detection and fetch steps"
+    required: false
+    default: "false"
+
+# NO CONFIG FILE INPUT.
+# The URL mapping is convention-only by design — a tracked config file
+# would publish the mapping between gitlink paths and private repo names,
+# which is exactly the leak anonymous gitlinks are meant to avoid.
+# See docs/conventions/embedded-tests-ci.md for the two conventions
+# (per-path and consolidated `<repo>-embedded`).
+
+outputs:
+  fetched_paths:
+    description: "Newline-separated list of gitlink paths that were successfully fetched"
+  skipped_reason:
+    description: "If the action skipped without fetching, the reason ('no-secrets', 'no-gitlinks', or empty)"
+  convention:
+    description: "Which convention was used: 'per-path', 'consolidated', or empty if skipped"
+
+runs:
+  using: node24
+  main: action.mjs
