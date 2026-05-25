@@ -21,7 +21,11 @@ on:
         branches: [master, main]
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
-        branches: [master, main]
+        # Include the v4 integration branches so feature/hotfix PRs (which
+        # target `next` or `hotfixes`, not master) actually trigger CodeQL.
+        # Without `next`/`hotfixes` here, rulesets that require the CodeQL
+        # check on those branches will sit on "waiting for results" forever.
+        branches: [master, main, next, hotfixes]
     schedule:
         - cron: "37 14 * * 1" # weekly Monday 14:37 UTC
     workflow_dispatch:
