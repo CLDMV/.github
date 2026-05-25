@@ -37,13 +37,21 @@ runs:
     - name: Checkout code
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
 
-    # When enabled, detect anonymous gitlinks in HEAD and clone the matching
-    # private repos via the bot App. Runs after checkout (gitlinks must be in
-    # the tree) and before any build/test steps (tests need the files present).
-    # Silently no-ops on fork PRs where the bot App secrets aren't available.
+    # When enabled, mint an App token then detect anonymous gitlinks in HEAD
+    # and clone the matching private repos. Runs after checkout (gitlinks must
+    # be in the tree) and before any build/test steps (tests need the files
+    # present). Silently no-ops on fork PRs where the bot App secrets aren't
+    # available (the token step returns empty, fetch-embedded-repos skips).
+    - name: Create App token (for embedded-tests fetch)
+      if: inputs.enable-embedded-tests == 'true'
+      id: embedded-tests-token
+      uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+
     - name: Fetch embedded private tests
       if: inputs.enable-embedded-tests == 'true'
       uses: CLDMV/.github/.github/actions/github/steps/fetch-embedded-repos@v4
+      with:
+        token: ${{ steps.embedded-tests-token.outputs.token }}
 
     - name: Setup Node.js
       uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
