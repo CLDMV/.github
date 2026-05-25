@@ -12,13 +12,18 @@
 # On PR merge: most branches deleted immediately; release/* keeps last 5,
 # hotfix/* keeps last 3. master/main/badges/gh-pages never touched.
 #
-# Batch 1.3 from tmp/plan-future-workflows.md.
+# v4 flow: feature PRs merge into `next` and hotfix PRs into `hotfixes`
+# (not directly into master). next/hotfixes are in the branches: filter
+# below so this workflow fires on those PR closures too — otherwise
+# feat/* / fix/* / chore/* etc. would pile up on origin indefinitely.
+# (Repos that haven't adopted v4 just won't see those branches; the
+# extra entries in the filter are harmless.)
 name: 🌿 Branch Retention
 
 on:
     pull_request:
         types: [closed]
-        branches: [master, main]
+        branches: [master, main, next, hotfixes]
 
 permissions:
     contents: write

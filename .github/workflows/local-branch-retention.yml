@@ -7,18 +7,32 @@
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# Prune merged head branches on this repo. Keeps last 5 release/* and 3
-# hotfix/*; everything else (feat/*, fix/*, chore/*, etc.) deleted on merge.
-# master/main/badges/gh-pages/dev — and the v4 integration branches
-# next/hotfixes — are never touched. (next/hotfixes are PR HEADS of the
-# persistent release PRs, so without this exemption a release would delete
-# the integration branch.)
+# Prune merged head branches on this repo. Rules (from
+# reusable-branch-retention.yml defaults + this file's exempt_patterns):
+#
+#   release/*  — keep last 5
+#   hotfix/*   — keep last 3
+#   everything else (feat/*, fix/*, chore/*, refactor/*, docs/*, ci/*,
+#                    perf/*, test/*, style/*, feature/*) — delete on merge
+#   master, main, badges, gh-pages, dev, next, hotfixes — exempt; never
+#       touched. (next/hotfixes are PR HEADS of the persistent release
+#       PRs; without exemption a release would delete the integration
+#       branch.)
+#
+# Trigger: PR-close against any branch in the `branches:` filter below.
+# In v4 the contributor PRs merge into next / hotfixes, not master — both
+# must be in the filter or retention never fires for those merges and
+# feat/* / fix/* / chore/* etc. pile up on origin indefinitely.
 name: 🌿 Local Branch Retention
 
 on:
     pull_request:
         types: [closed]
-        branches: [master, main]
+        # v4 flow: contributor PRs merge into `next` and `hotfixes`, not
+        # directly into master. Without next/hotfixes in this branches
+        # filter, branch-retention never fires for feat/fix/chore/etc.
+        # source branches under v4 — they pile up on origin indefinitely.
+        branches: [master, main, next, hotfixes]
 
 permissions:
     contents: write
