@@ -72,15 +72,16 @@ hotfixes ───────────────────────�
 
 1. Contributor branches off **`next`** (not master).
 2. Pushes commits in conventional format (`feat: ...`, `fix(scope): ...`, etc.).
-3. Opens PR — **target defaults to `next`** (repo's default branch is `next`).
-4. **PR title normalizer** workflow fires on PR open / sync:
+3. **First push of a branch matching a known prefix** (`feat/`, `feature/`, `fix/`, `release/`, `chore/`, `refactor/`, `docs/`, `ci/`, `perf/`, `test/`, `style/`) triggers the **auto-feature-PR workflow** (§6.8) — it opens a PR targeting `next` (or `hotfixes` for `hotfix/*`) with a populated categorized-commits body. The contributor doesn't open the PR manually.
+4. **Every subsequent push to the branch** triggers the same workflow's refresh path — the PR body is regenerated from `master..HEAD` (or `<integration>..HEAD`) and edited via `gh pr edit --body-file`. The body always reflects the current commit range.
+5. **PR title normalizer** workflow (§6.4) fires on PR open / sync:
    - Reads the PR's commits
    - Determines highest conventional type (breaking > feat > fix > perf > refactor > ...)
    - If PR title doesn't already conform to `<type>(<scope>)?(!): <summary>`, rewrites it
    - Posts a one-line comment explaining the rewrite (idempotent — only comments once)
-5. Required-reviews + green-checks pass → **GitHub auto-merges to `next`** (squash).
-6. Squash commit on `next` carries the conventional subject from the PR title.
-7. Push to `next` triggers the **release-PR refresh workflow** (§ 6.1) — the persistent `next → master` release PR updates its title, body, and labels.
+6. Required-reviews + green-checks pass → **GitHub auto-merges to `next`** (squash).
+7. Squash commit on `next` carries the conventional subject from the PR title.
+8. Push to `next` triggers the **release-PR refresh workflow** (§ 6.1) — the persistent `next → master` release PR updates its title, body, and labels.
 
 ### 5.2 Hotfix PR
 
@@ -209,6 +210,31 @@ Job:
    - File an issue (dedup by `dedup_window` bucket: `release-reminder-{branch}-{ISO-bucket}`)
    - Post a comment on the release PR linking the issue
 4. Use existing audit-style dedup so we don't re-file daily.
+
+### 6.8 `local-feature-pr.yml` (new in v4.3.x)
+
+Trigger: `push` to any branch matching the conventional-prefix patterns from [`docs/conventions/branch-naming.md`](branch-naming.md) (`feat/**`, `feature/**`, `fix/**`, `release/**`, `chore/**`, `refactor/**`, `docs/**`, `ci/**`, `perf/**`, `test/**`, `style/**`, `hotfix/**`).
+
+Maps the source branch to its integration target:
+
+- `hotfix/*` → `hotfixes`
+- everything else → `next`
+
+Job graph:
+
+1. **determine-target** — case statement on `${GITHUB_REF#refs/heads/}` to pick the target branch; exits silently if the branch doesn't match (so `master`, `badges`, `gh-pages`, `dependabot/*`, etc. are no-ops by default).
+2. **create-app-token** — standard org bot App token (read repo, write PRs).
+3. **check-existing-pr** — `gh pr list --head <branch> --base <target> --state open`. Records the PR number if one exists.
+4. **checkout** with `fetch-depth: 0` and an explicit `git fetch origin <target>` so the next step has `origin/<target>..HEAD` available locally.
+5. **get-commit-range** — produces the categorized commit JSON for that range, same machinery `local-next-release.yml` uses.
+6. **generate-comprehensive-changelog** — renders the standard Breaking Changes / Features / Bug Fixes / Other Changes / Contributors body. Same format as the persistent release PRs, so feature PRs are visually consistent with release PRs.
+7. **create-or-update** — if no existing PR, `gh pr create --body-file`; if one exists, `gh pr edit --body-file`. Title on create is the head commit's first line (preserves conventional-commit prefix for the §6.4 normalizer).
+
+**Loop guard.** Skips when `github.actor` is a bot account (`cldmv-bot[bot]`, `github-actions[bot]`) or the head commit starts with `chore: bump version` — covers the auto-bump pushes from the release-PR machinery.
+
+**Idempotency.** Per-branch concurrency group (`cancel-in-progress: false`) serializes pushes so the existence check doesn't race itself. The refresh path is safe to re-run; `gh pr edit --body-file` is replace-by-content.
+
+**Consumer template:** [`examples/individual-repo-workflows/release-flow-v4/feature-pr.yml`](../../examples/individual-repo-workflows/release-flow-v4/feature-pr.yml). The branch-pattern list and the `case` statement carry `# CUSTOMIZE:` markers — consumer trims to whatever prefixes their repo actually uses.
 
 ### 6.7 Decommissioned
 

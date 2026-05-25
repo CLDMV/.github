@@ -24,7 +24,7 @@
  * @module @cldmv/.github.scripts.validate-action-refs
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { execSync } from "node:child_process";
 
@@ -248,7 +248,7 @@ for (const file of files) {
 // ---- report ----------------------------------------------------------------
 
 const summary = process.env.GITHUB_STEP_SUMMARY;
-const writeSum = (s) => summary && require("node:fs").appendFileSync(summary, s + "\n");
+const writeSum = (s) => summary && appendFileSync(summary, s + "\n");
 
 if (findings.length === 0) {
 	console.log("✅ validate-action-refs — no findings");
