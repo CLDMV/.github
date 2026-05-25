@@ -99,6 +99,67 @@ jobs:
                       echo "::notice::PR #$pr already exists for ${{ steps.target.outputs.branch }} → ${{ steps.target.outputs.target }}; no action."
                   fi
 
+            - name: Build PR body from compare API
+              id: body
+              if: steps.target.outputs.target != '' && steps.existing.outputs.number == ''
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  HEAD_BRANCH: ${{ steps.target.outputs.branch }}
+                  BASE_BRANCH: ${{ steps.target.outputs.target }}
+              run: |
+                  # Pull commits + files from the compare API and render a
+                  # populated body. Caps lists so a long-running branch
+                  # doesn't produce an unreadable wall of text.
+                  COMMIT_CAP=50
+                  FILE_CAP=30
+
+                  compare=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE_BRANCH...$HEAD_BRANCH")
+
+                  commit_count=$(jq -r '.total_commits' <<< "$compare")
+                  file_count=$(jq -r '.files // [] | length' <<< "$compare")
+                  additions=$(jq -r '.files // [] | map(.additions) | add // 0' <<< "$compare")
+                  deletions=$(jq -r '.files // [] | map(.deletions) | add // 0' <<< "$compare")
+
+                  # Newest commits first; cap to COMMIT_CAP.
+                  commits=$(jq -r --argjson cap "$COMMIT_CAP" \
+                      '.commits | reverse | .[:$cap] | .[] | "- `\(.sha[0:8])` \(.commit.message | split("\n") | .[0])"' \
+                      <<< "$compare")
+                  commit_more=""
+                  if [ "$commit_count" -gt "$COMMIT_CAP" ]; then
+                      commit_more=$'\n\n_… and '$((commit_count - COMMIT_CAP))' earlier commits_'
+                  fi
+
+                  files=$(jq -r --argjson cap "$FILE_CAP" \
+                      '.files // [] | .[:$cap] | .[] | "- `\(.status[0:1] | ascii_upcase)` `\(.filename)` _(+\(.additions) / -\(.deletions))_"' \
+                      <<< "$compare")
+                  file_more=""
+                  if [ "$file_count" -gt "$FILE_CAP" ]; then
+                      file_more=$'\n\n_… and '$((file_count - FILE_CAP))' more files_'
+                  fi
+
+                  # Write to a file — cleaner than passing multiline through
+                  # $GITHUB_OUTPUT, and `gh pr create --body-file` is built for this.
+                  {
+                      echo "_Auto-opened by local-feature-pr.yml on first push to \`$HEAD_BRANCH\` → \`$BASE_BRANCH\`._"
+                      echo ""
+                      echo "## Commits ($commit_count)"
+                      echo ""
+                      echo "$commits"
+                      echo "$commit_more"
+                      echo ""
+                      echo "## Files changed ($file_count, +$additions / -$deletions)"
+                      echo ""
+                      echo "$files"
+                      echo "$file_more"
+                      echo ""
+                      echo "## Test plan"
+                      echo ""
+                      echo "- [ ] _Replace this section with the actual test steps for this branch_"
+                  } > /tmp/pr-body.md
+
+                  echo "body_file=/tmp/pr-body.md" >> "$GITHUB_OUTPUT"
+
             - name: Open PR
               if: steps.target.outputs.target != '' && steps.existing.outputs.number == ''
               shell: bash
@@ -108,31 +169,16 @@ jobs:
                   HEAD_BRANCH: ${{ steps.target.outputs.branch }}
                   BASE_BRANCH: ${{ steps.target.outputs.target }}
               run: |
-                  # Use the head commit's first line as the PR title — preserves
-                  # conventional-commit style (feat: ..., fix: ...) which the
-                  # release-PR title-normalizer + commit-type aggregator expect.
+                  # Title = head commit's first line — preserves the
+                  # conventional-commit prefix the release-PR title-normalizer
+                  # and commit-type aggregator expect.
                   title=$(printf '%s\n' "$HEAD_COMMIT_MSG" | head -1)
-                  body=$(cat <<EOF
-                  _Auto-opened by local-feature-pr.yml on first push to \`$HEAD_BRANCH\`._
-
-                  Edit this description with the summary, test plan, and any
-                  reviewer notes. The PR will refresh the persistent \`$BASE_BRANCH → master\` release PR's changelog after merge.
-
-                  <!-- Suggested template:
-                  ## Summary
-                  - …
-
-                  ## Test plan
-                  - [ ] …
-                  -->
-                  EOF
-                  )
                   pr_url=$(gh pr create \
                       --repo "$GITHUB_REPOSITORY" \
                       --base "$BASE_BRANCH" \
                       --head "$HEAD_BRANCH" \
                       --title "$title" \
-                      --body "$body")
+                      --body-file "${{ steps.body.outputs.body_file }}")
                   echo "::notice::Opened $pr_url"
                   echo "### 🔀 Auto-opened PR" >> "$GITHUB_STEP_SUMMARY"
                   echo "" >> "$GITHUB_STEP_SUMMARY"
