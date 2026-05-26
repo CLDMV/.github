@@ -134,8 +134,8 @@
 
 <label>
   <input type="checkbox" id="copilot-review">
-  <strong>Require Copilot Code Review (master + hotfixes)</strong>
-  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfixes. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
+  <strong>Require Copilot Code Review (next + hotfixes)</strong>
+  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to next and hotfixes — the branches where feature / hotfix PRs actually land and need review. Master PRs are release bundles assembled from already-reviewed commits, so Copilot review there adds no signal. Every PR to next / hotfixes triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
 </label>
 
 <label>
@@ -179,7 +179,7 @@
 <strong>Notes:</strong>
 <ul>
 <li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
-<li>Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit; <code>next</code> and <code>hotfixes</code> use <code>["rebase"]</code> so feature-PR commits land individually and GitHub appends <code>(#N)</code> refs that the to-master release-PR changelog picks up automatically.</li>
+<li>Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit; <code>next</code> and <code>hotfixes</code> use <code>["rebase", "squash"]</code> with rebase listed first (the default merge-button selection) so feature-PR commits normally land individually with GitHub auto-appending <code>(#N)</code> to each subject — the to-master release-PR changelog picks those refs up automatically. Squash stays available as a fallback for PRs where the maintainer wants to collapse noisy commit history.</li>
 <li><code>next.json</code> intentionally omits <code>required_linear_history</code> so §7.2's master-into-next API merge can produce a merge commit when needed.</li>
 <li>The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or blank the App ID, to opt out). It is never added to <code>master</code>.</li>
 </ul>
