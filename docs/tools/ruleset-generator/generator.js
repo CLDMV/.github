@@ -82,6 +82,11 @@
 	}
 
 	function buildMaster(opts) {
+		// master PRs are release-bundle PRs opened from next/hotfixes by the
+		// release-flow workflows — every commit in them was already reviewed
+		// on next or hotfixes when it landed. Code review (human or Copilot)
+		// adds no signal here. The PR review on master is essentially "approve
+		// the version bump and changelog".
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
@@ -91,7 +96,6 @@
 			codeScanningRule(),
 			requiredStatusChecksRule()
 		];
-		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Master",
 			target: "branch",
@@ -103,29 +107,42 @@
 	}
 
 	function buildNext(opts) {
+		// next is where feature PRs land. This is the primary code-review
+		// gate, so the Copilot opt-in (and code-scanning, status checks)
+		// belong here — not on master.
+		//
+		// Both rebase and squash are allowed; rebase is listed first so it's
+		// the default merge-button selection. Rebase preserves individual
+		// commits with GitHub auto-appending (#N) to each subject — that's
+		// the desired flow. Squash is kept as a fallback for unusual cases
+		// (e.g. a PR with many "fix typo" commits the maintainer wants
+		// collapsed).
+		const rules = [
+			{ type: "deletion" },
+			{ type: "non_fast_forward" },
+			{ type: "required_signatures" },
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["rebase", "squash"] }),
+			codeScanningRule(),
+			requiredStatusChecksRule()
+		];
+		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Next",
 			target: "branch",
 			enforcement: "active",
 			conditions: { ref_name: { exclude: [], include: ["refs/heads/next"] } },
-			rules: [
-				{ type: "deletion" },
-				{ type: "non_fast_forward" },
-				{ type: "required_signatures" },
-				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["rebase"] }),
-				codeScanningRule(),
-				requiredStatusChecksRule()
-			],
+			rules: rules,
 			bypass_actors: bypassWithBot(opts.includeBot, opts.botAppId)
 		};
 	}
 
 	function buildHotfix(opts) {
+		// Same rebase-first-with-squash-fallback policy as next.
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["rebase"] }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["rebase", "squash"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()
