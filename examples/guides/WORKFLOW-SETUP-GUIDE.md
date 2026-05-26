@@ -8,7 +8,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 
 | Category | Workflow | File | Trigger | Purpose |
 |---|---|---|---|---|
-| Core CI/CD | [CI Tests & Build](#-ci-tests--build) | `core-cicd/ci.yml` | push / fork-PR | Test matrix + build; PR gate |
+| Core CI/CD | [CI Tests & Build](#-ci-tests--build) | `core-cicd/ci.yml` | push / fork-PR | Test matrix + build; PR gate. Supports [embedded private tests](#-ci-tests--build) via anonymous gitlinks (opt-in) |
 | Core CI/CD | [Create Release PR](#-create-release-pr) | `core-cicd/release.yml` | push to non-default | Opens versioned release PRs |
 | Core CI/CD | [Release and Publish](#-release-and-publish) | `core-cicd/publish.yml` | push to master/main | Publishes to NPM / GitHub Packages |
 | Core CI/CD | [Update Major Version Tags](#-update-major-version-tags) | `core-cicd/update-major-version-tags.yml` | release published | Maintains `vX` / `vX.Y` floating tags |
@@ -60,6 +60,8 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 **Required secrets** — see [Secrets Summary](#secrets-summary). `NPM_TOKEN` for private deps; bot credentials optional but enable proper attribution; coverage-badge secrets required only when `enable_coverage_badge: true`.
 
 **Prereqs** — A `badges` branch must exist for coverage publishing (orphan: `git checkout --orphan badges && git commit --allow-empty -m "init" && git push origin badges`).
+
+**Optional: embedded private tests.** `ci.yml` supports running a private test suite from a separate repo, linked via an anonymous gitlink in the parent's tree at `tests/` (or any path). Set `enable_embedded_tests: true` on the workflow call and the CI fetches the matching private repo (per the URL-mapping convention) and runs its suite alongside the parent's. Fork PRs silently skip the fetch since they have no secret access. See [`docs/conventions/embedded-tests-ci.md`](../../docs/conventions/embedded-tests-ci.md) for the URL-mapping rules, the threat model, and how it interacts with `@cldmv/git-embedded` on the developer side.
 
 ---
 

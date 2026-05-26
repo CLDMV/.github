@@ -116,6 +116,7 @@ The other `local-*.yml` (`local-ci`, `local-codeql`, `local-labeler`, `local-wel
 - **Purpose**: CI testing and building for NPM packages.
 - **Triggers**: Push to any branch, PR to master/main.
 - **Usage**: `CLDMV/.github/.github/workflows/workflow-ci.yml@v4`
+- **Optional**: `enable_embedded_tests: true` runs a private test suite from a separate private repo linked via an anonymous gitlink (typically at `tests/`). See [`docs/conventions/embedded-tests-ci.md`](docs/conventions/embedded-tests-ci.md).
 
 ### Release Workflow (`workflow-release.yml`)
 
