@@ -25,7 +25,8 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Security | [Dependency Review](#-dependency-review) | `security/dependency-review.yml` | PR | Blocks PRs with high-severity new deps |
 | Security | [OpenSSF Scorecard](#-openssf-scorecard) | `security/scorecard.yml` | weekly + dispatch | Publishes OSSF Scorecard score |
 | Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
-| Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps |
+| Automation | [Dependabot config](#-dependabot-config) | `automation/dependabot.yml` | (config file) | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes` |
+| Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`) |
 | Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
 | Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
 | Automation | [Stale](#-stale) | `automation/stale.yml` | daily cron | Marks/closes inactive issues + PRs |
@@ -314,19 +315,39 @@ The bot's acknowledgment comment on the PR is the contributor's receipt — it c
 
 ## 🤖 Automation
 
+### 🔧 Dependabot config
+
+**File:** `automation/dependabot.yml` &nbsp;·&nbsp; **Lives at:** `.github/dependabot.yml` in the consumer repo
+
+The Dependabot config tuned for v4: routine bumps target `next`, so they pool with other contributor changes and ship in the next release. Security updates land on `next` initially and are auto-promoted to `hotfixes` by the hotfix-redirector (see below). No special routing config needed in `dependabot.yml` itself.
+
+Ships with two ecosystems enabled: `github-actions` and `npm`. Add / remove ecosystem blocks for your stack (gomod, pip, bundler, gradle, maven, cargo, docker, etc.). Adjust `directory` if manifests don't live at the repo root.
+
+---
+
 ### 🔀 Dependabot Auto-Merge
 
 **File:** `automation/dependabot-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependabot-auto-merge.yml@v4`
 
-Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI passes. Major bumps are left for a human.
+Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI passes — into whatever branch the PR targets (`next` for routine bumps; `hotfixes` for security updates that the hotfix-redirector promoted). Major bumps are left for a human.
+
+**Default in v4: ON (opt-out).** Delete the workflow if you'd rather review each Dependabot PR by hand. Routine bumps still pool into `next` via `dependabot.yml`; you'd just need to click the merge button on each one.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — bot App credentials.
 
-**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON. Branch protection on master/main must require CI status checks.
+**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). Branch protection on `next` and `hotfixes` with required CI status checks — the action refuses to merge into an unprotected branch.
 
 **Key inputs** — `bump_types` (default `patch,minor`), `merge_method` (default `squash`), `also_for_actors` (extend to Renovate or other bots).
+
+**Interaction with hotfix-redirector:** the redirector fires on `opened` *before* this workflow's auto-merge takes effect. For a Dependabot security PR, the sequence is:
+  1. Dependabot opens PR against `next` (per the config in `dependabot.yml`).
+  2. `hotfix-redirector.yml` detects the GHSA reference in the body and retargets the PR `next` → `hotfixes`.
+  3. CI runs against `hotfixes`.
+  4. This auto-merge workflow approves + auto-merges into `hotfixes`.
+
+The net effect: security updates ship via the hotfix lane without anyone clicking anything; routine bumps batch into `next` for the next release.
 
 ---
 
@@ -491,7 +512,8 @@ These come up across multiple workflows — set them once per repo:
 
 - **Branch protection** on `master`/`main` with required CI status check (`✅ Required PR Check` from `ci.yml`).
 - **Settings → Actions → "Require approval for outside collaborators"** to control fork-PR runs.
-- **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml`.
+- **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml` (auto-enabled by `v4-bootstrap.yml`).
+- **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
 - **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.

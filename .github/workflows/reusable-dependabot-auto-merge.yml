@@ -8,7 +8,15 @@
 #
 
 # Dependabot Auto-Merge (org-level, reusable).
-# Batch 3.2 from tmp/plan-future-workflows.md.
+#
+# Approves + queues auto-merge for Dependabot patch/minor PRs after CI passes.
+# Auto-merges into whatever branch the PR targets — in the v4 staging-branch
+# flow that's `next` for routine bumps and `hotfixes` for security updates
+# (the hotfix-redirector promotes the latter before this workflow's merge
+# takes effect).
+#
+# The action refuses to merge into a branch without required status checks
+# (so configure branch protection on `next` + `hotfixes` accordingly).
 name: 🤖 Dependabot Auto-Merge (Org-Level)
 
 on:
