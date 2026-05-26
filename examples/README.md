@@ -8,6 +8,7 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 - **[guides/WORKFLOW-SETUP-GUIDE.md](guides/WORKFLOW-SETUP-GUIDE.md)** — what each workflow does, which `package.json` scripts it requires, which secrets it needs, prerequisites. Start here when adding a workflow to a new repo by hand.
 - **[guides/DRY-RUN-GUIDE.md](guides/DRY-RUN-GUIDE.md)** — how to use dry-run mode on release and publish pipelines without making real changes.
 - **[guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)** — how the floating `vX` / `vX.Y` rolling tags are maintained.
+- **[../docs/conventions/embedded-tests-ci.md](../docs/conventions/embedded-tests-ci.md)** — opt-in feature on `ci.yml` to fetch a private test repo via anonymous gitlinks and run its suite alongside the public parent. For repos that ship public code but keep their full test suite (or vendored / license-restricted assets) in a separate private repo.
 - **[../docs/migration/v2-to-v3.md](../docs/migration/v2-to-v3.md)** — migration guide for consumers updating from v2 to v3.
 
 ## Template Catalog
@@ -33,7 +34,7 @@ The v4 release model: contributors merge into `next` (features) or `hotfixes` (u
 | `hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
 | `next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via REST API (gated on the released major tag); merges master into `next` after a hotfix release. |
 | `feature-pr.yml` | push to `feat/*`, `fix/*`, `hotfix/*`, etc. | Auto-opens (and refreshes on every push) a PR from a code-side branch to `next` (or `hotfixes` for `hotfix/*`). Body is the standard categorized changelog. Branch patterns are `# CUSTOMIZE:` markers in the file — trim to your repo's conventions. See [branch-naming.md](../../docs/conventions/branch-naming.md) for the full mapping. |
-| `hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs onto the `hotfixes` lane. |
+| `hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs **and Dependabot security-advisory PRs** onto the `hotfixes` lane. |
 | `pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
 | `v4-bootstrap.yml` | manual dispatch (one-time) | Creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. Run once per repo with `dry_run: true` first. |
 
@@ -54,13 +55,14 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 | `codeql.yml` | push, PR, weekly cron | CodeQL SAST. |
 | `dependency-review.yml` | PR | Flags new deps with known CVEs at PR-time. |
 | `scorecard.yml` | weekly + branch_protection_rule | OpenSSF Scorecard, publishes to public scoreboard. |
-| `cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger (`CLDMV/.cla-signatures`). Contributors sign once per CLA `major.minor`, covering every CLDMV repo until the next bump. Org members exempt. |
+| `cla.yml` | PR + issue_comment | Per-CLA-version signing via central ledger (`CLDMV/.cla-signatures`), with per-repo override support. Default scope (no consumer `CLA.md`) covers every CLDMV repo using the default until the next bump; override scope (consumer has root `CLA.md`) is scoped to that repo only. Org members exempt. |
 
 ### 🤖 [`automation/`](individual-repo-workflows/automation/) — Automation
 
 | Template | Triggers | What it does |
 |---|---|---|
-| `dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-approves + queues auto-merge for patch/minor bumps after CI. |
+| `dependabot.yml` | (config file at `.github/dependabot.yml`) | Routes Dependabot PRs to `next` (with `hotfix-redirector.yml` auto-promoting security updates to `hotfixes`). |
+| `dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-approves + queues auto-merge for patch/minor bumps after CI, into the PR's target (`next` or `hotfixes`). |
 | `labeler.yml` | pull_request_target | Path-based PR labels (uses [labeler.default.yml](../.github/labeler.default.yml) unless overridden by `.github/labeler.yml`). |
 | `welcome.yml` | first issue / PR | Friendly welcome with conditional links to CONTRIBUTING / CLA / COC. |
 | `stale.yml` | daily cron | Marks/closes inactive issues + PRs. Defaults: 60+14 days issues, 30+7 days PRs. |

@@ -40,13 +40,15 @@ Ask the user these questions before touching any files. Use a single batched que
 | 3 | Does this repo ship a runtime bundle (`dist/`)? | bool | If yes, adopt `bundle-size.yml` |
 | 4 | Does this repo publish docs to a `gh-pages` branch? | bool | If yes, adopt `docs.yml` |
 | 5 | Is there a `Dockerfile` at the repo root that should publish to GHCR? | bool | If yes, adopt `docker-publish.yml` |
-| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml` (also requires `CLA.md` in repo and the org-wide ledger repo `CLDMV/.cla-signatures` to exist) |
-| 7 | Want Dependabot's patch/minor PRs auto-merged after CI passes? | bool | If yes, adopt `dependabot-auto-merge.yml` ("Allow auto-merge" is enabled by `v4-bootstrap.yml`) |
+| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml`. The bot uses the org-wide default CLA from the `CLDMV/.cla-signatures` ledger — no per-repo `CLA.md` is needed in the default case. Only add a local `CLA.md` if this repo needs an **override** with custom terms; ask about that separately as Q6b. |
+| 6b | (Only if Q6 is yes) Does this repo need a CLA with **different terms** than the org-wide default? | bool | If yes, ask the user for the override CLA text; place at root as `CLA.md` with a `# … CLA — v1.0` header. The bot will detect override scope automatically and bootstrap a snapshot in the ledger on the first signature. |
+| 7 | Want Dependabot enabled for this repo? | bool | If yes, adopt `dependabot.yml` (routes PRs to `next`; security updates auto-promote to `hotfixes` via `hotfix-redirector.yml`). The companion `dependabot-auto-merge.yml` is **ON by default** — drop it from the adoption set only if the user explicitly wants to review each Dependabot PR by hand. |
 | 8 | Want Discord/Slack release notifications? | bool | If yes, adopt `release-notify.yml` (also requires `.github/release-notifier.yml` + per-channel webhook secrets) |
 | 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
 | 10 | Should the standard org-default labels be synced into this repo? | bool | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only) |
+| 11 | Does this repo have (or need) a private test suite pulled from a separate private repo via an anonymous gitlink (typically `tests/`)? | bool | If yes, set `enable_embedded_tests: true` on the `ci.yml` workflow call. Confirm the matching private repo exists per the URL-mapping convention (`<org>/<repo>-tests` for a `tests/` gitlink). See [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md). Independent of workflow adoption — it's a single input on the existing CI workflow. |
 
-Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #10 (org labels) which default to false.
+Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #6b (CLA override), #10 (org labels), #11 (embedded private tests) which default to false.
 
 ---
 
@@ -90,10 +92,12 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 3 | true | `bundle-size.yml` | `packaging-docs/bundle-size.yml` |
 | 4 | true | `docs.yml` | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent) |
 | 5 | true | `docker-publish.yml` | `packaging-docs/docker-publish.yml` |
-| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from `https://github.com/CLDMV/.github/blob/v4/CLA.md` and tell the user to do a legal review. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo) |
-| 7 | true | `dependabot-auto-merge.yml` | `automation/dependabot-auto-merge.yml` |
+| 6 | true | `cla.yml` | `security/cla.yml`. Do **not** add a `CLA.md` to the repo root unless Q6b is also yes — the bot defaults to the org-wide CLA from `CLDMV/.cla-signatures` and a stray local `CLA.md` would silently switch the repo into override scope. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo. |
+| 6b | true | `CLA.md` at repo root | Copy the consumer's override text into `CLA.md` with a `# … CLA — v1.0` header. (Or, if they want to start from the default and customize, copy from `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging.) The bot detects override scope by file presence; no other config needed. |
+| 7 | true | `dependabot.yml` + `dependabot-auto-merge.yml` | Copy `automation/dependabot.yml` to `.github/dependabot.yml` (NOT `.github/workflows/`); copy `automation/dependabot-auto-merge.yml` to `.github/workflows/`. Customize `dependabot.yml` ecosystems for the user's stack (drop the npm block for non-Node repos; add gomod / pip / docker / etc. as needed). |
 | 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
+| 11 | true | (no new file) | Set `enable_embedded_tests: true` on the existing `ci.yml`'s workflow call. Confirm the matching private repo exists (`<org>/<repo>-tests` for `tests/`; or `<org>/<repo>-embedded` for the consolidated layout — see [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md)). Confirm the bot App has access to the private repo. |
 
 ### Always (security baseline — recommended for any OSS repo)
 
@@ -149,7 +153,7 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
   min_node_version: ""
   ```
 - **`branch-retention.yml`** (from Q9): defaults already exempt `master, main, badges, gh-pages, next, hotfixes`. If the user listed extra patterns, append them: `exempt_patterns: '["master","main","badges","gh-pages","next","hotfixes","<their-branch>"]'`.
-- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from `https://raw.githubusercontent.com/CLDMV/.github/v4/CLA.md` and add a TODO in your final report: "user must review and adapt CLA.md for legal". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
+- **`cla.yml`** (Q6): no per-repo `CLA.md` by default — the bot uses the org-wide CLA from the ledger. If the user answered Q6b = yes (override), drop their custom CLA text at the repo root as `CLA.md` with a `# … CLA — v1.0` header. (Starting from the default text: fetch `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and let the user edit.) Add a TODO in your final report: "if you added a CLA.md, confirm the text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
 - **`release-notify.yml`** (Q8): create `.github/release-notifier.yml` with this stub:
   ```yaml
   channels:
@@ -193,7 +197,7 @@ You cannot do these from the CLI. Report them all at the end of your scaffolding
 ### One-time v4 setup (in order, after the scaffold PR is merged to `master`/`main`)
 
 - [ ] **Dispatch `v4-bootstrap.yml`** from the Actions tab — `dry_run: true` first to preview, then `dry_run: false` to apply. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
-- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://github.com/CLDMV/.github/blob/master/docs/tools/ruleset-generator/index.html). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
+- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
 - [ ] **Add the bot App to the bypass list** on the `next` + `hotfixes` rulesets (the generator pre-adds CLDMV's bot App ID by default; if you opted out, do it by hand here). The bot mutates `next`/`hotfixes` via the REST API on every release — without bypass, GitHub rejects with `GH013`. `master` does **not** get bot bypass.
 
 ### Repo settings (Settings tab)
@@ -297,12 +301,13 @@ If steps 5–6 work, the v4 flow is wired correctly.
 1. **`enable_coverage_badge` ON but no `badges` branch** — CI's badge-publish step fails. Solution: create the orphan `badges` branch (Phase 3.4).
 2. **`docs.yml` adopted but no `npm run docs:build` script** — docs-publish fails. Solution: add the script to `package.json` or change the `build_command` input in `docs.yml`.
 3. **`dependabot-auto-merge.yml` adopted but "Allow auto-merge" is OFF** — solution: run `v4-bootstrap.yml`, or enable manually in Settings → Pull Requests.
+3b. **`dependabot.yml` placed in `.github/workflows/` by mistake** — Dependabot won't pick it up there. It must live at `.github/dependabot.yml` (root of `.github/`, not inside `workflows/`).
 4. **`cla.yml` adopted but the bot App lacks `Organization → Members: Read`** — the org-member exemption fails open (everyone gets prompted to sign). Solution: request the permission from org admin.
 5. **Meta-package `publish.yml` left with `publish_to_npm: true`** — npm publish fails because the package isn't real. Solution: re-check Phase 2 customizations.
 6. **`package-name` placeholder left as `@your-org/your-package`** in `next-release.yml` / `hotfixes-release.yml` — release-PR creation fails ("package not found on npm"). Solution: search/replace the placeholder.
 7. **Coverage badge secrets missing but `enable_coverage_badge: true`** — coverage-publish step silently downgrades to `github-actions[bot]` and may fail on signed-commit policies. Solution: add the four `CLDMV_BOT_*` GPG secrets OR set `enable_coverage_badge: false`.
 8. **`next-release.yml` doesn't fire on first push to `next`** — likely `v4-bootstrap.yml` wasn't dispatched, or the bot App isn't in the `next` ruleset bypass (the chore-bump push to `next` is then rejected with `GH013`).
-9. **PR opened into `master` instead of `next`** — that bypasses the v4 batching. Either retarget the PR to `next` or rebase onto `next` and re-open. (Hotfix/security branches are auto-redirected to `hotfixes` by `hotfix-redirector.yml`; feature branches are not.)
+9. **PR opened into `master` instead of `next`** — that bypasses the v4 batching. Either retarget the PR to `next` or rebase onto `next` and re-open. (Hotfix/security branches and Dependabot security-advisory PRs are auto-redirected to `hotfixes` by `hotfix-redirector.yml`; routine feature/Dependabot-bump PRs are not.)
 10. **`v3` per-PR `release.yml` left installed alongside v4** — both flows fire on a `release:` commit and create competing release PRs. Solution: delete `release.yml` (the v4 flow replaces it).
 
 ---

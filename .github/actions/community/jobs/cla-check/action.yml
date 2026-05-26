@@ -8,16 +8,16 @@
 #
 
 name: "CLA Check"
-description: "On PR event: enumerate commit authors and check each is covered (exempt bot, org member, or has a signature record in the central ledger). Post or update a request comment when any author is missing; post a status check either way."
+description: "On PR event: detect whether the consumer repo has its own CLA.md (override scope) or falls back to the default CLA in the ledger. For each commit author, check that they're exempt, covered by org membership, or already have a signature record at the appropriate scope+version path. Posts a request comment when any author is missing; posts a status check either way."
 
 inputs:
   cla_version:
     required: true
-    description: "Current CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
+    description: "CLA version (e.g. '1.0' or '1.0.0'). Used for the default scope. For override scope, the version is read from the consumer's CLA.md header and this input is only a fallback if the header can't be parsed."
   cla_path:
     required: false
     default: "CLA.md"
-    description: "Path to the CLA text in the consumer repo (used to compute hash for display)"
+    description: "Path inside the consumer repo where an override CLA may exist. If the file is present at this path, the bot uses override scope and reads the version from its header."
   exempt_users:
     required: false
     default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
@@ -33,7 +33,7 @@ inputs:
   required_text_template:
     required: false
     default: "I have read and I agree to the CLA ${cla_version}"
-    description: "Template for the required acceptance text. ${cla_version} expands to the normalized major.minor (e.g. 'v1.0')."
+    description: "Template for the required acceptance text. ${cla_version} expands to the effective version (header version for override, input version for default)."
   ledger_repo:
     required: false
     default: "CLDMV/.cla-signatures"
@@ -42,9 +42,13 @@ inputs:
     required: false
     default: "github"
     description: "Platform bucket inside the ledger (currently only 'github' is supported)"
+  public_cla_url_template:
+    required: false
+    default: "https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/${cla_version}.md"
+    description: "URL template for the publicly-readable copy of the default CLA. Used in the bot's request comment to link contributors at the agreement text. ${cla_version} expands to the effective version. Not used for override scope (the override's own URL is used instead)."
   github_token:
     required: true
-    description: "App token; needs `members: read` org-level for org-member exemption and `contents: read` on the ledger repo"
+    description: "App token; needs `members: read` org-level for org-member exemption, `contents: read` on the consumer repo (for override detection), and `contents: read` on the ledger repo (for default CLA lookup + signature presence checks)"
 
 runs:
   using: node24

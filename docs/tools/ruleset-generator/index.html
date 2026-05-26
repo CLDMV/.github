@@ -134,8 +134,8 @@
 
 <label>
   <input type="checkbox" id="copilot-review">
-  <strong>Require Copilot Code Review (master + hotfixes)</strong>
-  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to master and hotfixes. Every PR to those branches triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
+  <strong>Require Copilot Code Review (next + hotfixes)</strong>
+  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to next and hotfixes — the branches where feature / hotfix PRs actually land and need review. Master PRs are release bundles assembled from already-reviewed commits, so Copilot review there adds no signal. Every PR to next / hotfixes triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
 </label>
 
 <label>
@@ -179,7 +179,7 @@
 <strong>Notes:</strong>
 <ul>
 <li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
-<li>Templates use <code>allowed_merge_methods: ["squash"]</code> across all three branches — matches the v4 squash-merge convention.</li>
+<li>Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit; <code>next</code> and <code>hotfixes</code> use <code>["merge"]</code> only — "Create a merge commit" preserves the PR's original signed commits intact. GitHub's "Rebase and merge" web-UI button re-creates commits server-side and <em>strips GPG signatures</em>, so it's deliberately disallowed on the staging branches. The slightly noisier git log on <code>next</code>/<code>hotfixes</code> is invisible at the master level: the master squash collapses the entire range (merge commits included) into one clean signed commit per release.</li>
 <li><code>next.json</code> intentionally omits <code>required_linear_history</code> so §7.2's master-into-next API merge can produce a merge commit when needed.</li>
 <li>The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or blank the App ID, to opt out). It is never added to <code>master</code>.</li>
 </ul>

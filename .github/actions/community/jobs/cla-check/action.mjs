@@ -1,14 +1,26 @@
 /**
  * @fileoverview CLA signature check for a PR against the central ledger repo.
  *
+ * Resolves the active CLA scope first:
+ *   - If the consumer repo has its own CLA.md, this is an OVERRIDE: the bot
+ *     enforces the consumer's text and stores signatures under
+ *     signatures/<platform>/overrides/<consumer-org>/<consumer-repo>/v<X.Y>/.
+ *     The CLA version is read from the override file's header (e.g. the line
+ *     `# ... CLA — v1.0` produces `v1.0`); the workflow's `cla_version` input
+ *     is a fallback if the header can't be parsed.
+ *   - Otherwise, the DEFAULT CLA text in the ledger
+ *     (cla-versions/<version>.md) applies; signatures live at
+ *     signatures/<platform>/v<X.Y>/<shard>/<id>.json. The version comes from
+ *     the workflow `cla_version` input.
+ *
+ * Signatures are scoped per-CLA-text-hash — signing the default v1.0 does
+ * not cover override-repo v1.0 and vice versa.
+ *
  * For each unique commit author on the PR:
  *   1. Skip if the login is in `exempt_users`.
  *   2. Skip if `exempt_org_members` and the login is in `exempt_org`.
- *   3. Look up the corresponding signature file in the ledger repo
- *      (default: CLDMV/.cla-signatures) at:
- *         signatures/<platform>/<version>/<shard>/<id>.json
- *      where <version> is the current CLA major.minor and <shard> is the
- *      first three hex chars of sha256(<id>).
+ *   3. Look up the corresponding signature file at the path for the active
+ *      scope.
  *
  * If any author lacks a signature: post (or update) a request comment and
  * set the status check to failure. Otherwise: clear the status check.
@@ -31,12 +43,27 @@ function normalizeVersion(v) {
 	return `v${major}.${minor}`;
 }
 
+/**
+ * Extract the CLA version from the file's H1 header, e.g.
+ * "# CLDMV Contributor License Agreement (CLA) — v1.0" → "v1.0".
+ * Returns null if no version-shaped token is present in the first
+ * non-empty line.
+ */
+function parseVersionFromCLAHeader(text) {
+	if (!text) return null;
+	const firstLine = text.split("\n").find((l) => l.trim().length > 0);
+	if (!firstLine) return null;
+	const m = firstLine.match(/v(\d+)\.(\d+)(?:\.\d+)?\b/i);
+	if (!m) return null;
+	return `v${m[1]}.${m[2]}`;
+}
+
 function shardFor(id) {
 	return createHash("sha256").update(String(id)).digest("hex").slice(0, 3);
 }
 
-function escapeRegex(s) {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function sha256Hex(text) {
+	return createHash("sha256").update(text).digest("hex");
 }
 
 async function isOrgMember({ token, org, login }) {
@@ -49,21 +76,41 @@ async function isOrgMember({ token, org, login }) {
 	}
 }
 
-async function ledgerHasSignature({ token, ledgerRepo, platform, version, userId }) {
-	const [ledgerOwner, ledgerName] = ledgerRepo.split("/");
-	const shard = shardFor(userId);
-	const path = `signatures/${platform}/${version}/${shard}/${userId}.json`;
+/**
+ * Fetch a file's contents via the GitHub Contents API.
+ * Returns { exists, text, sha256, blob_sha }; { exists: false } on 404.
+ */
+async function fetchFileContents({ token, owner, repo, path }) {
 	try {
-		await api("GET", `/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`, null, {
-			token,
-			owner: ledgerOwner,
-			repo: ledgerName
-		});
+		const res = await api("GET", `/contents/${path}`, null, { token, owner, repo });
+		if (res?.content && res.encoding === "base64") {
+			const text = Buffer.from(res.content, "base64").toString("utf8");
+			return { exists: true, text, sha256: sha256Hex(text), blob_sha: res.sha };
+		}
+		return { exists: false };
+	} catch (err) {
+		if (err.message.includes("404")) return { exists: false };
+		throw err;
+	}
+}
+
+async function ledgerHasFile({ token, ledgerRepo, path }) {
+	const [ledgerOwner, ledgerName] = ledgerRepo.split("/");
+	try {
+		await api("GET", `/contents/${path}`, null, { token, owner: ledgerOwner, repo: ledgerName });
 		return true;
 	} catch (err) {
 		if (err.message.includes("404")) return false;
 		throw err;
 	}
+}
+
+function signaturePathFor({ platform, version, userId, scope, consumerOwner, consumerRepo }) {
+	const shard = shardFor(userId);
+	if (scope === "override") {
+		return `signatures/${platform}/overrides/${consumerOwner}/${consumerRepo}/${version}/${shard}/${userId}.json`;
+	}
+	return `signatures/${platform}/${version}/${shard}/${userId}.json`;
 }
 
 async function getPRCommits({ token, owner, repo, prNumber }) {
@@ -121,7 +168,7 @@ async function postStatus({ token, owner, repo, sha, state, description, targetU
 
 try {
 	const rawClaVersion = getInput("cla_version", { required: true });
-	const claVersion = normalizeVersion(rawClaVersion);
+	const inputClaVersion = normalizeVersion(rawClaVersion);
 	const claPath = getInput("cla_path") || "CLA.md";
 	const exemptList = (getInput("exempt_users") || "")
 		.split(",")
@@ -132,6 +179,9 @@ try {
 	const textTpl = getInput("required_text_template") || "I have read and I agree to the CLA ${cla_version}";
 	const ledgerRepo = getInput("ledger_repo") || "CLDMV/.cla-signatures";
 	const ledgerPlatform = getInput("ledger_platform") || "github";
+	const publicClaUrlTpl =
+		getInput("public_cla_url_template") ||
+		"https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/${cla_version}.md";
 	const token = getInput("github_token", { required: true });
 
 	const repository = process.env.GITHUB_REPOSITORY || "";
@@ -148,23 +198,53 @@ try {
 	const prNumber = pr.number;
 	const headSha = pr.head.sha;
 
-	const requiredText = textTpl.replace("${cla_version}", claVersion);
+	// --- Resolve scope, active CLA, and effective version ---
+	const consumerCla = await fetchFileContents({ token, owner, repo, path: claPath });
+	let scope, claVersion, activeCla, activeClaSourceLabel, activeClaPublicUrl;
 
-	// Compute CLA hash for display in the request comment
-	let claHashShort = "";
-	try {
-		const claRes = await api("GET", `/contents/${claPath}`, null, { token, owner, repo });
-		if (claRes?.content && claRes.encoding === "base64") {
-			const text = Buffer.from(claRes.content, "base64").toString("utf8");
-			claHashShort = "sha256:" + createHash("sha256").update(text).digest("hex").slice(0, 16);
+	if (consumerCla.exists) {
+		scope = "override";
+		activeCla = consumerCla;
+
+		const headerVersion = parseVersionFromCLAHeader(consumerCla.text);
+		if (headerVersion) {
+			claVersion = headerVersion;
+			if (headerVersion !== inputClaVersion) {
+				console.log(
+					`::warning::workflow input cla_version=${inputClaVersion} doesn't match override CLA.md header ${headerVersion}; using ${headerVersion}.`
+				);
+			}
+		} else {
+			claVersion = inputClaVersion;
+			console.log(`::warning::Could not parse version from override CLA.md header; using workflow input ${inputClaVersion}.`);
 		}
-	} catch {
-		// Non-fatal: hash is just for display
+
+		activeClaSourceLabel = `override (\`${owner}/${repo}/${claPath}\`)`;
+		activeClaPublicUrl = `https://github.com/${owner}/${repo}/blob/${consumerCla.blob_sha}/${claPath}`;
+	} else {
+		scope = "default";
+		claVersion = inputClaVersion;
+
+		const [ledgerOwner, ledgerName] = ledgerRepo.split("/");
+		const defaultClaPath = `cla-versions/${claVersion}.md`;
+		const ledgerCla = await fetchFileContents({ token, owner: ledgerOwner, repo: ledgerName, path: defaultClaPath });
+		if (!ledgerCla.exists) {
+			console.error(
+				`::error::Default CLA not found at ${ledgerRepo}/${defaultClaPath} and consumer repo has no override at ${claPath}.`
+			);
+			process.exit(1);
+		}
+		activeCla = ledgerCla;
+		activeClaSourceLabel = `default (\`${ledgerRepo}/${defaultClaPath}\`)`;
+		activeClaPublicUrl = publicClaUrlTpl.replace("${cla_version}", claVersion);
 	}
 
-	// Enumerate unique commit-authors (login + numeric ID)
+	const requiredText = textTpl.replace("${cla_version}", claVersion);
+	const claHashShort = "sha256:" + activeCla.sha256.slice(0, 16);
+
+	// --- Enumerate unique commit-authors (login + numeric ID) ---
 	const commits = await getPRCommits({ token, owner, repo, prNumber });
-	const authors = new Map(); // login → { login, id }
+	const authors = new Map();
 	for (const c of commits) {
 		const login = c.author?.login;
 		const id = c.author?.id;
@@ -175,6 +255,7 @@ try {
 		}
 	}
 
+	// --- Check signature for each author at scope-appropriate path ---
 	const status = [];
 	let allCovered = true;
 	for (const a of authors.values()) {
@@ -188,13 +269,15 @@ try {
 				continue;
 			}
 		}
-		const signed = await ledgerHasSignature({
-			token,
-			ledgerRepo,
+		const sigPath = signaturePathFor({
 			platform: ledgerPlatform,
 			version: claVersion,
-			userId: a.id
+			userId: a.id,
+			scope,
+			consumerOwner: owner,
+			consumerRepo: repo
 		});
+		const signed = await ledgerHasFile({ token, ledgerRepo, path: sigPath });
 		if (signed) {
 			status.push({ login: a.login, state: "signed", emoji: "✅", id: a.id });
 			continue;
@@ -203,24 +286,24 @@ try {
 		allCovered = false;
 	}
 
-	const claUrl = `https://github.com/${owner}/${repo}/blob/HEAD/${claPath}`;
-
 	if (allCovered) {
-		console.log(`✅ All ${authors.size} author(s) covered.`);
+		console.log(`✅ All ${authors.size} author(s) covered (${scope}).`);
 		await postStatus({
 			token,
 			owner,
 			repo,
 			sha: headSha,
 			state: "success",
-			description: `All ${authors.size} author(s) covered`,
+			description: `All ${authors.size} author(s) covered (${scope})`,
 			targetUrl: pr.html_url
 		});
-		appendSummary(`## ✅ CLA signature-check passed\n\nAll ${authors.size} commit author(s) are covered for ${claVersion}.`);
+		appendSummary(
+			`## ✅ CLA signature-check passed\n\nAll ${authors.size} commit author(s) are covered for ${claVersion} (${scope} CLA).`
+		);
 		process.exit(0);
 	}
 
-	// Build the request comment
+	// --- Build the request comment ---
 	const statusList = status
 		.map((s) => {
 			const label =
@@ -241,10 +324,18 @@ try {
 		.join(", ");
 
 	const [ledgerOwner, ledgerName] = ledgerRepo.split("/");
+
+	const scopeLine =
+		scope === "override"
+			? `This repository defines its own CLA (override): the bot enforces the text at [\`${claPath}\`](${activeClaPublicUrl}) in this repo. Signing here does **not** carry over to repos that use the org-wide default CLA.`
+			: `This repository uses the org-wide default CLA. The text the bot enforces is published at [\`${claVersion}\`](${activeClaPublicUrl}). Signing once covers your future contributions to every ${owner} repository that uses the default — until the CLA's major.minor version is bumped.`;
+
 	const body = [
 		`📜 **CLA signature required**`,
 		``,
-		`By contributing to this repo you agree to our [Contributor License Agreement](${claUrl}) (current version: \`${claVersion}\`${claHashShort ? `, ${claHashShort}` : ""}).`,
+		`${scopeLine}`,
+		``,
+		`Current version: \`${claVersion}\` (${activeClaSourceLabel}, ${claHashShort}).`,
 		``,
 		`Each listed signer must reply on this PR with exactly:`,
 		``,
@@ -258,7 +349,7 @@ try {
 		``,
 		`> Required signers: ${missingLogins}`,
 		``,
-		`Signing once for ${claVersion} covers all your future contributions to every ${owner} repository until the CLA's major.minor version is bumped. Records are kept in the [${ledgerName}](https://github.com/${ledgerOwner}/${ledgerName}) ledger.`
+		`Records are kept in the [${ledgerName}](https://github.com/${ledgerOwner}/${ledgerName}) ledger.`
 	].join("\n");
 
 	await postOrUpdateRequestComment({ token, owner, repo, prNumber, body });
@@ -272,7 +363,7 @@ try {
 		targetUrl: pr.html_url
 	});
 
-	appendSummary(`## ❌ CLA signature-check pending\n\n${statusList}`);
+	appendSummary(`## ❌ CLA signature-check pending (${scope} CLA)\n\n${statusList}`);
 	process.exit(0);
 } catch (error) {
 	console.error(`::error::${error.message}`);

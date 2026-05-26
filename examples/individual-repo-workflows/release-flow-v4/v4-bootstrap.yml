@@ -114,7 +114,7 @@ jobs:
                       echo "Branches: \`$NEXT\`, \`$HOTFIXES\` (dry-run: \`$DRY_RUN\`)"
                       echo ""
                       echo "### Still to do by hand"
-                      echo "1. Import \`master\` / \`next\` / \`hotfixes\` rulesets — generate them at the [CLDMV ruleset generator](https://github.com/CLDMV/.github/blob/master/docs/tools/ruleset-generator/index.html) (or copy from \`CLDMV/.github\`'s [\`data/rulesets/*.json\`](https://github.com/CLDMV/.github/tree/master/data/rulesets))."
+                      echo "1. Import \`master\` / \`next\` / \`hotfixes\` rulesets — generate them at the [CLDMV ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) (or copy from \`CLDMV/.github\`'s [\`data/rulesets/*.json\`](https://github.com/CLDMV/.github/tree/master/data/rulesets))."
                       echo "2. Add the **bot App** (not the bot user/team) to the **Bypass list** of the \`next\` + \`hotfixes\` rulesets."
                       echo "3. Re-run this workflow with \`dry_run: false\` if this was a dry run."
                   } >> "$GITHUB_STEP_SUMMARY"

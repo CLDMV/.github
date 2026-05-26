@@ -8,14 +8,14 @@ Per-template setup reference for every example workflow under [`../individual-re
 
 | Category | Workflow | File | Trigger | Purpose |
 |---|---|---|---|---|
-| Core CI/CD | [CI Tests & Build](#-ci-tests--build) | `core-cicd/ci.yml` | push / fork-PR | Test matrix + build; PR gate |
+| Core CI/CD | [CI Tests & Build](#-ci-tests--build) | `core-cicd/ci.yml` | push / fork-PR | Test matrix + build; PR gate. Supports [embedded private tests](#-ci-tests--build) via anonymous gitlinks (opt-in) |
 | Core CI/CD | [Create Release PR](#-create-release-pr) | `core-cicd/release.yml` | push to non-default | Opens versioned release PRs |
 | Core CI/CD | [Release and Publish](#-release-and-publish) | `core-cicd/publish.yml` | push to master/main | Publishes to NPM / GitHub Packages |
 | Core CI/CD | [Update Major Version Tags](#-update-major-version-tags) | `core-cicd/update-major-version-tags.yml` | release published | Maintains `vX` / `vX.Y` floating tags |
 | Release flow v4 | [Next Release](#-next-release-v4) | `release-flow-v4/next-release.yml` | push to `next` | Refreshes persistent `next → master` release PR |
 | Release flow v4 | [Hotfixes Release](#-hotfixes-release-v4) | `release-flow-v4/hotfixes-release.yml` | push to `hotfixes` | Refreshes persistent `hotfixes → master` release PR |
 | Release flow v4 | [Next/Hotfixes Reset](#-nexthotfixes-reset-v4) | `release-flow-v4/next-reset.yml` | push to `master` (release commit) | Re-syncs integration branches after a release |
-| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs onto `hotfixes` |
+| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs **and Dependabot security updates** onto `hotfixes` |
 | Release flow v4 | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer) | `release-flow-v4/pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to conventional-commit shape |
 | Release flow v4 | [v4 Bootstrap](#-v4-bootstrap) | `release-flow-v4/v4-bootstrap.yml` | manual dispatch | Creates `next` + `hotfixes`; configures repo for v4 |
 | Release companions | [Tag Health](#-tag-health) | `release-companions/tag-health.yml` | weekly cron + dispatch | Validates / repairs tags |
@@ -25,7 +25,8 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Security | [Dependency Review](#-dependency-review) | `security/dependency-review.yml` | PR | Blocks PRs with high-severity new deps |
 | Security | [OpenSSF Scorecard](#-openssf-scorecard) | `security/scorecard.yml` | weekly + dispatch | Publishes OSSF Scorecard score |
 | Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
-| Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps |
+| Automation | [Dependabot config](#-dependabot-config) | `automation/dependabot.yml` | (config file) | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes` |
+| Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`) |
 | Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
 | Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
 | Automation | [Stale](#-stale) | `automation/stale.yml` | daily cron | Marks/closes inactive issues + PRs |
@@ -59,6 +60,8 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 **Required secrets** — see [Secrets Summary](#secrets-summary). `NPM_TOKEN` for private deps; bot credentials optional but enable proper attribution; coverage-badge secrets required only when `enable_coverage_badge: true`.
 
 **Prereqs** — A `badges` branch must exist for coverage publishing (orphan: `git checkout --orphan badges && git commit --allow-empty -m "init" && git push origin badges`).
+
+**Optional: embedded private tests.** `ci.yml` supports running a private test suite from a separate repo, linked via an anonymous gitlink in the parent's tree at `tests/` (or any path). Set `enable_embedded_tests: true` on the workflow call and the CI fetches the matching private repo (per the URL-mapping convention) and runs its suite alongside the parent's. Fork PRs silently skip the fetch since they have no secret access. See [`docs/conventions/embedded-tests-ci.md`](../../docs/conventions/embedded-tests-ci.md) for the URL-mapping rules, the threat model, and how it interacts with `@cldmv/git-embedded` on the developer side.
 
 ---
 
@@ -156,7 +159,12 @@ A `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling 
 
 **File:** `release-flow-v4/hotfix-redirector.yml` &nbsp;·&nbsp; **Calls:** `redirect-hotfix-pr@v4`
 
-When a PR opens from a `hotfix/*` or `security/*` head branch, retargets it onto the `hotfixes` integration branch. API-only (`pull_request_target` without checkout — safe).
+Retargets a PR onto the `hotfixes` integration branch on `opened`, under either trigger:
+
+- **Head branch matches `hotfix/*` or `security/*`** — the original human-driven hotfix flow.
+- **Dependabot security update** — author is `dependabot[bot]` AND the PR body references a GHSA security advisory (either a `GHSA-XXXX-XXXX-XXXX` id or a `github.com/advisories/GHSA-…` URL). Dependabot's routine bumps don't reference GHSAs, so this cleanly separates security updates (→ `hotfixes`) from regular bumps (stay on `next`).
+
+API-only (`pull_request_target` without checkout — safe). Idempotent (skips PRs already on `hotfixes`). Posts a one-time explanatory comment with the relevant reason.
 
 **Required `package.json` scripts** — none.
 
@@ -286,35 +294,62 @@ Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:
 
 **File:** `security/cla.yml` &nbsp;·&nbsp; **Calls:** `reusable-cla.yml@v4`
 
-On every PR (including from forks), checks whether each commit author has signed the current CLA version. Signing is per-CLA-version and org-wide: a contributor replies on their PR with the exact text `I have read and I agree to the CLA v<X.Y>` and the bot writes an immutable JSON signature record to the central ledger repo (private — `CLDMV/.cla-signatures`). That single signature covers every CLDMV repository and every future PR until the CLA's `major.minor` is bumped. Org members and configured bots are exempt; no per-PR or per-repo re-signing.
+On every PR (including from forks), checks whether each commit author has signed the active CLA at the active version. The bot supports two scopes and resolves which applies on every run:
 
-The bot's acknowledgment comment on the PR is the contributor's receipt — it contains the `signature_id` (a SHA-256 anchor of the full record), the CLA version, and the CLA SHA-256. Because the ledger is private, the comment is the only contributor-facing copy of the receipt.
+- **Default scope** — the consumer repo has no `CLA.md` at the root. The bot reads the org-wide CLA from the ledger at `cla-versions/v<X.Y>.md`. One signature covers every consumer repo using the default, until the major.minor version is bumped.
+- **Override scope** — the consumer repo includes its own `CLA.md` with custom terms. The bot reads that text directly and parses the version from the file's header (`# … CLA — v1.0` → `v1.0`). On the **first signature** the bot bootstraps an immutable snapshot at `cla-versions/overrides/<owner>/<repo>/v<X.Y>.md`; on subsequent signatures it verifies the consumer's text still matches that snapshot. Editing the override's text without bumping the header version is detected as **drift** and rejected with a clear remediation message.
+
+Signatures are scoped per-CLA-text-hash. Signing the default v1.0 does *not* cover override-repo v1.0 and vice versa — the override's text is a different agreement. Override signatures live at `signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/<shard>/<id>.json`; default signatures live at `signatures/<platform>/v<X.Y>/<shard>/<id>.json`.
+
+A contributor replies on the PR with the exact text `I have read and I agree to the CLA v<X.Y>`; the bot writes an immutable JSON signature record to the central ledger (private — `CLDMV/.cla-signatures`). Org members and configured bots are exempt.
+
+The bot's acknowledgment comment on the PR is the contributor's receipt — it contains the `signature_id`, the scope, the CLA version, and the CLA SHA-256. Because the ledger is private, the comment is the only contributor-facing copy of the receipt.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for commit attribution on the ledger writes. Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY` override the general bot identity for the CLA workflow only.
 
-**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (to write signature files). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). `CLA.md` in this `.github` repo is the canonical working copy and feeds the SHA-256 captured in each signature.
+**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (for signature files + override snapshots). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). A public sample of the default CLA — what consumer repos copy from when they want to start with a local `CLA.md` override — is published at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). This `.github` repo deliberately has no root-level `CLA.md` — if it did, the bot would pick it up as a fallback CLA source.
 
-**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — normalized to `major.minor` internally; patch-level changes don't trigger re-signing, see [`CLA.md`](../../CLA.md) §7). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location.
+**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — used as the default-scope version; for override scope, the header in the consumer's CLA.md takes precedence). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location. `public_cla_url_template` (URL pointing contributors at the public default-CLA copy in the request comment). See [`VERSIONING.md`](../repo-seeds/.cla-signatures/VERSIONING.md) in the seed for the patch/minor/major versioning policy.
 
 ---
 
 ## 🤖 Automation
 
+### 🔧 Dependabot config
+
+**File:** `automation/dependabot.yml` &nbsp;·&nbsp; **Lives at:** `.github/dependabot.yml` in the consumer repo
+
+The Dependabot config tuned for v4: routine bumps target `next`, so they pool with other contributor changes and ship in the next release. Security updates land on `next` initially and are auto-promoted to `hotfixes` by the hotfix-redirector (see below). No special routing config needed in `dependabot.yml` itself.
+
+Ships with two ecosystems enabled: `github-actions` and `npm`. Add / remove ecosystem blocks for your stack (gomod, pip, bundler, gradle, maven, cargo, docker, etc.). Adjust `directory` if manifests don't live at the repo root.
+
+---
+
 ### 🔀 Dependabot Auto-Merge
 
 **File:** `automation/dependabot-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-dependabot-auto-merge.yml@v4`
 
-Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI passes. Major bumps are left for a human.
+Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI passes — into whatever branch the PR targets (`next` for routine bumps; `hotfixes` for security updates that the hotfix-redirector promoted). Major bumps are left for a human.
+
+**Default in v4: ON (opt-out).** Delete the workflow if you'd rather review each Dependabot PR by hand. Routine bumps still pool into `next` via `dependabot.yml`; you'd just need to click the merge button on each one.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — bot App credentials.
 
-**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON. Branch protection on master/main must require CI status checks.
+**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). Branch protection on `next` and `hotfixes` with required CI status checks — the action refuses to merge into an unprotected branch.
 
 **Key inputs** — `bump_types` (default `patch,minor`), `merge_method` (default `squash`), `also_for_actors` (extend to Renovate or other bots).
+
+**Interaction with hotfix-redirector:** the redirector fires on `opened` *before* this workflow's auto-merge takes effect. For a Dependabot security PR, the sequence is:
+  1. Dependabot opens PR against `next` (per the config in `dependabot.yml`).
+  2. `hotfix-redirector.yml` detects the GHSA reference in the body and retargets the PR `next` → `hotfixes`.
+  3. CI runs against `hotfixes`.
+  4. This auto-merge workflow approves + auto-merges into `hotfixes`.
+
+The net effect: security updates ship via the hotfix lane without anyone clicking anything; routine bumps batch into `next` for the next release.
 
 ---
 
@@ -479,10 +514,11 @@ These come up across multiple workflows — set them once per repo:
 
 - **Branch protection** on `master`/`main` with required CI status check (`✅ Required PR Check` from `ci.yml`).
 - **Settings → Actions → "Require approval for outside collaborators"** to control fork-PR runs.
-- **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml`.
+- **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml` (auto-enabled by `v4-bootstrap.yml`).
+- **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
-- **`CLA.md`** at repo root — required by `cla.yml`. The canonical working copy lives in `CLDMV/.github`; consumer repos that want their own local copy can mirror it, but it's not required since the bot computes the SHA from `CLA.md` in the consumer repo's checkout. Set `cla_path:` if your CLA file lives elsewhere.
+- **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
 - **`.github/release-notifier.yml`** — required by `release-notify.yml` to define channels.

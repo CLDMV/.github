@@ -13,7 +13,17 @@
 				require_code_owner_review: !!opts.requireCodeOwner,
 				require_last_push_approval: false,
 				required_review_thread_resolution: true,
-				allowed_merge_methods: ["squash"]
+				// Per-branch merge method:
+				//   - master: squash only — release PRs land as a single clean
+				//     commit on the released line; individual commit history
+				//     of the staging branches is preserved inside the squash's
+				//     body as a categorized changelog.
+				//   - next / hotfixes: rebase only — individual commits from
+				//     feature PRs are preserved linearly; GitHub appends
+				//     (#N) to commit subjects, so the to-master release PR's
+				//     changelog gets PR refs for free without re-running
+				//     anything.
+				allowed_merge_methods: Array.isArray(opts.mergeMethods) && opts.mergeMethods.length > 0 ? opts.mergeMethods : ["squash"]
 			}
 		};
 	}
@@ -72,16 +82,20 @@
 	}
 
 	function buildMaster(opts) {
+		// master PRs are release-bundle PRs opened from next/hotfixes by the
+		// release-flow workflows — every commit in them was already reviewed
+		// on next or hotfixes when it landed. Code review (human or Copilot)
+		// adds no signal here. The PR review on master is essentially "approve
+		// the version bump and changelog".
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["squash"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()
 		];
-		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Master",
 			target: "branch",
@@ -93,29 +107,52 @@
 	}
 
 	function buildNext(opts) {
+		// next is where feature PRs land. This is the primary code-review
+		// gate, so the Copilot opt-in (and code-scanning, status checks)
+		// belong here — not on master.
+		//
+		// **Merge-commit only.** GitHub's "Rebase and merge" web-UI button
+		// re-creates the PR's commits server-side and does NOT preserve
+		// their GPG signatures — every rebased commit lands unsigned, even
+		// when the source PR's commits were all signed (documented limitation).
+		// "Create a merge commit" keeps the original commits intact
+		// (signatures and all) and adds a single merge commit on top.
+		//
+		// The merge-commit gives a slightly noisier git log on `next`, but
+		// that's invisible at the master level: master uses squash (above),
+		// which collapses the entire `next..master` range — merge commits
+		// included — into one clean signed commit per release.
+		//
+		// Squash is also off `next` so a maintainer doesn't accidentally
+		// squash a multi-commit PR (losing the individual signed commits)
+		// when they meant to preserve them.
+		const rules = [
+			{ type: "deletion" },
+			{ type: "non_fast_forward" },
+			{ type: "required_signatures" },
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["merge"] }),
+			codeScanningRule(),
+			requiredStatusChecksRule()
+		];
+		if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
 		return {
 			name: "Protect Next",
 			target: "branch",
 			enforcement: "active",
 			conditions: { ref_name: { exclude: [], include: ["refs/heads/next"] } },
-			rules: [
-				{ type: "deletion" },
-				{ type: "non_fast_forward" },
-				{ type: "required_signatures" },
-				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
-				codeScanningRule(),
-				requiredStatusChecksRule()
-			],
+			rules: rules,
 			bypass_actors: bypassWithBot(opts.includeBot, opts.botAppId)
 		};
 	}
 
 	function buildHotfix(opts) {
+		// Same merge-commit-only policy as next: preserves the PR's signed
+		// commits intact. The master squash absorbs the merge-commit noise.
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["merge"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()

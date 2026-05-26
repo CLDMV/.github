@@ -231,6 +231,168 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
  * @param {string} text - Subject/body text potentially containing PR reference.
  * @returns {number|null} Parsed PR number.
  */
+/**
+ * Look up a commit's associated pull request via GitHub's REST API.
+ * Returns the first associated PR number, or null when none / on error.
+ * Used to annotate commit lines in the changelog with `(#N)` when the
+ * commit's subject doesn't already carry the reference (e.g. commits
+ * brought in by a "create a merge commit" PR rather than a rebase-merge).
+ * @param {string} sha - Commit SHA.
+ * @param {string} owner - Repo owner.
+ * @param {string} repo - Repo name.
+ * @param {string} token - GitHub token.
+ * @returns {Promise<number|null>}
+ */
+/**
+ * Filter out commits whose patch content is already on the base branch.
+ *
+ * Stacked PRs that target `next`/`hotfixes` can carry commits that have
+ * since been merged into the target via earlier PRs — under "Create a
+ * merge commit" the original commits land on the target with their
+ * original SHAs preserved, so a simple `git log base..HEAD` range still
+ * includes them in subsequent stacked PRs because they're not in the
+ * old PR-branch's history.
+ *
+ * `git cherry <base> <head>` marks each commit in `base..head` with `+`
+ * (patch not yet on base) or `-` (patch already on base, by patch-id).
+ * Filtering out the `-` entries removes the duplicates from the rendered
+ * changelog body without depending on SHA equality.
+ *
+ * Best-effort: any failure (e.g. ranges that can't be cherry-checked)
+ * returns the input commits unchanged and logs a warning.
+ *
+ * @param {Array} commits
+ * @param {string} commitRange - "base..head" string.
+ * @returns {Array}
+ */
+/**
+ * Drop merge commits from the changelog list. Under v4's merge-commit-only
+ * policy on `next`/`hotfixes`, every merged PR leaves both a merge commit
+ * (with a subject like `<PR title> (#N)`) AND the original commits intact
+ * on the target branch. The merge commit is structural — it joins the two
+ * histories — but it isn't a real change-bearing commit; the contributor's
+ * original commits are what describe the change. Listing both produces the
+ * duplicated lines we see in release PR bodies today.
+ *
+ * Identifies merge commits via `git rev-parse --no-merges` — or equivalently
+ * `git log --merges --format=%H <range>` to enumerate the merges then filter
+ * those SHAs out of the commits array. One git call total.
+ *
+ * Best-effort: any failure returns the input commits unchanged and logs a
+ * warning. Runs before augmentCommitsWithPRRefs so the merge commits don't
+ * cost API lookups.
+ *
+ * @param {Array} commits
+ * @param {string} commitRange - "base..head" string for the merge enumeration.
+ * @returns {Array}
+ */
+function filterMergeCommits(commits, commitRange) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!commitRange || !commitRange.includes("..")) return commits;
+	try {
+		const out = gitCommand(`git log --merges --format=%H ${commitRange}`, true);
+		const mergeSet = new Set(
+			String(out)
+				.split("\n")
+				.map((s) => s.trim())
+				.filter(Boolean)
+		);
+		if (mergeSet.size === 0) return commits;
+		const kept = commits.filter((c) => {
+			const sha = c?.hash || c?.sha;
+			if (!sha) return true;
+			return !mergeSet.has(sha);
+		});
+		console.log(`🌳 Dropped ${commits.length - kept.length} merge commit(s) from changelog.`);
+		return kept;
+	} catch (err) {
+		console.log(`⚠️ Merge-commit filter skipped: ${err.message}`);
+		return commits;
+	}
+}
+
+function filterAlreadyAppliedByPatchId(commits, commitRange) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!commitRange || !commitRange.includes("..")) return commits;
+	const match = commitRange.match(/^(.+?)\.{2,3}(.+)$/);
+	if (!match) return commits;
+	const [, baseRef, headRef] = match;
+	try {
+		const out = gitCommand(`git cherry "${baseRef}" "${headRef}"`, true);
+		const alreadyApplied = new Set();
+		for (const line of String(out).split("\n")) {
+			const m = line.match(/^-\s+([0-9a-f]{7,40})/);
+			if (m) alreadyApplied.add(m[1]);
+		}
+		if (alreadyApplied.size === 0) return commits;
+		const kept = commits.filter((c) => {
+			const sha = c?.hash || c?.sha;
+			if (!sha) return true;
+			return !alreadyApplied.has(sha);
+		});
+		console.log(`🔁 Dropped ${commits.length - kept.length} commits already on ${baseRef} (by patch-id).`);
+		return kept;
+	} catch (err) {
+		console.log(`⚠️ Patch-id dedup skipped: ${err.message}`);
+		return commits;
+	}
+}
+
+async function findAssociatedPullNumber(sha, owner, repo, token) {
+	// Caller (augmentCommitsWithPRRefs) already validates sha/owner/repo/token,
+	// so no internal precondition check — CodeQL would flag it as dead code.
+	try {
+		const prs = await api("GET", `/commits/${sha}/pulls`, null, { token, owner, repo });
+		if (Array.isArray(prs) && prs.length > 0 && typeof prs[0].number === "number") {
+			return prs[0].number;
+		}
+		return null;
+	} catch (err) {
+		console.log(`⚠️ Could not look up PR for ${String(sha).slice(0, 7)}: ${err.message}`);
+		return null;
+	}
+}
+
+/**
+ * For each commit, ensure its subject carries a `(#N)` PR reference. When
+ * the subject already has one (rebase-merged from a feature PR), it's left
+ * alone. When it doesn't, the bot queries the GitHub API to find the
+ * associated PR and appends the ref. Failures are logged and ignored —
+ * the changelog falls back to just the subject + sha in that case.
+ *
+ * Mutates and returns the same array (so categorization that already ran
+ * is preserved).
+ *
+ * @param {Array} commits
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @returns {Promise<Array>}
+ */
+async function augmentCommitsWithPRRefs(commits, owner, repo, token) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!owner || !repo || !token) {
+		console.log("⚠️ Skipping PR-ref augmentation (missing owner/repo/token).");
+		return commits;
+	}
+	let augmented = 0;
+	for (const c of commits) {
+		if (!c || typeof c.subject !== "string") continue;
+		if (/\(#\d+\)/.test(c.subject)) continue;
+		const sha = c.hash || c.sha;
+		if (!sha) continue;
+		const prNumber = await findAssociatedPullNumber(sha, owner, repo, token);
+		if (prNumber) {
+			c.subject = `${c.subject} (#${prNumber})`;
+			augmented++;
+		}
+	}
+	if (augmented > 0) {
+		console.log(`🔗 Augmented ${augmented} commit subject(s) with PR refs.`);
+	}
+	return commits;
+}
+
 function extractPullRequestNumber(text) {
 	if (!text) {
 		return null;
@@ -681,6 +843,34 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// upstream bot bumps. The PR title communicates the version; the section
 	// bodies should describe the human-authored changes, nothing else.
 	commits = filterBotCommits(commits);
+
+	// Drop merge commits — they're structural artifacts of the v4
+	// merge-commit-only policy on next/hotfixes, not real change-bearing
+	// commits. The contributor's original commits already describe the
+	// change; listing the merge commit too duplicates every entry.
+	commits = filterMergeCommits(commits, range);
+
+	// Drop commits whose patch is already on the base branch. Happens for
+	// stacked PRs targeting `next`/`hotfixes`: an earlier PR in the stack
+	// has merged via "Create a merge commit", so its commits are already
+	// on the target with their original SHAs, but they still appear in the
+	// later PR's base..HEAD range. Patch-id dedup (via `git cherry`)
+	// removes them from the rendered changelog without affecting the
+	// release-to-master changelog (where master has no equivalent patches
+	// for commits in master..next, so the dedup is a no-op there).
+	commits = filterAlreadyAppliedByPatchId(commits, range);
+
+	// Annotate each commit's subject with its associated PR reference
+	// `(#N)` whenever possible. Rebase-merged commits already carry the
+	// ref because GitHub appends it on merge; commits that landed via
+	// "Create a merge commit" don't, so the bot looks them up via
+	// /commits/{sha}/pulls. Augmentation is best-effort: API failures
+	// or absent owner/repo/token degrade gracefully to the un-annotated
+	// subject.
+	{
+		const [augOwner, augRepo] = (GITHUB_REPOSITORY || "").split("/");
+		commits = await augmentCommitsWithPRRefs(commits, augOwner, augRepo, token);
+	}
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
