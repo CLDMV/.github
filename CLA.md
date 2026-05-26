@@ -1,10 +1,10 @@
-# CLDMV Contributor License Agreement (CLA) — v1.0.0
+# CLDMV Contributor License Agreement (CLA) — v1.0
 
-> ⚠️ This is a starting point and **must be reviewed by legal counsel** before being treated as binding. Adjust to fit CLDMV's actual legal needs. The CLA-bot mechanism in this repo will detect signatures against whatever text is here at the version specified in the workflow input.
+> ⚠️ This is a starting point and **must be reviewed by legal counsel** before being treated as binding. Adjust to fit CLDMV's actual legal needs. The CLA bot detects signatures against this exact text via the `agreement.cla_sha256` recorded in each signature.
 
 ## Acceptance
 
-By submitting any contribution (code, documentation, configuration, or other material) via pull request to a CLDMV repository, you ("Contributor") agree to the terms below for that contribution.
+By submitting any contribution (code, documentation, configuration, or other material) via pull request to a CLDMV repository, you ("Contributor") agree to the terms below for that contribution and all subsequent contributions you make to any CLDMV repository, until this CLA's `major.minor` version is bumped.
 
 ## 1. Grant of license
 
@@ -30,23 +30,32 @@ The contribution is provided "as is," without warranty of any kind, express or i
 
 ## 5. Signing
 
-To accept these terms, reply to the CLA-bot comment on your pull request with this exact text:
+To accept these terms, reply to the CLA bot's comment on your pull request with this exact text:
 
 ```
-I have read and I agree to the CLA v1.0.0
+I have read and I agree to the CLA v1.0
 ```
 
-The bot will record your acceptance:
+The bot will record your acceptance as an immutable JSON file in CLDMV's internal `.cla-signatures` ledger repository. The record captures your GitHub identity (immutable user ID, login at signing time, account metadata), the PR and commits that triggered signing, a SHA-256 of this document at the time of signing, and a commit-pinned URL to the exact text you agreed to. That ledger entry is the durable legal artifact.
 
-- A signed bot-commit on your PR branch with `CLA-Signed-By:` and `CLA-Source-Comment:` trailers (same-repo PRs)
-- An acknowledgment comment on your PR linking back to your "I agree" comment (fork PRs)
+The bot's acknowledgment comment on your PR is your **receipt**: it contains a stable `signature_id` (a SHA-256 hash anchoring your full record), the CLA version, and the signing timestamp. Keep that comment for your records. The ledger repository itself is private — contributor metadata (commit-author emails and similar) is not aggregated into a public, searchable index — so the comment is the only contributor-facing copy of your receipt.
 
-Both forms link your acceptance to your GitHub identity, the commit/PR in question, the CLA version, and a SHA-256 of this document at the time of signing. The PR itself is the durable legal artifact; CLDMV does not maintain a central signatures repository.
+Your signature applies to every CLDMV repository for every future contribution you make, until this CLA's `major.minor` version is bumped. You do not need to sign separately per repository or per pull request.
 
 ## 6. Exemption for organization members
 
-If you are an active member of the CLDMV GitHub organization at the time of your contribution, you are covered by your org-level relationship and do not need to sign this CLA per-PR. The bot detects org membership via `GET /orgs/CLDMV/members/{login}` and silently passes the status check.
+If you are an active member of the CLDMV GitHub organization at the time of your contribution, you are covered by your org-level relationship and do not need to sign this CLA. The bot detects org membership via `GET /orgs/CLDMV/members/{login}` and silently passes the status check.
 
-## 7. Version updates
+## 7. Versioning
 
-CLDMV may update this CLA. Existing signatures cover the version they were signed against. The bot will re-prompt for re-acceptance when the version field of this document changes meaningfully.
+CLA versions are numbered `major.minor.patch`:
+
+| Level | Triggers re-signing? | Examples |
+|---|---|---|
+| **Major** (`v1.0` → `v2.0`) | Yes | Fundamental terms change — scope of the license grant, jurisdiction, addition or removal of a patent clause. |
+| **Minor** (`v1.0` → `v1.1`) | Yes | Wording changes that affect meaning, clarification that shifts interpretation, added or removed exemption. |
+| **Patch** (`v1.0` → `v1.0.1`) | **No** | Spelling fixes, typo corrections, pure formatting. No change in meaning. |
+
+The bot reads the CLA version at `major.minor` granularity — patch-level fixes never invalidate an existing signature. Each signature record additionally captures the SHA-256 of the text at signing time and a commit-pinned URL to the exact version the contributor agreed to, so any earlier signature can be verified against precisely the text the contributor saw.
+
+For the authoritative policy (workflow for patch fixes vs. minor/major bumps), see [VERSIONING.md](https://github.com/CLDMV/.cla-signatures/blob/master/VERSIONING.md) in the signatures ledger.
