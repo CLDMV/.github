@@ -54,7 +54,7 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 | `codeql.yml` | push, PR, weekly cron | CodeQL SAST. |
 | `dependency-review.yml` | PR | Flags new deps with known CVEs at PR-time. |
 | `scorecard.yml` | weekly + branch_protection_rule | OpenSSF Scorecard, publishes to public scoreboard. |
-| `cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger (`CLDMV/.cla-signatures`). Contributors sign once per CLA `major.minor`, covering every CLDMV repo until the next bump. Org members exempt. |
+| `cla.yml` | PR + issue_comment | Per-CLA-version signing via central ledger (`CLDMV/.cla-signatures`), with per-repo override support. Default scope (no consumer `CLA.md`) covers every CLDMV repo using the default until the next bump; override scope (consumer has root `CLA.md`) is scoped to that repo only. Org members exempt. |
 
 ### 🤖 [`automation/`](individual-repo-workflows/automation/) — Automation
 
