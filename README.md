@@ -66,7 +66,6 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 data/github-labels.json                          # org label catalog (5 new in v3)
 docs/conventions/branch-naming.md                # 🆕 v3: branch naming convention
 scripts/setup-org-rulesets.mjs                   # 🆕 v3: installer for naming Ruleset
-CLA.md                                           # 🆕 v3: contributor license agreement
 examples/
 ├── guides/                                      # 🆕 v3: setup / dry-run / rolling-tag guides
 └── individual-repo-workflows/                   # copy-paste templates for consumers, grouped:

@@ -30,22 +30,22 @@ The canonical agreement texts live in [`cla-versions/`](cla-versions/), one file
 
 ### Patch fix workflow
 
-1. Edit the affected `cla-versions/v<X.Y>.md` file in place to incorporate the fix.
+1. Edit the affected `cla-versions/v<X.Y>.md` file in this ledger in place to incorporate the fix.
 2. Regenerate the corresponding `.sha256` file via `node tools/verify.mjs --regen-hashes`.
-3. Update the working copy at [`CLDMV/.github/CLA.md`](https://github.com/CLDMV/.github/blob/master/CLA.md) to match.
+3. Update the public-facing seed copy at [`examples/repo-seeds/.cla-signatures/cla-versions/v<X.Y>.md`](https://github.com/CLDMV/.github/tree/master/examples/repo-seeds/.cla-signatures/cla-versions) in `CLDMV/.github` to match — keeps the public reference in sync with the live binding text.
 4. Commit both with a `fix(cla):` message. Git history preserves the diff.
 
 No bot input change. No re-signing prompt to contributors.
 
 ### Minor / major bump workflow
 
-1. Create a new `cla-versions/v<X.Y>.md` file alongside the existing ones (do not overwrite previous versions).
+1. Create a new `cla-versions/v<X.Y>.md` file alongside the existing ones in this ledger (do not overwrite previous versions).
 2. Generate its `.sha256` via `node tools/verify.mjs --regen-hashes`.
-3. Update the working copy at [`CLDMV/.github/CLA.md`](https://github.com/CLDMV/.github/blob/master/CLA.md) to the new text.
+3. Add the corresponding `cla-versions/v<X.Y>.md` to the public seed at [`examples/repo-seeds/.cla-signatures/cla-versions/`](https://github.com/CLDMV/.github/tree/master/examples/repo-seeds/.cla-signatures/cla-versions) in `CLDMV/.github` so the public reference reflects the new version.
 4. Bump the `cla_version:` input in the consumer-repo workflow template at [`CLDMV/.github/examples/individual-repo-workflows/security/cla.yml`](https://github.com/CLDMV/.github/blob/master/examples/individual-repo-workflows/security/cla.yml).
 5. Each consumer repo picks up the new version on its next workflow run (no per-repo change required if they pin to the floating tag).
 6. Contributors are prompted to re-sign on their next PR. The bot writes new files under `signatures/github/v<X.Y>/...`; older-version records under `signatures/github/v<X.Y-1>/...` are preserved untouched.
 
 ## Authoritative source
 
-This document is the authoritative definition of the versioning policy. The CLA file itself ([`cla-versions/v1.0.md`](cla-versions/v1.0.md), and the working copy at [`CLDMV/.github/CLA.md`](https://github.com/CLDMV/.github/blob/master/CLA.md)) includes a short summary referencing this policy.
+This document is the authoritative definition of the versioning policy. The CLA file itself at [`cla-versions/v1.0.md`](cla-versions/v1.0.md) includes a short summary referencing this policy.
