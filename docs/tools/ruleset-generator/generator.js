@@ -13,7 +13,17 @@
 				require_code_owner_review: !!opts.requireCodeOwner,
 				require_last_push_approval: false,
 				required_review_thread_resolution: true,
-				allowed_merge_methods: ["squash"]
+				// Per-branch merge method:
+				//   - master: squash only — release PRs land as a single clean
+				//     commit on the released line; individual commit history
+				//     of the staging branches is preserved inside the squash's
+				//     body as a categorized changelog.
+				//   - next / hotfixes: rebase only — individual commits from
+				//     feature PRs are preserved linearly; GitHub appends
+				//     (#N) to commit subjects, so the to-master release PR's
+				//     changelog gets PR refs for free without re-running
+				//     anything.
+				allowed_merge_methods: Array.isArray(opts.mergeMethods) && opts.mergeMethods.length > 0 ? opts.mergeMethods : ["squash"]
 			}
 		};
 	}
@@ -76,7 +86,7 @@
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["squash"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()
@@ -102,7 +112,7 @@
 				{ type: "deletion" },
 				{ type: "non_fast_forward" },
 				{ type: "required_signatures" },
-				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false }),
+				pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["rebase"] }),
 				codeScanningRule(),
 				requiredStatusChecksRule()
 			],
@@ -115,7 +125,7 @@
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["rebase"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()

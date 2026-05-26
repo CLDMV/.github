@@ -231,6 +231,72 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
  * @param {string} text - Subject/body text potentially containing PR reference.
  * @returns {number|null} Parsed PR number.
  */
+/**
+ * Look up a commit's associated pull request via GitHub's REST API.
+ * Returns the first associated PR number, or null when none / on error.
+ * Used to annotate commit lines in the changelog with `(#N)` when the
+ * commit's subject doesn't already carry the reference (e.g. commits
+ * brought in by a "create a merge commit" PR rather than a rebase-merge).
+ * @param {string} sha - Commit SHA.
+ * @param {string} owner - Repo owner.
+ * @param {string} repo - Repo name.
+ * @param {string} token - GitHub token.
+ * @returns {Promise<number|null>}
+ */
+async function findAssociatedPullNumber(sha, owner, repo, token) {
+	if (!sha || !owner || !repo || !token) return null;
+	try {
+		const prs = await api("GET", `/commits/${sha}/pulls`, null, { token, owner, repo });
+		if (Array.isArray(prs) && prs.length > 0 && typeof prs[0].number === "number") {
+			return prs[0].number;
+		}
+		return null;
+	} catch (err) {
+		console.log(`⚠️ Could not look up PR for ${String(sha).slice(0, 7)}: ${err.message}`);
+		return null;
+	}
+}
+
+/**
+ * For each commit, ensure its subject carries a `(#N)` PR reference. When
+ * the subject already has one (rebase-merged from a feature PR), it's left
+ * alone. When it doesn't, the bot queries the GitHub API to find the
+ * associated PR and appends the ref. Failures are logged and ignored —
+ * the changelog falls back to just the subject + sha in that case.
+ *
+ * Mutates and returns the same array (so categorization that already ran
+ * is preserved).
+ *
+ * @param {Array} commits
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @returns {Promise<Array>}
+ */
+async function augmentCommitsWithPRRefs(commits, owner, repo, token) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!owner || !repo || !token) {
+		console.log("⚠️ Skipping PR-ref augmentation (missing owner/repo/token).");
+		return commits;
+	}
+	let augmented = 0;
+	for (const c of commits) {
+		if (!c || typeof c.subject !== "string") continue;
+		if (/\(#\d+\)/.test(c.subject)) continue;
+		const sha = c.hash || c.sha;
+		if (!sha) continue;
+		const prNumber = await findAssociatedPullNumber(sha, owner, repo, token);
+		if (prNumber) {
+			c.subject = `${c.subject} (#${prNumber})`;
+			augmented++;
+		}
+	}
+	if (augmented > 0) {
+		console.log(`🔗 Augmented ${augmented} commit subject(s) with PR refs.`);
+	}
+	return commits;
+}
+
 function extractPullRequestNumber(text) {
 	if (!text) {
 		return null;
@@ -681,6 +747,18 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// upstream bot bumps. The PR title communicates the version; the section
 	// bodies should describe the human-authored changes, nothing else.
 	commits = filterBotCommits(commits);
+
+	// Annotate each commit's subject with its associated PR reference
+	// `(#N)` whenever possible. Rebase-merged commits already carry the
+	// ref because GitHub appends it on merge; commits that landed via
+	// "Create a merge commit" don't, so the bot looks them up via
+	// /commits/{sha}/pulls. Augmentation is best-effort: API failures
+	// or absent owner/repo/token degrade gracefully to the un-annotated
+	// subject.
+	{
+		const [augOwner, augRepo] = (GITHUB_REPOSITORY || "").split("/");
+		commits = await augmentCommitsWithPRRefs(commits, augOwner, augRepo, token);
+	}
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
