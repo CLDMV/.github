@@ -90,7 +90,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 3 | true | `bundle-size.yml` | `packaging-docs/bundle-size.yml` |
 | 4 | true | `docs.yml` | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent) |
 | 5 | true | `docker-publish.yml` | `packaging-docs/docker-publish.yml` |
-| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from the public seed mirror at `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo) |
+| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from the public sample at `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo) |
 | 7 | true | `dependabot-auto-merge.yml` | `automation/dependabot-auto-merge.yml` |
 | 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
@@ -149,7 +149,7 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
   min_node_version: ""
   ```
 - **`branch-retention.yml`** (from Q9): defaults already exempt `master, main, badges, gh-pages, next, hotfixes`. If the user listed extra patterns, append them: `exempt_patterns: '["master","main","badges","gh-pages","next","hotfixes","<their-branch>"]'`.
-- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from the public seed mirror at `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and add a TODO in your final report: "user must confirm CLA.md text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
+- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from the public sample at `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and add a TODO in your final report: "user must confirm CLA.md text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
 - **`release-notify.yml`** (Q8): create `.github/release-notifier.yml` with this stub:
   ```yaml
   channels:
