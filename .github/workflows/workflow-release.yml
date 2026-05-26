@@ -147,6 +147,29 @@ on:
             GPG_PRIVATE_KEY:
                 description: "ASCII-armored private key for signing"
                 required: false
+
+            # Release-PR notifier — one secret per (type, visibility) tuple.
+            # All optional: any unset secret means that channel is silently
+            # skipped. Set the org-level secret in CLDMV (or repo-level for
+            # an override) with the channel's webhook URL.
+            DISCORD_RELEASE_PR_PUBLIC_WEBHOOK:
+                description: "Discord webhook URL for release-PR version-bump notifications from public repos."
+                required: false
+            DISCORD_RELEASE_PR_PRIVATE_WEBHOOK:
+                description: "Discord webhook URL for release-PR version-bump notifications from private/internal repos."
+                required: false
+            SLACK_RELEASE_PR_PUBLIC_WEBHOOK:
+                description: "Slack webhook URL for release-PR version-bump notifications from public repos."
+                required: false
+            SLACK_RELEASE_PR_PRIVATE_WEBHOOK:
+                description: "Slack webhook URL for release-PR version-bump notifications from private/internal repos."
+                required: false
+            GENERIC_RELEASE_PR_PUBLIC_WEBHOOK:
+                description: "Generic JSON webhook URL for release-PR version-bump notifications from public repos."
+                required: false
+            GENERIC_RELEASE_PR_PRIVATE_WEBHOOK:
+                description: "Generic JSON webhook URL for release-PR version-bump notifications from private/internal repos."
+                required: false
             GPG_PASSPHRASE:
                 description: "Passphrase for the private key (if protected)"
                 required: false
@@ -209,6 +232,7 @@ jobs:
             # the v4 integration-branch release workflows (local-next-release.yml /
             # local-hotfixes-release.yml) share it without duplication.
             - name: Refresh release PR
+              id: refresh
               uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: ${{ github.ref_name }}
@@ -219,6 +243,26 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   debug: ${{ inputs.debug && 'true' || 'false' }}
+
+            # Release-PR notifier — fires only when the target version
+            # actually changes this refresh (PR open or version-bump shift),
+            # never on the changelog-only refreshes that run on every push.
+            # Each secret is independently opt-in: unset = no-op.
+            - name: Notify on release-PR version bump
+              if: steps.refresh.outputs.version-changed == 'true'
+              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
+              with:
+                  event_kind: release_pr
+                  pr_number: ${{ needs.check-existing-pr.outputs.pr-number }}
+                  version: ${{ steps.refresh.outputs.new-version }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+              env:
+                  DISCORD_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.DISCORD_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  DISCORD_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_PR_PRIVATE_WEBHOOK }}
+                  SLACK_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.SLACK_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  SLACK_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.SLACK_RELEASE_PR_PRIVATE_WEBHOOK }}
+                  GENERIC_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  GENERIC_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PRIVATE_WEBHOOK }}
 
     build-and-test:
         name: "🏗️ Build and Test"

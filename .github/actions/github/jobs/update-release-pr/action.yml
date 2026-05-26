@@ -47,6 +47,12 @@ outputs:
   should-update:
     description: "'true' if a release-worthy commit was found and the PR was updated; 'false' otherwise"
     value: ${{ steps.release-check.outputs.should-create-pr }}
+  previous-version:
+    description: "The version embedded in the PR title before this refresh (empty when the title doesn't carry one, e.g. first open)."
+    value: ${{ steps.prev-version.outputs.version }}
+  version-changed:
+    description: "'true' when the recalculated version differs from the PR's previous title-encoded version. Use as a gate for release-PR notifications so the changelog-only refreshes don't fan out a fresh announcement."
+    value: ${{ steps.prev-version.outputs.changed }}
 
 runs:
   using: composite
@@ -145,6 +151,34 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v4
       with:
         commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
+
+    # Capture the version currently encoded in the PR title BEFORE we rewrite
+    # it, so the calling workflow can gate a release-PR notification on
+    # whether the version is actually changing this refresh.
+    # PR titles look like `release: vX.Y.Z[ - suffix]`; an empty
+    # previous-version (no match) is treated as a change too — covers the
+    # first-refresh case where the PR was just opened by create-release-pr.
+    - name: Capture previous PR version
+      id: prev-version
+      if: steps.release-check.outputs.should-create-pr == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        NEW_VERSION: ${{ steps.version.outputs.new-version }}
+      run: |
+        set -euo pipefail
+        title=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.title' 2>/dev/null || echo "")
+        prev=$(printf '%s' "$title" | sed -nE 's/^release: v([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p')
+        if [ -n "$prev" ] && [ "$prev" = "$NEW_VERSION" ]; then
+            changed="false"
+        else
+            changed="true"
+        fi
+        echo "version=$prev" >> "$GITHUB_OUTPUT"
+        echo "changed=$changed" >> "$GITHUB_OUTPUT"
+        echo "📋 Previous version: ${prev:-<none>}   New version: $NEW_VERSION   Changed: $changed"
 
     - name: Update PR title and description
       if: steps.release-check.outputs.should-create-pr == 'true'
