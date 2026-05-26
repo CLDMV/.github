@@ -9,12 +9,27 @@
 
 # Individual repo: .github/workflows/dependabot-auto-merge.yml
 #
+# Auto-approves + queues auto-merge for Dependabot patch/minor bumps after
+# CI passes. Major bumps are left for a human.
+#
+# Default in v4: ON. To opt out, delete this file — Dependabot PRs still
+# flow into `next` (via dependabot.yml) but require a manual merge click.
+#
+# How v4 routing works:
+#   - dependabot.yml sets `target-branch: next`, so Dependabot opens PRs
+#     against `next`. This workflow auto-merges those PRs into `next` after
+#     CI; they batch into the next release like every other change.
+#   - For security advisories, hotfix-redirector.yml (release-flow-v4/)
+#     detects GHSA references in the PR body and retargets the PR from
+#     `next` → `hotfixes` *before* this workflow runs, so security updates
+#     auto-merge into the hotfix lane instead of waiting for the next batch.
+#
 # Required setup (one-time per repo):
 #   1. Settings → Pull Requests → "Allow auto-merge" → ON
-#   2. Branch protection on master/main requires CI status checks
-# Both are validated by the action; the workflow will fail loudly if missing.
-#
-# Batch 3.2 from tmp/plan-future-workflows.md.
+#      (enabled automatically by `release-flow-v4/v4-bootstrap.yml`)
+#   2. Branch protection on `next` and `hotfixes` with required CI status
+#      checks — the action refuses to merge into an unprotected branch.
+# Both are validated by the action; the workflow fails loudly if missing.
 name: 🤖 Dependabot Auto-Merge
 
 on:

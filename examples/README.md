@@ -60,7 +60,8 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 
 | Template | Triggers | What it does |
 |---|---|---|
-| `dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-approves + queues auto-merge for patch/minor bumps after CI. |
+| `dependabot.yml` | (config file at `.github/dependabot.yml`) | Routes Dependabot PRs to `next` (with `hotfix-redirector.yml` auto-promoting security updates to `hotfixes`). |
+| `dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-approves + queues auto-merge for patch/minor bumps after CI, into the PR's target (`next` or `hotfixes`). |
 | `labeler.yml` | pull_request_target | Path-based PR labels (uses [labeler.default.yml](../.github/labeler.default.yml) unless overridden by `.github/labeler.yml`). |
 | `welcome.yml` | first issue / PR | Friendly welcome with conditional links to CONTRIBUTING / CLA / COC. |
 | `stale.yml` | daily cron | Marks/closes inactive issues + PRs. Defaults: 60+14 days issues, 30+7 days PRs. |
