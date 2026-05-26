@@ -8,20 +8,20 @@
 #
 
 name: "CLA Record"
-description: "On issue_comment:created — if the comment is on an open PR and matches the required CLA acceptance text, validate the commenter is one of the PR's commit authors and record the signature in the central ledger repo. Idempotent: existing records are not overwritten."
+description: "On issue_comment:created — if the comment is on an open PR and matches the required CLA acceptance text, validate the commenter is a commit author and record the signature in the central ledger repo at the appropriate scope (default or override). For overrides, bootstraps the immutable per-version snapshot on the first signature and detects drift (consumer text changed without a version bump) on subsequent signatures. Idempotent: existing records are not overwritten."
 
 inputs:
   cla_version:
     required: true
-    description: "Current CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
+    description: "CLA version (e.g. '1.0' or '1.0.0'). Used for the default scope. For override scope, the version is read from the consumer's CLA.md header and this input is only a fallback."
   cla_path:
     required: false
     default: "CLA.md"
-    description: "Path to the CLA text in the consumer repo (used to compute hash + commit-pinned URL for the signature record)"
+    description: "Path inside the consumer repo where an override CLA may exist. If present, the bot enforces override scope: signatures land at signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/<shard>/<id>.json and the consumer's text is archived (once) at cla-versions/overrides/<owner>/<repo>/v<X.Y>.md."
   required_text_template:
     required: false
     default: "I have read and I agree to the CLA ${cla_version}"
-    description: "Template for the required acceptance text. ${cla_version} expands to the normalized major.minor (e.g. 'v1.0')."
+    description: "Template for the required acceptance text. ${cla_version} expands to the effective version (header version for override, input version for default)."
   ledger_repo:
     required: false
     default: "CLDMV/.cla-signatures"
@@ -32,7 +32,7 @@ inputs:
     description: "Platform bucket inside the ledger (currently only 'github' is supported)"
   github_token:
     required: true
-    description: "App token; needs `contents: write` on the ledger repo plus `pull_requests: write` / `statuses: write` on the consumer repo"
+    description: "App token; needs `contents: write` on the ledger repo (for signature files + override snapshots), `contents: read` on the consumer repo (for override detection), and `pull_requests: write` / `statuses: write` on the consumer repo (for ack comments + status)"
 
 runs:
   using: node24
