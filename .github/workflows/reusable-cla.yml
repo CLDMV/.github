@@ -9,11 +9,22 @@
 
 # CLA bot (org-level, reusable).
 #
-# Per-CLA-version, org-wide signing model. A contributor signs once for a
-# given CLA major.minor; their signature applies to every consumer repo
-# until the CLA's major.minor is bumped. Org members are exempt via
-# /orgs/{org}/members lookup. Records live in the central ledger repo
-# (default: CLDMV/.cla-signatures) as immutable JSON files.
+# Per-CLA-version, org-wide signing model with per-repo override support.
+#
+#   - Default scope: a consumer repo with no local CLA.md uses the org-wide
+#     CLA in the ledger at cla-versions/v<X.Y>.md. A contributor signs once
+#     per CLA major.minor; their signature applies to every consumer repo
+#     that uses the default until the major.minor is bumped.
+#   - Override scope: a consumer repo with its own CLA.md at the root
+#     overrides the default. The bot reads the version from the file's
+#     header. On the first signature, the bot bootstraps an immutable
+#     snapshot at cla-versions/overrides/<owner>/<repo>/v<X.Y>.md and
+#     stores signatures under signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/.
+#     Editing the override CLA.md without bumping the header version is
+#     detected as drift and rejected.
+#
+# Records live in the central ledger repo (default: CLDMV/.cla-signatures)
+# as immutable JSON files. Org members are exempt via /orgs/{org}/members.
 #
 # Two secret pairs:
 #   - BOT_APP_CLIENT_ID / BOT_APP_PRIVATE_KEY: required; the general org bot
@@ -28,11 +39,12 @@ on:
             cla_version:
                 required: true
                 type: string
-                description: "CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
+                description: "Default-scope CLA version (e.g. '1.0' or '1.0.0'). For override scope, the version is read from the consumer's CLA.md header and this input is only a fallback."
             cla_path:
                 required: false
                 type: string
                 default: "CLA.md"
+                description: "Path inside the consumer repo where an override CLA may exist. If a file is present at this path, the bot uses override scope."
             exempt_users:
                 required: false
                 type: string
@@ -58,6 +70,11 @@ on:
                 required: false
                 type: string
                 default: "github"
+            public_cla_url_template:
+                required: false
+                type: string
+                default: "https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/${cla_version}.md"
+                description: "URL template for the publicly-readable copy of the default CLA. ${cla_version} expands to the effective version. Only used for the default scope; overrides link to the consumer's own CLA.md."
         secrets:
             BOT_APP_CLIENT_ID:
                 required: true
@@ -117,6 +134,7 @@ jobs:
                   required_text_template: ${{ inputs.required_text_template }}
                   ledger_repo: ${{ inputs.ledger_repo }}
                   ledger_platform: ${{ inputs.ledger_platform }}
+                  public_cla_url_template: ${{ inputs.public_cla_url_template }}
                   github_token: ${{ steps.app-token.outputs.token }}
 
     record:

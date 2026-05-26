@@ -286,17 +286,24 @@ Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:
 
 **File:** `security/cla.yml` &nbsp;·&nbsp; **Calls:** `reusable-cla.yml@v4`
 
-On every PR (including from forks), checks whether each commit author has signed the current CLA version. Signing is per-CLA-version and org-wide: a contributor replies on their PR with the exact text `I have read and I agree to the CLA v<X.Y>` and the bot writes an immutable JSON signature record to the central ledger repo (private — `CLDMV/.cla-signatures`). That single signature covers every CLDMV repository and every future PR until the CLA's `major.minor` is bumped. Org members and configured bots are exempt; no per-PR or per-repo re-signing.
+On every PR (including from forks), checks whether each commit author has signed the active CLA at the active version. The bot supports two scopes and resolves which applies on every run:
 
-The bot's acknowledgment comment on the PR is the contributor's receipt — it contains the `signature_id` (a SHA-256 anchor of the full record), the CLA version, and the CLA SHA-256. Because the ledger is private, the comment is the only contributor-facing copy of the receipt.
+- **Default scope** — the consumer repo has no `CLA.md` at the root. The bot reads the org-wide CLA from the ledger at `cla-versions/v<X.Y>.md`. One signature covers every consumer repo using the default, until the major.minor version is bumped.
+- **Override scope** — the consumer repo includes its own `CLA.md` with custom terms. The bot reads that text directly and parses the version from the file's header (`# … CLA — v1.0` → `v1.0`). On the **first signature** the bot bootstraps an immutable snapshot at `cla-versions/overrides/<owner>/<repo>/v<X.Y>.md`; on subsequent signatures it verifies the consumer's text still matches that snapshot. Editing the override's text without bumping the header version is detected as **drift** and rejected with a clear remediation message.
+
+Signatures are scoped per-CLA-text-hash. Signing the default v1.0 does *not* cover override-repo v1.0 and vice versa — the override's text is a different agreement. Override signatures live at `signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/<shard>/<id>.json`; default signatures live at `signatures/<platform>/v<X.Y>/<shard>/<id>.json`.
+
+A contributor replies on the PR with the exact text `I have read and I agree to the CLA v<X.Y>`; the bot writes an immutable JSON signature record to the central ledger (private — `CLDMV/.cla-signatures`). Org members and configured bots are exempt.
+
+The bot's acknowledgment comment on the PR is the contributor's receipt — it contains the `signature_id`, the scope, the CLA version, and the CLA SHA-256. Because the ledger is private, the comment is the only contributor-facing copy of the receipt.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for commit attribution on the ledger writes. Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY` override the general bot identity for the CLA workflow only.
 
-**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (to write signature files). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). A public sample CLA — what consumer repos copy from when they need a local `CLA.md` — is published at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). This `.github` repo deliberately has no root-level `CLA.md` — if it did, the bot would pick it up as a fallback CLA source.
+**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (for signature files + override snapshots). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). A public sample of the default CLA — what consumer repos copy from when they want to start with a local `CLA.md` override — is published at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). This `.github` repo deliberately has no root-level `CLA.md` — if it did, the bot would pick it up as a fallback CLA source.
 
-**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — normalized to `major.minor` internally; patch-level changes don't trigger re-signing, see [`VERSIONING.md`](../repo-seeds/.cla-signatures/VERSIONING.md) in the seed). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location.
+**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — used as the default-scope version; for override scope, the header in the consumer's CLA.md takes precedence). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location. `public_cla_url_template` (URL pointing contributors at the public default-CLA copy in the request comment). See [`VERSIONING.md`](../repo-seeds/.cla-signatures/VERSIONING.md) in the seed for the patch/minor/major versioning policy.
 
 ---
 
@@ -482,7 +489,7 @@ These come up across multiple workflows — set them once per repo:
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml`.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
-- **`CLA.md`** at repo root — required by `cla.yml` until [branch 1 of the in-flight refactor](#-cla-bot) lands the ledger-direct read. Today the bot computes the SHA from the consumer repo's own `CLA.md`. Copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). Set `cla_path:` if your CLA file lives elsewhere.
+- **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
 - **`.github/release-notifier.yml`** — required by `release-notify.yml` to define channels.

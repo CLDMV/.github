@@ -40,13 +40,14 @@ Ask the user these questions before touching any files. Use a single batched que
 | 3 | Does this repo ship a runtime bundle (`dist/`)? | bool | If yes, adopt `bundle-size.yml` |
 | 4 | Does this repo publish docs to a `gh-pages` branch? | bool | If yes, adopt `docs.yml` |
 | 5 | Is there a `Dockerfile` at the repo root that should publish to GHCR? | bool | If yes, adopt `docker-publish.yml` |
-| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml` (also requires `CLA.md` in repo and the org-wide ledger repo `CLDMV/.cla-signatures` to exist) |
+| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml`. The bot uses the org-wide default CLA from the `CLDMV/.cla-signatures` ledger — no per-repo `CLA.md` is needed in the default case. Only add a local `CLA.md` if this repo needs an **override** with custom terms; ask about that separately as Q6b. |
+| 6b | (Only if Q6 is yes) Does this repo need a CLA with **different terms** than the org-wide default? | bool | If yes, ask the user for the override CLA text; place at root as `CLA.md` with a `# … CLA — v1.0` header. The bot will detect override scope automatically and bootstrap a snapshot in the ledger on the first signature. |
 | 7 | Want Dependabot's patch/minor PRs auto-merged after CI passes? | bool | If yes, adopt `dependabot-auto-merge.yml` ("Allow auto-merge" is enabled by `v4-bootstrap.yml`) |
 | 8 | Want Discord/Slack release notifications? | bool | If yes, adopt `release-notify.yml` (also requires `.github/release-notifier.yml` + per-channel webhook secrets) |
 | 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
 | 10 | Should the standard org-default labels be synced into this repo? | bool | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only) |
 
-Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #10 (org labels) which default to false.
+Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #6b (CLA override), #10 (org labels) which default to false.
 
 ---
 
@@ -90,7 +91,8 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 3 | true | `bundle-size.yml` | `packaging-docs/bundle-size.yml` |
 | 4 | true | `docs.yml` | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent) |
 | 5 | true | `docker-publish.yml` | `packaging-docs/docker-publish.yml` |
-| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from the public sample at `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo) |
+| 6 | true | `cla.yml` | `security/cla.yml`. Do **not** add a `CLA.md` to the repo root unless Q6b is also yes — the bot defaults to the org-wide CLA from `CLDMV/.cla-signatures` and a stray local `CLA.md` would silently switch the repo into override scope. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo. |
+| 6b | true | `CLA.md` at repo root | Copy the consumer's override text into `CLA.md` with a `# … CLA — v1.0` header. (Or, if they want to start from the default and customize, copy from `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging.) The bot detects override scope by file presence; no other config needed. |
 | 7 | true | `dependabot-auto-merge.yml` | `automation/dependabot-auto-merge.yml` |
 | 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
@@ -149,7 +151,7 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
   min_node_version: ""
   ```
 - **`branch-retention.yml`** (from Q9): defaults already exempt `master, main, badges, gh-pages, next, hotfixes`. If the user listed extra patterns, append them: `exempt_patterns: '["master","main","badges","gh-pages","next","hotfixes","<their-branch>"]'`.
-- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from the public sample at `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and add a TODO in your final report: "user must confirm CLA.md text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
+- **`cla.yml`** (Q6): no per-repo `CLA.md` by default — the bot uses the org-wide CLA from the ledger. If the user answered Q6b = yes (override), drop their custom CLA text at the repo root as `CLA.md` with a `# … CLA — v1.0` header. (Starting from the default text: fetch `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and let the user edit.) Add a TODO in your final report: "if you added a CLA.md, confirm the text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
 - **`release-notify.yml`** (Q8): create `.github/release-notifier.yml` with this stub:
   ```yaml
   channels:
