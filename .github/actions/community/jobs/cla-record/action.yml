@@ -8,19 +8,31 @@
 #
 
 name: "CLA Record"
-description: "On issue_comment: created, if the comment is on an open PR and exactly matches the required CLA text, validate that the commenter is one of the PR's commit authors and record the signature. For same-repo PRs: create an empty signed commit on the PR branch. For fork PRs: post an acknowledgment comment. Then re-run cla-check to flip the status. Batch 1.1."
+description: "On issue_comment:created — if the comment is on an open PR and matches the required CLA acceptance text, validate the commenter is one of the PR's commit authors and record the signature in the central ledger repo. Idempotent: existing records are not overwritten."
 
 inputs:
   cla_version:
     required: true
+    description: "Current CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
   cla_path:
     required: false
     default: "CLA.md"
+    description: "Path to the CLA text in the consumer repo (used to compute hash + commit-pinned URL for the signature record)"
   required_text_template:
     required: false
-    default: "I have read and I agree to the CLA v${cla_version}"
+    default: "I have read and I agree to the CLA ${cla_version}"
+    description: "Template for the required acceptance text. ${cla_version} expands to the normalized major.minor (e.g. 'v1.0')."
+  ledger_repo:
+    required: false
+    default: "CLDMV/.cla-signatures"
+    description: "owner/name of the central CLA signatures ledger repository"
+  ledger_platform:
+    required: false
+    default: "github"
+    description: "Platform bucket inside the ledger (currently only 'github' is supported)"
   github_token:
     required: true
+    description: "App token; needs `contents: write` on the ledger repo plus `pull_requests: write` / `statuses: write` on the consumer repo"
 
 runs:
   using: node24
