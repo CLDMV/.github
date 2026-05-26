@@ -145,6 +145,9 @@ runs:
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v4
       with:
         commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
+        # next/hotfixes → master release PR body groups each section by the
+        # source PR. See create-release-pr/action.yml for the rationale.
+        group-by-pr: "true"
 
     - name: Update PR title and description
       if: steps.release-check.outputs.should-create-pr == 'true'
