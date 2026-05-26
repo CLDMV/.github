@@ -343,7 +343,7 @@ Canonical templates live in [`data/rulesets/`](../../data/rulesets/):
 - [`next.json`](../../data/rulesets/next.json) — integration branch
 - [`hotfixes.json`](../../data/rulesets/hotfixes.json) — hotfix lane
 
-A static generator at [`docs/tools/ruleset-generator/`](../tools/ruleset-generator/index.html) (hosted via GitHub Pages from this repo) prompts for repo-specific values and emits ready-to-import JSON for each branch. Consumers download the three files and import each in the repo's Settings → Rules → Rulesets UI.
+A static generator at [`docs/tools/ruleset-generator/`](https://cldmv.github.io/.github/tools/ruleset-generator/) (hosted via GitHub Pages from this repo) prompts for repo-specific values and emits ready-to-import JSON for each branch. Consumers download the three files and import each in the repo's Settings → Rules → Rulesets UI.
 
 ### 9.1 Generator questions
 

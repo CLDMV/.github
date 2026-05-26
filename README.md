@@ -4,11 +4,15 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## 📋 Quick Start
 
-1. **Copy example workflows** from [`examples/individual-repo-workflows/`](examples/individual-repo-workflows/) into your project's `.github/workflows/` directory.
-2. **Update `package_name`** in each workflow to match your NPM package name.
-3. **Customize inputs** as needed for your project.
-4. **Commit and push** — the workflows run automatically when triggered.
-5. **Configure fork-PR approval** — in **Settings → Actions → General → Fork pull request workflows from outside collaborators**, choose **"Require approval for all outside collaborators"** (or stricter). The example `ci.yml` runs on `push` for branches in this repo (no duplicates with PR sync) and on `pull_request` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR's checks. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
+These workflows ship a complete CI / release / publish pipeline tuned for the **v4 staging-branch release flow** — feature PRs land on `next`, urgent work on `hotfixes`, and `master` is a clean release-only history. New repos should adopt v4 directly; existing v3 repos have a [migration guide](docs/migration/v3-to-v4.md).
+
+1. **Adopt the v4 release-flow workflows** — copy the set from [`examples/individual-repo-workflows/release-flow-v4/`](examples/individual-repo-workflows/release-flow-v4/) into your repo's `.github/workflows/`. These are adopted as a set (they depend on each other).
+2. **Copy the core CI / publish / tag templates** from [`examples/individual-repo-workflows/core-cicd/`](examples/individual-repo-workflows/core-cicd/) and update `package_name` to your NPM package name. Add the security / automation templates you want from the other subfolders.
+3. **Import the branch rulesets** for `master` / `next` / `hotfixes` from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) — pick approvals count and bot-bypass options once, download three JSON files, import each via **Settings → Rules → Rulesets → New ruleset → Import**.
+4. **Dispatch `v4-bootstrap.yml`** from the Actions tab once (`dry_run: true` first to preview, then `false`). Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
+5. **Configure fork-PR approval** — **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators" (or stricter). The example `ci.yml` runs on `push` for in-repo branches and on `pull_request_target` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
+
+For agent-driven scaffolding, point your agent at [`examples/guides/AGENT-SCAFFOLDING.md`](examples/guides/AGENT-SCAFFOLDING.md) — it walks through discovery questions, decisions, copy/customize steps, and validation. For human-driven setup, see [`examples/guides/WORKFLOW-SETUP-GUIDE.md`](examples/guides/WORKFLOW-SETUP-GUIDE.md).
 
 ## 🏗️ Architecture Overview
 
@@ -27,6 +31,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 .github/
 ├── workflows/
 │   ├── local-*.yml                              # dogfood — runs on this repo's events
+│   │     # core CI / housekeeping:
 │   │     local-ci.yml, local-codeql.yml, local-tag-health.yml,
 │   │     local-stale.yml, local-labeler.yml, local-welcome.yml,
 │   │     local-branch-retention.yml, local-master-commit-audit.yml,
@@ -34,46 +39,50 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   │     # v4 staging-branch flow:
 │   │     local-next-release.yml, local-next-reset.yml, local-hotfixes-release.yml,
 │   │     local-hotfix-redirector.yml, local-pr-title-normalizer.yml,
-│   │     local-pending-release-reminder.yml, local-v4-bootstrap.yml
+│   │     local-pending-release-reminder.yml, local-v4-bootstrap.yml, local-feature-pr.yml
 │   │
-│   ├── workflow-ci.yml                          # CI entry point
-│   ├── workflow-release.yml                     # Release-PR entry point
-│   ├── workflow-publish.yml                     # Publish entry point
+│   ├── workflow-ci.yml                          # CI entry point (called by consumer ci.yml)
+│   ├── workflow-publish.yml                     # Publish entry point (called on release merge to master)
 │   ├── workflow-docker-publish.yml              # Docker publish entry point
 │   ├── workflow-sync-org-labels.yml             # Org label sync entry point
-│   ├── workflow-update-major-version-tags.yml
-│   ├── reusable-build-and-test.yml              # orchestrators (run_* gated)
-│   ├── reusable-release-management.yml
-│   ├── reusable-publishing.yml
+│   ├── workflow-update-major-version-tags.yml   # Floating-tag maintainer entry point
+│   ├── workflow-release.yml                     # Legacy v3 release-PR entry point (frozen)
+│   │
+│   ├── reusable-build-and-test.yml              # Lower-level building blocks
+│   ├── reusable-release-management.yml          #   (called by entry points;
+│   ├── reusable-publishing.yml                  #    gated by run_* boolean inputs)
 │   ├── reusable-tag-health.yml
 │   ├── reusable-coverage-badge.yml
 │   ├── reusable-coverage-pr-comment.yml
-│   ├── reusable-codeql.yml                      # 🆕 v3: CodeQL SAST
-│   ├── reusable-dependency-review.yml           # 🆕 v3: PR-time CVE diff
-│   ├── reusable-container-scan.yml              # 🆕 v3: Trivy
-│   ├── reusable-stale.yml                       # 🆕 v3: roll-our-own stale sweep
-│   ├── reusable-dependabot-auto-merge.yml       # 🆕 v3: Dependabot auto-merge
-│   ├── reusable-pr-labeler.yml                  # 🆕 v3: path-based PR labels
-│   ├── reusable-welcome.yml                     # 🆕 v3: first-time contributor welcome
-│   ├── reusable-bundle-size.yml                 # 🆕 v3: bundle-size diff on PRs
-│   ├── reusable-docs-publish.yml                # 🆕 v3: gh-pages docs publisher
-│   ├── reusable-release-notifier.yml            # 🆕 v3: Discord/Slack/webhook
-│   ├── reusable-branch-retention.yml            # 🆕 v3: prune merged branches
-│   └── reusable-cla.yml                         # 🆕 v3: CLA bot
+│   ├── reusable-codeql.yml                      # CodeQL SAST
+│   ├── reusable-dependency-review.yml           # PR-time CVE diff
+│   ├── reusable-container-scan.yml              # Trivy
+│   ├── reusable-stale.yml                       # Roll-our-own stale sweep
+│   ├── reusable-dependabot-auto-merge.yml       # Dependabot auto-merge (rebases into next/hotfixes)
+│   ├── reusable-pr-labeler.yml                  # Path-based PR labels
+│   ├── reusable-welcome.yml                     # First-time contributor welcome
+│   ├── reusable-bundle-size.yml                 # Bundle-size diff on PRs
+│   ├── reusable-docs-publish.yml                # gh-pages docs publisher
+│   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out
+│   ├── reusable-branch-retention.yml            # Prune merged branches
+│   └── reusable-cla.yml                         # CLA bot (central ledger, per-version signing)
 └── actions/                                     # reusable actions (Node)
     ├── common/  git/  github/  npm/  node/  docker/  coverage/  workflows/
-    └── community/                               # 🆕 v3: CLA, release notifier
-data/github-labels.json                          # org label catalog (5 new in v3)
-docs/conventions/branch-naming.md                # 🆕 v3: branch naming convention
-scripts/setup-org-rulesets.mjs                   # 🆕 v3: installer for naming Ruleset
+    └── community/                               # CLA, release notifier
+data/github-labels.json                          # org label catalog
+docs/conventions/                                # branch-naming, embedded-tests-ci, release-flow-v4
+docs/tools/ruleset-generator/                   # browser tool — emits master/next/hotfixes ruleset JSON
+scripts/setup-org-rulesets.mjs                  # one-shot installer for the org-wide branch-naming ruleset
 examples/
-├── guides/                                      # 🆕 v3: setup / dry-run / rolling-tag guides
+├── guides/                                      # setup, scaffolding, dry-run, and rolling-tag guides
+├── repo-seeds/.cla-signatures/                  # initial content for the org CLA-signatures ledger
 └── individual-repo-workflows/                   # copy-paste templates for consumers, grouped:
-    ├── core-cicd/         (ci, release, publish, update-major-version-tags)
-    ├── release-flow-v4/   (next-release, hotfixes-release, next-reset, hotfix-redirector, pr-title-normalizer, v4-bootstrap)
+    ├── core-cicd/         (ci, publish, update-major-version-tags; v3-only: release)
+    ├── release-flow-v4/   (next-release, hotfixes-release, next-reset, hotfix-redirector,
+    │                       pr-title-normalizer, feature-pr, v4-bootstrap)
     ├── release-companions/(tag-health, release-notify, master-commit-audit)
     ├── security/          (codeql, dependency-review, scorecard, cla)
-    ├── automation/        (dependabot-auto-merge, labeler, welcome, stale, branch-retention)
+    ├── automation/        (dependabot, dependabot-auto-merge, labeler, welcome, stale, branch-retention)
     └── packaging-docs/    (docker-publish, bundle-size, docs, sync-org-labels)
 ```
 
@@ -84,7 +93,7 @@ examples/
 - Contributors branch off **`next`** (features/fixes); urgent work goes on `hotfix/*` / `security/*` branches whose PRs are auto-redirected to the **`hotfixes`** lane.
 - One **persistent `next → master` release PR** (and one `hotfixes → master`) batches all accumulated commits into a single release; a maintainer clicks merge when ready.
 - After each release the integration branches auto-reset to `master` HEAD (hotfix releases merge `master` back into `next` to preserve in-flight work). The bot mutates the protected integration branches via the **REST API** — a bot-App `git push` is rejected by the ruleset even with bypass.
-- Branch protection is configured per-repo by importing rulesets from the **[ruleset generator](docs/tools/ruleset-generator/)** (`master` / `next` / `hotfixes`). The generator pre-adds the bot App to the `next` + `hotfixes` bypass lists (with an opt-out and an App-ID field); `master` is never given bot bypass.
+- Branch protection is configured per-repo by importing rulesets from the **[ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/)** (`master` / `next` / `hotfixes`). The generator pre-adds the bot App to the `next` + `hotfixes` bypass lists (with an opt-out and an App-ID field); `master` is never given bot bypass.
 - Bootstrap a repo with **`local-v4-bootstrap.yml`** (creates the integration branches, enables auto-merge, disables auto-delete-head-branches). Cutover steps: [docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md).
 
 **`@v3` (legacy, frozen):** the previous per-PR flow — every release-eligible PR carried its own `release: vX.Y.Z` version bump with an auto-pushed `chore: bump version` commit. Frozen at v3.8.1, unmaintained but available indefinitely; new repos should adopt `@v4`.
@@ -109,71 +118,45 @@ These `local-*.yml` workflows run the v4 flow **on this repo itself** — the en
 
 The other `local-*.yml` (`local-ci`, `local-codeql`, `local-labeler`, `local-welcome`, `local-stale`, `local-branch-retention`, `local-master-commit-audit`, `local-tag-health`) dogfood the reusable building blocks below, calling the matching `reusable-*.yml` (or an inline equivalent) on this repo's own events.
 
-## 🔧 Available Workflows
+## 🔧 Org entry-point workflows
+
+These `workflow-*.yml` files are what consumer repos invoke via `uses: CLDMV/.github/.github/workflows/<entry>.yml@v4`. Optional `enable_embedded_tests: true` on `workflow-ci.yml` runs a private test suite from a sibling repo via an anonymous gitlink — see [`docs/conventions/embedded-tests-ci.md`](docs/conventions/embedded-tests-ci.md).
 
 ### CI Workflow (`workflow-ci.yml`)
 
-- **Purpose**: CI testing and building for NPM packages.
-- **Triggers**: Push to any branch, PR to master/main.
+- **Purpose**: Test matrix + build for NPM packages. PR-time coverage commentary + on-default-branch coverage-badge publishing.
+- **Triggers** (in the consumer repo's `ci.yml`): push to feature/release branches, `pull_request_target` for fork PRs.
 - **Usage**: `CLDMV/.github/.github/workflows/workflow-ci.yml@v4`
 - **Optional**: `enable_embedded_tests: true` runs a private test suite from a separate private repo linked via an anonymous gitlink (typically at `tests/`). See [`docs/conventions/embedded-tests-ci.md`](docs/conventions/embedded-tests-ci.md).
 
-### Release Workflow (`workflow-release.yml`)
-
-- **Purpose**: Creates release PRs from release commits, with changelog generation.
-- **Triggers**: Push to non-master/main branches (when you push `release:` or `release!:` commits).
-- **Dry Run Support**: Validate the entire release process without making changes.
-- **Usage**: `CLDMV/.github/.github/workflows/workflow-release.yml@v4`
-
-#### 🧪 Dry Run Mode
-
-The release workflow validates the entire release process without making changes:
-
-**Validates**: release commit detection, version calculation/bumping, build and
-test, changelog generation, and all prerequisites for PR creation.
-
-**Skips**: package.json version updates, git commit creation, pull request creation.
-
 ### Publish Workflow (`workflow-publish.yml`)
 
-- **Purpose**: Publishes packages to NPM / GitHub Packages and creates GitHub releases.
-- **Triggers**: PR closed on master (when release PRs are merged).
-- **Dry Run Support**: Validate the entire publishing pipeline without publishing.
+- **Purpose**: When a release PR merges into `master`, build + test, publish to NPM and/or GitHub Packages, then create the signed `vX.Y.Z` tag and GitHub Release.
+- **Triggers** (in the consumer repo's `publish.yml`): push to default branch with a release-merge commit.
+- **Dry-run**: see [`examples/guides/DRY-RUN-GUIDE.md`](examples/guides/DRY-RUN-GUIDE.md). Validates the full pipeline (auth, prerequisites, version metadata) without actually publishing or tagging.
 - **Usage**: `CLDMV/.github/.github/workflows/workflow-publish.yml@v4`
-
-#### 🧪 Dry Run Mode
-
-**Validates**: build and test, NPM and GitHub Packages authentication/commands,
-GitHub release prerequisites, package version and metadata.
-
-**Skips**: actual NPM/GitHub Packages publishing, GitHub release creation, git
-tag creation.
 
 ### Update Major Version Tags Workflow (`workflow-update-major-version-tags.yml`)
 
-- **Purpose**: Maintains rolling major/minor version tags (e.g. `v1`, `v1.2`).
-- **Triggers**: New release published or semantic version tag pushed.
+- **Purpose**: Rolls the floating `vX` / `vX.Y` tags onto each new pinned `vX.Y.Z` release so consumers pinning `@v4` automatically track the latest.
+- **Triggers** (in the consumer repo): `release:published` and semver-tag push.
 - **Usage**: `CLDMV/.github/.github/workflows/workflow-update-major-version-tags.yml@v4`
 
 ### Tag Health Workflow (`reusable-tag-health.yml`)
 
-- **Purpose**: Tag maintenance and health monitoring for Git repositories.
-- **Triggers**: Manual dispatch, tag push events, scheduled maintenance.
+- **Purpose**: Validates and repairs tag health — fixes bot signature drift, re-signs unsigned tags, recreates orphaned tags for GitHub Releases, relocates tags pointing at orphaned commits, maintains rolling major/minor references.
+- **Triggers** (in the consumer repo's `tag-health.yml`): weekly cron + manual dispatch.
 - **Usage**: `CLDMV/.github/.github/workflows/reusable-tag-health.yml@v4`
 
-#### 🏥 Health Check Operations
+### Release Workflow (`workflow-release.yml`) — legacy v3 only
 
-1. **🔍 Validation** — ensures a pushed tag is reachable from main/master.
-2. **🏷️ Bot Signature Fixes** — recreates tags with incorrect author signatures.
-3. **✍️ Unsigned Tag Fixes** — adds GPG signatures to unsigned tags.
-4. **🔗 Orphaned Release Fixes** — recreates missing tags for GitHub releases.
-5. **🚨 Orphaned Tag Fixes** — relocates tags pointing at orphaned commits.
-6. **📈 Major/Minor Updates** — maintains rolling version references.
-7. **🔄 Token Management** — coordinates App-token authentication throughout.
+- **Purpose**: The v3 per-PR release model — emits release PRs when commits with `release:` / `release!:` prefixes are pushed. **In v4, this workflow isn't used.** v4 consumers use the staging-branch flow ([above](#-release-flow--v4-current)): `next-release.yml` / `hotfixes-release.yml` open the release PRs from accumulated commits, no `release:` commits required.
+- **Triggers** (consumer's `release.yml`): push of `release:` / `release!:` commits to a non-default branch.
+- **Usage**: not part of the v4 setup. The workflow is frozen at the final v3 release line for repos that haven't migrated; new repos using v4 should skip this workflow entirely.
 
 ## 🧩 Reusable building blocks (consumer-facing)
 
-Reusable `workflow_call` jobs — introduced in v3, current on `@v4`. Each has a copy-paste template in `examples/individual-repo-workflows/`.
+Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/individual-repo-workflows/`](examples/individual-repo-workflows/).
 
 | Workflow | Purpose |
 |---|---|
@@ -204,7 +187,13 @@ The jobs themselves delegate to actions under `.github/actions/`
 
 ## 📖 Documentation
 
-- **[examples/](examples/)** — usage examples and setup guides.
+- **[examples/](examples/)** — copy-paste workflow templates + onboarding guides.
+- **[examples/guides/AGENT-SCAFFOLDING.md](examples/guides/AGENT-SCAFFOLDING.md)** — point an AI agent at this to scaffold the whole workflow set end-to-end into a new consumer repo.
+- **[examples/guides/WORKFLOW-SETUP-GUIDE.md](examples/guides/WORKFLOW-SETUP-GUIDE.md)** — per-template setup reference for humans: what each workflow does, required scripts, required secrets, prerequisites.
+- **[docs/conventions/release-flow-v4.md](docs/conventions/release-flow-v4.md)** — the full v4 staging-branch release-flow design.
+- **[docs/conventions/branch-naming.md](docs/conventions/branch-naming.md)** — branch-prefix conventions enforced by the org ruleset.
+- **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
+- **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.
 - **[.github/actions/README.md](.github/actions/README.md)** — how the actions are structured.
 - **[.github/instructions/repo-conventions.instructions.md](.github/instructions/repo-conventions.instructions.md)** — tag, signing, API-version, and secret-naming rules.
 
