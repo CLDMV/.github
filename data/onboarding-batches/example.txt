@@ -1,0 +1,21 @@
+# Example onboarding batch.
+#
+# One `owner/name` per line. Blank lines and `#` comments are allowed.
+# Pass to `local-org-onboarding.yml` via the `repos_file` input — e.g.
+# `data/onboarding-batches/example.txt` — or paste the list inline as `repos`.
+#
+# Triage each repo before adding it: clean up dirt heads, merge in-flight
+# PRs, confirm master is current. The fanout is idempotent (re-run safe),
+# but it overwrites diverged settings/rulesets with the baseline.
+#
+# Recommended workflow:
+#   1. Copy this file to `batch-N.txt` (or any name you'll dispatch against).
+#   2. Add the ready repos one per line.
+#   3. Dispatch the workflow with `dry_run: true`, `repos_file: data/onboarding-batches/batch-N.txt`.
+#   4. Review the per-repo run summaries — every divergence the bootstrap
+#      would overwrite is listed as a warning.
+#   5. Re-dispatch with `dry_run: false` to apply.
+
+# Examples (delete these lines in your real batch file):
+# CLDMV/slothlet
+# CLDMV/some-other-repo

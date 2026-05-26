@@ -194,16 +194,23 @@ If the consumer's source layout differs from the org default (`src/`-centric), c
 
 You cannot do these from the CLI. Report them all at the end of your scaffolding run as a single checklist.
 
-### One-time v4 setup (in order, after the scaffold PR is merged to `master`/`main`)
+### One-time v4 setup (after the scaffold PR is merged to `master`/`main`)
 
-- [ ] **Dispatch `v4-bootstrap.yml`** from the Actions tab — `dry_run: true` first to preview, then `dry_run: false` to apply. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
-- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
-- [ ] **Add the bot App to the bypass list** on the `next` + `hotfixes` rulesets (the generator pre-adds CLDMV's bot App ID by default; if you opted out, do it by hand here). The bot mutates `next`/`hotfixes` via the REST API on every release — without bypass, GitHub rejects with `GH013`. `master` does **not** get bot bypass.
+**Two ways to run it — pick one:**
 
-### Repo settings (Settings tab)
+- **Org-wide fanout (recommended for ≥3 repos):** add this repo to a batch file in `CLDMV/.github/data/onboarding-batches/`, then dispatch `local-org-onboarding.yml` from the `CLDMV/.github` Actions tab with `dry_run: true` (preview), then `dry_run: false` (apply). One run handles N repos in parallel.
+- **Per-repo dispatch (one-offs):** in this repo's Actions tab, dispatch `v4-bootstrap.yml` with `dry_run: true`, then `dry_run: false`.
 
-- [ ] **Settings → Actions → General → Fork pull request workflows from outside collaborators** → set to "Require approval for all outside collaborators"
-- [ ] Branch protection is handled by the rulesets above; no per-branch rule needed.
+Either path applies the same baseline (idempotent, re-run safe, overwrite-with-warn):
+
+- `next` + `hotfixes` branches created from master HEAD if missing
+- Repo settings flipped to v4 defaults (allow_auto_merge, delete_branch_on_merge=false, merge methods, etc.)
+- Security toggles enabled (Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting)
+- Three rulesets installed (`Protect Master`, `Protect Next`, `Protect Hotfixes`) — bot App pre-added to next/hotfixes bypass
+
+### Repo settings (still requires the GitHub UI — no API)
+
+- [ ] **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators". There's no public REST API for this knob.
 
 ### Secrets to add (Settings → Secrets and variables → Actions)
 
