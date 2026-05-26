@@ -265,6 +265,52 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
  * @param {string} commitRange - "base..head" string.
  * @returns {Array}
  */
+/**
+ * Drop merge commits from the changelog list. Under v4's merge-commit-only
+ * policy on `next`/`hotfixes`, every merged PR leaves both a merge commit
+ * (with a subject like `<PR title> (#N)`) AND the original commits intact
+ * on the target branch. The merge commit is structural — it joins the two
+ * histories — but it isn't a real change-bearing commit; the contributor's
+ * original commits are what describe the change. Listing both produces the
+ * duplicated lines we see in release PR bodies today.
+ *
+ * Identifies merge commits via `git rev-parse --no-merges` — or equivalently
+ * `git log --merges --format=%H <range>` to enumerate the merges then filter
+ * those SHAs out of the commits array. One git call total.
+ *
+ * Best-effort: any failure returns the input commits unchanged and logs a
+ * warning. Runs before augmentCommitsWithPRRefs so the merge commits don't
+ * cost API lookups.
+ *
+ * @param {Array} commits
+ * @param {string} commitRange - "base..head" string for the merge enumeration.
+ * @returns {Array}
+ */
+function filterMergeCommits(commits, commitRange) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!commitRange || !commitRange.includes("..")) return commits;
+	try {
+		const out = gitCommand(`git log --merges --format=%H ${commitRange}`, true);
+		const mergeSet = new Set(
+			String(out)
+				.split("\n")
+				.map((s) => s.trim())
+				.filter(Boolean)
+		);
+		if (mergeSet.size === 0) return commits;
+		const kept = commits.filter((c) => {
+			const sha = c?.hash || c?.sha;
+			if (!sha) return true;
+			return !mergeSet.has(sha);
+		});
+		console.log(`🌳 Dropped ${commits.length - kept.length} merge commit(s) from changelog.`);
+		return kept;
+	} catch (err) {
+		console.log(`⚠️ Merge-commit filter skipped: ${err.message}`);
+		return commits;
+	}
+}
+
 function filterAlreadyAppliedByPatchId(commits, commitRange) {
 	if (!Array.isArray(commits) || commits.length === 0) return commits;
 	if (!commitRange || !commitRange.includes("..")) return commits;
@@ -797,6 +843,12 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// upstream bot bumps. The PR title communicates the version; the section
 	// bodies should describe the human-authored changes, nothing else.
 	commits = filterBotCommits(commits);
+
+	// Drop merge commits — they're structural artifacts of the v4
+	// merge-commit-only policy on next/hotfixes, not real change-bearing
+	// commits. The contributor's original commits already describe the
+	// change; listing the merge commit too duplicates every entry.
+	commits = filterMergeCommits(commits, range);
 
 	// Drop commits whose patch is already on the base branch. Happens for
 	// stacked PRs targeting `next`/`hotfixes`: an earlier PR in the stack
