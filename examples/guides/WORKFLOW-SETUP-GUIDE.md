@@ -394,7 +394,7 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
 
 **Required secrets** — bot App credentials.
 
-**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). Branch protection on `next` and `hotfixes` with required CI status checks — the action refuses to merge into an unprotected branch.
+**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). The `next` and `hotfixes` rulesets (imported from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/)) already require `✅ Required PR Check`, which GitHub treats as branch protection for the auto-merge prerequisite — no separate classic branch-protection rule needed.
 
 **Key inputs** — `bump_types` (default `patch,minor`), `merge_method` (default `squash`), `also_for_actors` (extend to Renovate or other bots).
 
@@ -567,7 +567,7 @@ Templates not in this table (`codeql.yml`, `dependency-review.yml`, `scorecard.y
 
 These come up across multiple workflows — set them once per repo:
 
-- **Branch protection** on `master`/`main` with required CI status check (`✅ Required PR Check` from `ci.yml`).
+- **Rulesets** — import `master` / `next` / `hotfixes` from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) (or copy from this repo's [`data/rulesets/`](https://github.com/CLDMV/.github/tree/master/data/rulesets)). All three already require `✅ Required PR Check` from `ci.yml`; no separate classic branch-protection rule is needed.
 - **Settings → Actions → "Require approval for outside collaborators"** to control fork-PR runs.
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml` (auto-enabled by `v4-bootstrap.yml`).
 - **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
