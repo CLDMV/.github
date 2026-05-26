@@ -91,6 +91,6 @@ CLA acceptances need to survive forever, independent of any individual project's
 - A single signature covers every CLDMV repo, so a contributor signs once per CLA version, not once per PR.
 - Contributor metadata (especially commit-author emails) stays out of public, searchable indexes.
 
-## License
+## Rights
 
-The audit and verification tooling in this repository is licensed under [Apache-2.0](LICENSE). The signature records themselves are legal artifacts of the agreements they document and are not separately licensed.
+All contents of this repository are © CLDMV. All rights reserved. No license is granted for any use of this repository's contents beyond CLDMV's internal purposes. The signature records are legal artifacts of the agreements they document; the CLA texts in `cla-versions/` are binding documents whose terms are governed by the agreements themselves, not by any open-source license applied to this repository.

@@ -294,9 +294,9 @@ The bot's acknowledgment comment on the PR is the contributor's receipt — it c
 
 **Required secrets** — bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for commit attribution on the ledger writes. Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY` override the general bot identity for the CLA workflow only.
 
-**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (to write signature files). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). `CLA.md` in this `.github` repo is the canonical working copy and feeds the SHA-256 captured in each signature.
+**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (to write signature files). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). A public sample CLA — what consumer repos copy from when they need a local `CLA.md` — is published at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). This `.github` repo deliberately has no root-level `CLA.md` — if it did, the bot would pick it up as a fallback CLA source.
 
-**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — normalized to `major.minor` internally; patch-level changes don't trigger re-signing, see [`CLA.md`](../../CLA.md) §7). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location.
+**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — normalized to `major.minor` internally; patch-level changes don't trigger re-signing, see [`VERSIONING.md`](../repo-seeds/.cla-signatures/VERSIONING.md) in the seed). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location.
 
 ---
 
@@ -482,7 +482,7 @@ These come up across multiple workflows — set them once per repo:
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml`.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
-- **`CLA.md`** at repo root — required by `cla.yml`. The canonical working copy lives in `CLDMV/.github`; consumer repos that want their own local copy can mirror it, but it's not required since the bot computes the SHA from `CLA.md` in the consumer repo's checkout. Set `cla_path:` if your CLA file lives elsewhere.
+- **`CLA.md`** at repo root — required by `cla.yml` until [branch 1 of the in-flight refactor](#-cla-bot) lands the ledger-direct read. Today the bot computes the SHA from the consumer repo's own `CLA.md`. Copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md). Set `cla_path:` if your CLA file lives elsewhere.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
 - **`.github/release-notifier.yml`** — required by `release-notify.yml` to define channels.
