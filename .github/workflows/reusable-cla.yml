@@ -8,10 +8,18 @@
 #
 
 # CLA bot (org-level, reusable).
-# Per-PR signing model. Org members are exempt via /orgs/{org}/members lookup.
-# Same-repo PRs get an empty signed commit recording the signature; fork PRs
-# get an acknowledgment comment (since the bot can't push to the fork).
-# Batch 1.1 from tmp/plan-future-workflows.md.
+#
+# Per-CLA-version, org-wide signing model. A contributor signs once for a
+# given CLA major.minor; their signature applies to every consumer repo
+# until the CLA's major.minor is bumped. Org members are exempt via
+# /orgs/{org}/members lookup. Records live in the central ledger repo
+# (default: CLDMV/.cla-signatures) as immutable JSON files.
+#
+# Two secret pairs:
+#   - BOT_APP_CLIENT_ID / BOT_APP_PRIVATE_KEY: required; the general org bot
+#   - CLA_BOT_APP_CLIENT_ID / CLA_BOT_APP_PRIVATE_KEY: optional override
+#     that, when both are set, takes precedence. Useful if you want a
+#     dedicated CLA-bot identity in the audit trail.
 name: 📜 CLA (Org-Level)
 
 on:
@@ -20,6 +28,7 @@ on:
             cla_version:
                 required: true
                 type: string
+                description: "CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
             cla_path:
                 required: false
                 type: string
@@ -39,38 +48,63 @@ on:
             required_text_template:
                 required: false
                 type: string
-                default: "I have read and I agree to the CLA v${cla_version}"
+                default: "I have read and I agree to the CLA ${cla_version}"
+            ledger_repo:
+                required: false
+                type: string
+                default: "CLDMV/.cla-signatures"
+                description: "owner/name of the central CLA signatures ledger repo"
+            ledger_platform:
+                required: false
+                type: string
+                default: "github"
         secrets:
             BOT_APP_CLIENT_ID:
                 required: true
             BOT_APP_PRIVATE_KEY:
                 required: true
+            CLA_BOT_APP_CLIENT_ID:
+                required: false
+            CLA_BOT_APP_PRIVATE_KEY:
+                required: false
             TAGGER_NAME:
                 required: false
             TAGGER_EMAIL:
                 required: false
 
 permissions:
-    contents: write
+    contents: read
     pull-requests: write
     statuses: write
     issues: write
 
 jobs:
     check:
-        # Runs on PR events (opened/synchronize/reopened/etc)
+        # Runs on PR events (opened/synchronize/reopened/etc) — uses
+        # pull_request_target so fork PRs get full permissions + secrets.
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         runs-on: ubuntu-latest
         steps:
+            - name: Validate CLA bot credentials are paired
+              shell: bash
+              env:
+                  CLA_ID: ${{ secrets.CLA_BOT_APP_CLIENT_ID }}
+                  CLA_KEY: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
+              run: |
+                  if { [[ -n "$CLA_ID" && -z "$CLA_KEY" ]] || [[ -z "$CLA_ID" && -n "$CLA_KEY" ]]; }; then
+                      echo "::error::CLA_BOT_APP_CLIENT_ID and CLA_BOT_APP_PRIVATE_KEY must be set together (or both unset)."
+                      exit 1
+                  fi
+
             - name: Create App token
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  client_id: ${{ secrets.CLA_BOT_APP_CLIENT_ID || secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY || secrets.BOT_APP_PRIVATE_KEY }}
               env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLA_BOT_APP_CLIENT_ID || secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY || secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: CLA check
               uses: CLDMV/.github/.github/actions/community/jobs/cla-check@v4
@@ -81,28 +115,36 @@ jobs:
                   exempt_org_members: ${{ inputs.exempt_org_members }}
                   exempt_org: ${{ inputs.exempt_org }}
                   required_text_template: ${{ inputs.required_text_template }}
+                  ledger_repo: ${{ inputs.ledger_repo }}
+                  ledger_platform: ${{ inputs.ledger_platform }}
                   github_token: ${{ steps.app-token.outputs.token }}
 
     record:
-        # Runs on issue_comment events
+        # Runs on issue_comment events — no git checkout needed since the
+        # record action writes to the ledger repo via the Contents API.
         if: github.event_name == 'issue_comment' && github.event.action == 'created'
         runs-on: ubuntu-latest
         steps:
+            - name: Validate CLA bot credentials are paired
+              shell: bash
+              env:
+                  CLA_ID: ${{ secrets.CLA_BOT_APP_CLIENT_ID }}
+                  CLA_KEY: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
+              run: |
+                  if { [[ -n "$CLA_ID" && -z "$CLA_KEY" ]] || [[ -z "$CLA_ID" && -n "$CLA_KEY" ]]; }; then
+                      echo "::error::CLA_BOT_APP_CLIENT_ID and CLA_BOT_APP_PRIVATE_KEY must be set together (or both unset)."
+                      exit 1
+                  fi
+
             - name: Create App token
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  client_id: ${{ secrets.CLA_BOT_APP_CLIENT_ID || secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY || secrets.BOT_APP_PRIVATE_KEY }}
               env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-            # Need git for signing same-repo PRs (the record action pushes a commit)
-            - name: Checkout (default; refs fetched in action)
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
-              with:
-                  fetch-depth: 0
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLA_BOT_APP_CLIENT_ID || secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY || secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: CLA record
               uses: CLDMV/.github/.github/actions/community/jobs/cla-record@v4
@@ -110,6 +152,8 @@ jobs:
                   cla_version: ${{ inputs.cla_version }}
                   cla_path: ${{ inputs.cla_path }}
                   required_text_template: ${{ inputs.required_text_template }}
+                  ledger_repo: ${{ inputs.ledger_repo }}
+                  ledger_platform: ${{ inputs.ledger_platform }}
                   github_token: ${{ steps.app-token.outputs.token }}
               env:
                   TAGGER_NAME: ${{ secrets.TAGGER_NAME }}

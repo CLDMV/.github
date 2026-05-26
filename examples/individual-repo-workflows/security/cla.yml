@@ -9,17 +9,20 @@
 
 # Individual repo: .github/workflows/cla.yml
 #
-# Per-PR CLA signing. Each commit author must either:
+# Per-CLA-version, org-wide signing. Each commit author must either:
 #   - Be in the org (silent pass via /orgs/CLDMV/members lookup)
 #   - Be in the exempt-bots list
-#   - Reply on this PR with the exact required text
+#   - Already have a signature record for the current CLA major.minor in
+#     the central ledger repo (default: CLDMV/.cla-signatures)
+#   - Reply on this PR with the exact required text (one-time per version,
+#     applies across all CLDMV repos)
 #
 # Required setup:
-#   - Bot App must have `Organization permissions → Members: read` so
-#     the org-member exemption works.
-#   - CLA.md must exist in this repo (or in the org repo + linked).
-#
-# Batch 1.1 from tmp/plan-future-workflows.md.
+#   - Bot App must have `Organization permissions → Members: read` for the
+#     org-member exemption.
+#   - Bot App must have `Repository contents: write` on the ledger repo.
+#   - Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY`
+#     org secrets override the general bot identity for CLA actions only.
 name: 📜 CLA
 
 on:
@@ -29,7 +32,7 @@ on:
         types: [created]
 
 permissions:
-    contents: write
+    contents: read
     pull-requests: write
     statuses: write
     issues: write
@@ -38,9 +41,11 @@ jobs:
     cla:
         uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v4
         with:
-            cla_version: "1.0.0"
+            cla_version: "1.0"
         secrets:
             BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
             BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            CLA_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_CLA_BOT_APP_CLIENT_ID }}
+            CLA_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_CLA_BOT_APP_PRIVATE_KEY }}
             TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
             TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

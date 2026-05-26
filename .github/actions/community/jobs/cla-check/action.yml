@@ -8,32 +8,43 @@
 #
 
 name: "CLA Check"
-description: "On PR event: enumerate commit authors, check each is covered (org member, exempt bot, or already signed via comment/commit). Post request comment if any are missing; write a status check either way. Batch 1.1."
+description: "On PR event: enumerate commit authors and check each is covered (exempt bot, org member, or has a signature record in the central ledger). Post or update a request comment when any author is missing; post a status check either way."
 
 inputs:
   cla_version:
     required: true
-    description: "Current CLA version string (must match the text in cla_path)"
+    description: "Current CLA version (e.g. '1.0' or '1.0.0'). Normalized to major.minor internally."
   cla_path:
     required: false
     default: "CLA.md"
-    description: "Path to CLA text (used to compute hash + link)"
+    description: "Path to the CLA text in the consumer repo (used to compute hash for display)"
   exempt_users:
     required: false
     default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
-    description: "Comma-sep logins always exempt"
+    description: "Comma-separated logins always exempt"
   exempt_org_members:
     required: false
     default: "true"
+    description: "When 'true', skip CLA enforcement for users who are active members of `exempt_org`"
   exempt_org:
     required: false
     default: ${{ github.repository_owner }}
+    description: "Organization whose members are exempted (defaults to the repository owner)"
   required_text_template:
     required: false
-    default: "I have read and I agree to the CLA v${cla_version}"
+    default: "I have read and I agree to the CLA ${cla_version}"
+    description: "Template for the required acceptance text. ${cla_version} expands to the normalized major.minor (e.g. 'v1.0')."
+  ledger_repo:
+    required: false
+    default: "CLDMV/.cla-signatures"
+    description: "owner/name of the central CLA signatures ledger repository"
+  ledger_platform:
+    required: false
+    default: "github"
+    description: "Platform bucket inside the ledger (currently only 'github' is supported)"
   github_token:
     required: true
-    description: "App token; needs `members: read` org-level for org-member lookup"
+    description: "App token; needs `members: read` org-level for org-member exemption and `contents: read` on the ledger repo"
 
 runs:
   using: node24
