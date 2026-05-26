@@ -1,5 +1,5 @@
 name: "Redirect Hotfix PR"
-description: "Change a PR's base branch from the default ('next' under v4) to 'hotfixes' when the head branch matches a hotfix/security pattern. Idempotent; skips bot-created PRs and PRs already targeting the hotfixes branch."
+description: "Change a PR's base branch from the default ('next' under v4) to 'hotfixes' when either: (a) the head branch matches a hotfix/security pattern, or (b) the PR is a Dependabot security advisory update (author = dependabot[bot] AND body references a GHSA advisory). Routine Dependabot bumps without GHSA references still skip. Idempotent; skips PRs already targeting the hotfixes branch."
 
 inputs:
   pr-number:

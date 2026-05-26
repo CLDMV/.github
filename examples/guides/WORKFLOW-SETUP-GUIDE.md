@@ -15,7 +15,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Release flow v4 | [Next Release](#-next-release-v4) | `release-flow-v4/next-release.yml` | push to `next` | Refreshes persistent `next → master` release PR |
 | Release flow v4 | [Hotfixes Release](#-hotfixes-release-v4) | `release-flow-v4/hotfixes-release.yml` | push to `hotfixes` | Refreshes persistent `hotfixes → master` release PR |
 | Release flow v4 | [Next/Hotfixes Reset](#-nexthotfixes-reset-v4) | `release-flow-v4/next-reset.yml` | push to `master` (release commit) | Re-syncs integration branches after a release |
-| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs onto `hotfixes` |
+| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs **and Dependabot security updates** onto `hotfixes` |
 | Release flow v4 | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer) | `release-flow-v4/pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to conventional-commit shape |
 | Release flow v4 | [v4 Bootstrap](#-v4-bootstrap) | `release-flow-v4/v4-bootstrap.yml` | manual dispatch | Creates `next` + `hotfixes`; configures repo for v4 |
 | Release companions | [Tag Health](#-tag-health) | `release-companions/tag-health.yml` | weekly cron + dispatch | Validates / repairs tags |
@@ -156,7 +156,12 @@ A `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling 
 
 **File:** `release-flow-v4/hotfix-redirector.yml` &nbsp;·&nbsp; **Calls:** `redirect-hotfix-pr@v4`
 
-When a PR opens from a `hotfix/*` or `security/*` head branch, retargets it onto the `hotfixes` integration branch. API-only (`pull_request_target` without checkout — safe).
+Retargets a PR onto the `hotfixes` integration branch on `opened`, under either trigger:
+
+- **Head branch matches `hotfix/*` or `security/*`** — the original human-driven hotfix flow.
+- **Dependabot security update** — author is `dependabot[bot]` AND the PR body references a GHSA security advisory (either a `GHSA-XXXX-XXXX-XXXX` id or a `github.com/advisories/GHSA-…` URL). Dependabot's routine bumps don't reference GHSAs, so this cleanly separates security updates (→ `hotfixes`) from regular bumps (stay on `next`).
+
+API-only (`pull_request_target` without checkout — safe). Idempotent (skips PRs already on `hotfixes`). Posts a one-time explanatory comment with the relevant reason.
 
 **Required `package.json` scripts** — none.
 

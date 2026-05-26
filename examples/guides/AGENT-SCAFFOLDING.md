@@ -302,7 +302,7 @@ If steps 5–6 work, the v4 flow is wired correctly.
 6. **`package-name` placeholder left as `@your-org/your-package`** in `next-release.yml` / `hotfixes-release.yml` — release-PR creation fails ("package not found on npm"). Solution: search/replace the placeholder.
 7. **Coverage badge secrets missing but `enable_coverage_badge: true`** — coverage-publish step silently downgrades to `github-actions[bot]` and may fail on signed-commit policies. Solution: add the four `CLDMV_BOT_*` GPG secrets OR set `enable_coverage_badge: false`.
 8. **`next-release.yml` doesn't fire on first push to `next`** — likely `v4-bootstrap.yml` wasn't dispatched, or the bot App isn't in the `next` ruleset bypass (the chore-bump push to `next` is then rejected with `GH013`).
-9. **PR opened into `master` instead of `next`** — that bypasses the v4 batching. Either retarget the PR to `next` or rebase onto `next` and re-open. (Hotfix/security branches are auto-redirected to `hotfixes` by `hotfix-redirector.yml`; feature branches are not.)
+9. **PR opened into `master` instead of `next`** — that bypasses the v4 batching. Either retarget the PR to `next` or rebase onto `next` and re-open. (Hotfix/security branches and Dependabot security-advisory PRs are auto-redirected to `hotfixes` by `hotfix-redirector.yml`; routine feature/Dependabot-bump PRs are not.)
 10. **`v3` per-PR `release.yml` left installed alongside v4** — both flows fire on a `release:` commit and create competing release PRs. Solution: delete `release.yml` (the v4 flow replaces it).
 
 ---
