@@ -111,17 +111,26 @@
 		// gate, so the Copilot opt-in (and code-scanning, status checks)
 		// belong here — not on master.
 		//
-		// Both rebase and squash are allowed; rebase is listed first so it's
-		// the default merge-button selection. Rebase preserves individual
-		// commits with GitHub auto-appending (#N) to each subject — that's
-		// the desired flow. Squash is kept as a fallback for unusual cases
-		// (e.g. a PR with many "fix typo" commits the maintainer wants
-		// collapsed).
+		// **Merge-commit only.** GitHub's "Rebase and merge" web-UI button
+		// re-creates the PR's commits server-side and does NOT preserve
+		// their GPG signatures — every rebased commit lands unsigned, even
+		// when the source PR's commits were all signed (documented limitation).
+		// "Create a merge commit" keeps the original commits intact
+		// (signatures and all) and adds a single merge commit on top.
+		//
+		// The merge-commit gives a slightly noisier git log on `next`, but
+		// that's invisible at the master level: master uses squash (above),
+		// which collapses the entire `next..master` range — merge commits
+		// included — into one clean signed commit per release.
+		//
+		// Squash is also off `next` so a maintainer doesn't accidentally
+		// squash a multi-commit PR (losing the individual signed commits)
+		// when they meant to preserve them.
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["rebase", "squash"] }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["merge"] }),
 			codeScanningRule(),
 			requiredStatusChecksRule()
 		];
@@ -137,12 +146,13 @@
 	}
 
 	function buildHotfix(opts) {
-		// Same rebase-first-with-squash-fallback policy as next.
+		// Same merge-commit-only policy as next: preserves the PR's signed
+		// commits intact. The master squash absorbs the merge-commit noise.
 		const rules = [
 			{ type: "deletion" },
 			{ type: "non_fast_forward" },
 			{ type: "required_signatures" },
-			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["rebase", "squash"] }),
+			pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["merge"] }),
 			{ type: "required_linear_history" },
 			codeScanningRule(),
 			requiredStatusChecksRule()

@@ -243,6 +243,55 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
  * @param {string} token - GitHub token.
  * @returns {Promise<number|null>}
  */
+/**
+ * Filter out commits whose patch content is already on the base branch.
+ *
+ * Stacked PRs that target `next`/`hotfixes` can carry commits that have
+ * since been merged into the target via earlier PRs — under "Create a
+ * merge commit" the original commits land on the target with their
+ * original SHAs preserved, so a simple `git log base..HEAD` range still
+ * includes them in subsequent stacked PRs because they're not in the
+ * old PR-branch's history.
+ *
+ * `git cherry <base> <head>` marks each commit in `base..head` with `+`
+ * (patch not yet on base) or `-` (patch already on base, by patch-id).
+ * Filtering out the `-` entries removes the duplicates from the rendered
+ * changelog body without depending on SHA equality.
+ *
+ * Best-effort: any failure (e.g. ranges that can't be cherry-checked)
+ * returns the input commits unchanged and logs a warning.
+ *
+ * @param {Array} commits
+ * @param {string} commitRange - "base..head" string.
+ * @returns {Array}
+ */
+function filterAlreadyAppliedByPatchId(commits, commitRange) {
+	if (!Array.isArray(commits) || commits.length === 0) return commits;
+	if (!commitRange || !commitRange.includes("..")) return commits;
+	const match = commitRange.match(/^(.+?)\.{2,3}(.+)$/);
+	if (!match) return commits;
+	const [, baseRef, headRef] = match;
+	try {
+		const out = gitCommand(`git cherry "${baseRef}" "${headRef}"`, true);
+		const alreadyApplied = new Set();
+		for (const line of String(out).split("\n")) {
+			const m = line.match(/^-\s+([0-9a-f]{7,40})/);
+			if (m) alreadyApplied.add(m[1]);
+		}
+		if (alreadyApplied.size === 0) return commits;
+		const kept = commits.filter((c) => {
+			const sha = c?.hash || c?.sha;
+			if (!sha) return true;
+			return !alreadyApplied.has(sha);
+		});
+		console.log(`🔁 Dropped ${commits.length - kept.length} commits already on ${baseRef} (by patch-id).`);
+		return kept;
+	} catch (err) {
+		console.log(`⚠️ Patch-id dedup skipped: ${err.message}`);
+		return commits;
+	}
+}
+
 async function findAssociatedPullNumber(sha, owner, repo, token) {
 	// Caller (augmentCommitsWithPRRefs) already validates sha/owner/repo/token,
 	// so no internal precondition check — CodeQL would flag it as dead code.
@@ -748,6 +797,16 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// upstream bot bumps. The PR title communicates the version; the section
 	// bodies should describe the human-authored changes, nothing else.
 	commits = filterBotCommits(commits);
+
+	// Drop commits whose patch is already on the base branch. Happens for
+	// stacked PRs targeting `next`/`hotfixes`: an earlier PR in the stack
+	// has merged via "Create a merge commit", so its commits are already
+	// on the target with their original SHAs, but they still appear in the
+	// later PR's base..HEAD range. Patch-id dedup (via `git cherry`)
+	// removes them from the rendered changelog without affecting the
+	// release-to-master changelog (where master has no equivalent patches
+	// for commits in master..next, so the dedup is a no-op there).
+	commits = filterAlreadyAppliedByPatchId(commits, range);
 
 	// Annotate each commit's subject with its associated PR reference
 	// `(#N)` whenever possible. Rebase-merged commits already carry the
