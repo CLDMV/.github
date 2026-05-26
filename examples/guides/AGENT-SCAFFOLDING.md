@@ -193,7 +193,7 @@ You cannot do these from the CLI. Report them all at the end of your scaffolding
 ### One-time v4 setup (in order, after the scaffold PR is merged to `master`/`main`)
 
 - [ ] **Dispatch `v4-bootstrap.yml`** from the Actions tab — `dry_run: true` first to preview, then `dry_run: false` to apply. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
-- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://github.com/CLDMV/.github/blob/master/docs/tools/ruleset-generator/index.html). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
+- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
 - [ ] **Add the bot App to the bypass list** on the `next` + `hotfixes` rulesets (the generator pre-adds CLDMV's bot App ID by default; if you opted out, do it by hand here). The bot mutates `next`/`hotfixes` via the REST API on every release — without bypass, GitHub rejects with `GH013`. `master` does **not** get bot bypass.
 
 ### Repo settings (Settings tab)
