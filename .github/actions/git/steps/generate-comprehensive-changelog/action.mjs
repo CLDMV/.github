@@ -244,7 +244,8 @@ function toGitHubMention(linkedAuthor, fallbackAuthor) {
  * @returns {Promise<number|null>}
  */
 async function findAssociatedPullNumber(sha, owner, repo, token) {
-	if (!sha || !owner || !repo || !token) return null;
+	// Caller (augmentCommitsWithPRRefs) already validates sha/owner/repo/token,
+	// so no internal precondition check — CodeQL would flag it as dead code.
 	try {
 		const prs = await api("GET", `/commits/${sha}/pulls`, null, { token, owner, repo });
 		if (Array.isArray(prs) && prs.length > 0 && typeof prs[0].number === "number") {
