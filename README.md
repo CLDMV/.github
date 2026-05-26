@@ -188,7 +188,7 @@ Reusable `workflow_call` jobs — introduced in v3, current on `@v4`. Each has a
 | `reusable-docs-publish.yml` | Build docs and push to `gh-pages` branch. |
 | `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook channels. Per-repo channel config merged with org default. |
 | `reusable-branch-retention.yml` | On PR merge: prune most head branches; keep last N of `release/*` / `hotfix/*`. |
-| `reusable-cla.yml` | Per-PR CLA signing via "I agree" comment. Org members exempt. |
+| `reusable-cla.yml` | Per-CLA-version, org-wide signing via "I agree" comment. Signatures recorded to the private `CLDMV/.cla-signatures` ledger; one signature covers every CLDMV repo until the CLA's `major.minor` is bumped. Org members exempt. |
 
 ## 🏗️ Orchestrator Pattern
 

@@ -24,7 +24,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Security | [CodeQL](#-codeql) | `security/codeql.yml` | push / PR / weekly cron | SAST via CodeQL |
 | Security | [Dependency Review](#-dependency-review) | `security/dependency-review.yml` | PR | Blocks PRs with high-severity new deps |
 | Security | [OpenSSF Scorecard](#-openssf-scorecard) | `security/scorecard.yml` | weekly + dispatch | Publishes OSSF Scorecard score |
-| Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Requires CLA from non-members |
+| Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
 | Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps |
 | Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
 | Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
@@ -286,15 +286,17 @@ Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:
 
 **File:** `security/cla.yml` &nbsp;·&nbsp; **Calls:** `reusable-cla.yml@v4`
 
-On every PR (including from forks), checks whether each commit author has signed the CLA. Non-members can sign by commenting `I have read the CLA Document and I hereby sign the CLA` on the PR. Org members and configured bots are exempt.
+On every PR (including from forks), checks whether each commit author has signed the current CLA version. Signing is per-CLA-version and org-wide: a contributor replies on their PR with the exact text `I have read and I agree to the CLA v<X.Y>` and the bot writes an immutable JSON signature record to the central ledger repo (private — `CLDMV/.cla-signatures`). That single signature covers every CLDMV repository and every future PR until the CLA's `major.minor` is bumped. Org members and configured bots are exempt; no per-PR or per-repo re-signing.
+
+The bot's acknowledgment comment on the PR is the contributor's receipt — it contains the `signature_id` (a SHA-256 anchor of the full record), the CLA version, and the CLA SHA-256. Because the ledger is private, the comment is the only contributor-facing copy of the receipt.
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — bot App credentials, plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for signed commit attribution on the CLA store.
+**Required secrets** — bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for commit attribution on the ledger writes. Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY` override the general bot identity for the CLA workflow only.
 
-**Prereqs** — the bot App must have Organization → Members: Read permission (to detect org members for exemption). `CLA.md` in the repo (or referenced from an org-wide repo).
+**Prereqs** — the bot App must have Organization → Members: read (to detect org members for exemption) and Contents: write on the `CLDMV/.cla-signatures` ledger repo (to write signature files). The ledger repo itself must exist and be seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/). `CLA.md` in this `.github` repo is the canonical working copy and feeds the SHA-256 captured in each signature.
 
-**Key inputs** — `cla_version` (default `1.0.0`; bump when the CLA text changes to invalidate prior signatures).
+**Key inputs** — `cla_version` (e.g. `"1.0"` or `"1.0.0"` — normalized to `major.minor` internally; patch-level changes don't trigger re-signing, see [`CLA.md`](../../CLA.md) §7). `ledger_repo` (default `CLDMV/.cla-signatures`) for orgs with a different ledger location.
 
 ---
 
@@ -450,6 +452,8 @@ The table below maps each template to the org/repo secrets it actually reference
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | `CLDMV_BOT_APP_CLIENT_ID` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `CLDMV_BOT_APP_PRIVATE_KEY` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `CLDMV_CLA_BOT_APP_CLIENT_ID` | — | — | — | — | — | — | ✓⁴ | — | — | — | — | — |
+| `CLDMV_CLA_BOT_APP_PRIVATE_KEY` | — | — | — | — | — | — | ✓⁴ | — | — | — | — | — |
 | `CLDMV_BOT_NAME` | ✓¹ | ✓² | ✓² | — | ✓ | — | ✓ | ✓ | — | — | — | — |
 | `CLDMV_BOT_EMAIL` | ✓¹ | ✓² | ✓² | — | ✓ | — | ✓ | ✓ | — | — | — | — |
 | `CLDMV_BOT_GPG_PRIVATE_KEY` | ✓¹ | ✓² | ✓² | — | ✓ | — | — | — | — | — | — | — |
@@ -459,6 +463,7 @@ The table below maps each template to the org/repo secrets it actually reference
 ¹ Required when `enable_coverage_badge: true` (the default — uncheck to skip)
 ² Required when `use_gpg: true`
 ³ Required when installing private deps from npm
+⁴ Optional CLA-only override; falls back to `CLDMV_BOT_APP_*` when unset. Set both halves together or both unset.
 
 Templates not in this table (`codeql.yml`, `dependency-review.yml`, `scorecard.yml`, `labeler.yml`, `welcome.yml`, `bundle-size.yml`, `master-commit-audit.yml`, `release-notify.yml`) need no secrets beyond the automatic `GITHUB_TOKEN`.
 
@@ -477,7 +482,8 @@ These come up across multiple workflows — set them once per repo:
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml`.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
-- **`CLA.md`** at repo root (or referenced from org repo) — required by `cla.yml`.
+- **`CLA.md`** at repo root — required by `cla.yml`. The canonical working copy lives in `CLDMV/.github`; consumer repos that want their own local copy can mirror it, but it's not required since the bot computes the SHA from `CLA.md` in the consumer repo's checkout. Set `cla_path:` if your CLA file lives elsewhere.
+- **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
 - **`.github/release-notifier.yml`** — required by `release-notify.yml` to define channels.
-- **Bot App permissions** — Contents: write, Pull-requests: write, Issues: write, Packages: write (for Docker), Org → Members: read (for CLA).
+- **Bot App permissions** — Contents: write, Pull-requests: write, Issues: write, Packages: write (for Docker), Org → Members: read (for CLA), plus Contents: write on `CLDMV/.cla-signatures` specifically (for CLA signature recording).

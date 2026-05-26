@@ -40,7 +40,7 @@ Ask the user these questions before touching any files. Use a single batched que
 | 3 | Does this repo ship a runtime bundle (`dist/`)? | bool | If yes, adopt `bundle-size.yml` |
 | 4 | Does this repo publish docs to a `gh-pages` branch? | bool | If yes, adopt `docs.yml` |
 | 5 | Is there a `Dockerfile` at the repo root that should publish to GHCR? | bool | If yes, adopt `docker-publish.yml` |
-| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml` (also requires `CLA.md` in repo) |
+| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml` (also requires `CLA.md` in repo and the org-wide ledger repo `CLDMV/.cla-signatures` to exist) |
 | 7 | Want Dependabot's patch/minor PRs auto-merged after CI passes? | bool | If yes, adopt `dependabot-auto-merge.yml` ("Allow auto-merge" is enabled by `v4-bootstrap.yml`) |
 | 8 | Want Discord/Slack release notifications? | bool | If yes, adopt `release-notify.yml` (also requires `.github/release-notifier.yml` + per-channel webhook secrets) |
 | 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
@@ -90,7 +90,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 3 | true | `bundle-size.yml` | `packaging-docs/bundle-size.yml` |
 | 4 | true | `docs.yml` | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent) |
 | 5 | true | `docker-publish.yml` | `packaging-docs/docker-publish.yml` |
-| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from `https://github.com/CLDMV/.github/blob/v4/CLA.md` and tell the user to do a legal review) |
+| 6 | true | `cla.yml` | `security/cla.yml` (also: ensure `CLA.md` exists at repo root; if missing, copy from `https://github.com/CLDMV/.github/blob/v4/CLA.md` and tell the user to do a legal review. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo) |
 | 7 | true | `dependabot-auto-merge.yml` | `automation/dependabot-auto-merge.yml` |
 | 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
@@ -149,7 +149,7 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
   min_node_version: ""
   ```
 - **`branch-retention.yml`** (from Q9): defaults already exempt `master, main, badges, gh-pages, next, hotfixes`. If the user listed extra patterns, append them: `exempt_patterns: '["master","main","badges","gh-pages","next","hotfixes","<their-branch>"]'`.
-- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from `https://raw.githubusercontent.com/CLDMV/.github/v4/CLA.md` and add a TODO in your final report: "user must review and adapt CLA.md for legal".
+- **`cla.yml`** (Q6): if `CLA.md` doesn't exist, copy from `https://raw.githubusercontent.com/CLDMV/.github/v4/CLA.md` and add a TODO in your final report: "user must review and adapt CLA.md for legal". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
 - **`release-notify.yml`** (Q8): create `.github/release-notifier.yml` with this stub:
   ```yaml
   channels:
@@ -227,10 +227,11 @@ For release notifications (REQUIRED if Q8 = true, one per channel):
 
 The CLDMV-bot App needs the following permissions added (request from org admin if you don't have access):
 
-- **Organization → Members: Read** — required for `cla.yml`
+- **Organization → Members: Read** — required for `cla.yml` (org-member exemption)
 - **Repository → Issues: Write** — `stale.yml`, `master-commit-audit.yml`, `welcome.yml`, `cla.yml`
-- **Repository → Pull requests: Write** — `labeler.yml`, `welcome.yml`, `dependabot-auto-merge.yml`, `next-release.yml`, `hotfixes-release.yml`, `pr-title-normalizer.yml`, `hotfix-redirector.yml`
-- **Repository → Contents: Write** — `branch-retention.yml`, `docs.yml`, `next-reset.yml`
+- **Repository → Pull requests: Write** — `labeler.yml`, `welcome.yml`, `dependabot-auto-merge.yml`, `next-release.yml`, `hotfixes-release.yml`, `pr-title-normalizer.yml`, `hotfix-redirector.yml`, `cla.yml`
+- **Repository → Statuses: Write** — `cla.yml` (status check posting)
+- **Repository → Contents: Write** — `branch-retention.yml`, `docs.yml`, `next-reset.yml`. Also on `CLDMV/.cla-signatures` specifically for `cla.yml` (signature record writes).
 - **Repository → Administration: Write** — `v4-bootstrap.yml` (toggles auto-merge / auto-delete-branches)
 - **Repository → Packages: Write** — `docker-publish.yml`
 
