@@ -46,8 +46,9 @@ Ask the user these questions before touching any files. Use a single batched que
 | 8 | Want Discord/Slack release notifications? | bool | If yes, adopt `release-notify.yml` (also requires `.github/release-notifier.yml` + per-channel webhook secrets) |
 | 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
 | 10 | Should the standard org-default labels be synced into this repo? | bool | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only) |
+| 11 | Does this repo have (or need) a private test suite pulled from a separate private repo via an anonymous gitlink (typically `tests/`)? | bool | If yes, set `enable_embedded_tests: true` on the `ci.yml` workflow call. Confirm the matching private repo exists per the URL-mapping convention (`<org>/<repo>-tests` for a `tests/` gitlink). See [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md). Independent of workflow adoption — it's a single input on the existing CI workflow. |
 
-Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #6b (CLA override), #10 (org labels) which default to false.
+Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #6b (CLA override), #10 (org labels), #11 (embedded private tests) which default to false.
 
 ---
 
@@ -96,6 +97,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 7 | true | `dependabot.yml` + `dependabot-auto-merge.yml` | Copy `automation/dependabot.yml` to `.github/dependabot.yml` (NOT `.github/workflows/`); copy `automation/dependabot-auto-merge.yml` to `.github/workflows/`. Customize `dependabot.yml` ecosystems for the user's stack (drop the npm block for non-Node repos; add gomod / pip / docker / etc. as needed). |
 | 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
+| 11 | true | (no new file) | Set `enable_embedded_tests: true` on the existing `ci.yml`'s workflow call. Confirm the matching private repo exists (`<org>/<repo>-tests` for `tests/`; or `<org>/<repo>-embedded` for the consolidated layout — see [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md)). Confirm the bot App has access to the private repo. |
 
 ### Always (security baseline — recommended for any OSS repo)
 

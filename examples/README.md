@@ -8,6 +8,7 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 - **[guides/WORKFLOW-SETUP-GUIDE.md](guides/WORKFLOW-SETUP-GUIDE.md)** — what each workflow does, which `package.json` scripts it requires, which secrets it needs, prerequisites. Start here when adding a workflow to a new repo by hand.
 - **[guides/DRY-RUN-GUIDE.md](guides/DRY-RUN-GUIDE.md)** — how to use dry-run mode on release and publish pipelines without making real changes.
 - **[guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md](guides/UPDATE-MAJOR-VERSION-TAGS-GUIDE.md)** — how the floating `vX` / `vX.Y` rolling tags are maintained.
+- **[../docs/conventions/embedded-tests-ci.md](../docs/conventions/embedded-tests-ci.md)** — opt-in feature on `ci.yml` to fetch a private test repo via anonymous gitlinks and run its suite alongside the public parent. For repos that ship public code but keep their full test suite (or vendored / license-restricted assets) in a separate private repo.
 - **[../docs/migration/v2-to-v3.md](../docs/migration/v2-to-v3.md)** — migration guide for consumers updating from v2 to v3.
 
 ## Template Catalog
