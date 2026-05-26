@@ -11,12 +11,15 @@
 #
 # v4 hotfix lane: retarget hotfix/security PRs to the `hotfixes` branch.
 #
-# When a PR opens from a `hotfix/*` or `security/*` head branch, change its
-# base to `hotfixes` so it joins the hotfix lane instead of the default base
-# (CLDMV/.github docs/conventions/release-flow-v4.md §5.2, §6.5). The
-# redirect-hotfix-pr action owns all the logic — it skips bot-authored PRs,
-# non-matching heads, and PRs already on `hotfixes`, and posts a one-time
-# explanatory comment.
+# Two paths trigger a redirect (CLDMV/.github docs/conventions/release-flow-v4.md §5.2, §6.5):
+#   1. Head branch matches `hotfix/*` or `security/*` (human-driven hotfix flow).
+#   2. Author is `dependabot[bot]` AND the PR body references a GHSA security
+#      advisory (Dependabot's security-update PRs flow into the hotfix lane;
+#      routine version bumps stay on `next`).
+#
+# The redirect-hotfix-pr action owns all detection logic — it skips non-matching
+# bot PRs, non-matching heads, and PRs already on `hotfixes`, and posts a
+# one-time explanatory comment with the appropriate reason.
 name: 🔀 Hotfix PR Redirector (v4)
 
 # SECURITY NOTE: pull_request_target runs in the BASE repo's context with

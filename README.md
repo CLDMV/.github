@@ -99,7 +99,7 @@ These `local-*.yml` workflows run the v4 flow **on this repo itself** — the en
 |---|---|---|
 | `local-next-release.yml` | push to `next` | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range. |
 | `local-hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
-| `local-hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs onto the `hotfixes` lane. |
+| `local-hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs **and Dependabot security-advisory PRs** onto the `hotfixes` lane. |
 | `local-pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
 | `local-next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via the **REST API** (gated on the released major tag); merges master into `next` after a hotfix release to preserve in-flight work. |
 | `local-publish.yml` | push to `master` (release merge) | Creates the signed `vX.Y.Z` tag + GitHub Release — no npm publish (this repo isn't a package) — which in turn fires the tag roller. |
