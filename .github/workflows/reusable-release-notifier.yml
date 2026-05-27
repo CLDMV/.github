@@ -1,35 +1,28 @@
 #
 # @Project: workflows
 # @Filename: /reusable-release-notifier.yml
-# @Date: 2026-05-19 00:00:00 -07:00 (1779519600)
+# @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# Release notifier (org-level, reusable).
-# Batch 6.2 from tmp/plan-future-workflows.md.
+# Release notifier (org-level, reusable). Fires on `release: published` and
+# routes the announcement to the matching set of (discord, slack, generic)
+# webhooks based on repo visibility (public vs private/internal).
+#
+# Channels are addressed by secret name — no config file. Set the org-level
+# secret for each channel you want active; unset secrets are silently skipped.
+# Per-repo override: set a repo secret with the same name (repo wins over org).
+# Repo mute: set the repo secret to an empty string.
+#
+# Secret naming: <TYPE>_RELEASES_<VIS>_WEBHOOK
+#   TYPE = DISCORD | SLACK | GENERIC
+#   VIS  = PUBLIC | PRIVATE
 name: 📣 Release Notifier (Org-Level)
 
 on:
     workflow_call:
-        inputs:
-            config_path:
-                required: false
-                type: string
-                default: ".github/release-notifier.yml"
-            default_config_repo:
-                required: false
-                type: string
-                default: "CLDMV/.github"
-            default_config_ref:
-                required: false
-                type: string
-                default: "v4"
-            default_config_path:
-                required: false
-                type: string
-                default: ".github/templates/release-notifier.default.yml"
 
 permissions:
     contents: read
@@ -38,18 +31,19 @@ jobs:
     notify:
         runs-on: ubuntu-latest
         steps:
-            - name: Dispatch release notifications
+            - name: Dispatch release notification
               uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
               with:
-                  config_path: ${{ inputs.config_path }}
-                  default_config_repo: ${{ inputs.default_config_repo }}
-                  default_config_ref: ${{ inputs.default_config_ref }}
-                  default_config_path: ${{ inputs.default_config_path }}
+                  event_kind: releases
                   github_token: ${{ github.token }}
-              # `secrets: inherit` at the calling consumer level passes all
-              # secrets through env. Each channel handler reads the secret
-              # named by its `webhook_secret` field.
               env:
-                  DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
-                  SLACK_ENGINEERING_WEBHOOK: ${{ secrets.SLACK_ENGINEERING_WEBHOOK }}
-                  MATRIX_WEBHOOK_URL: ${{ secrets.MATRIX_WEBHOOK_URL }}
+                  # All six release channels. Empty / unset secrets are no-ops
+                  # — only the channels you've actually provisioned URLs for
+                  # will fire. The dispatcher picks PUBLIC vs PRIVATE based on
+                  # the repo's actual visibility.
+                  DISCORD_RELEASES_PUBLIC_WEBHOOK: ${{ secrets.DISCORD_RELEASES_PUBLIC_WEBHOOK }}
+                  DISCORD_RELEASES_PRIVATE_WEBHOOK: ${{ secrets.DISCORD_RELEASES_PRIVATE_WEBHOOK }}
+                  SLACK_RELEASES_PUBLIC_WEBHOOK: ${{ secrets.SLACK_RELEASES_PUBLIC_WEBHOOK }}
+                  SLACK_RELEASES_PRIVATE_WEBHOOK: ${{ secrets.SLACK_RELEASES_PRIVATE_WEBHOOK }}
+                  GENERIC_RELEASES_PUBLIC_WEBHOOK: ${{ secrets.GENERIC_RELEASES_PUBLIC_WEBHOOK }}
+                  GENERIC_RELEASES_PRIVATE_WEBHOOK: ${{ secrets.GENERIC_RELEASES_PRIVATE_WEBHOOK }}

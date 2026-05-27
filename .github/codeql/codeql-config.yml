@@ -18,3 +18,46 @@ paths-ignore:
     - backup/
     - .archive/
     - examples/
+
+# Org-wide false-positive suppressions. Every entry here needs a clear
+# rationale; the cost of misuse is real findings being suppressed silently.
+query-filters:
+    # js/file-data-to-network-request — "Outbound network request depends
+    # on file data."
+    #
+    # Triggers on the release / PR / release-PR notifier dispatchers
+    # (.github/actions/community/jobs/release-notifier/channels/*.mjs)
+    # because they read `GITHUB_EVENT_PATH` (a JSON event file written by
+    # GitHub Actions infrastructure) and POST fields from that event to a
+    # Discord / Slack / generic webhook URL.
+    #
+    # Why it's a false positive in this codebase:
+    #   - The source file is runner-local — written by GitHub Actions
+    #     infrastructure, not user input, not a configurable path.
+    #   - The destination URL is a GitHub Actions secret (org or repo),
+    #     not pulled from the event payload.
+    #   - The fields broadcast are already public GitHub event data
+    #     visible to anyone who can read the repo.
+    #   - buildEventData (action.mjs) explicitly whitelists specific
+    #     scalar fields off the parsed event into a fresh object literal;
+    #     `event` itself is never passed to the channel handlers.
+    #
+    # Forwarding GitHub event data to a configured webhook IS the entire
+    # purpose of the notifier action — no code change resolves the alert,
+    # only a behavior change that defeats the feature would.
+    #
+    # Suppressed query-globally rather than via paths-ignore so the
+    # dispatcher files keep coverage from every OTHER CodeQL query (XSS
+    # in embed content, prototype-pollution in JSON.stringify, etc.).
+    # The trade-off: a NEW legitimate file → network flow added elsewhere
+    # in this repo also escapes this specific query. The repo's other
+    # `readFileSync` usages don't feed into fetch(), and any reviewer
+    # adding such a path should see this comment via grep and weigh
+    # whether to keep the suppression.
+    #
+    # Does not propagate to consumer repos: this config is loaded only
+    # by THIS repo's local-codeql.yml. Consumers use reusable-codeql.yml
+    # with their own config_file or a generated one, and they analyze
+    # their own source — not our notifier action's internals.
+    - exclude:
+          id: js/file-data-to-network-request

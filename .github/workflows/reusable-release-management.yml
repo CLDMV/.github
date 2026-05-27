@@ -91,6 +91,14 @@ on:
                 description: "Whether this commit should trigger a release"
                 value: ${{ jobs.detect-release.outputs.should-release }}
 
+# Workflow-level: create-release-pr pushes the version-bump commit
+# (contents:write) and opens the persistent release PR (pull-requests:
+# write). The pushes go through the bot App token minted in-job, but the
+# GITHUB_TOKEN's scope still caps post-job git operations.
+permissions:
+    contents: write
+    pull-requests: write
+
 jobs:
     detect-release:
         name: "🔍 Detect Release"

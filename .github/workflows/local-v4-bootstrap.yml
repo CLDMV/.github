@@ -1,53 +1,53 @@
 #
 # @Project: workflows
 # @Filename: /local-v4-bootstrap.yml
-# @Date: 2026-05-22 00:00:00 -07:00 (1779778800)
+# @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# v4 one-shot migration bootstrap (§10.3). Run once per repo via the Actions
-# tab. Idempotent — running twice is a no-op.
+# Local dogfood of v4-bootstrap. Mirrors examples/.../v4-bootstrap.yml but
+# wired against THIS repo, calling the shared org-bootstrap-repo composite
+# action via a relative path so a PR that edits the action is tested against
+# the PR's version (not the published @v4 tag).
 #
-# It does the parts that genuinely benefit from automation:
-#   - creates the `next` and `hotfixes` integration branches from master HEAD
-#   - enables the repo-level "Allow auto-merge" toggle
+# What gets applied (full list in the composite action docs):
+#   - next + hotfixes branches if missing
+#   - repo settings flipped to v4 defaults
+#   - security toggles (Dependabot alerts + security updates, secret
+#     scanning + push protection, private vulnerability reporting)
+#   - the three rulesets installed (overwrite-with-warn for divergences)
 #
-# It deliberately does NOT apply branch protection — import the rulesets from
-# the generator (docs/tools/ruleset-generator/) and add the bot to the
-# next/hotfixes bypass lists by hand (§9). The run summary links both steps.
+# Idempotent. Default `dry_run: true`.
 name: 🚀 Local v4 Bootstrap
 
 on:
     workflow_dispatch:
         inputs:
-            next_branch:
-                description: "Integration branch for features/fixes"
-                required: false
-                default: "next"
-            hotfixes_branch:
-                description: "Integration branch for hotfixes"
-                required: false
-                default: "hotfixes"
             dry_run:
-                description: "Log actions without making changes"
+                description: "Log every API call without applying. Default `true`."
                 type: boolean
                 required: false
                 default: true
+            steps:
+                description: "Subset of phases to run, comma-separated."
+                required: false
+                default: "branches,settings,security,rulesets"
 
 permissions:
-    contents: write
+    contents: read
 
 jobs:
     bootstrap:
-        name: "🚀 Bootstrap v4 branches + settings"
+        name: "🚀 Bootstrap v4 (this repo)"
         runs-on: ubuntu-latest
         steps:
+            - name: Checkout (for relative-path action ref)
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+
             - name: Create App token
               id: app-token
-              # Full-permission mode: branch creation needs contents:write and
-              # the auto-merge toggle needs repo administration:write.
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
@@ -56,54 +56,9 @@ jobs:
                   BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
-            - name: Create integration branches + enable auto-merge
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
-                  REPO: ${{ github.repository }}
-                  NEXT: ${{ github.event.inputs.next_branch || 'next' }}
-                  HOTFIXES: ${{ github.event.inputs.hotfixes_branch || 'hotfixes' }}
-                  DRY_RUN: ${{ github.event.inputs.dry_run }}
-              run: |
-                  set -euo pipefail
-                  master_sha=$(gh api "repos/$REPO/git/ref/heads/master" --jq '.object.sha')
-                  echo "master HEAD: $master_sha"
-
-                  create_branch() {
-                      local branch="$1"
-                      if gh api "repos/$REPO/git/ref/heads/$branch" >/dev/null 2>&1; then
-                          echo "✅ $branch already exists — skipping"
-                          return
-                      fi
-                      if [ "$DRY_RUN" = "true" ]; then
-                          echo "🔸 [dry-run] would create $branch at $master_sha"
-                      else
-                          gh api -X POST "repos/$REPO/git/refs" \
-                              -f "ref=refs/heads/$branch" -f "sha=$master_sha" >/dev/null
-                          echo "🌱 created $branch at $master_sha"
-                      fi
-                  }
-                  create_branch "$NEXT"
-                  create_branch "$HOTFIXES"
-
-                  if [ "$DRY_RUN" = "true" ]; then
-                      echo "🔸 [dry-run] would set allow_auto_merge=true, delete_branch_on_merge=false"
-                  else
-                      # delete_branch_on_merge MUST be false: next/hotfixes are the
-                      # PR HEADS of the persistent release PRs, so GitHub auto-delete
-                      # would remove the integration branch on every release.
-                      gh api -X PATCH "repos/$REPO" -F allow_auto_merge=true -F delete_branch_on_merge=false >/dev/null \
-                          && echo "🔀 allow_auto_merge=true, delete_branch_on_merge=false" \
-                          || echo "⚠️ could not update repo settings (App may lack admin) — set 'Allow auto-merge' ON and 'Automatically delete head branches' OFF in Settings → General"
-                  fi
-
-                  {
-                      echo "## 🚀 v4 bootstrap"
-                      echo ""
-                      echo "Branches: \`$NEXT\`, \`$HOTFIXES\` (dry-run: \`$DRY_RUN\`)"
-                      echo ""
-                      echo "### Still to do by hand (§9)"
-                      echo "1. Import \`master\` / \`next\` / \`hotfixes\` rulesets — generate them at the [ruleset generator](https://github.com/$REPO/blob/master/docs/tools/ruleset-generator/index.html) or use \`data/rulesets/*.json\`."
-                      echo "2. Add the **bot App** (not the bot user/team) to the **Bypass list** of the \`next\` + \`hotfixes\` rulesets."
-                      echo "3. Re-run with \`dry_run: false\` if this was a dry run."
-                  } >> "$GITHUB_STEP_SUMMARY"
+            - name: Bootstrap
+              uses: ./.github/actions/github/jobs/org-bootstrap-repo
+              with:
+                  github_token: ${{ steps.app-token.outputs.token }}
+                  dry_run: ${{ github.event.inputs.dry_run }}
+                  steps: ${{ github.event.inputs.steps }}

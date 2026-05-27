@@ -207,6 +207,16 @@ on:
                 description: "Whether rolling version tags were successfully updated"
                 value: ${{ jobs.update-version-tags.outputs.updated }}
 
+# Workflow-level: publish jobs need to create GitHub releases (contents),
+# publish to GitHub Packages (packages), and use OIDC for npm provenance
+# (id-token). The detect-version + dry-run jobs only read, but the
+# workflow-level grant matches the broadest consumer to keep the
+# permissions surface declared in one place.
+permissions:
+    contents: write
+    packages: write
+    id-token: write
+
 jobs:
     detect-version:
         name: "🔍 Detect Version"

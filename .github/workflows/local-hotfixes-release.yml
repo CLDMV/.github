@@ -134,6 +134,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Refresh release PR
+              id: refresh
               uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: hotfixes
@@ -141,3 +142,21 @@ jobs:
                   package-name: "@cldmv/.github"
                   build-command: "echo '✓ No build step for a workflows + actions package.'"
                   github-token: ${{ steps.app-token.outputs.token }}
+
+            # Release-PR notifier — see local-next-release.yml for the rationale.
+            # Fires only on actual version-bump shifts; secrets unset = no-op.
+            - name: Notify on release-PR version bump
+              if: steps.refresh.outputs.version-changed == 'true'
+              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
+              with:
+                  event_kind: release_pr
+                  pr_number: ${{ needs.plan.outputs.pr-number }}
+                  version: ${{ steps.refresh.outputs.new-version }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+              env:
+                  DISCORD_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.DISCORD_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  DISCORD_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_PR_PRIVATE_WEBHOOK }}
+                  SLACK_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.SLACK_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  SLACK_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.SLACK_RELEASE_PR_PRIVATE_WEBHOOK }}
+                  GENERIC_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PUBLIC_WEBHOOK }}
+                  GENERIC_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PRIVATE_WEBHOOK }}

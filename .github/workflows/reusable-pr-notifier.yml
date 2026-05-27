@@ -1,0 +1,50 @@
+#
+# @Project: workflows
+# @Filename: /reusable-pr-notifier.yml
+# @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# PR-opened notifier (org-level, reusable). Fires on `pull_request: opened`
+# for any PR (including release PRs created by the release-flow workflows).
+#
+# Release-PR *updates* (changelog refresh, version bump shift) do not fire
+# this workflow — those go through the release-PR notifier wired inline into
+# update-release-pr/action.yml, so a release-PR open is announced exactly
+# once via this workflow's `pull_request: opened` trigger.
+#
+# Channels are addressed by secret name — no config file. Set the org-level
+# secret for each channel you want active; unset secrets are silently skipped.
+# Per-repo override: set a repo secret with the same name (repo wins over org).
+# Repo mute: set the repo secret to an empty string.
+#
+# Secret naming: <TYPE>_PR_<VIS>_WEBHOOK
+#   TYPE = DISCORD | SLACK | GENERIC
+#   VIS  = PUBLIC | PRIVATE
+name: 📥 PR Notifier (Org-Level)
+
+on:
+    workflow_call:
+
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    notify:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Dispatch PR-opened notification
+              uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
+              with:
+                  event_kind: pr
+                  github_token: ${{ github.token }}
+              env:
+                  DISCORD_PR_PUBLIC_WEBHOOK: ${{ secrets.DISCORD_PR_PUBLIC_WEBHOOK }}
+                  DISCORD_PR_PRIVATE_WEBHOOK: ${{ secrets.DISCORD_PR_PRIVATE_WEBHOOK }}
+                  SLACK_PR_PUBLIC_WEBHOOK: ${{ secrets.SLACK_PR_PUBLIC_WEBHOOK }}
+                  SLACK_PR_PRIVATE_WEBHOOK: ${{ secrets.SLACK_PR_PRIVATE_WEBHOOK }}
+                  GENERIC_PR_PUBLIC_WEBHOOK: ${{ secrets.GENERIC_PR_PUBLIC_WEBHOOK }}
+                  GENERIC_PR_PRIVATE_WEBHOOK: ${{ secrets.GENERIC_PR_PRIVATE_WEBHOOK }}

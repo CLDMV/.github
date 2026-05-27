@@ -226,6 +226,17 @@ on:
                     matrix. Required when deps declare engines that exclude
                     odd-numbered releases (e.g. rolldown)."
 
+# Workflow-level: matches the broadest write surface across called jobs.
+# `reusable-publishing` creates GitHub releases (`contents:write`),
+# publishes to GitHub Packages (`packages:write`), and uses OIDC for npm
+# provenance attestations (`id-token:write`). Read-only branches of the
+# workflow (build/test, dry-run) still inherit but never exercise the
+# write surface.
+permissions:
+    contents: write
+    packages: write
+    id-token: write
+
 jobs:
     build-and-test:
         name: "🏗️ Build and Test"

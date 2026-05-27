@@ -1,158 +1,172 @@
 /**
- * @fileoverview Release notifier entry point. Loads org-default + per-repo
- * channel configs, merges by id, dispatches per channel with continue-on-
- * failure semantics. Batch 6.2.
+ * @fileoverview Release / PR / release-PR notifier. Looks up one secret per
+ * (type, kind, visibility) tuple — if the secret is set, dispatches; if not,
+ * skips. No config file: the secret name itself encodes the channel.
+ *
+ *   Secret naming: <TYPE>_<KIND>_<VIS>_WEBHOOK
+ *     TYPE   = DISCORD | SLACK | GENERIC
+ *     KIND   = RELEASES | PR | RELEASE_PR
+ *     VIS    = PUBLIC | PRIVATE
+ *
+ *   Visibility is derived from the repo: GitHub `public` → PUBLIC; `private`
+ *   or `internal` → PRIVATE. Internal repos are non-public; they route to
+ *   the private webhook.
+ *
+ *   Per-repo override: set a repo secret with the same name to override the
+ *   org-level URL, or to an empty string to mute that channel for the repo.
+ *   GitHub's secret precedence (repo > org) handles the override for free.
+ *
  * @module @cldmv/.github.community.jobs.release-notifier
  */
 
-import { getInput, appendSummary } from "../../../common/common/core.mjs";
+import { getInput, appendSummary, getEventPayload } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 import { dispatch as discordDispatch } from "./channels/discord.mjs";
 import { dispatch as slackDispatch } from "./channels/slack.mjs";
-import { dispatch as webhookDispatch } from "./channels/webhook.mjs";
+import { dispatch as genericDispatch } from "./channels/generic.mjs";
 
 const DISPATCHERS = {
 	discord: discordDispatch,
 	slack: slackDispatch,
-	webhook: webhookDispatch
+	generic: genericDispatch
 };
 
-/** Minimal YAML parser for our channels config shape. */
-function parseChannelsYaml(text) {
-	const channels = [];
-	let current = null;
-	let inChannels = false;
-	const lines = text.split(/\r?\n/);
-	for (const rawLine of lines) {
-		const line = rawLine.replace(/(^|[^"'])#.*$/, "$1").trimEnd();
-		if (!line.trim()) continue;
-		if (/^channels\s*:\s*$/.test(line)) {
-			inChannels = true;
-			continue;
-		}
-		if (!inChannels) continue;
-		// New channel: `  - id: foo`
-		const newChan = line.match(/^\s+-\s+(\w+)\s*:\s*(.*)$/);
-		if (newChan) {
-			if (current) channels.push(current);
-			current = {};
-			current[newChan[1]] = parseScalar(newChan[2]);
-			continue;
-		}
-		// Continued field: `    key: value`
-		const kv = line.match(/^\s+(\w+)\s*:\s*(.*)$/);
-		if (kv && current) {
-			current[kv[1]] = parseScalar(kv[2]);
-		}
+const TYPES = ["discord", "slack", "generic"];
+const KIND_KEYS = { releases: "RELEASES", pr: "PR", release_pr: "RELEASE_PR" };
+
+/**
+ * Determine repo visibility — `private` or `public`. GitHub `internal` repos
+ * route to `private` because they are not publicly visible (the whole point
+ * of the split is "don't broadcast non-public repo activity to public
+ * webhooks"). Reads from the event payload's `repository` object when
+ * available; falls back to a `/repos/{owner}/{repo}` GET otherwise.
+ */
+async function detectVisibility(event, owner, repo, token) {
+	const repository = event?.repository;
+	if (repository) {
+		if (repository.visibility === "private" || repository.visibility === "internal") return "private";
+		if (repository.visibility === "public") return "public";
+		if (typeof repository.private === "boolean") return repository.private ? "private" : "public";
 	}
-	if (current) channels.push(current);
-	return channels;
+	const fetched = await api("GET", "", null, { token, owner, repo });
+	if (fetched?.visibility === "private" || fetched?.visibility === "internal") return "private";
+	return fetched?.private ? "private" : "public";
 }
 
-function parseScalar(raw) {
-	const s = raw.trim();
-	if (s === "") return "";
-	if (s === "true") return true;
-	if (s === "false") return false;
-	if (/^-?\d+$/.test(s)) return Number(s);
-	if (/^-?\d+\.\d+$/.test(s)) return Number(s);
-	if (/^0x[0-9a-fA-F]+$/.test(s)) return parseInt(s, 16);
-	if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-		return s.slice(1, -1);
+/** Normalize the trigger event into per-kind eventData consumed by handlers. */
+async function buildEventData(kind, event, owner, repo, token) {
+	const repoName = `${owner}/${repo}`;
+	if (kind === "releases") {
+		const r = event?.release;
+		if (!r) throw new Error("event_kind=releases but no `release` in event payload");
+		return {
+			repo: repoName,
+			tag_name: r.tag_name || "",
+			name: r.name || r.tag_name || "",
+			body: r.body || "",
+			html_url: r.html_url || "",
+			prerelease: !!r.prerelease,
+			published_at: r.published_at || new Date().toISOString()
+		};
 	}
-	return s;
-}
-
-/** Fetch raw file content from a repo. Returns null on 404. */
-async function readFile({ token, owner, repo, path, ref }) {
-	const refQuery = ref ? `?ref=${encodeURIComponent(ref)}` : "";
-	try {
-		const res = await api("GET", `/contents/${path}${refQuery}`, null, { token, owner, repo });
-		if (res?.content && res.encoding === "base64") {
-			return Buffer.from(res.content, "base64").toString("utf8");
-		}
-	} catch (err) {
-		if (!err.message.includes("404")) throw err;
+	if (kind === "pr") {
+		const p = event?.pull_request;
+		if (!p) throw new Error("event_kind=pr but no `pull_request` in event payload");
+		return {
+			repo: repoName,
+			number: p.number,
+			title: p.title || "",
+			html_url: p.html_url || "",
+			author: p.user?.login || "",
+			base: p.base?.ref || "",
+			head: p.head?.ref || "",
+			draft: !!p.draft
+		};
 	}
-	return null;
-}
-
-/** Merge two channel arrays by id; per-repo overrides org default settings. */
-function mergeChannels(orgDefaults, perRepo) {
-	const byId = new Map();
-	for (const c of orgDefaults) if (c.id) byId.set(c.id, { ...c });
-	for (const c of perRepo) {
-		if (!c.id) continue;
-		const existing = byId.get(c.id);
-		if (existing) byId.set(c.id, { ...existing, ...c });
-		else byId.set(c.id, { ...c });
+	if (kind === "release_pr") {
+		// Inline-called from update-release-pr; trigger event is `push`, not
+		// `pull_request`, so we fetch the PR via API.
+		const prNumber = Number(getInput("pr_number", { required: true }));
+		const version = getInput("version", { required: true });
+		const pr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
+		return {
+			repo: repoName,
+			number: pr.number,
+			title: pr.title || "",
+			html_url: pr.html_url || "",
+			base: pr.base?.ref || "master",
+			head: pr.head?.ref || "",
+			version
+		};
 	}
-	return [...byId.values()];
+	throw new Error(`Unknown event_kind: "${kind}"`);
 }
 
 try {
 	const token = getInput("github_token", { required: true });
-	const configPath = getInput("config_path") || ".github/release-notifier.yml";
-	const defaultRepo = getInput("default_config_repo") || "CLDMV/.github";
-	const defaultRef = getInput("default_config_ref") || "v2";
-	const defaultPath = getInput("default_config_path") || ".github/templates/release-notifier.default.yml";
+	const kind = getInput("event_kind", { required: true });
+	if (!Object.prototype.hasOwnProperty.call(KIND_KEYS, kind)) {
+		throw new Error(`Invalid event_kind: "${kind}" (expected one of: ${Object.keys(KIND_KEYS).join(", ")})`);
+	}
 
 	const repository = process.env.GITHUB_REPOSITORY || "";
 	const [owner, repo] = repository.split("/");
 	if (!owner || !repo) throw new Error(`Invalid GITHUB_REPOSITORY: "${repository}"`);
 
-	const eventPath = process.env.GITHUB_EVENT_PATH;
-	if (!eventPath) throw new Error("GITHUB_EVENT_PATH not set");
-	const fs = await import("node:fs");
-	const event = JSON.parse(fs.readFileSync(eventPath, "utf8"));
-	const release = event.release;
-	if (!release) {
-		console.log("ℹ️ No release in event; skipping.");
-		process.exit(0);
-	}
-	if (release.draft) {
-		console.log("ℹ️ Draft release; skipping.");
-		process.exit(0);
-	}
-	if (!release.tag_name) {
-		console.log("ℹ️ Untagged release; skipping (defensive guard).");
-		process.exit(0);
+	const event = getEventPayload();
+
+	// Pre-flight gates: skip the noisy / non-actionable cases entirely.
+	if (kind === "releases") {
+		if (!event?.release) {
+			console.log("ℹ️ No release in event; skipping.");
+			process.exit(0);
+		}
+		if (event.release.draft) {
+			console.log("ℹ️ Draft release; skipping.");
+			process.exit(0);
+		}
+		if (!event.release.tag_name) {
+			console.log("ℹ️ Untagged release; skipping (defensive guard).");
+			process.exit(0);
+		}
 	}
 
-	// Load configs
-	const [defOwner, defRepo] = defaultRepo.split("/");
-	const orgConfigText = await readFile({ token, owner: defOwner, repo: defRepo, path: defaultPath, ref: defaultRef });
-	const orgChannels = orgConfigText ? parseChannelsYaml(orgConfigText) : [];
-	const repoConfigText = await readFile({ token, owner, repo, path: configPath, ref: null });
-	const repoChannels = repoConfigText ? parseChannelsYaml(repoConfigText) : [];
+	const visibility = await detectVisibility(event, owner, repo, token);
+	const visKey = visibility === "private" ? "PRIVATE" : "PUBLIC";
+	const kindKey = KIND_KEYS[kind];
 
-	const merged = mergeChannels(orgChannels, repoChannels);
-	const enabled = merged.filter((c) => c.enabled !== false && c.type);
-	console.log(`📣 ${enabled.length} channel(s) enabled (${merged.length} merged, ${orgChannels.length} org + ${repoChannels.length} per-repo)`);
+	const eventData = await buildEventData(kind, event, owner, repo, token);
 
-	const results = { ok: 0, failed: [] };
-	for (const channel of enabled) {
-		const dispatcher = DISPATCHERS[channel.type];
-		if (!dispatcher) {
-			console.log(`::warning::Unknown channel type "${channel.type}" for id "${channel.id}"; skipping.`);
+	console.log(`📣 event_kind=${kind} visibility=${visibility} repo=${owner}/${repo}`);
+
+	const results = { ok: 0, failed: [], skipped: 0 };
+	for (const type of TYPES) {
+		const secretName = `${type.toUpperCase()}_${kindKey}_${visKey}_WEBHOOK`;
+		const url = process.env[secretName];
+		if (!url) {
+			console.log(`  · ${type}: ${secretName} unset — skipped`);
+			results.skipped++;
 			continue;
 		}
 		try {
-			console.log(`  → ${channel.id} (${channel.type})`);
-			await dispatcher(channel, release, repository);
+			console.log(`  → ${type}: ${secretName}`);
+			await DISPATCHERS[type](url, kind, eventData);
 			results.ok++;
 		} catch (err) {
-			console.log(`  ✗ ${channel.id}: ${err.message}`);
-			results.failed.push({ id: channel.id, error: err.message });
+			console.log(`  ✗ ${type}: ${err.message}`);
+			results.failed.push({ type, error: err.message });
 		}
 	}
 
 	appendSummary(`## 📣 Release Notifier`);
 	appendSummary(``);
+	appendSummary(`- event_kind: \`${kind}\``);
+	appendSummary(`- visibility: \`${visibility}\``);
 	appendSummary(`- ✅ Delivered: **${results.ok}**`);
+	appendSummary(`- · Skipped (no secret): **${results.skipped}**`);
 	if (results.failed.length) {
 		appendSummary(`- ✗ Failed: **${results.failed.length}**`);
-		for (const f of results.failed) appendSummary(`  - \`${f.id}\`: ${f.error}`);
+		for (const f of results.failed) appendSummary(`  - \`${f.type}\`: ${f.error}`);
 	}
 } catch (error) {
 	console.error(`::error::${error.message}`);

@@ -8,6 +8,25 @@
 #
 
 # Individual repo: .github/workflows/codeql.yml
+#
+# REQUIRED REPO SETTING — CodeQL must be in "Advanced" mode for this workflow
+# to upload SARIF. If the repo has CodeQL "Default setup" enabled (the
+# GitHub-managed alternative), upload runs fail with:
+#
+#   "Code Scanning could not process the submitted SARIF file: CodeQL
+#    analyses from advanced configurations cannot be processed when the
+#    default setup is enabled"
+#
+# The org-bootstrap-repo action automatically disables default setup
+# (overwrite-with-warn) on every fanout run, so a freshly-bootstrapped
+# repo lands in the right state by default. If you want to KEEP default
+# setup (the GitHub-managed config) instead of this workflow, DELETE
+# this codeql.yml file — with the conflict gone, the bootstrap leaves
+# default setup alone on subsequent runs.
+#
+# Manual fix when running outside the bootstrap:
+#   Settings → Code security and analysis → Code scanning → CodeQL
+#   analysis → ⚙️ → Switch to advanced.
 name: 🔍 CodeQL
 
 on:

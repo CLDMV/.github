@@ -15,6 +15,13 @@ inputs:
     description: "Whether to use commit message directly for single commits (true for publish, false for PR)"
     required: false
     default: "false"
+  group-by-pr:
+    description: "Group each section's commits by their associated PR number, with the PR's merge SHA on the parent line and the contributor commits indented underneath. Intended for release-to-master PR bodies opened from next/hotfixes, where every commit was already reviewed in its own PR and the per-PR grouping carries more signal than a flat list."
+    required: false
+    default: "false"
+  github-token:
+    description: "GitHub token used by the PR-ref augmentation (lookup of each commit's source PR via `/commits/{sha}/pulls`) and per-PR merge-SHA fetch when `group-by-pr` is on. Without a token, augmentation silently no-ops and the grouped output falls back to whatever PR refs were already in commit subjects — meaning commits brought in by a merge-commit PR (rather than a squash that appends `(#N)` automatically) end up at the bottom of the section as ungrouped bullets. Pass the bot App token (with at minimum `pull-requests: read`) for the PR-bodies that this action generates."
+    required: false
 
 outputs:
   changelog-content:
@@ -33,5 +40,12 @@ runs:
         COMMITS_INPUT: ${{ inputs.commits }}
         COMMIT_RANGE_INPUT: ${{ inputs.commit-range }}
         USE_SINGLE_COMMIT_MESSAGE: ${{ inputs.use-single-commit-message }}
+        GROUP_BY_PR: ${{ inputs.group-by-pr }}
+        # Fall back to ${{ github.token }} so the augmentation can still
+        # find squashed-PR refs even when the caller doesn't pass an
+        # explicit token. Default github.token carries `pull-requests:
+        # read` on workflows that declare it (the workflow-level perms
+        # sweep from PR #54 grants it on every release-flow workflow).
+        GITHUB_TOKEN: ${{ inputs.github-token || github.token }}
       run: |
         node "${{ github.action_path }}/action.mjs"

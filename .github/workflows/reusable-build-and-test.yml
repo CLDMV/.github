@@ -111,6 +111,12 @@ on:
                     enable_embedded_tests is true; ignored otherwise."
                 required: false
 
+# Workflow-level baseline: build + test only reads from the repo. The
+# embedded-tests path mints an App token that has its own scope; nothing
+# in this workflow writes back via GITHUB_TOKEN.
+permissions:
+    contents: read
+
 jobs:
     set-matrix:
         name: "Set Node.js Matrix"

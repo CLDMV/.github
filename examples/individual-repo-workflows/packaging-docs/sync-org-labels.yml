@@ -31,6 +31,13 @@ on:
         required: false
         default: false
 
+# Workflow-level: the called `workflow-sync-org-labels.yml` mints a
+# bot App token for the actual label mutations (the App carries its own
+# permissions). GITHUB_TOKEN is only used for checkout, so `contents:read`
+# suffices.
+permissions:
+  contents: read
+
 jobs:
   sync-labels:
     uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v4
