@@ -38,20 +38,28 @@ inputs:
     description: "Numeric GitHub App ID to pre-add to next/hotfixes ruleset bypass_actors. Defaults to CLDMV's bot App."
     required: false
     default: "1910694"
+  code_security:
+    description: "GitHub Code Security policy (the paid product that gates CodeQL alerts on private repos; free on public). One of `off` | `public-only` | `all`. `off` = ensure DISABLED on every repo. `public-only` = ensure ENABLED on public repos (free), DISABLED on private/internal (paid). `all` = ensure ENABLED everywhere (paid for private). Overwrite-with-warn either direction. Default `off`. Internally drives the `security_and_analysis.advanced_security` API field — the field name didn't get renamed when GitHub unbundled GHAS into Code Security + Secret Protection."
+    required: false
+    default: "off"
+  secret_protection:
+    description: "GitHub Secret Protection policy (the paid product that gates secret scanning + push protection on private repos; free on public). Same `off` | `public-only` | `all` shape as `code_security`. Drives the `secret_scanning` + `secret_scanning_push_protection` API fields together."
+    required: false
+    default: "off"
 
 outputs:
+  # Node actions don't use the composite `value: ${{ steps.<id>.outputs.<name> }}`
+  # syntax — the script writes via $GITHUB_OUTPUT directly and the runner
+  # picks the values up by name. Declarations below are for documentation +
+  # consumer discoverability only.
   status:
     description: "`succeeded`, `skipped`, or `failed`. Drives the org-fanout's summary table."
-    value: ${{ steps.bootstrap.outputs.status }}
   skip_reason:
     description: "Reason when status=skipped (e.g. `archived`, `no-master`)."
-    value: ${{ steps.bootstrap.outputs.skip_reason }}
   applied:
     description: "Comma-separated list of step ids that actually mutated state (vs. were already correct)."
-    value: ${{ steps.bootstrap.outputs.applied }}
   warnings:
     description: "Newline-separated divergence warnings — settings or rulesets that were overwritten because they didn't match the org baseline."
-    value: ${{ steps.bootstrap.outputs.warnings }}
 
 runs:
   using: node24

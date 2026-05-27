@@ -2,9 +2,15 @@
  * @fileoverview Per-repo bootstrap. Applies the v4 org baseline to ONE repo:
  *   - create next/hotfixes if missing
  *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods)
- *   - enable security toggles (dependabot alerts + security updates, secret
- *     scanning + push protection, private vulnerability reporting)
+ *   - enable always-free security toggles (Dependabot alerts + security
+ *     updates, private vulnerability reporting, Dependabot security update
+ *     PRs)
  *   - replace the three rulesets from the shared builders module
+ *
+ * Opt-in paid-on-private security products (3-way: off | public-only | all,
+ * default off; both are free on public, paid on private):
+ *   - GitHub Code Security (CodeQL alerts surface): `code_security`
+ *   - Secret Protection (scanning + push protection): `secret_protection`
  *
  * Overwrites diverged values and emits a warning per divergence so the
  * audit trail captures what changed. Idempotent — re-running is safe.
@@ -68,6 +74,22 @@ async function main() {
 	const nextBranch = getInput("next_branch") || "next";
 	const hotfixesBranch = getInput("hotfixes_branch") || "hotfixes";
 	const botAppId = parseInt(getInput("bot_app_id") || "1910694", 10);
+	// Security feature policies are 3-way: "off" | "public-only" | "all".
+	// public-only resolves per-repo against the visibility check below.
+	//
+	// `code_security` is the operator-facing name (matches the unbundled
+	// product name); internally it drives the `security_and_analysis.advanced_security`
+	// API field — GitHub kept the legacy field name after unbundling.
+	const codeSecurityPolicy = (getInput("code_security") || "off").toLowerCase();
+	const secretProtectionPolicy = (getInput("secret_protection") || "off").toLowerCase();
+	for (const [name, val] of [
+		["code_security", codeSecurityPolicy],
+		["secret_protection", secretProtectionPolicy]
+	]) {
+		if (!["off", "public-only", "all"].includes(val)) {
+			throw new Error(`Invalid ${name}: "${val}" (expected one of: off, public-only, all)`);
+		}
+	}
 
 	const targetRepo = getInput("target_repo") || process.env.GITHUB_REPOSITORY || "";
 	const [owner, repo] = targetRepo.split("/");
@@ -188,7 +210,9 @@ async function main() {
 			ok("enabled automated-security-fixes", "security.auto-fixes.enabled");
 		}
 
-		// Private vulnerability reporting.
+		// Private vulnerability reporting. 404/403 from this endpoint means
+		// the feature isn't available on this repo — usually because the
+		// org-level policy hasn't turned it on. Surface where to enable it.
 		try {
 			const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
 			if (prv?.enabled) {
@@ -200,15 +224,56 @@ async function main() {
 				ok("enabled private-vulnerability-reporting", "security.pvr.enabled");
 			}
 		} catch (err) {
-			warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+			if (err.message.includes("404") || err.message.includes("403")) {
+				const code = err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable";
+				note(
+					`private-vulnerability-reporting unavailable on \`${owner}/${repo}\` (HTTP ${code}). To enable: ` +
+						`https://github.com/${owner}/${repo}/settings/security_analysis → "Private vulnerability reporting" → Enable. ` +
+						`If toggle is greyed out, org admin must allow PVR at ` +
+						`https://github.com/organizations/${owner}/settings/security_analysis first.`
+				);
+				applied.push("security.pvr.unavailable");
+			} else {
+				warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+			}
 		}
 
-		// security_and_analysis: secret_scanning + push_protection + dependabot_security_updates.
-		// On private repos without GHAS, some of these PATCHes 403 — we surface and continue.
+		// security_and_analysis baseline.
+		//
+		// Every field below is driven by operator input (overwrite-with-warn,
+		// same as the rest of the bootstrap). The two paid-on-private products
+		// (Code Security + Secret Protection — both gated by GitHub billing
+		// on private repos, free on public) use a 3-way policy resolved
+		// per-repo against the repo's visibility:
+		//
+		//   code_security: off          → disable everywhere
+		//   code_security: public-only  → enable on public (free), disable on private (paid)
+		//   code_security: all          → enable everywhere (paid for private)
+		//   (secret_protection has the same shape; secret_scanning +
+		//    secret_scanning_push_protection move together as one feature.)
+		//
+		// `dependabot_security_updates` is always on — free everywhere, and
+		// there's no reason to disable security update PRs.
+		//
+		// Both policy inputs default to `off`, so a vanilla bootstrap run
+		// keeps both paid products off on every repo — safe stance for an
+		// org-wide fanout. `public-only` is the zero-cost middle ground:
+		// enables wherever the feature is free (public repos) and leaves it
+		// off where it'd cost money (private/internal).
+		//
+		// API field names: GitHub didn't rename `advanced_security` when it
+		// unbundled GHAS into Code Security + Secret Protection — that field
+		// is now what gates Code Security per-repo. So the operator input
+		// `code_security` drives the `advanced_security` field below; the
+		// `secret_*` fields drive Secret Protection.
+		const isPrivate = !!repoInfo.private; // covers private + internal
+		const codeSecOnHere = codeSecurityPolicy === "all" || (codeSecurityPolicy === "public-only" && !isPrivate);
+		const secProtOnHere = secretProtectionPolicy === "all" || (secretProtectionPolicy === "public-only" && !isPrivate);
 		const saExpected = {
-			secret_scanning: { status: "enabled" },
-			secret_scanning_push_protection: { status: "enabled" },
-			dependabot_security_updates: { status: "enabled" }
+			dependabot_security_updates: { status: "enabled" },
+			advanced_security: { status: codeSecOnHere ? "enabled" : "disabled" },
+			secret_scanning: { status: secProtOnHere ? "enabled" : "disabled" },
+			secret_scanning_push_protection: { status: secProtOnHere ? "enabled" : "disabled" }
 		};
 		const saCurrent = repoInfo.security_and_analysis || {};
 		const saDiff = {};
@@ -224,7 +289,12 @@ async function main() {
 				await mutate("PATCH", "", { security_and_analysis: saDiff }, "patch security_and_analysis");
 				ok(`patched security_and_analysis: ${Object.keys(saDiff).join(", ")}`, "security.sa.patched");
 			} catch (err) {
-				warn(`security_and_analysis PATCH failed (likely needs GHAS for private repos): ${err.message}`);
+				warn(
+					`security_and_analysis PATCH failed on \`${owner}/${repo}\`: ${err.message}. ` +
+						`Private repos need GitHub Advanced Security for secret scanning + push protection. ` +
+						`Enable at https://github.com/${owner}/${repo}/settings/security_analysis ` +
+						`(or org-wide at https://github.com/organizations/${owner}/settings/security_analysis) and re-run the bootstrap.`
+				);
 			}
 		} else {
 			note("security_and_analysis already matches baseline");
@@ -263,12 +333,28 @@ async function main() {
 				applied.push("security.codeql-default-setup.ok");
 			}
 		} catch (err) {
-			// 404 on repos that have never touched the endpoint is normal.
+			// 404 → endpoint never touched on this repo (no conflict).
+			// 403 → "Code Security must be enabled" — i.e. private repo
+			//       without GHAS, where code scanning isn't available at
+			//       all. Default setup can't be configured here either,
+			//       so the conflict can't exist. Same effective answer
+			//       as 404: nothing to do, but tell the operator where
+			//       to enable code scanning if they want it.
 			if (err.message.includes("404")) {
 				note("CodeQL default setup not configured (404) — no conflict");
 				applied.push("security.codeql-default-setup.ok");
+			} else if (err.message.includes("403") && err.message.includes("Code Security")) {
+				note(
+					`Code scanning unavailable on \`${owner}/${repo}\` (private repo without GitHub Advanced Security). ` +
+						`No CodeQL conflict to resolve. To enable code scanning here: enable GHAS at ` +
+						`https://github.com/${owner}/${repo}/settings/security_analysis (Code security and analysis → Enable). ` +
+						`Org-wide GHAS toggle: https://github.com/organizations/${owner}/settings/security_analysis. ` +
+						`Alternative: make the repo public (GHAS is free on public repos), or delete the custom codeql.yml ` +
+						`if this repo shouldn't run code scanning.`
+				);
+				applied.push("security.codeql-default-setup.unavailable");
 			} else {
-				warn(`could not check CodeQL default setup: ${err.message} — skipping`);
+				warn(`could not check CodeQL default setup on \`${owner}/${repo}\`: ${err.message}`);
 			}
 		}
 	}
