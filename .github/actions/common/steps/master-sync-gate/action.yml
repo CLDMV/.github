@@ -1,0 +1,17 @@
+name: "Master Sync Gate"
+description: "Detect whether the current branch tip already matches the default branch (master/main). After a release merge, `next` / `hotfixes` get force-synced to master and the resulting push event fires every CI workflow on a SHA that has nothing new to test. This action lets downstream jobs short-circuit in that case."
+inputs:
+  default_branch:
+    description: "Default branch name to compare against. Tried first; if it doesn't exist, falls back to `main`."
+    required: false
+    default: "master"
+  github-token:
+    description: "Token for GitHub REST API calls (defaults to github.token)."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  is_master_sync:
+    description: "true if GITHUB_SHA matches the default branch's tip; false otherwise."
+runs:
+  using: "node24"
+  main: "action.mjs"
