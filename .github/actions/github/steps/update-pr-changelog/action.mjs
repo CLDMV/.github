@@ -18,8 +18,8 @@
  *     starts with a letter).
  *   - `<task-id>` must be unique per CI task — pick something specific
  *     enough that it won't collide with another action's namespace.
- *     Examples in flight: `coverage-badge` (.github/actions/coverage/
- *     steps/update-pr-coverage). Future examples might be `bundle-size`,
+ *     Examples in flight: `coverage` (.github/actions/coverage/steps/
+ *     update-pr-coverage). Future examples might be `bundle-size`,
  *     `perf-regression`, etc.
  *   - Any block matching the convention is preserved automatically by
  *     this action — no list to update here when a new CI task lands.
