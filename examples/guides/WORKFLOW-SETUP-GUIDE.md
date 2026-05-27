@@ -222,13 +222,68 @@ Weekly Sunday 04:04 UTC sweep that runs the unified tag-health pipeline: validat
 
 **File:** `release-companions/release-notify.yml` &nbsp;·&nbsp; **Calls:** `reusable-release-notifier.yml@v4`
 
-Fires on `release: published`. Reads per-repo channel config from `.github/release-notifier.yml` (merged with org defaults) and fans out to configured Discord / Slack / generic webhooks.
+Fires on `release: published`. Each channel is a single secret — set the secret to enable, leave it unset to skip. Visibility is auto-detected from the repo (`private`/`internal` → PRIVATE; `public` → PUBLIC).
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — channel-specific webhook secrets (e.g. `DISCORD_<REPO>_WEBHOOK`) referenced by the per-repo config file.
+**Required secrets** — any of `<TYPE>_RELEASES_<VIS>_WEBHOOK` you want active:
 
-**Prereqs** — `.github/release-notifier.yml` in the repo defining the channels to notify.
+| Secret | Effect |
+|---|---|
+| `DISCORD_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → Discord |
+| `DISCORD_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → Discord |
+| `SLACK_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → Slack |
+| `SLACK_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → Slack |
+| `GENERIC_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → JSON POST |
+| `GENERIC_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → JSON POST |
+
+Repo secret overrides org secret of the same name (built-in GitHub precedence). Set a repo secret to an empty string to mute that channel for this repo.
+
+**Prereqs** — none. No config file required.
+
+---
+
+### 📥 PR Notifier
+
+**File:** `release-companions/pr-notify.yml` &nbsp;·&nbsp; **Calls:** `reusable-pr-notifier.yml@v4`
+
+Fires once per `pull_request: opened` (for every PR, including release PRs opened by the release-flow workflows). Release-PR *updates* are notified separately by the inline notifier step in `update-release-pr` — so a release PR open hits this notifier exactly once and version-bump shifts are handled by the release-PR notifier.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — any of `<TYPE>_PR_<VIS>_WEBHOOK`:
+
+| Secret | Effect |
+|---|---|
+| `DISCORD_PR_PUBLIC_WEBHOOK` | Public-repo PR open → Discord |
+| `DISCORD_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → Discord |
+| `SLACK_PR_PUBLIC_WEBHOOK` | Public-repo PR open → Slack |
+| `SLACK_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → Slack |
+| `GENERIC_PR_PUBLIC_WEBHOOK` | Public-repo PR open → JSON POST |
+| `GENERIC_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → JSON POST |
+
+Same precedence + mute mechanics as the release notifier.
+
+**Prereqs** — none.
+
+---
+
+### 🏷️ Release-PR Notifier (inline, no separate workflow)
+
+The release-flow workflows (`next-release.yml`, `hotfixes-release.yml`, `workflow-release.yml`) fire a release-PR notification at the end of `update-release-pr` — but **only when the target version actually changed** (initial PR open, or a version-bump shift, never the changelog-only refreshes that run on every push).
+
+**Required secrets** — any of `<TYPE>_RELEASE_PR_<VIS>_WEBHOOK`:
+
+| Secret | Effect |
+|---|---|
+| `DISCORD_RELEASE_PR_PUBLIC_WEBHOOK` | Public-repo release-PR version bump → Discord |
+| `DISCORD_RELEASE_PR_PRIVATE_WEBHOOK` | Private/internal-repo release-PR version bump → Discord |
+| `SLACK_RELEASE_PR_PUBLIC_WEBHOOK` | … → Slack |
+| `SLACK_RELEASE_PR_PRIVATE_WEBHOOK` | … → Slack |
+| `GENERIC_RELEASE_PR_PUBLIC_WEBHOOK` | … → JSON POST |
+| `GENERIC_RELEASE_PR_PRIVATE_WEBHOOK` | … → JSON POST |
+
+To opt out entirely: delete the `Notify on release-PR version bump` step in your `next-release.yml` / `hotfixes-release.yml`. Otherwise just leave the secrets unset.
 
 ---
 
@@ -339,7 +394,7 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
 
 **Required secrets** — bot App credentials.
 
-**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). Branch protection on `next` and `hotfixes` with required CI status checks — the action refuses to merge into an unprotected branch.
+**Prereqs** — **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled automatically by `release-flow-v4/v4-bootstrap.yml`). The `next` and `hotfixes` rulesets (imported from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/)) already require `✅ Required PR Check`, which GitHub treats as branch protection for the auto-merge prerequisite — no separate classic branch-protection rule needed.
 
 **Key inputs** — `bump_types` (default `patch,minor`), `merge_method` (default `squash`), `also_for_actors` (extend to Renovate or other bots).
 
@@ -512,7 +567,7 @@ Templates not in this table (`codeql.yml`, `dependency-review.yml`, `scorecard.y
 
 These come up across multiple workflows — set them once per repo:
 
-- **Branch protection** on `master`/`main` with required CI status check (`✅ Required PR Check` from `ci.yml`).
+- **Rulesets** — import `master` / `next` / `hotfixes` from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) (or copy from this repo's [`data/rulesets/`](https://github.com/CLDMV/.github/tree/master/data/rulesets)). All three already require `✅ Required PR Check` from `ci.yml`; no separate classic branch-protection rule is needed.
 - **Settings → Actions → "Require approval for outside collaborators"** to control fork-PR runs.
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml` (auto-enabled by `v4-bootstrap.yml`).
 - **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
@@ -521,5 +576,4 @@ These come up across multiple workflows — set them once per repo:
 - **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
-- **`.github/release-notifier.yml`** — required by `release-notify.yml` to define channels.
 - **Bot App permissions** — Contents: write, Pull-requests: write, Issues: write, Packages: write (for Docker), Org → Members: read (for CLA), plus Contents: write on `CLDMV/.cla-signatures` specifically (for CLA signature recording).

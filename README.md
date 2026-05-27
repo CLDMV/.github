@@ -63,7 +63,8 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   ├── reusable-welcome.yml                     # First-time contributor welcome
 │   ├── reusable-bundle-size.yml                 # Bundle-size diff on PRs
 │   ├── reusable-docs-publish.yml                # gh-pages docs publisher
-│   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out
+│   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out (release: published)
+│   ├── reusable-pr-notifier.yml                 # Discord / Slack / webhook fan-out (pull_request: opened)
 │   ├── reusable-branch-retention.yml            # Prune merged branches
 │   └── reusable-cla.yml                         # CLA bot (central ledger, per-version signing)
 └── actions/                                     # reusable actions (Node)
@@ -169,7 +170,8 @@ Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/indi
 | `reusable-welcome.yml` | Friendly first-PR / first-issue welcome with conditional links to CONTRIBUTING / CLA / COC. |
 | `reusable-bundle-size.yml` | Diff `dist/` sizes on PRs; comment with delta table. For runtime libs. |
 | `reusable-docs-publish.yml` | Build docs and push to `gh-pages` branch. |
-| `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook channels. Per-repo channel config merged with org default. |
+| `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_RELEASES_<VIS>_WEBHOOK` — set the secret to enable; unset = no-op. Repo secret overrides org. |
+| `reusable-pr-notifier.yml` | On `pull_request:opened`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_PR_<VIS>_WEBHOOK`. Same secret precedence as the release notifier. |
 | `reusable-branch-retention.yml` | On PR merge: prune most head branches; keep last N of `release/*` / `hotfix/*`. |
 | `reusable-cla.yml` | Per-CLA-version signing via "I agree" comment, with per-repo override support. Default scope (no consumer `CLA.md`): bot uses org-wide CLA from the private `CLDMV/.cla-signatures` ledger; one signature covers every CLDMV repo until major.minor is bumped. Override scope (consumer has root `CLA.md`): bot enforces that text and bootstraps an immutable snapshot in the ledger on first signature; drift (text changes without a version bump) is rejected. Org members exempt. |
 
