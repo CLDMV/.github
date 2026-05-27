@@ -230,6 +230,46 @@ async function main() {
 			note("security_and_analysis already matches baseline");
 			applied.push("security.sa.already-correct");
 		}
+
+		// CodeQL default setup vs. custom codeql.yml workflow conflict.
+		//
+		// GitHub blocks SARIF uploads from the advanced (custom workflow)
+		// configuration when the repo's default setup is `configured`:
+		//
+		//   "Code Scanning could not process the submitted SARIF file: CodeQL
+		//    analyses from advanced configurations cannot be processed when
+		//    the default setup is enabled"
+		//
+		// Our scaffolding ships an advanced `codeql.yml` workflow (consumers
+		// adopt it from examples/individual-repo-workflows/security/), so
+		// default setup being on means CodeQL will start failing the moment
+		// the consumer runs their first CI. Detect-only (no overwrite): the
+		// fix is one of two operator choices — either switch to advanced in
+		// the repo's Settings → Code security and analysis, or remove the
+		// custom workflow. Either is wrong to pick for the operator.
+		try {
+			const ds = await api("GET", "/code-scanning/default-setup", null, ctx);
+			if (ds?.state === "configured") {
+				warn(
+					`CodeQL default setup is \`configured\` — will conflict with the custom codeql.yml workflow. ` +
+						`Resolve in the repo's Settings → Code security and analysis: either Switch to advanced (recommended ` +
+						`if you adopted security/codeql.yml from the v4 templates), or remove the custom codeql.yml. ` +
+						`Until resolved, advanced-config SARIF uploads will be rejected.`
+				);
+				applied.push("security.codeql-default-setup.conflict-detected");
+			} else {
+				note(`CodeQL default setup state: \`${ds?.state || "unset"}\` (no conflict)`);
+				applied.push("security.codeql-default-setup.ok");
+			}
+		} catch (err) {
+			// 404 on repos that have never touched the endpoint is normal.
+			if (err.message.includes("404")) {
+				note("CodeQL default setup not configured (404) — no conflict");
+				applied.push("security.codeql-default-setup.ok");
+			} else {
+				warn(`could not check CodeQL default setup: ${err.message} — skipping`);
+			}
+		}
 	}
 
 	// ── RULESETS ──────────────────────────────────────────────────────────
