@@ -111,6 +111,14 @@ concurrency:
   group: release-pr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Workflow-level: matches the broadest surface the called
+# `workflow-release.yml` reaches. Release-PR creation pushes the
+# version-bump commit (`contents:write`) and opens the persistent
+# release PR (`pull-requests:write`).
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   create-release-pr:
     # Prevent infinite loops: Don't run on bot commits or if PR already exists

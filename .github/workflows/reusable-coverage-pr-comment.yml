@@ -76,6 +76,14 @@ on:
             BOT_APP_PRIVATE_KEY:
                 required: false
 
+# Workflow-level: edits the PR description body (HTML marker-fenced
+# coverage block). PRs live under the issues API surface, so
+# `pull-requests: write` is what's needed — no `contents: write` since
+# nothing is pushed back to the repo.
+permissions:
+    contents: read
+    pull-requests: write
+
 jobs:
     coverage-pr-comment:
         name: "PR Coverage Badge"

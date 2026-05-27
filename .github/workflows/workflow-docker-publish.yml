@@ -74,6 +74,14 @@ on:
                 description: "Pushed image digest"
                 value: ${{ jobs.build-and-push.outputs.digest }}
 
+# Workflow-level: GHCR push needs `packages:write`. `contents:read` for
+# the build context checkout. `id-token:write` for OIDC-attested
+# provenance on the published image (cosign keyless).
+permissions:
+    contents: read
+    packages: write
+    id-token: write
+
 jobs:
     build-and-push:
         name: "🐳 Build and Push GHCR Image"

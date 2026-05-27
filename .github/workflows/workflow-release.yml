@@ -151,6 +151,15 @@ on:
                 description: "Passphrase for the private key (if protected)"
                 required: false
 
+# Workflow-level: matches the broadest write surface called by this
+# workflow's jobs. release → master release PR creation needs both
+# (`reusable-release-management` pushes the version-bump commit and opens
+# the PR). The pre-release detection jobs read only — they still inherit
+# write but never exercise it.
+permissions:
+    contents: write
+    pull-requests: write
+
 jobs:
     check-existing-pr:
         name: "🔍 Check for Existing PR"

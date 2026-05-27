@@ -137,6 +137,17 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
+# Workflow-level: matches the broadest write surface the called
+# `workflow-ci.yml` reaches across its branches:
+#   - coverage-badge:      contents:write    (push to `badges` branch)
+#   - coverage-pr-comment: pull-requests:write (edit PR description body)
+# Jobs that don't need write (CI matrix, commit-gate, the mirror below)
+# inherit but never exercise the surface. The mirror job overrides to
+# `permissions: {}` since it's pure shell.
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   ci:
     name: 🏗️ Continuous Integration
@@ -221,6 +232,9 @@ jobs:
     # intact for branch protection.
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest
+    # Pure shell mirror — no GitHub API access. Strip the workflow's
+    # write defaults to zero for this job.
+    permissions: {}
     steps:
       - name: Mirror reusable result
         run: |
