@@ -71,6 +71,13 @@ jobs:
         outputs:
             docs_only: ${{ steps.gate.outputs.docs_only }}
         steps:
+            # Required so `uses: ./...` below can resolve the action source —
+            # without checkout the runner's workspace is empty and the step
+            # fails with "Can't find 'action.yml'".
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
             - name: Decide docs-only
               id: gate
               # Relative path — the action is in this same repo and isn't on
