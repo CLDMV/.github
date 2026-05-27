@@ -19,7 +19,7 @@ inputs:
     description: "App token with administration:write on the target repo. Mint with the App scoped to a single repo for org-fanout matrix jobs; for the per-repo dispatch case the same token the rest of the bootstrap uses is fine."
     required: true
   dry_run:
-    description: "If `true`, GET state and log every PUT/POST/PATCH/DELETE that *would* be applied without actually firing them. Default `true` — explicit opt-in required to mutate."
+    description: "Dry-run: when `true`, GET state and log every mutation (PUT/POST/PATCH/DELETE) that *would* be applied without firing it. Default `true` — set to `false` to actually apply changes."
     required: false
     default: "true"
   steps:

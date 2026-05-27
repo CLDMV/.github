@@ -45,7 +45,7 @@ on:
                 required: false
                 default: false
             dry_run:
-                description: "Log every PUT/POST/PATCH/DELETE that *would* fire without actually applying. Default `true` — explicit opt-in required to mutate."
+                description: "Dry-run: preview every mutation (PUT/POST/PATCH/DELETE) without firing it. Default `true` — leave checked to preview, UNCHECK to actually apply changes."
                 type: boolean
                 required: false
                 default: true
