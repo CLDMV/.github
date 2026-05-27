@@ -10,8 +10,15 @@ import fs from "node:fs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
 import { getInput, getEventPayload } from "../../../common/common/core.mjs";
 
-const START = "<!-- coverage-badge-start -->";
-const END = "<!-- coverage-badge-end -->";
+const START = "<!-- coverage-start -->";
+const END = "<!-- coverage-end -->";
+
+// Legacy marker pair from the original implementation. Strip any stray
+// `coverage-badge-*` block from in-flight PR bodies on first run after
+// rename, so we don't end up with two coverage blocks side-by-side.
+// Safe to remove after all currently-open release PRs have shipped.
+const LEGACY_START = "<!-- coverage-badge-start -->";
+const LEGACY_END = "<!-- coverage-badge-end -->";
 
 try {
 	const summaryPath = getInput("coverage-summary-path", { required: true });
@@ -59,7 +66,30 @@ try {
 	].join("\n");
 
 	const pr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
-	const currentBody = pr.body || "";
+	let currentBody = pr.body || "";
+
+	// One-time migration: strip any leftover legacy `coverage-badge-*`
+	// block from in-flight PR bodies so the new `coverage-*` block doesn't
+	// stack alongside it. Also handles the surrounding `\n\n---\n\n`
+	// separator that the original append path inserted, so the body
+	// doesn't accumulate orphan horizontal rules across migrations.
+	{
+		const legacyStart = currentBody.indexOf(LEGACY_START);
+		if (legacyStart !== -1) {
+			const legacyEnd = currentBody.indexOf(LEGACY_END, legacyStart + LEGACY_START.length);
+			if (legacyEnd !== -1) {
+				const blockEnd = legacyEnd + LEGACY_END.length;
+				// Eat trailing newlines + horizontal-rule separator that the
+				// legacy append path likely wrote ahead of the block.
+				let stripStart = legacyStart;
+				const beforeBlock = currentBody.slice(0, legacyStart);
+				const sepMatch = beforeBlock.match(/\n\n-{3,}\n\n$/);
+				if (sepMatch) stripStart -= sepMatch[0].length;
+				currentBody = currentBody.slice(0, stripStart) + currentBody.slice(blockEnd);
+				console.log("Stripped legacy `coverage-badge-*` block (migration).");
+			}
+		}
+	}
 
 	let newBody;
 	if (currentBody.includes(START) && currentBody.includes(END)) {
