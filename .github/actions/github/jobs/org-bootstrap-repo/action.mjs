@@ -291,12 +291,17 @@ async function main() {
 			saExpected.advanced_security = { status: codeSecOnHere ? "enabled" : "disabled" };
 		} else if (codeSecurityPolicy !== "off") {
 			// Operator wants GHAS managed but this repo is org-config-driven.
-			// Tell them where to actually configure it.
+			// The per-repo `security_and_analysis.advanced_security` field
+			// is hidden from the API response because an org-level Code
+			// Security Configuration owns it. To change Advanced Security
+			// on this repo, an org admin manages it via the org's Code
+			// Security settings (location varies by GitHub UI version —
+			// look under org Settings for Code security / Code Security
+			// configurations).
 			note(
 				`code_security policy is \`${codeSecurityPolicy}\` but Advanced Security on \`${owner}/${repo}\` ` +
 					`is managed by an org-level Code Security Configuration (the per-repo \`security_and_analysis.advanced_security\` ` +
-					`field is absent from the API response). Configure at ` +
-					`https://github.com/organizations/${owner}/settings/security_products/configurations.`
+					`field is absent from the API response). Change via your org's Code security settings.`
 			);
 			applied.push("security.advanced-security.org-managed");
 		}
