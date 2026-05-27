@@ -279,8 +279,9 @@ async function main() {
 		const saDiff = {};
 		for (const [k, v] of Object.entries(saExpected)) {
 			const actual = saCurrent[k]?.status;
-			if (actual !== "enabled") {
-				warn(`security_and_analysis.${k} was \`${actual || "unset"}\`, overwriting to \`enabled\``);
+			const expected = v.status;
+			if (actual !== expected) {
+				warn(`security_and_analysis.${k} was \`${actual || "unset"}\`, overwriting to \`${expected}\``);
 				saDiff[k] = v;
 			}
 		}
