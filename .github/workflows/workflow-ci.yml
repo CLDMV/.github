@@ -77,6 +77,12 @@ on:
                 type: string
                 default: "npm run build:ci"
                 description: "Command to build package"
+            skip_build:
+                required: false
+                type: boolean
+                default: false
+                description: "Skip the local Build step in the coverage-badge and
+                    coverage-pr-comment legs. Use for repos with no build."
             # Test control options
             skip_performance_tests:
                 required: false
@@ -269,6 +275,11 @@ jobs:
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
+            # Coverage runs on a fresh runner — pass `build_command` so the
+            # local `dist/` exists before `test:types` resolves. Set
+            # `skip_build: true` upstream for repos with no build.
+            build_command: ${{ inputs.build_command }}
+            skip_build: ${{ inputs.skip_build }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}
             skip_type_check: ${{ inputs.skip_type_check }}
@@ -297,6 +308,10 @@ jobs:
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
+            # Coverage runs on a fresh runner — pass `build_command` so the
+            # local `dist/` exists before `test:types` resolves.
+            build_command: ${{ inputs.build_command }}
+            skip_build: ${{ inputs.skip_build }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}
             coverage_summary_path: ${{ inputs.coverage_summary_path }}

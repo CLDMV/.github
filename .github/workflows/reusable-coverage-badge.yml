@@ -25,6 +25,17 @@ on:
                 default: "npm"
 
             # ── Commands ────────────────────────────────────────────────────────
+            build_command:
+                description: "Command to build the package before type-checking. The
+                    Build step is a sibling matrix job, so its `dist/` is invisible
+                    here — repos whose `test:types` reads from compiled `dist/` (e.g.
+                    via a `./typegen` export) need this. Set `skip_build: true` to
+                    drop the step for repos with no build (the Install step alone
+                    is sufficient)."
+                required: false
+                type: string
+                default: "npm run build:ci"
+
             type_check_command:
                 description: "Command to run type checking (e.g. npm run types:check)"
                 required: false
@@ -37,7 +48,14 @@ on:
                 type: string
                 default: "npm run ci:coverage"
 
-            # ── Type-check control ──────────────────────────────────────────────
+            # ── Build / type-check control ──────────────────────────────────────
+            skip_build:
+                description: "Set to true to skip the build step (for repos that don't
+                    need `dist/` for `test:types` or coverage)."
+                required: false
+                type: boolean
+                default: false
+
             skip_type_check:
                 description: "Set to true to skip the type-check step"
                 required: false
@@ -133,23 +151,35 @@ jobs:
               with:
                   package-manager: ${{ inputs.package_manager }}
 
-            # ── 4. Type check ───────────────────────────────────────────────────
+            # ── 4. Build ────────────────────────────────────────────────────────
+            # The matrix `Build` step in reusable-build-and-test.yml runs on a
+            # sibling runner with no shared filesystem, so its `dist/` is
+            # invisible here. Build locally before type-check / coverage so
+            # consumers whose `test:types` resolves against compiled output
+            # (e.g. via a `./typegen` package export pointing at `dist/`)
+            # don't fail with TS2307. Pass `skip_build: true` for repos with
+            # no build step.
+            - name: Build
+              if: ${{ !inputs.skip_build }}
+              run: ${{ inputs.build_command }}
+
+            # ── 5. Type check ───────────────────────────────────────────────────
             - name: Type check
               if: ${{ !inputs.skip_type_check }}
               run: ${{ inputs.type_check_command }}
 
-            # ── 5. Tests + coverage ─────────────────────────────────────────────
+            # ── 6. Tests + coverage ─────────────────────────────────────────────
             - name: Tests + coverage
               run: ${{ inputs.coverage_command }}
 
-            # ── 6. Compute badge JSON ───────────────────────────────────────────
+            # ── 7. Compute badge JSON ───────────────────────────────────────────
             - name: Compute coverage badge JSON
               id: badge
               uses: CLDMV/.github/.github/actions/coverage/steps/compute-badge@v4
               with:
                   coverage-summary-path: ${{ inputs.coverage_summary_path }}
 
-            # ── 7. Mint short-lived bot token ───────────────────────────────────
+            # ── 8. Mint short-lived bot token ───────────────────────────────────
             - name: Generate bot token
               id: bot-token
               uses: actions/create-github-app-token@v3
@@ -157,7 +187,7 @@ jobs:
                   client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-            # ── 8. Import GPG key for signed commit ─────────────────────────────
+            # ── 9. Import GPG key for signed commit ─────────────────────────────
             - name: Import bot GPG key
               uses: crazy-max/ghaction-import-gpg@v6
               with:
@@ -166,7 +196,7 @@ jobs:
                   git_user_signingkey: true
                   git_commit_gpgsign: true
 
-            # ── 9. Push badge to badges branch ──────────────────────────────────
+            # ── 10. Push badge to badges branch ─────────────────────────────────
             - name: Push coverage badge to badges branch
               uses: CLDMV/.github/.github/actions/coverage/steps/push-badge@v4
               env:
@@ -178,7 +208,7 @@ jobs:
                   bot-email: ${{ secrets.BOT_EMAIL }}
                   repository: ${{ github.repository }}
 
-            # ── 10. Upload full coverage report ─────────────────────────────────
+            # ── 11. Upload full coverage report ─────────────────────────────────
             - name: Upload coverage artifact
               if: ${{ inputs.upload_coverage_artifact }}
               uses: actions/upload-artifact@v6
