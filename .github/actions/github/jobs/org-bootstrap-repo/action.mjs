@@ -271,10 +271,21 @@ async function main() {
 		const secProtOnHere = secretProtectionPolicy === "all" || (secretProtectionPolicy === "public-only" && !isPrivate);
 		const saExpected = {
 			dependabot_security_updates: { status: "enabled" },
-			advanced_security: { status: codeSecOnHere ? "enabled" : "disabled" },
 			secret_scanning: { status: secProtOnHere ? "enabled" : "disabled" },
 			secret_scanning_push_protection: { status: secProtOnHere ? "enabled" : "disabled" }
 		};
+		// `advanced_security` is only settable on private/internal repos.
+		// Public repos hit a 422 from the PATCH endpoint:
+		//   "Updating Advanced Security on this repository is not
+		//    available, nor a pre-requisite for security features."
+		// The features it would otherwise gate (CodeQL, secret scanning)
+		// are free + always-available on public, so the field is hidden.
+		// Including it in the diff on a public repo means the whole atomic
+		// PATCH 422s and the OTHER security_and_analysis fields don't get
+		// applied either. Skip it on public.
+		if (isPrivate) {
+			saExpected.advanced_security = { status: codeSecOnHere ? "enabled" : "disabled" };
+		}
 		const saCurrent = repoInfo.security_and_analysis || {};
 		const saDiff = {};
 		for (const [k, v] of Object.entries(saExpected)) {
