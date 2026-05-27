@@ -17,12 +17,16 @@
 #    analyses from advanced configurations cannot be processed when the
 #    default setup is enabled"
 #
-# Fix:  Settings → Code security and analysis → Code scanning → CodeQL
-#       analysis → ⚙️ → Switch to advanced.
+# The org-bootstrap-repo action automatically disables default setup
+# (overwrite-with-warn) on every fanout run, so a freshly-bootstrapped
+# repo lands in the right state by default. If you want to KEEP default
+# setup (the GitHub-managed config) instead of this workflow, DELETE
+# this codeql.yml file — with the conflict gone, the bootstrap leaves
+# default setup alone on subsequent runs.
 #
-# The org-bootstrap-repo action detects this conflict and surfaces it as a
-# warning, but it does not flip the switch automatically (operator may
-# legitimately prefer default setup; in that case delete THIS workflow).
+# Manual fix when running outside the bootstrap:
+#   Settings → Code security and analysis → Code scanning → CodeQL
+#   analysis → ⚙️ → Switch to advanced.
 name: 🔍 CodeQL
 
 on:
