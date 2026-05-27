@@ -22,13 +22,15 @@
 name: 🧪 Local CI
 
 on:
+    # Note: we deliberately do NOT use `paths:` / `paths-ignore:` at the trigger
+    # level. Trigger-level filtering causes GitHub to skip the workflow entirely
+    # for docs-only changes, which means the `Required PR Check` status never
+    # posts and branch protection blocks the merge. Instead we always fire the
+    # workflow and let the `paths-gate` job below decide whether the heavy
+    # `validate` job runs — Required PR Check still posts green on docs-only
+    # changes via the gate's `docs_only` output.
     push:
         branches-ignore: [badges, gh-pages]
-        paths:
-            - ".github/**"
-            - "scripts/**"
-            - "data/**"
-            - "package.json"
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
         # Include the v4 integration branches so:
@@ -38,23 +40,54 @@ on:
         # out on the push path; without pull_request coverage the required
         # check never posts.)
         branches: [master, main, next, hotfixes]
-        paths:
-            - ".github/**"
-            - "scripts/**"
-            - "data/**"
-            - "package.json"
     workflow_dispatch:
 
 permissions:
     contents: read
+    pull-requests: read
 
 concurrency:
     group: local-ci-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
 jobs:
+    # Decide whether this change is entirely covered by the docs-only ignore
+    # list. Required PR Check uses the output to green-light docs PRs without
+    # firing the heavy validate job. See `.github/actions/common/steps/paths-gate`.
+    paths-gate:
+        name: "🧭 Paths gate"
+        runs-on: ubuntu-latest
+        # Mirror the validate job's gating: skip on in-repo non-release PRs
+        # (push on the head branch already ran for that SHA, so no Required
+        # PR Check needs posting here).
+        if: |
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.fork == true ||
+            github.event.pull_request.head.ref == 'next' ||
+            github.event.pull_request.head.ref == 'hotfixes'
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            docs_only: ${{ steps.gate.outputs.docs_only }}
+        steps:
+            - name: Decide docs-only
+              id: gate
+              # Relative path — the action is in this same repo and isn't on
+              # the v4 tag yet during the PR that adds it. Once cut, external
+              # callers via workflow-ci.yml use the v4 pin.
+              uses: ./.github/actions/common/steps/paths-gate
+              with:
+                  paths_ignore: |
+                      **.md
+                      docs/**
+                      *.md
+                      LICENSE
+                      .gitignore
+
     validate:
         name: "🧪 Validate workflows + actions"
+        needs: paths-gate
         runs-on: ubuntu-latest
         # Run on pull_request when:
         #   - the PR is from a fork (push doesn't fire upstream)
@@ -64,11 +97,15 @@ jobs:
         #     without this fallback the required check never posts.
         # Other (in-repo, non-release) PRs skip — push on the head branch
         # already ran CI for that SHA.
+        # Skip when `paths-gate` says the change is docs-only — required-check
+        # still posts green via its own docs_only check below.
         if: |
-            github.event_name != 'pull_request' ||
-            github.event.pull_request.head.repo.fork == true ||
-            github.event.pull_request.head.ref == 'next' ||
-            github.event.pull_request.head.ref == 'hotfixes'
+            needs.paths-gate.outputs.docs_only != 'true' && (
+                github.event_name != 'pull_request' ||
+                github.event.pull_request.head.repo.fork == true ||
+                github.event.pull_request.head.ref == 'next' ||
+                github.event.pull_request.head.ref == 'hotfixes'
+            )
         steps:
             - name: Checkout
               uses: actions/checkout@v6
@@ -321,9 +358,11 @@ jobs:
 
     required-check:
         name: ✅ Required PR Check
-        needs: validate
+        needs: [paths-gate, validate]
         # Mirror the validate job's gating exactly so the status is posted
-        # on the SHA that branch protection actually inspects.
+        # on the SHA that branch protection actually inspects. Includes
+        # `always()` so the docs-only path (where validate is skipped) still
+        # posts a green status.
         if: |
             always() && (
                 github.event_name != 'pull_request' ||
@@ -335,10 +374,17 @@ jobs:
         steps:
             - name: Mirror validate result
               shell: bash
+              env:
+                  DOCS_ONLY: ${{ needs.paths-gate.outputs.docs_only }}
+                  VALIDATE_RESULT: ${{ needs.validate.result }}
               run: |
-                  if [ "${{ needs.validate.result }}" = "success" ]; then
+                  if [ "$DOCS_ONLY" = "true" ]; then
+                      echo "Docs-only change — Required PR Check passes without running validate."
+                      exit 0
+                  fi
+                  if [ "$VALIDATE_RESULT" = "success" ]; then
                       echo "validate passed"
                       exit 0
                   fi
-                  echo "validate did not pass (${{ needs.validate.result }})"
+                  echo "validate did not pass (result=$VALIDATE_RESULT)"
                   exit 1

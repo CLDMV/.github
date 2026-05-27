@@ -16,11 +16,25 @@ name: 🧪 CI Workflow (Org-Level)
 
 on:
     workflow_call:
+        outputs:
+            docs_only:
+                description: "true if every changed file matched `paths_ignore`; false otherwise. Callers should green-light their Required PR Check when this is true so docs-only PRs aren't blocked at the ruleset."
+                value: ${{ jobs.paths-gate.outputs.docs_only }}
         inputs:
             package_name:
                 required: true
                 type: string
                 description: "NPM package name (e.g., @cldmv/slothlet)"
+            paths_ignore:
+                required: false
+                type: string
+                default: |
+                    **.md
+                    docs/**
+                    *.md
+                    LICENSE
+                    .gitignore
+                description: "Multiline list of GitHub paths-ignore-style globs. When every changed file matches one of these, the CI matrix is skipped and `docs_only` output is set to `true` so the caller can post a green Required PR Check without running the heavy chain. Do NOT put these on the `on:` trigger — that skips the workflow entirely and the required check never posts."
             debug:
                 required: false
                 type: boolean
@@ -187,6 +201,23 @@ permissions:
     pull-requests: write
 
 jobs:
+    # Decide whether the triggering change is entirely covered by the
+    # `paths_ignore` glob list. The caller's Required PR Check should
+    # green-light when `docs_only=true` so docs-only PRs aren't blocked at
+    # the ruleset. Heavy jobs (`ci`, `coverage-*`) gate on the output so
+    # they don't run for docs-only changes.
+    paths-gate:
+        name: "🧭 Paths Gate"
+        runs-on: ubuntu-latest
+        outputs:
+            docs_only: ${{ steps.gate.outputs.docs_only }}
+        steps:
+            - name: Decide docs-only
+              id: gate
+              uses: CLDMV/.github/.github/actions/common/steps/paths-gate@v4
+              with:
+                  paths_ignore: ${{ inputs.paths_ignore }}
+
     # Check if we should skip CI based on commit message
     commit-gate:
         name: "🚪 Commit Gate"
@@ -203,8 +234,8 @@ jobs:
 
     ci:
         name: "🏗️ Continuous Integration"
-        needs: commit-gate
-        if: needs.commit-gate.outputs.should_skip != 'true'
+        needs: [paths-gate, commit-gate]
+        if: needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true'
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
@@ -227,8 +258,9 @@ jobs:
 
     coverage-badge:
         name: "📊 Coverage & Badge Push"
-        needs: [ commit-gate, ci ]
+        needs: [ paths-gate, commit-gate, ci ]
         if: >
+            needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && inputs.enable_coverage_badge == true &&
             github.event_name == 'push' && github.ref ==
@@ -255,8 +287,9 @@ jobs:
 
     coverage-pr-comment:
         name: "PR Coverage Badge"
-        needs: [ commit-gate, ci ]
+        needs: [ paths-gate, commit-gate, ci ]
         if: >
+            needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && inputs.enable_coverage_pr_comment == true &&
             github.event_name == 'pull_request'
@@ -277,8 +310,8 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [ commit-gate, ci, coverage-badge, coverage-pr-comment ]
-        if: always() && needs.commit-gate.outputs.should_skip != 'true'
+        needs: [ paths-gate, commit-gate, ci, coverage-badge, coverage-pr-comment ]
+        if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true'
         runs-on: ubuntu-latest
         steps:
             - name: Generate CI Summary
