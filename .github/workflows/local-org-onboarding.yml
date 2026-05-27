@@ -188,9 +188,11 @@ jobs:
                   fi
 
                   json=$(printf '%s\n' "$list" | jq -R . | jq -sc .)
-                  echo "count=$count" >> "$GITHUB_OUTPUT"
-                  echo "repos=$json" >> "$GITHUB_OUTPUT"
-                  echo "mode=$mode" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "count=$count"
+                      echo "repos=$json"
+                      echo "mode=$mode"
+                  } >> "$GITHUB_OUTPUT"
                   {
                       echo "## 📋 Onboarding batch"
                       echo ""
