@@ -80,21 +80,21 @@ jobs:
     # Decide whether this change is entirely covered by the docs-only ignore
     # list. Required PR Check uses the output to green-light docs PRs without
     # firing the heavy validate job. See `.github/actions/common/steps/paths-gate`.
+    # Runs in parallel with sync-gate — keeping them independent avoids the
+    # cascading-skip trap where one gate's skip would force the other to skip
+    # via `needs:` and leave validate skipped (which required-check reports
+    # as red).
     paths-gate:
         name: "🧭 Paths gate"
-        needs: sync-gate
         runs-on: ubuntu-latest
         # Mirror the validate job's gating: skip on in-repo non-release PRs
         # (push on the head branch already ran for that SHA, so no Required
-        # PR Check needs posting here). Also skip when sync-gate says the
-        # branch is just a master sync — nothing to gate.
+        # PR Check needs posting here).
         if: |
-            needs.sync-gate.outputs.is_master_sync != 'true' && (
-                github.event_name != 'pull_request' ||
-                github.event.pull_request.head.repo.fork == true ||
-                github.event.pull_request.head.ref == 'next' ||
-                github.event.pull_request.head.ref == 'hotfixes'
-            )
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.fork == true ||
+            github.event.pull_request.head.ref == 'next' ||
+            github.event.pull_request.head.ref == 'hotfixes'
         permissions:
             contents: read
             pull-requests: read
@@ -138,7 +138,13 @@ jobs:
         # still posts green via its own docs_only check below.
         # Skip when `sync-gate` says next/hotfixes was just force-synced to
         # master — nothing new to test.
+        # `!cancelled()` is load-bearing: either gate job legitimately skips
+        # on most events (sync-gate runs only for push to next/hotfixes;
+        # paths-gate skips on in-repo non-release PRs). Without it, the
+        # cascade-skip default would skip validate too even when validate's
+        # own `if:` would allow it to run.
         if: |
+            !cancelled() &&
             needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' && (
                 github.event_name != 'pull_request' ||

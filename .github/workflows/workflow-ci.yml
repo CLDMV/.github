@@ -264,7 +264,15 @@ jobs:
     ci:
         name: "🏗️ Continuous Integration"
         needs: [sync-gate, paths-gate, commit-gate]
-        if: needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
+        # `!cancelled()` is load-bearing: sync-gate skips on every event that
+        # isn't a push to next/hotfixes, which would cascade-skip ci without
+        # the guard. With it, ci runs whenever the gate outputs (empty when
+        # skipped) don't actively veto.
+        if: |
+            !cancelled() &&
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.sync-gate.outputs.is_master_sync != 'true'
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
@@ -349,6 +357,9 @@ jobs:
     summary:
         name: "📊 CI Summary"
         needs: [ sync-gate, paths-gate, commit-gate, ci, coverage-badge, coverage-pr-comment ]
+        # `always()` is already there so skipped gates don't suppress the
+        # summary; the sync-gate / paths-gate / commit-gate output checks
+        # then decide whether the summary is meaningful enough to produce.
         if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
         runs-on: ubuntu-latest
         steps:
