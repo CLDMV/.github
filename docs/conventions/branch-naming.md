@@ -14,7 +14,7 @@ The **Auto-PR target** column shows where the v4 [`feature-pr.yml`](../../exampl
 | `feature/<slug>` | Same as `feat/<slug>` (alias) | normal CI | `next` |
 | `fix/<slug>` | Bug fixes | normal CI | `next` |
 | `chore/<slug>` | Maintenance, deps, scripts | normal CI | `next` |
-| `docs/<slug>` | Documentation only | normal CI (often skipped via `paths-ignore`) | `next` |
+| `docs/<slug>` | Documentation only | CI fires but the inline `paths-gate` job green-lights Required PR Check when every changed file matches `paths_ignore` (docs/md/LICENSE/.gitignore by default) | `next` |
 | `ci/<slug>` | CI/workflow changes | normal CI | `next` |
 | `refactor/<slug>` | Internal restructuring | normal CI | `next` |
 | `perf/<slug>` | Performance | normal CI | `next` |
