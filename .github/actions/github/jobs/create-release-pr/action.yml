@@ -113,6 +113,13 @@ runs:
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.commit-check.outputs.commits-file }}
+        # Bot App token — drives the PR-ref augmentation (looks up the
+        # source PR for each commit so the grouped output can fold the
+        # original branch commits under their squashed parent). Without
+        # this, commits that lack `(#N)` in their subject (i.e. anything
+        # the augmentation step would have annotated) fall to the bottom
+        # of the section as ungrouped flat bullets.
+        github-token: ${{ inputs.github-token }}
         # next/hotfixes → master release PR body groups each section by the
         # source PR (e.g. `- #48 (7d06c21)` with the contributor commits
         # indented underneath). Every commit in the range was reviewed in its

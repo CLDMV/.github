@@ -451,10 +451,19 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 	for (const c of sectionCommits) {
 		const subject = (c && typeof c.subject === "string" ? c.subject : "") || "";
 		const m = subject.match(/\(#(\d+)\)/);
-		if (m) {
-			const n = Number(m[1]);
-			if (!byPR.has(n)) byPR.set(n, []);
-			byPR.get(n).push(c);
+		let prNumber = m ? Number(m[1]) : null;
+		// Belt-and-suspenders: when the subject doesn't already carry a
+		// `(#N)` ref AND augmentCommitsWithPRRefs didn't get to inject one
+		// (e.g. the token wasn't passed, or the API call failed for this
+		// SHA), try the lookup one more time here. Cheap on cache hits;
+		// degrades gracefully when offline.
+		if (!prNumber && owner && repo && token) {
+			const sha = c?.hash || c?.sha;
+			if (sha) prNumber = await findAssociatedPullNumber(sha, owner, repo, token);
+		}
+		if (prNumber) {
+			if (!byPR.has(prNumber)) byPR.set(prNumber, []);
+			byPR.get(prNumber).push(c);
 		} else {
 			noPR.push(c);
 		}
@@ -470,6 +479,11 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 		const shortSha = owner && repo && token ? await getPRMergeShortSha(n, owner, repo, token, prShaCache) : null;
 		let group = shortSha ? `- #${n} (${shortSha})\n` : `- #${n}\n`;
 		for (const c of byPR.get(n)) {
+			// Skip the commit that IS the PR's merge / squash commit — it's
+			// already represented by the parent line above. Showing it as a
+			// child of itself just adds noise.
+			const cSha = (c.hash || c.sha || "").toLowerCase();
+			if (shortSha && cSha.startsWith(shortSha.toLowerCase())) continue;
 			// Strip the trailing `(#N)` since it's already on the parent line.
 			const subject = (c.subject || "").replace(/\s*\(#\d+\)\s*$/, "");
 			group += `  - ${subject} (${c.hash})\n`;
