@@ -31,7 +31,13 @@ on:
             - "package.json"
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
-        branches: [master, main]
+        # Include the v4 integration branches so:
+        #   - feature PRs targeting next/hotfixes trigger CI
+        #   - release PRs from next/hotfixes → master also trigger CI
+        # (the latter's head SHA is a bot chore-bump that gets commit-gated
+        # out on the push path; without pull_request coverage the required
+        # check never posts.)
+        branches: [master, main, next, hotfixes]
         paths:
             - ".github/**"
             - "scripts/**"
@@ -50,9 +56,19 @@ jobs:
     validate:
         name: "🧪 Validate workflows + actions"
         runs-on: ubuntu-latest
-        # Same fork-PR shape as the example ci.yml — `push` covers same-repo
-        # branches; `pull_request` only does fork PRs.
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true
+        # Run on pull_request when:
+        #   - the PR is from a fork (push doesn't fire upstream)
+        #   - the PR is a v4 release PR — head is next/hotfixes targeting
+        #     master/main. Push-event CI on the head SHA is unreliable
+        #     here because the bot's chore-bump commit gets gated out, so
+        #     without this fallback the required check never posts.
+        # Other (in-repo, non-release) PRs skip — push on the head branch
+        # already ran CI for that SHA.
+        if: |
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.fork == true ||
+            github.event.pull_request.head.ref == 'next' ||
+            github.event.pull_request.head.ref == 'hotfixes'
         steps:
             - name: Checkout
               uses: actions/checkout@v6
@@ -306,7 +322,15 @@ jobs:
     required-check:
         name: ✅ Required PR Check
         needs: validate
-        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
+        # Mirror the validate job's gating exactly so the status is posted
+        # on the SHA that branch protection actually inspects.
+        if: |
+            always() && (
+                github.event_name != 'pull_request' ||
+                github.event.pull_request.head.repo.fork == true ||
+                github.event.pull_request.head.ref == 'next' ||
+                github.event.pull_request.head.ref == 'hotfixes'
+            )
         runs-on: ubuntu-latest
         steps:
             - name: Mirror validate result
