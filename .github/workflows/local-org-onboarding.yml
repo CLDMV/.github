@@ -49,8 +49,8 @@ on:
                 type: boolean
                 required: false
                 default: true
-            advanced_security:
-                description: "GitHub Advanced Security policy. off = disable everywhere. public-only = enable on public repos (where GHAS is free), disable on private/internal. all = enable everywhere (PAID for private)."
+            code_security:
+                description: "GitHub Code Security policy (the paid product that gates CodeQL alerts on private repos; free on public). off = disable everywhere. public-only = enable on public repos (free), disable on private (paid). all = enable everywhere (paid for private)."
                 type: choice
                 required: false
                 default: "off"
@@ -59,7 +59,7 @@ on:
                     - "public-only"
                     - "all"
             secret_protection:
-                description: "Secret Protection (secret scanning + push protection) policy. Same shape as advanced_security. Enabling on private requires advanced_security on too."
+                description: "GitHub Secret Protection policy (secret scanning + push protection — paid on private, free on public). Same off | public-only | all shape as code_security."
                 type: choice
                 required: false
                 default: "off"
@@ -273,7 +273,7 @@ jobs:
                   github_token: ${{ steps.app-token.outputs.token }}
                   dry_run: ${{ github.event.inputs.dry_run }}
                   steps: ${{ github.event.inputs.steps }}
-                  advanced_security: ${{ github.event.inputs.advanced_security }}
+                  code_security: ${{ github.event.inputs.code_security }}
                   secret_protection: ${{ github.event.inputs.secret_protection }}
 
     summary:

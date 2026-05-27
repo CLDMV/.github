@@ -7,9 +7,10 @@
  *     PRs)
  *   - replace the three rulesets from the shared builders module
  *
- * Opt-in security toggles (default off — operator must enable):
- *   - GitHub Advanced Security (GHAS): `enable_advanced_security`
- *   - Secret Protection (scanning + push protection): `enable_secret_protection`
+ * Opt-in paid-on-private security products (3-way: off | public-only | all,
+ * default off; both are free on public, paid on private):
+ *   - GitHub Code Security (CodeQL alerts surface): `code_security`
+ *   - Secret Protection (scanning + push protection): `secret_protection`
  *
  * Overwrites diverged values and emits a warning per divergence so the
  * audit trail captures what changed. Idempotent — re-running is safe.
@@ -75,10 +76,14 @@ async function main() {
 	const botAppId = parseInt(getInput("bot_app_id") || "1910694", 10);
 	// Security feature policies are 3-way: "off" | "public-only" | "all".
 	// public-only resolves per-repo against the visibility check below.
-	const advancedSecurityPolicy = (getInput("advanced_security") || "off").toLowerCase();
+	//
+	// `code_security` is the operator-facing name (matches the unbundled
+	// product name); internally it drives the `security_and_analysis.advanced_security`
+	// API field — GitHub kept the legacy field name after unbundling.
+	const codeSecurityPolicy = (getInput("code_security") || "off").toLowerCase();
 	const secretProtectionPolicy = (getInput("secret_protection") || "off").toLowerCase();
 	for (const [name, val] of [
-		["advanced_security", advancedSecurityPolicy],
+		["code_security", codeSecurityPolicy],
 		["secret_protection", secretProtectionPolicy]
 	]) {
 		if (!["off", "public-only", "all"].includes(val)) {
@@ -223,12 +228,14 @@ async function main() {
 		// security_and_analysis baseline.
 		//
 		// Every field below is driven by operator input (overwrite-with-warn,
-		// same as the rest of the bootstrap). The two paid-on-private features
-		// use a 3-way policy resolved per-repo:
+		// same as the rest of the bootstrap). The two paid-on-private products
+		// (Code Security + Secret Protection — both gated by GitHub billing
+		// on private repos, free on public) use a 3-way policy resolved
+		// per-repo against the repo's visibility:
 		//
-		//   advanced_security: off          → disable GHAS everywhere
-		//   advanced_security: public-only  → enable on public, disable on private
-		//   advanced_security: all          → enable everywhere
+		//   code_security: off          → disable everywhere
+		//   code_security: public-only  → enable on public (free), disable on private (paid)
+		//   code_security: all          → enable everywhere (paid for private)
 		//   (secret_protection has the same shape; secret_scanning +
 		//    secret_scanning_push_protection move together as one feature.)
 		//
@@ -236,16 +243,22 @@ async function main() {
 		// there's no reason to disable security update PRs.
 		//
 		// Both policy inputs default to `off`, so a vanilla bootstrap run
-		// keeps GHAS / Secret Protection off on every repo — the safe stance
-		// for an org-wide fanout. `public-only` is the zero-cost middle
-		// ground: enables the features wherever they're free (public repos)
-		// and leaves them off where they'd cost money (private/internal).
+		// keeps both paid products off on every repo — safe stance for an
+		// org-wide fanout. `public-only` is the zero-cost middle ground:
+		// enables wherever the feature is free (public repos) and leaves it
+		// off where it'd cost money (private/internal).
+		//
+		// API field names: GitHub didn't rename `advanced_security` when it
+		// unbundled GHAS into Code Security + Secret Protection — that field
+		// is now what gates Code Security per-repo. So the operator input
+		// `code_security` drives the `advanced_security` field below; the
+		// `secret_*` fields drive Secret Protection.
 		const isPrivate = !!repoInfo.private; // covers private + internal
-		const ghasOnHere = advancedSecurityPolicy === "all" || (advancedSecurityPolicy === "public-only" && !isPrivate);
+		const codeSecOnHere = codeSecurityPolicy === "all" || (codeSecurityPolicy === "public-only" && !isPrivate);
 		const secProtOnHere = secretProtectionPolicy === "all" || (secretProtectionPolicy === "public-only" && !isPrivate);
 		const saExpected = {
 			dependabot_security_updates: { status: "enabled" },
-			advanced_security: { status: ghasOnHere ? "enabled" : "disabled" },
+			advanced_security: { status: codeSecOnHere ? "enabled" : "disabled" },
 			secret_scanning: { status: secProtOnHere ? "enabled" : "disabled" },
 			secret_scanning_push_protection: { status: secProtOnHere ? "enabled" : "disabled" }
 		};

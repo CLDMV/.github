@@ -30,8 +30,8 @@ on:
                 type: boolean
                 required: false
                 default: true
-            advanced_security:
-                description: "GHAS policy. off = disable. public-only = enable only if this repo is public (free). all = enable (PAID on private)."
+            code_security:
+                description: "Code Security policy. off = disable. public-only = enable only if this repo is public (free). all = enable (paid on private)."
                 type: choice
                 required: false
                 default: "off"
@@ -40,7 +40,7 @@ on:
                     - "public-only"
                     - "all"
             secret_protection:
-                description: "Secret Protection (scanning + push protection) policy. Same shape as advanced_security."
+                description: "Secret Protection (scanning + push protection) policy. Same shape as code_security."
                 type: choice
                 required: false
                 default: "off"
@@ -80,5 +80,5 @@ jobs:
                   github_token: ${{ steps.app-token.outputs.token }}
                   dry_run: ${{ github.event.inputs.dry_run }}
                   steps: ${{ github.event.inputs.steps }}
-                  advanced_security: ${{ github.event.inputs.advanced_security }}
+                  code_security: ${{ github.event.inputs.code_security }}
                   secret_protection: ${{ github.event.inputs.secret_protection }}
