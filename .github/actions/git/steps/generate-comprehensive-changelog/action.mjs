@@ -474,16 +474,18 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 	// Blank line between PR groups makes GitHub render each group as its own
 	// "loose" list item — visually separated, but the nested commits stay
 	// attached to their parent bullet. Matches the confirmed PR-body shape.
+	//
+	// Every commit in the PR's group is listed as a child, INCLUDING the
+	// squash/merge commit whose SHA matches the parent line. The parent
+	// `#N` is only a GitHub render-time link — the actual commit subject
+	// text isn't there for `git log --grep` / changelog-text-search. So
+	// the children carry the searchable text; the parent carries the PR
+	// link + merge SHA for navigation.
 	const groups = [];
 	for (const n of prNumbers) {
 		const shortSha = owner && repo && token ? await getPRMergeShortSha(n, owner, repo, token, prShaCache) : null;
 		let group = shortSha ? `- #${n} (${shortSha})\n` : `- #${n}\n`;
 		for (const c of byPR.get(n)) {
-			// Skip the commit that IS the PR's merge / squash commit — it's
-			// already represented by the parent line above. Showing it as a
-			// child of itself just adds noise.
-			const cSha = (c.hash || c.sha || "").toLowerCase();
-			if (shortSha && cSha.startsWith(shortSha.toLowerCase())) continue;
 			// Strip the trailing `(#N)` since it's already on the parent line.
 			const subject = (c.subject || "").replace(/\s*\(#\d+\)\s*$/, "");
 			group += `  - ${subject} (${c.hash})\n`;
