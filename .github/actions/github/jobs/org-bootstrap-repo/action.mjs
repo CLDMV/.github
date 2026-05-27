@@ -274,17 +274,36 @@ async function main() {
 			secret_scanning: { status: secProtOnHere ? "enabled" : "disabled" },
 			secret_scanning_push_protection: { status: secProtOnHere ? "enabled" : "disabled" }
 		};
-		// `advanced_security` is only settable on private/internal repos.
-		// Public repos hit a 422 from the PATCH endpoint:
-		//   "Updating Advanced Security on this repository is not
-		//    available, nor a pre-requisite for security features."
-		// The features it would otherwise gate (CodeQL, secret scanning)
-		// are free + always-available on public, so the field is hidden.
-		// Including it in the diff on a public repo means the whole atomic
-		// PATCH 422s and the OTHER security_and_analysis fields don't get
-		// applied either. Skip it on public.
-		if (isPrivate) {
+
+		// `advanced_security` is org-managed on modern setups. Heuristic:
+		// only attempt to PATCH it per-repo when the API response actually
+		// INCLUDES the field. Two scenarios where it's absent:
+		//   - Public repos: field doesn't exist (features are free, not
+		//     gated). PATCH 422s with "not available, not a pre-requisite".
+		//   - Private repos covered by an org-level Code Security
+		//     Configuration: field is hidden from the response because the
+		//     org config controls it. PATCH 422s with the same message.
+		// In both cases the field's effective state is "not user-settable
+		// via this endpoint" — only org-level config can change it.
+		const repoAdvSec = repoInfo.security_and_analysis?.advanced_security?.status;
+		if (repoAdvSec) {
+			// Field present in the response → settable per-repo.
 			saExpected.advanced_security = { status: codeSecOnHere ? "enabled" : "disabled" };
+		} else if (codeSecurityPolicy !== "off") {
+			// Operator wants GHAS managed but this repo is org-config-driven.
+			// The per-repo `security_and_analysis.advanced_security` field
+			// is hidden from the API response because an org-level Code
+			// Security Configuration owns it. To change Advanced Security
+			// on this repo, an org admin manages it via the org's Code
+			// Security settings (location varies by GitHub UI version —
+			// look under org Settings for Code security / Code Security
+			// configurations).
+			note(
+				`code_security policy is \`${codeSecurityPolicy}\` but Advanced Security on \`${owner}/${repo}\` ` +
+					`is managed by an org-level Code Security Configuration (the per-repo \`security_and_analysis.advanced_security\` ` +
+					`field is absent from the API response). Change via your org's Code security settings.`
+			);
+			applied.push("security.advanced-security.org-managed");
 		}
 		const saCurrent = repoInfo.security_and_analysis || {};
 		const saDiff = {};
