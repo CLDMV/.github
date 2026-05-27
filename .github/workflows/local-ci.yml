@@ -51,20 +51,50 @@ concurrency:
     cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
 jobs:
+    # Detect whether next/hotfixes was just force-synced to master. After a
+    # release merge the bot force-syncs the integration branches to master
+    # and the resulting push event fires every workflow on a SHA that has
+    # nothing new to test. Downstream jobs gate on the output so they skip
+    # in that case. See `.github/actions/common/steps/master-sync-gate`.
+    sync-gate:
+        name: "🪞 Master sync gate"
+        runs-on: ubuntu-latest
+        # Only relevant on push to next/hotfixes; everything else falls
+        # through with no API call.
+        if: |
+            github.event_name == 'push' &&
+            (github.ref_name == 'next' || github.ref_name == 'hotfixes')
+        permissions:
+            contents: read
+        outputs:
+            is_master_sync: ${{ steps.gate.outputs.is_master_sync }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
+            - name: Decide master-sync
+              id: gate
+              uses: ./.github/actions/common/steps/master-sync-gate
+
     # Decide whether this change is entirely covered by the docs-only ignore
     # list. Required PR Check uses the output to green-light docs PRs without
     # firing the heavy validate job. See `.github/actions/common/steps/paths-gate`.
     paths-gate:
         name: "🧭 Paths gate"
+        needs: sync-gate
         runs-on: ubuntu-latest
         # Mirror the validate job's gating: skip on in-repo non-release PRs
         # (push on the head branch already ran for that SHA, so no Required
-        # PR Check needs posting here).
+        # PR Check needs posting here). Also skip when sync-gate says the
+        # branch is just a master sync — nothing to gate.
         if: |
-            github.event_name != 'pull_request' ||
-            github.event.pull_request.head.repo.fork == true ||
-            github.event.pull_request.head.ref == 'next' ||
-            github.event.pull_request.head.ref == 'hotfixes'
+            needs.sync-gate.outputs.is_master_sync != 'true' && (
+                github.event_name != 'pull_request' ||
+                github.event.pull_request.head.repo.fork == true ||
+                github.event.pull_request.head.ref == 'next' ||
+                github.event.pull_request.head.ref == 'hotfixes'
+            )
         permissions:
             contents: read
             pull-requests: read
@@ -94,7 +124,7 @@ jobs:
 
     validate:
         name: "🧪 Validate workflows + actions"
-        needs: paths-gate
+        needs: [sync-gate, paths-gate]
         runs-on: ubuntu-latest
         # Run on pull_request when:
         #   - the PR is from a fork (push doesn't fire upstream)
@@ -106,7 +136,10 @@ jobs:
         # already ran CI for that SHA.
         # Skip when `paths-gate` says the change is docs-only — required-check
         # still posts green via its own docs_only check below.
+        # Skip when `sync-gate` says next/hotfixes was just force-synced to
+        # master — nothing new to test.
         if: |
+            needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' && (
                 github.event_name != 'pull_request' ||
                 github.event.pull_request.head.repo.fork == true ||
@@ -365,11 +398,11 @@ jobs:
 
     required-check:
         name: ✅ Required PR Check
-        needs: [paths-gate, validate]
+        needs: [sync-gate, paths-gate, validate]
         # Mirror the validate job's gating exactly so the status is posted
         # on the SHA that branch protection actually inspects. Includes
-        # `always()` so the docs-only path (where validate is skipped) still
-        # posts a green status.
+        # `always()` so the docs-only / master-sync paths (where validate
+        # is skipped) still post a green status.
         if: |
             always() && (
                 github.event_name != 'pull_request' ||
@@ -382,9 +415,14 @@ jobs:
             - name: Mirror validate result
               shell: bash
               env:
+                  IS_MASTER_SYNC: ${{ needs.sync-gate.outputs.is_master_sync }}
                   DOCS_ONLY: ${{ needs.paths-gate.outputs.docs_only }}
                   VALIDATE_RESULT: ${{ needs.validate.result }}
               run: |
+                  if [ "$IS_MASTER_SYNC" = "true" ]; then
+                      echo "Branch tip matches master — Required PR Check passes without running validate."
+                      exit 0
+                  fi
                   if [ "$DOCS_ONLY" = "true" ]; then
                       echo "Docs-only change — Required PR Check passes without running validate."
                       exit 0

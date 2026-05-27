@@ -20,6 +20,9 @@ on:
             docs_only:
                 description: "true if every changed file matched `paths_ignore`; false otherwise. Callers should green-light their Required PR Check when this is true so docs-only PRs aren't blocked at the ruleset."
                 value: ${{ jobs.paths-gate.outputs.docs_only }}
+            is_master_sync:
+                description: "true if `next` / `hotfixes` was just force-synced to master (head SHA matches the default branch). Callers should green-light their Required PR Check when this is true — there's no diff to test, no PR to gate."
+                value: ${{ jobs.sync-gate.outputs.is_master_sync }}
         inputs:
             package_name:
                 required: true
@@ -207,6 +210,26 @@ permissions:
     pull-requests: write
 
 jobs:
+    # After a release merge, the bot force-syncs `next` / `hotfixes` to
+    # master. The resulting push event fires every workflow on a SHA that
+    # has nothing new to test. This gate detects that case so downstream
+    # jobs can short-circuit, and the caller's Required PR Check can
+    # green-light. See `.github/actions/common/steps/master-sync-gate`.
+    sync-gate:
+        name: "🪞 Master sync gate"
+        runs-on: ubuntu-latest
+        if: |
+            github.event_name == 'push' &&
+            (github.ref_name == 'next' || github.ref_name == 'hotfixes')
+        permissions:
+            contents: read
+        outputs:
+            is_master_sync: ${{ steps.gate.outputs.is_master_sync }}
+        steps:
+            - name: Decide master-sync
+              id: gate
+              uses: CLDMV/.github/.github/actions/common/steps/master-sync-gate@v4
+
     # Decide whether the triggering change is entirely covered by the
     # `paths_ignore` glob list. The caller's Required PR Check should
     # green-light when `docs_only=true` so docs-only PRs aren't blocked at
@@ -240,8 +263,8 @@ jobs:
 
     ci:
         name: "🏗️ Continuous Integration"
-        needs: [paths-gate, commit-gate]
-        if: needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true'
+        needs: [sync-gate, paths-gate, commit-gate]
+        if: needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             package_name: ${{ inputs.package_name }}
@@ -325,8 +348,8 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [ paths-gate, commit-gate, ci, coverage-badge, coverage-pr-comment ]
-        if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true'
+        needs: [ sync-gate, paths-gate, commit-gate, ci, coverage-badge, coverage-pr-comment ]
+        if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
         runs-on: ubuntu-latest
         steps:
             - name: Generate CI Summary
