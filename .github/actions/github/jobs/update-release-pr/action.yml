@@ -154,6 +154,12 @@ runs:
         # next/hotfixes → master release PR body groups each section by the
         # source PR. See create-release-pr/action.yml for the rationale.
         group-by-pr: "true"
+        # Bot App token — same role as the create-release-pr counterpart:
+        # the PR-ref augmentation needs auth'd /commits/{sha}/pulls calls
+        # so the original branch commits get associated with their source
+        # PR and grouped under it. Without this, the secondary commits
+        # fall to the bottom as ungrouped flat bullets.
+        github-token: ${{ inputs.github-token }}
 
     # Capture the version currently encoded in the PR title BEFORE we rewrite
     # it, so the calling workflow can gate a release-PR notification on

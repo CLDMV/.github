@@ -451,10 +451,19 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 	for (const c of sectionCommits) {
 		const subject = (c && typeof c.subject === "string" ? c.subject : "") || "";
 		const m = subject.match(/\(#(\d+)\)/);
-		if (m) {
-			const n = Number(m[1]);
-			if (!byPR.has(n)) byPR.set(n, []);
-			byPR.get(n).push(c);
+		let prNumber = m ? Number(m[1]) : null;
+		// Belt-and-suspenders: when the subject doesn't already carry a
+		// `(#N)` ref AND augmentCommitsWithPRRefs didn't get to inject one
+		// (e.g. the token wasn't passed, or the API call failed for this
+		// SHA), try the lookup one more time here. Cheap on cache hits;
+		// degrades gracefully when offline.
+		if (!prNumber && owner && repo && token) {
+			const sha = c?.hash || c?.sha;
+			if (sha) prNumber = await findAssociatedPullNumber(sha, owner, repo, token);
+		}
+		if (prNumber) {
+			if (!byPR.has(prNumber)) byPR.set(prNumber, []);
+			byPR.get(prNumber).push(c);
 		} else {
 			noPR.push(c);
 		}
@@ -465,6 +474,13 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 	// Blank line between PR groups makes GitHub render each group as its own
 	// "loose" list item — visually separated, but the nested commits stay
 	// attached to their parent bullet. Matches the confirmed PR-body shape.
+	//
+	// Every commit in the PR's group is listed as a child, INCLUDING the
+	// squash/merge commit whose SHA matches the parent line. The parent
+	// `#N` is only a GitHub render-time link — the actual commit subject
+	// text isn't there for `git log --grep` / changelog-text-search. So
+	// the children carry the searchable text; the parent carries the PR
+	// link + merge SHA for navigation.
 	const groups = [];
 	for (const n of prNumbers) {
 		const shortSha = owner && repo && token ? await getPRMergeShortSha(n, owner, repo, token, prShaCache) : null;
