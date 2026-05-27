@@ -1,0 +1,186 @@
+#
+# @Project: workflows
+# @Filename: /local-org-onboarding.yml
+# @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Org-wide v4 onboarding fanout. Run ONCE from this repo's Actions tab and
+# bootstrap up to N target repos in parallel. Each target gets the full
+# baseline applied by the `org-bootstrap-repo` composite action:
+#   - next + hotfixes branches created if missing
+#   - repo settings flipped to v4 defaults
+#   - security toggles enabled (alerts, secret scanning + push protection,
+#     dependabot security updates, private vulnerability reporting)
+#   - the three rulesets replaced with the org canonical defaults
+#
+# Overwrite-with-warn policy: existing diverged values are overwritten and
+# logged in the run summary so the audit trail captures what changed.
+#
+# Run order: triage repos first ("dirt heads", in-flight PRs, etc.), then
+# add the ready ones to a batch file and dispatch this workflow against
+# that batch. Re-running is safe — every step in the composite is idempotent.
+name: 🏗️ Org Onboarding (v4 Fanout)
+
+on:
+    workflow_dispatch:
+        inputs:
+            repos:
+                description: 'Comma-separated `owner/name` list. Leave blank to use `repos_file`. Example: `CLDMV/foo,CLDMV/bar`'
+                required: false
+                default: ""
+            repos_file:
+                description: 'Path in THIS repo to a newline-delimited list of `owner/name` entries. Blank lines and `#` comments allowed. Example: `data/onboarding-batches/batch-1.txt`'
+                required: false
+                default: ""
+            dry_run:
+                description: "Log every PUT/POST/PATCH/DELETE that *would* fire without actually applying. Default `true` — explicit opt-in required to mutate."
+                type: boolean
+                required: false
+                default: true
+            steps:
+                description: "Subset of phases to run, comma-separated. Default runs everything."
+                required: false
+                default: "branches,settings,security,rulesets"
+            concurrency:
+                description: "Max parallel per-repo jobs. GitHub Actions caps matrix at 256."
+                required: false
+                default: "10"
+
+permissions:
+    contents: read
+
+jobs:
+    plan:
+        name: "📋 Resolve target repo list"
+        runs-on: ubuntu-latest
+        outputs:
+            repos: ${{ steps.resolve.outputs.repos }}
+            count: ${{ steps.resolve.outputs.count }}
+        steps:
+            - name: Checkout (for repos_file lookup)
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+
+            - name: Resolve repo list
+              id: resolve
+              shell: bash
+              env:
+                  REPOS_INLINE: ${{ github.event.inputs.repos }}
+                  REPOS_FILE: ${{ github.event.inputs.repos_file }}
+              run: |
+                  set -euo pipefail
+                  raw=""
+                  if [ -n "${REPOS_INLINE}" ]; then
+                      raw=$(printf '%s' "$REPOS_INLINE" | tr ',' '\n')
+                  elif [ -n "${REPOS_FILE}" ]; then
+                      if [ ! -f "$REPOS_FILE" ]; then
+                          echo "::error::repos_file '$REPOS_FILE' not found in this repo" >&2
+                          exit 1
+                      fi
+                      raw=$(cat "$REPOS_FILE")
+                  else
+                      echo "::error::Provide either 'repos' or 'repos_file' input" >&2
+                      exit 1
+                  fi
+                  # Drop comments + blanks, normalize whitespace, dedupe.
+                  list=$(printf '%s\n' "$raw" \
+                      | sed -E 's/#.*$//' \
+                      | tr -d '\r' \
+                      | awk 'NF' \
+                      | sort -u)
+                  if [ -z "$list" ]; then
+                      echo "::error::Empty repo list after filtering" >&2
+                      exit 1
+                  fi
+                  # Validate owner/name shape.
+                  while IFS= read -r entry; do
+                      if ! printf '%s' "$entry" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
+                          echo "::error::Invalid entry '$entry' (expected owner/name)" >&2
+                          exit 1
+                      fi
+                  done <<< "$list"
+                  count=$(printf '%s\n' "$list" | wc -l)
+                  json=$(printf '%s\n' "$list" | jq -R . | jq -sc .)
+                  echo "count=$count" >> "$GITHUB_OUTPUT"
+                  echo "repos=$json" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "## 📋 Onboarding batch"
+                      echo ""
+                      echo "**Count:** $count repo(s)"
+                      echo ""
+                      echo "**Dry run:** \`${{ github.event.inputs.dry_run }}\`"
+                      echo ""
+                      echo '<details><summary>Target repos</summary>'
+                      echo ""
+                      echo '```'
+                      printf '%s\n' "$list"
+                      echo '```'
+                      echo "</details>"
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+    bootstrap:
+        name: "🏗️ ${{ matrix.repo }}"
+        needs: plan
+        if: needs.plan.outputs.count != '0'
+        runs-on: ubuntu-latest
+        # `max-parallel` honors the user's `concurrency` input; matrix continues
+        # on individual failures so one bad repo doesn't block the rest.
+        strategy:
+            fail-fast: false
+            max-parallel: ${{ fromJSON(github.event.inputs.concurrency || '10') }}
+            matrix:
+                repo: ${{ fromJSON(needs.plan.outputs.repos) }}
+        steps:
+            - name: Split owner / name from target_repo
+              id: target
+              shell: bash
+              env:
+                  TARGET: ${{ matrix.repo }}
+              run: |
+                  owner="${TARGET%%/*}"
+                  name="${TARGET#*/}"
+                  echo "owner=$owner" >> "$GITHUB_OUTPUT"
+                  echo "name=$name" >> "$GITHUB_OUTPUT"
+
+            - name: Create App token (target-repo owner)
+              id: app-token
+              # Mints an App-installation token for the target repo's owner.
+              # The App must be installed on each target — repos where the App
+              # isn't installed fail fast in the bootstrap step with a clear
+              # GitHub error.
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+                  owner: ${{ steps.target.outputs.owner }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Bootstrap
+              id: bootstrap
+              uses: CLDMV/.github/.github/actions/github/jobs/org-bootstrap-repo@v4
+              with:
+                  target_repo: ${{ matrix.repo }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+                  dry_run: ${{ github.event.inputs.dry_run }}
+                  steps: ${{ github.event.inputs.steps }}
+
+    summary:
+        name: "📊 Aggregate summary"
+        needs: [plan, bootstrap]
+        if: always() && needs.plan.outputs.count != '0'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Aggregate per-repo status
+              shell: bash
+              run: |
+                  {
+                      echo "## 📊 Org onboarding result"
+                      echo ""
+                      echo "See individual per-repo job pages for the warn-on-diff details — each repo's run summary lists every divergence that was overwritten."
+                      echo ""
+                      echo "**Bootstrap job overall:** \`${{ needs.bootstrap.result }}\`"
+                  } >> "$GITHUB_STEP_SUMMARY"

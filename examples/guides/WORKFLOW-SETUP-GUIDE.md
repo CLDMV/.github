@@ -190,13 +190,22 @@ Normalizes contributor PR titles to Conventional Commits format (the release flo
 
 ### 🚀 v4 Bootstrap
 
-**File:** `release-flow-v4/v4-bootstrap.yml` &nbsp;·&nbsp; **Calls:** (inline `gh api`)
+**File:** `release-flow-v4/v4-bootstrap.yml` &nbsp;·&nbsp; **Calls:** `org-bootstrap-repo@v4`
 
-One-shot setup, run once per repo via the Actions tab. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches" (next/hotfixes must survive PR merges — they're the persistent release-PR heads). Idempotent. Defaults `dry_run: true`.
+One-shot setup, run once per repo via the Actions tab. Thin wrapper around the shared `org-bootstrap-repo` composite that applies the full v4 org baseline:
+
+- Creates `next` + `hotfixes` from master HEAD if missing.
+- Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`.
+- Enables security toggles: Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting.
+- Replaces the three rulesets (`Protect Master/Next/Hotfixes`) with the org canonical defaults from `data/rulesets/*.json` (or, equivalently, what the [browser ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) emits with default options).
+
+Idempotent — re-running is safe. Overwrite-with-warn policy: existing diverged values are overwritten and surfaced in the run summary so the audit trail captures what changed. Defaults `dry_run: true`.
+
+**For onboarding many repos at once**, prefer `local-org-onboarding.yml` in `CLDMV/.github` — it fans out across a list of target repos in parallel, applying the same baseline.
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — bot App credentials (App needs `administration: write` for the auto-merge / branch-delete toggle).
+**Required secrets** — bot App credentials (App needs `administration: write` for security toggles + ruleset import).
 
 **Prereqs** — master branch with at least one commit. Doesn't apply branch protection — import the rulesets by hand after running; the run summary links them.
 

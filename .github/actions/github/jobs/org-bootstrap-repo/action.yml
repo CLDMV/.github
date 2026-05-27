@@ -1,0 +1,58 @@
+#
+# @Project: org-bootstrap-repo
+# @Filename: /action.yml
+# @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Org Bootstrap (single repo)"
+description: "Apply the v4 org-wide baseline to one repo: create next/hotfixes branches, flip repo settings, enable security toggles, replace the three rulesets. Idempotent — re-running is safe. Overwrites diverged settings/rulesets and surfaces every divergence as a warning so the audit trail captures what changed. Used by both v4-bootstrap.yml (per-repo dispatch) and local-org-onboarding.yml (org-wide fanout)."
+
+inputs:
+  target_repo:
+    description: "Target repo in `owner/name` form. Defaults to GITHUB_REPOSITORY (the workflow's own repo) when unset, so the per-repo v4-bootstrap dispatch call doesn't have to pass it."
+    required: false
+    default: ""
+  github_token:
+    description: "App token with administration:write on the target repo. Mint with the App scoped to a single repo for org-fanout matrix jobs; for the per-repo dispatch case the same token the rest of the bootstrap uses is fine."
+    required: true
+  dry_run:
+    description: "If `true`, GET state and log every PUT/POST/PATCH/DELETE that *would* be applied without actually firing them. Default `true` — explicit opt-in required to mutate."
+    required: false
+    default: "true"
+  steps:
+    description: "Comma-separated subset of phases to run. Default `branches,settings,security,rulesets` runs everything; pass a subset for partial reapply (e.g. `rulesets` to re-import after editing builders.mjs)."
+    required: false
+    default: "branches,settings,security,rulesets"
+  next_branch:
+    description: "Integration branch name for features/fixes."
+    required: false
+    default: "next"
+  hotfixes_branch:
+    description: "Integration branch name for hotfixes."
+    required: false
+    default: "hotfixes"
+  bot_app_id:
+    description: "Numeric GitHub App ID to pre-add to next/hotfixes ruleset bypass_actors. Defaults to CLDMV's bot App."
+    required: false
+    default: "1910694"
+
+outputs:
+  status:
+    description: "`succeeded`, `skipped`, or `failed`. Drives the org-fanout's summary table."
+    value: ${{ steps.bootstrap.outputs.status }}
+  skip_reason:
+    description: "Reason when status=skipped (e.g. `archived`, `no-master`)."
+    value: ${{ steps.bootstrap.outputs.skip_reason }}
+  applied:
+    description: "Comma-separated list of step ids that actually mutated state (vs. were already correct)."
+    value: ${{ steps.bootstrap.outputs.applied }}
+  warnings:
+    description: "Newline-separated divergence warnings — settings or rulesets that were overwritten because they didn't match the org baseline."
+    value: ${{ steps.bootstrap.outputs.warnings }}
+
+runs:
+  using: node24
+  main: action.mjs

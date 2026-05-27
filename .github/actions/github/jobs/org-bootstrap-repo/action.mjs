@@ -1,0 +1,263 @@
+/**
+ * @fileoverview Per-repo bootstrap. Applies the v4 org baseline to ONE repo:
+ *   - create next/hotfixes if missing
+ *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods)
+ *   - enable security toggles (dependabot alerts + security updates, secret
+ *     scanning + push protection, private vulnerability reporting)
+ *   - replace the three rulesets from the shared builders module
+ *
+ * Overwrites diverged values and emits a warning per divergence so the
+ * audit trail captures what changed. Idempotent — re-running is safe.
+ *
+ * Called by:
+ *   - local-org-onboarding.yml (matrix fanout across many repos)
+ *   - examples/.../v4-bootstrap.yml (per-repo dispatch)
+ *
+ * @module @cldmv/.github.github.jobs.org-bootstrap-repo
+ */
+
+import { getInput, setOutput, appendSummary } from "../../../common/common/core.mjs";
+import { api } from "../../api/_api/core.mjs";
+import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-generator/builders.mjs";
+
+const warnings = [];
+const applied = [];
+
+function warn(msg) {
+	warnings.push(msg);
+	console.log(`⚠️  ${msg}`);
+}
+
+function note(msg) {
+	console.log(`ℹ️  ${msg}`);
+}
+
+function ok(msg, stepId) {
+	console.log(`✅ ${msg}`);
+	if (stepId) applied.push(stepId);
+}
+
+function finish(status, reason = "") {
+	setOutput("status", status);
+	setOutput("skip_reason", reason);
+	setOutput("applied", applied.join(","));
+	setOutput("warnings", warnings.join("\n"));
+	if (status === "skipped") {
+		appendSummary(`### ⏭️ Bootstrap skipped — ${reason}`);
+	} else {
+		appendSummary(`### ${status === "succeeded" ? "✅" : "❌"} Bootstrap ${status}`);
+		if (applied.length) {
+			appendSummary("");
+			appendSummary(`**Applied:** ${applied.length} step(s)`);
+			for (const a of applied) appendSummary(`- \`${a}\``);
+		}
+		if (warnings.length) {
+			appendSummary("");
+			appendSummary(`**Warnings (divergence from baseline — overwritten):**`);
+			for (const w of warnings) appendSummary(`- ${w}`);
+		}
+	}
+	process.exit(status === "failed" ? 1 : 0);
+}
+
+async function main() {
+	const token = getInput("github_token", { required: true });
+	const dryRun = getInput("dry_run") !== "false";
+	const stepsCsv = getInput("steps") || "branches,settings,security,rulesets";
+	const steps = new Set(stepsCsv.split(",").map((s) => s.trim()).filter(Boolean));
+	const nextBranch = getInput("next_branch") || "next";
+	const hotfixesBranch = getInput("hotfixes_branch") || "hotfixes";
+	const botAppId = parseInt(getInput("bot_app_id") || "1910694", 10);
+
+	const targetRepo = getInput("target_repo") || process.env.GITHUB_REPOSITORY || "";
+	const [owner, repo] = targetRepo.split("/");
+	if (!owner || !repo) throw new Error(`Invalid target_repo: "${targetRepo}" (expected owner/name)`);
+
+	const ctx = { token, owner, repo };
+	console.log(`🚀 Bootstrap ${owner}/${repo}  (dry_run=${dryRun}, steps=${[...steps].join("+")})`);
+
+	/** Wrap a mutating call so dry_run suppresses the fire-the-API part. */
+	async function mutate(method, path, body, label) {
+		if (dryRun) {
+			console.log(`🔸 [dry-run] would ${method} ${path}`);
+			return null;
+		}
+		return api(method, path, body, ctx);
+	}
+
+	// ── PRECHECK ───────────────────────────────────────────────────────────
+	let repoInfo;
+	try {
+		repoInfo = await api("GET", "", null, ctx);
+	} catch (err) {
+		throw new Error(`Could not GET repo ${owner}/${repo}: ${err.message}`);
+	}
+	if (repoInfo.archived) return finish("skipped", "archived");
+	const defaultBranch = repoInfo.default_branch || "master";
+	if (defaultBranch !== "master") {
+		warn(`default branch is "${defaultBranch}", not master — proceeding with that as the master analog`);
+	}
+
+	let defaultBranchSha;
+	try {
+		const ref = await api("GET", `/git/ref/heads/${defaultBranch}`, null, ctx);
+		defaultBranchSha = ref.object?.sha || "";
+	} catch (err) {
+		return finish("skipped", `no commits on default branch ${defaultBranch}`);
+	}
+	if (!defaultBranchSha) return finish("skipped", `default branch ${defaultBranch} has no HEAD`);
+
+	// ── BRANCHES ──────────────────────────────────────────────────────────
+	if (steps.has("branches")) {
+		for (const branch of [nextBranch, hotfixesBranch]) {
+			let exists = false;
+			let existingSha = "";
+			try {
+				const ref = await api("GET", `/git/ref/heads/${branch}`, null, ctx);
+				exists = true;
+				existingSha = ref.object?.sha || "";
+			} catch (err) {
+				if (!err.message.includes("404")) throw err;
+			}
+			if (exists) {
+				if (existingSha !== defaultBranchSha) {
+					note(`${branch} exists at ${existingSha.slice(0, 7)} (diverged from ${defaultBranch}@${defaultBranchSha.slice(0, 7)}) — leaving alone`);
+				} else {
+					note(`${branch} already at ${defaultBranch} HEAD — no-op`);
+				}
+				applied.push(`branch.${branch}.existed`);
+				continue;
+			}
+			await mutate("POST", "/git/refs", { ref: `refs/heads/${branch}`, sha: defaultBranchSha }, `create ${branch}`);
+			ok(`created ${branch} at ${defaultBranchSha.slice(0, 7)}`, `branch.${branch}.created`);
+		}
+	}
+
+	// ── REPO SETTINGS ─────────────────────────────────────────────────────
+	if (steps.has("settings")) {
+		const expected = {
+			allow_auto_merge: true,
+			delete_branch_on_merge: false,
+			allow_squash_merge: true,
+			allow_merge_commit: true,
+			allow_rebase_merge: false,
+			allow_update_branch: true,
+			web_commit_signoff_required: false
+		};
+		const diff = {};
+		for (const [k, v] of Object.entries(expected)) {
+			const actual = repoInfo[k];
+			if (actual !== v) {
+				warn(`setting \`${k}\` was \`${actual}\`, overwriting to \`${v}\``);
+				diff[k] = v;
+			}
+		}
+		if (Object.keys(diff).length > 0) {
+			await mutate("PATCH", "", diff, "patch repo settings");
+			ok(`patched repo settings: ${Object.keys(diff).join(", ")}`, "settings.patched");
+		} else {
+			note("repo settings already match baseline");
+			applied.push("settings.already-correct");
+		}
+	}
+
+	// ── SECURITY ──────────────────────────────────────────────────────────
+	if (steps.has("security")) {
+		// Dependabot vulnerability alerts. GET returns 204 if enabled, 404 if not.
+		try {
+			await api("GET", "/vulnerability-alerts", null, ctx);
+			note("vulnerability-alerts already enabled");
+			applied.push("security.vuln-alerts.already-on");
+		} catch (err) {
+			if (!err.message.includes("404")) throw err;
+			warn("vulnerability-alerts was OFF, turning ON");
+			await mutate("PUT", "/vulnerability-alerts", null, "enable vulnerability-alerts");
+			ok("enabled vulnerability-alerts", "security.vuln-alerts.enabled");
+		}
+
+		// Automated security fixes (the auto-PR creation for vuln fixes).
+		// Same GET-204-vs-404 protocol.
+		try {
+			await api("GET", "/automated-security-fixes", null, ctx);
+			note("automated-security-fixes already enabled");
+			applied.push("security.auto-fixes.already-on");
+		} catch (err) {
+			if (!err.message.includes("404")) throw err;
+			warn("automated-security-fixes was OFF, turning ON");
+			await mutate("PUT", "/automated-security-fixes", null, "enable automated-security-fixes");
+			ok("enabled automated-security-fixes", "security.auto-fixes.enabled");
+		}
+
+		// Private vulnerability reporting.
+		try {
+			const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
+			if (prv?.enabled) {
+				note("private-vulnerability-reporting already enabled");
+				applied.push("security.pvr.already-on");
+			} else {
+				warn("private-vulnerability-reporting was OFF, turning ON");
+				await mutate("PUT", "/private-vulnerability-reporting", null, "enable PVR");
+				ok("enabled private-vulnerability-reporting", "security.pvr.enabled");
+			}
+		} catch (err) {
+			warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+		}
+
+		// security_and_analysis: secret_scanning + push_protection + dependabot_security_updates.
+		// On private repos without GHAS, some of these PATCHes 403 — we surface and continue.
+		const saExpected = {
+			secret_scanning: { status: "enabled" },
+			secret_scanning_push_protection: { status: "enabled" },
+			dependabot_security_updates: { status: "enabled" }
+		};
+		const saCurrent = repoInfo.security_and_analysis || {};
+		const saDiff = {};
+		for (const [k, v] of Object.entries(saExpected)) {
+			const actual = saCurrent[k]?.status;
+			if (actual !== "enabled") {
+				warn(`security_and_analysis.${k} was \`${actual || "unset"}\`, overwriting to \`enabled\``);
+				saDiff[k] = v;
+			}
+		}
+		if (Object.keys(saDiff).length > 0) {
+			try {
+				await mutate("PATCH", "", { security_and_analysis: saDiff }, "patch security_and_analysis");
+				ok(`patched security_and_analysis: ${Object.keys(saDiff).join(", ")}`, "security.sa.patched");
+			} catch (err) {
+				warn(`security_and_analysis PATCH failed (likely needs GHAS for private repos): ${err.message}`);
+			}
+		} else {
+			note("security_and_analysis already matches baseline");
+			applied.push("security.sa.already-correct");
+		}
+	}
+
+	// ── RULESETS ──────────────────────────────────────────────────────────
+	if (steps.has("rulesets")) {
+		const desired = buildAll({ ...DEFAULT_OPTS, botAppId });
+		const existing = await api("GET", "/rulesets", null, ctx);
+		const byName = new Map((existing || []).map((r) => [r.name, r]));
+
+		for (const [branchKey, ruleset] of Object.entries(desired)) {
+			const match = byName.get(ruleset.name);
+			if (match) {
+				warn(`ruleset "${ruleset.name}" already exists (id=${match.id}) — replacing per overwrite-with-warn policy`);
+				await mutate("DELETE", `/rulesets/${match.id}`, null, `delete existing ruleset ${match.id}`);
+				await mutate("POST", "/rulesets", ruleset, `create ruleset ${ruleset.name}`);
+				ok(`replaced ruleset "${ruleset.name}"`, `rulesets.${branchKey}.replaced`);
+			} else {
+				await mutate("POST", "/rulesets", ruleset, `create ruleset ${ruleset.name}`);
+				ok(`created ruleset "${ruleset.name}"`, `rulesets.${branchKey}.created`);
+			}
+		}
+	}
+
+	finish("succeeded");
+}
+
+main().catch((error) => {
+	console.error(`::error::${error.message}`);
+	if (error.stack) console.error(error.stack);
+	warnings.push(`FATAL: ${error.message}`);
+	finish("failed");
+});
