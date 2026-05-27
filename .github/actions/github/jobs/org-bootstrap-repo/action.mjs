@@ -243,20 +243,21 @@ async function main() {
 		// Our scaffolding ships an advanced `codeql.yml` workflow (consumers
 		// adopt it from examples/individual-repo-workflows/security/), so
 		// default setup being on means CodeQL will start failing the moment
-		// the consumer runs their first CI. Detect-only (no overwrite): the
-		// fix is one of two operator choices — either switch to advanced in
-		// the repo's Settings → Code security and analysis, or remove the
-		// custom workflow. Either is wrong to pick for the operator.
+		// the consumer runs their first CI. The baseline is therefore
+		// `not-configured` — overwrite-with-warn like the rest of the
+		// security phase. Operators who actually prefer default setup
+		// should delete their custom codeql.yml; the next bootstrap
+		// re-runs and leaves default setup alone if the conflict is gone.
 		try {
 			const ds = await api("GET", "/code-scanning/default-setup", null, ctx);
 			if (ds?.state === "configured") {
-				warn(
-					`CodeQL default setup is \`configured\` — will conflict with the custom codeql.yml workflow. ` +
-						`Resolve in the repo's Settings → Code security and analysis: either Switch to advanced (recommended ` +
-						`if you adopted security/codeql.yml from the v4 templates), or remove the custom codeql.yml. ` +
-						`Until resolved, advanced-config SARIF uploads will be rejected.`
-				);
-				applied.push("security.codeql-default-setup.conflict-detected");
+				warn(`CodeQL default setup was \`configured\`, overwriting to \`not-configured\` (conflicts with the custom codeql.yml workflow)`);
+				try {
+					await mutate("PATCH", "/code-scanning/default-setup", { state: "not-configured" }, "disable CodeQL default setup");
+					ok("disabled CodeQL default setup", "security.codeql-default-setup.disabled");
+				} catch (err) {
+					warn(`disable CodeQL default setup failed: ${err.message}`);
+				}
 			} else {
 				note(`CodeQL default setup state: \`${ds?.state || "unset"}\` (no conflict)`);
 				applied.push("security.codeql-default-setup.ok");
