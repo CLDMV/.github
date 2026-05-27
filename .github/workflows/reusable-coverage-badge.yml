@@ -103,6 +103,13 @@ on:
                 description: "Passphrase for the GPG key"
                 required: true
 
+# Workflow-level: needs to push the computed badge JSON onto the `badges`
+# branch. The push uses the bot App token (minted in the job), but the
+# GITHUB_TOKEN still needs `contents: write` for actions/checkout's full
+# fetch + the post-job permission cap on git operations.
+permissions:
+    contents: write
+
 jobs:
     coverage-badge:
         name: "📊 Coverage & Badge Push"

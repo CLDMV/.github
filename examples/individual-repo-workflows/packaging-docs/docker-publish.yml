@@ -31,6 +31,14 @@ on:
         required: false
         default: "npm test"
 
+# Workflow-level: GHCR push needs `packages:write`. `contents:read` for
+# the build context checkout. `id-token:write` for cosign OIDC-attested
+# image provenance.
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
   docker-publish:
     uses: CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v4
