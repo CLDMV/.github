@@ -137,6 +137,14 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
+# Minimal workflow-level baseline. The reusable `workflow-ci.yml` declares
+# its own elevated permissions (coverage badge publish, etc.) on the jobs
+# that need them — those are scoped per-job, not granted org-wide here.
+# The mirror job below overrides with `permissions: {}` since it only runs
+# shell commands and never touches the GitHub API.
+permissions:
+  contents: read
+
 jobs:
   ci:
     name: 🏗️ Continuous Integration
@@ -221,6 +229,9 @@ jobs:
     # intact for branch protection.
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest
+    # Pure shell mirror — no GitHub API access needed. Strip the workflow's
+    # `contents: read` default to zero on this job specifically.
+    permissions: {}
     steps:
       - name: Mirror reusable result
         run: |
