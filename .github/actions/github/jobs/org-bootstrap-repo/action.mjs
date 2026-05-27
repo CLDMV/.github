@@ -188,10 +188,9 @@ async function main() {
 			ok("enabled automated-security-fixes", "security.auto-fixes.enabled");
 		}
 
-		// Private vulnerability reporting. 404 from this endpoint means the
-		// feature isn't available on this particular repo (org policy off,
-		// repo type not eligible, etc.) — that's not a divergence, just
-		// "feature unavailable here". Treat as a note, not a warning.
+		// Private vulnerability reporting. 404/403 from this endpoint means
+		// the feature isn't available on this repo — usually because the
+		// org-level policy hasn't turned it on. Surface where to enable it.
 		try {
 			const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
 			if (prv?.enabled) {
@@ -204,7 +203,13 @@ async function main() {
 			}
 		} catch (err) {
 			if (err.message.includes("404") || err.message.includes("403")) {
-				note(`private-vulnerability-reporting not available for this repo (${err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable"}) — skipping`);
+				const code = err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable";
+				note(
+					`private-vulnerability-reporting unavailable on \`${owner}/${repo}\` (HTTP ${code}). To enable: ` +
+						`https://github.com/${owner}/${repo}/settings/security_analysis → "Private vulnerability reporting" → Enable. ` +
+						`If toggle is greyed out, org admin must allow PVR at ` +
+						`https://github.com/organizations/${owner}/settings/security_analysis first.`
+				);
 				applied.push("security.pvr.unavailable");
 			} else {
 				warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
@@ -232,7 +237,12 @@ async function main() {
 				await mutate("PATCH", "", { security_and_analysis: saDiff }, "patch security_and_analysis");
 				ok(`patched security_and_analysis: ${Object.keys(saDiff).join(", ")}`, "security.sa.patched");
 			} catch (err) {
-				warn(`security_and_analysis PATCH failed (likely needs GHAS for private repos): ${err.message}`);
+				warn(
+					`security_and_analysis PATCH failed on \`${owner}/${repo}\`: ${err.message}. ` +
+						`Private repos need GitHub Advanced Security for secret scanning + push protection. ` +
+						`Enable at https://github.com/${owner}/${repo}/settings/security_analysis ` +
+						`(or org-wide at https://github.com/organizations/${owner}/settings/security_analysis) and re-run the bootstrap.`
+				);
 			}
 		} else {
 			note("security_and_analysis already matches baseline");
@@ -276,15 +286,23 @@ async function main() {
 			//       without GHAS, where code scanning isn't available at
 			//       all. Default setup can't be configured here either,
 			//       so the conflict can't exist. Same effective answer
-			//       as 404: nothing to do.
+			//       as 404: nothing to do, but tell the operator where
+			//       to enable code scanning if they want it.
 			if (err.message.includes("404")) {
 				note("CodeQL default setup not configured (404) — no conflict");
 				applied.push("security.codeql-default-setup.ok");
 			} else if (err.message.includes("403") && err.message.includes("Code Security")) {
-				note("Code scanning unavailable (private repo without GHAS) — CodeQL default-setup check skipped");
+				note(
+					`Code scanning unavailable on \`${owner}/${repo}\` (private repo without GitHub Advanced Security). ` +
+						`No CodeQL conflict to resolve. To enable code scanning here: enable GHAS at ` +
+						`https://github.com/${owner}/${repo}/settings/security_analysis (Code security and analysis → Enable). ` +
+						`Org-wide GHAS toggle: https://github.com/organizations/${owner}/settings/security_analysis. ` +
+						`Alternative: make the repo public (GHAS is free on public repos), or delete the custom codeql.yml ` +
+						`if this repo shouldn't run code scanning.`
+				);
 				applied.push("security.codeql-default-setup.unavailable");
 			} else {
-				warn(`could not check CodeQL default setup: ${err.message} — skipping`);
+				warn(`could not check CodeQL default setup on \`${owner}/${repo}\`: ${err.message}`);
 			}
 		}
 	}
