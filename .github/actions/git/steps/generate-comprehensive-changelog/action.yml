@@ -15,6 +15,10 @@ inputs:
     description: "Whether to use commit message directly for single commits (true for publish, false for PR)"
     required: false
     default: "false"
+  group-by-pr:
+    description: "Group each section's commits by their associated PR number, with the PR's merge SHA on the parent line and the contributor commits indented underneath. Intended for release-to-master PR bodies opened from next/hotfixes, where every commit was already reviewed in its own PR and the per-PR grouping carries more signal than a flat list."
+    required: false
+    default: "false"
 
 outputs:
   changelog-content:
@@ -33,5 +37,6 @@ runs:
         COMMITS_INPUT: ${{ inputs.commits }}
         COMMIT_RANGE_INPUT: ${{ inputs.commit-range }}
         USE_SINGLE_COMMIT_MESSAGE: ${{ inputs.use-single-commit-message }}
+        GROUP_BY_PR: ${{ inputs.group-by-pr }}
       run: |
         node "${{ github.action_path }}/action.mjs"

@@ -8,9 +8,10 @@ These workflows ship a complete CI / release / publish pipeline tuned for the **
 
 1. **Adopt the v4 release-flow workflows** — copy the set from [`examples/individual-repo-workflows/release-flow-v4/`](examples/individual-repo-workflows/release-flow-v4/) into your repo's `.github/workflows/`. These are adopted as a set (they depend on each other).
 2. **Copy the core CI / publish / tag templates** from [`examples/individual-repo-workflows/core-cicd/`](examples/individual-repo-workflows/core-cicd/) and update `package_name` to your NPM package name. Add the security / automation templates you want from the other subfolders.
-3. **Import the branch rulesets** for `master` / `next` / `hotfixes` from the [ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) — pick approvals count and bot-bypass options once, download three JSON files, import each via **Settings → Rules → Rulesets → New ruleset → Import**.
-4. **Dispatch `v4-bootstrap.yml`** from the Actions tab once (`dry_run: true` first to preview, then `false`). Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
-5. **Configure fork-PR approval** — **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators" (or stricter). The example `ci.yml` runs on `push` for in-repo branches and on `pull_request_target` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
+3. **Bootstrap the repo** — applies branches + rulesets + security toggles + repo settings in one shot. Two ways:
+    - **Org-wide fanout (recommended for ≥3 repos)** — add the target repos to a batch file in [`data/onboarding-batches/`](data/onboarding-batches/) and dispatch `local-org-onboarding.yml` from `CLDMV/.github`'s Actions tab. Runs against N repos in parallel; idempotent.
+    - **Per-repo dispatch (one-offs)** — dispatch `v4-bootstrap.yml` from the target repo's Actions tab. Same baseline, scoped to the one repo.
+4. **Configure fork-PR approval** — **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators" (or stricter). No public REST API for this knob, so it stays a manual step. The example `ci.yml` runs on `push` for in-repo branches and on `pull_request_target` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
 
 For agent-driven scaffolding, point your agent at [`examples/guides/AGENT-SCAFFOLDING.md`](examples/guides/AGENT-SCAFFOLDING.md) — it walks through discovery questions, decisions, copy/customize steps, and validation. For human-driven setup, see [`examples/guides/WORKFLOW-SETUP-GUIDE.md`](examples/guides/WORKFLOW-SETUP-GUIDE.md).
 
@@ -63,7 +64,8 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   ├── reusable-welcome.yml                     # First-time contributor welcome
 │   ├── reusable-bundle-size.yml                 # Bundle-size diff on PRs
 │   ├── reusable-docs-publish.yml                # gh-pages docs publisher
-│   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out
+│   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out (release: published)
+│   ├── reusable-pr-notifier.yml                 # Discord / Slack / webhook fan-out (pull_request: opened)
 │   ├── reusable-branch-retention.yml            # Prune merged branches
 │   └── reusable-cla.yml                         # CLA bot (central ledger, per-version signing)
 └── actions/                                     # reusable actions (Node)
@@ -169,7 +171,8 @@ Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/indi
 | `reusable-welcome.yml` | Friendly first-PR / first-issue welcome with conditional links to CONTRIBUTING / CLA / COC. |
 | `reusable-bundle-size.yml` | Diff `dist/` sizes on PRs; comment with delta table. For runtime libs. |
 | `reusable-docs-publish.yml` | Build docs and push to `gh-pages` branch. |
-| `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook channels. Per-repo channel config merged with org default. |
+| `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_RELEASES_<VIS>_WEBHOOK` — set the secret to enable; unset = no-op. Repo secret overrides org. |
+| `reusable-pr-notifier.yml` | On `pull_request:opened`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_PR_<VIS>_WEBHOOK`. Same secret precedence as the release notifier. |
 | `reusable-branch-retention.yml` | On PR merge: prune most head branches; keep last N of `release/*` / `hotfix/*`. |
 | `reusable-cla.yml` | Per-CLA-version signing via "I agree" comment, with per-repo override support. Default scope (no consumer `CLA.md`): bot uses org-wide CLA from the private `CLDMV/.cla-signatures` ledger; one signature covers every CLDMV repo until major.minor is bumped. Override scope (consumer has root `CLA.md`): bot enforces that text and bootstraps an immutable snapshot in the ledger on first signature; drift (text changes without a version bump) is rejected. Org members exempt. |
 

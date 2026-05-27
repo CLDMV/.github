@@ -43,7 +43,7 @@ Ask the user these questions before touching any files. Use a single batched que
 | 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml`. The bot uses the org-wide default CLA from the `CLDMV/.cla-signatures` ledger — no per-repo `CLA.md` is needed in the default case. Only add a local `CLA.md` if this repo needs an **override** with custom terms; ask about that separately as Q6b. |
 | 6b | (Only if Q6 is yes) Does this repo need a CLA with **different terms** than the org-wide default? | bool | If yes, ask the user for the override CLA text; place at root as `CLA.md` with a `# … CLA — v1.0` header. The bot will detect override scope automatically and bootstrap a snapshot in the ledger on the first signature. |
 | 7 | Want Dependabot enabled for this repo? | bool | If yes, adopt `dependabot.yml` (routes PRs to `next`; security updates auto-promote to `hotfixes` via `hotfix-redirector.yml`). The companion `dependabot-auto-merge.yml` is **ON by default** — drop it from the adoption set only if the user explicitly wants to review each Dependabot PR by hand. |
-| 8 | Want Discord/Slack release notifications? | bool | If yes, adopt `release-notify.yml` (also requires `.github/release-notifier.yml` + per-channel webhook secrets) |
+| 8 | Want Discord/Slack/webhook release notifications? | bool | If yes, adopt `release-notify.yml` (and `pr-notify.yml` for PR-opened notifications). Each channel is a single secret named `<TYPE>_<KIND>_<VIS>_WEBHOOK` — set the secret to enable, unset = no-op. No config file required. |
 | 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
 | 10 | Should the standard org-default labels be synced into this repo? | bool | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only) |
 | 11 | Does this repo have (or need) a private test suite pulled from a separate private repo via an anonymous gitlink (typically `tests/`)? | bool | If yes, set `enable_embedded_tests: true` on the `ci.yml` workflow call. Confirm the matching private repo exists per the URL-mapping convention (`<org>/<repo>-tests` for a `tests/` gitlink). See [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md). Independent of workflow adoption — it's a single input on the existing CI workflow. |
@@ -95,7 +95,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | 6 | true | `cla.yml` | `security/cla.yml`. Do **not** add a `CLA.md` to the repo root unless Q6b is also yes — the bot defaults to the org-wide CLA from `CLDMV/.cla-signatures` and a stray local `CLA.md` would silently switch the repo into override scope. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo. |
 | 6b | true | `CLA.md` at repo root | Copy the consumer's override text into `CLA.md` with a `# … CLA — v1.0` header. (Or, if they want to start from the default and customize, copy from `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging.) The bot detects override scope by file presence; no other config needed. |
 | 7 | true | `dependabot.yml` + `dependabot-auto-merge.yml` | Copy `automation/dependabot.yml` to `.github/dependabot.yml` (NOT `.github/workflows/`); copy `automation/dependabot-auto-merge.yml` to `.github/workflows/`. Customize `dependabot.yml` ecosystems for the user's stack (drop the npm block for non-Node repos; add gomod / pip / docker / etc. as needed). |
-| 8 | true | `release-notify.yml` | `release-companions/release-notify.yml` (also: create empty `.github/release-notifier.yml` and tell the user to add channel config + webhook secrets) |
+| 8 | true | `release-notify.yml` + `pr-notify.yml` | `release-companions/release-notify.yml` and `release-companions/pr-notify.yml`. No config file needed. Tell the user to set whichever `<TYPE>_<KIND>_<VIS>_WEBHOOK` secrets they want active (org-level for the default; repo-level overrides). The release-PR notifier is already wired into `next-release.yml` / `hotfixes-release.yml` from Q7's flow — see the `RELEASE_PR` secret block below. |
 | 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
 | 11 | true | (no new file) | Set `enable_embedded_tests: true` on the existing `ci.yml`'s workflow call. Confirm the matching private repo exists (`<org>/<repo>-tests` for `tests/`; or `<org>/<repo>-embedded` for the consolidated layout — see [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md)). Confirm the bot App has access to the private repo. |
 
@@ -154,15 +154,7 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
   ```
 - **`branch-retention.yml`** (from Q9): defaults already exempt `master, main, badges, gh-pages, next, hotfixes`. If the user listed extra patterns, append them: `exempt_patterns: '["master","main","badges","gh-pages","next","hotfixes","<their-branch>"]'`.
 - **`cla.yml`** (Q6): no per-repo `CLA.md` by default — the bot uses the org-wide CLA from the ledger. If the user answered Q6b = yes (override), drop their custom CLA text at the repo root as `CLA.md` with a `# … CLA — v1.0` header. (Starting from the default text: fetch `https://raw.githubusercontent.com/CLDMV/.github/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and let the user edit.) Add a TODO in your final report: "if you added a CLA.md, confirm the text with legal before merging". Also add: "confirm the org-level `CLDMV/.cla-signatures` ledger repo exists (private) and the bot App has Contents: write on it; one-time org setup independent of this consumer repo".
-- **`release-notify.yml`** (Q8): create `.github/release-notifier.yml` with this stub:
-  ```yaml
-  channels:
-    # Add channel configs here. Each one references a webhook secret you'll
-    # add separately in repo Settings → Secrets and variables → Actions.
-    # Example for Discord:
-    # - type: discord
-    #   webhook_secret: DISCORD_RELEASE_WEBHOOK
-  ```
+- **`release-notify.yml` + `pr-notify.yml`** (Q8): no per-repo config file. Each channel is one secret named `<TYPE>_<KIND>_<VIS>_WEBHOOK`. Tell the user to set whichever secrets they want active (see the "release notifications" section under Phase 4 secrets). Org-level secret = default for all v4 repos; repo-level secret with the same name = override or empty-string mute.
 
 ### 3.4 — Create orphan support branches if needed
 
@@ -194,16 +186,23 @@ If the consumer's source layout differs from the org default (`src/`-centric), c
 
 You cannot do these from the CLI. Report them all at the end of your scaffolding run as a single checklist.
 
-### One-time v4 setup (in order, after the scaffold PR is merged to `master`/`main`)
+### One-time v4 setup (after the scaffold PR is merged to `master`/`main`)
 
-- [ ] **Dispatch `v4-bootstrap.yml`** from the Actions tab — `dry_run: true` first to preview, then `dry_run: false` to apply. Creates `next` + `hotfixes` from master HEAD, enables "Allow auto-merge", and disables "Automatically delete head branches".
-- [ ] **Generate + import the three rulesets** (`master` / `next` / `hotfixes`) from the [CLDMV ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/). In your repo: **Settings → Rules → Rulesets → New ruleset → Import**.
-- [ ] **Add the bot App to the bypass list** on the `next` + `hotfixes` rulesets (the generator pre-adds CLDMV's bot App ID by default; if you opted out, do it by hand here). The bot mutates `next`/`hotfixes` via the REST API on every release — without bypass, GitHub rejects with `GH013`. `master` does **not** get bot bypass.
+**Two ways to run it — pick one:**
 
-### Repo settings (Settings tab)
+- **Org-wide fanout (recommended for ≥3 repos):** add this repo to a batch file in `CLDMV/.github/data/onboarding-batches/`, then dispatch `local-org-onboarding.yml` from the `CLDMV/.github` Actions tab with `dry_run: true` (preview), then `dry_run: false` (apply). One run handles N repos in parallel.
+- **Per-repo dispatch (one-offs):** in this repo's Actions tab, dispatch `v4-bootstrap.yml` with `dry_run: true`, then `dry_run: false`.
 
-- [ ] **Settings → Actions → General → Fork pull request workflows from outside collaborators** → set to "Require approval for all outside collaborators"
-- [ ] Branch protection is handled by the rulesets above; no per-branch rule needed.
+Either path applies the same baseline (idempotent, re-run safe, overwrite-with-warn):
+
+- `next` + `hotfixes` branches created from master HEAD if missing
+- Repo settings flipped to v4 defaults (allow_auto_merge, delete_branch_on_merge=false, merge methods, etc.)
+- Security toggles enabled (Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting)
+- Three rulesets installed (`Protect Master`, `Protect Next`, `Protect Hotfixes`) — bot App pre-added to next/hotfixes bypass
+
+### Repo settings (still requires the GitHub UI — no API)
+
+- [ ] **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators". There's no public REST API for this knob.
 
 ### Secrets to add (Settings → Secrets and variables → Actions)
 
@@ -223,9 +222,15 @@ For npm publishing (REQUIRED if Q2 = `npm` and not using trusted publishers):
 
 - [ ] `NPM_TOKEN`
 
-For release notifications (REQUIRED if Q8 = true, one per channel):
+For release / PR / release-PR notifications (OPTIONAL, set whichever channels you want):
 
-- [ ] `DISCORD_<NAME>_WEBHOOK`, `SLACK_<NAME>_WEBHOOK`, etc. — names match `.github/release-notifier.yml` config
+The secret name itself encodes the channel — `<TYPE>_<KIND>_<VIS>_WEBHOOK`. Set the secret at the org level for an org-wide default; override or mute per-repo by setting a repo-level secret with the same name (empty string = mute). Visibility is auto-detected (public vs private/internal).
+
+| `<KIND>` | Fires on | Pick whichever of these you want |
+|---|---|---|
+| `RELEASES` | `release: published` | `DISCORD_RELEASES_PUBLIC_WEBHOOK`, `DISCORD_RELEASES_PRIVATE_WEBHOOK`, `SLACK_RELEASES_PUBLIC_WEBHOOK`, `SLACK_RELEASES_PRIVATE_WEBHOOK`, `GENERIC_RELEASES_PUBLIC_WEBHOOK`, `GENERIC_RELEASES_PRIVATE_WEBHOOK` |
+| `PR` | `pull_request: opened` | `DISCORD_PR_PUBLIC_WEBHOOK`, `DISCORD_PR_PRIVATE_WEBHOOK`, `SLACK_PR_PUBLIC_WEBHOOK`, `SLACK_PR_PRIVATE_WEBHOOK`, `GENERIC_PR_PUBLIC_WEBHOOK`, `GENERIC_PR_PRIVATE_WEBHOOK` |
+| `RELEASE_PR` | release-PR version-bump (inline, in `next-release.yml` / `hotfixes-release.yml`) | `DISCORD_RELEASE_PR_PUBLIC_WEBHOOK`, `DISCORD_RELEASE_PR_PRIVATE_WEBHOOK`, `SLACK_RELEASE_PR_PUBLIC_WEBHOOK`, `SLACK_RELEASE_PR_PRIVATE_WEBHOOK`, `GENERIC_RELEASE_PR_PUBLIC_WEBHOOK`, `GENERIC_RELEASE_PR_PRIVATE_WEBHOOK` |
 
 ### Bot App permissions (Org admin only)
 
@@ -350,6 +355,6 @@ After scaffolding, hand the user this summary (fill in `[brackets]`):
 > - `[N]` secrets to add (listed)
 > - `[N]` bot App permissions to request from org admin (listed)
 > - `[Y/N]` adapt `CLA.md` for legal review
-> - `[Y/N]` add channel config to `.github/release-notifier.yml` with webhook secrets
+> - `[Y/N]` set `<TYPE>_<KIND>_<VIS>_WEBHOOK` secrets for any notifier channels you want active (org-level default, repo-level override)
 >
 > Re-run me with "verify v4 scaffolding" after you've completed the v4 setup steps (Phase 4) to run the end-to-end flow test (Phase 5.4).

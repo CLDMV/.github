@@ -113,6 +113,12 @@ runs:
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.commit-check.outputs.commits-file }}
+        # next/hotfixes → master release PR body groups each section by the
+        # source PR (e.g. `- #48 (7d06c21)` with the contributor commits
+        # indented underneath). Every commit in the range was reviewed in its
+        # own PR; grouping by PR carries more signal than a flat list and
+        # collapses stacked-PR duplicates visually.
+        group-by-pr: "true"
 
     - name: Detect default branch
       id: default-branch
