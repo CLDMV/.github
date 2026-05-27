@@ -188,7 +188,10 @@ async function main() {
 			ok("enabled automated-security-fixes", "security.auto-fixes.enabled");
 		}
 
-		// Private vulnerability reporting.
+		// Private vulnerability reporting. 404 from this endpoint means the
+		// feature isn't available on this particular repo (org policy off,
+		// repo type not eligible, etc.) — that's not a divergence, just
+		// "feature unavailable here". Treat as a note, not a warning.
 		try {
 			const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
 			if (prv?.enabled) {
@@ -200,7 +203,12 @@ async function main() {
 				ok("enabled private-vulnerability-reporting", "security.pvr.enabled");
 			}
 		} catch (err) {
-			warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+			if (err.message.includes("404") || err.message.includes("403")) {
+				note(`private-vulnerability-reporting not available for this repo (${err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable"}) — skipping`);
+				applied.push("security.pvr.unavailable");
+			} else {
+				warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+			}
 		}
 
 		// security_and_analysis: secret_scanning + push_protection + dependabot_security_updates.
@@ -263,10 +271,18 @@ async function main() {
 				applied.push("security.codeql-default-setup.ok");
 			}
 		} catch (err) {
-			// 404 on repos that have never touched the endpoint is normal.
+			// 404 → endpoint never touched on this repo (no conflict).
+			// 403 → "Code Security must be enabled" — i.e. private repo
+			//       without GHAS, where code scanning isn't available at
+			//       all. Default setup can't be configured here either,
+			//       so the conflict can't exist. Same effective answer
+			//       as 404: nothing to do.
 			if (err.message.includes("404")) {
 				note("CodeQL default setup not configured (404) — no conflict");
 				applied.push("security.codeql-default-setup.ok");
+			} else if (err.message.includes("403") && err.message.includes("Code Security")) {
+				note("Code scanning unavailable (private repo without GHAS) — CodeQL default-setup check skipped");
+				applied.push("security.codeql-default-setup.unavailable");
 			} else {
 				warn(`could not check CodeQL default setup: ${err.message} — skipping`);
 			}
