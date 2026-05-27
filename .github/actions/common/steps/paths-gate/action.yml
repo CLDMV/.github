@@ -1,0 +1,17 @@
+name: "Paths Gate"
+description: "Decide whether a triggering change is entirely covered by paths-ignore globs, so the Required PR Check can green-light docs-only PRs without skipping the workflow at the trigger level."
+inputs:
+  paths_ignore:
+    description: "Multiline list of GitHub paths-ignore-style globs. A change is `docs_only` only when every changed file matches at least one of these patterns. Empty (or all-blank) opts out — the action emits `docs_only=false` without an API round-trip."
+    required: false
+    default: ""
+  github-token:
+    description: "Token for GitHub REST API calls (defaults to github.token)."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  docs_only:
+    description: "true if every changed file matched a paths_ignore glob; false otherwise. Empty string when the event has no diff context (workflow_dispatch / schedule / new-branch push)."
+runs:
+  using: "node24"
+  main: "action.mjs"
