@@ -38,20 +38,28 @@ inputs:
     description: "Numeric GitHub App ID to pre-add to next/hotfixes ruleset bypass_actors. Defaults to CLDMV's bot App."
     required: false
     default: "1910694"
+  advanced_security:
+    description: "GitHub Advanced Security (GHAS) policy. One of `off` | `public-only` | `all`. `off` = disable GHAS on every repo. `public-only` = enable on public repos (where GHAS is free), disable on private/internal (where it's a paid feature). `all` = enable everywhere (paid for private). Overwrite-with-warn in either direction. Default `off`."
+    required: false
+    default: "off"
+  secret_protection:
+    description: "Secret Protection (secret scanning + push protection) policy. Same `off` | `public-only` | `all` shape as `advanced_security`. On private repos this requires GHAS too — set `advanced_security: all` (or `public-only` if you only want it where it's free) to match."
+    required: false
+    default: "off"
 
 outputs:
+  # Node actions don't use the composite `value: ${{ steps.<id>.outputs.<name> }}`
+  # syntax — the script writes via $GITHUB_OUTPUT directly and the runner
+  # picks the values up by name. Declarations below are for documentation +
+  # consumer discoverability only.
   status:
     description: "`succeeded`, `skipped`, or `failed`. Drives the org-fanout's summary table."
-    value: ${{ steps.bootstrap.outputs.status }}
   skip_reason:
     description: "Reason when status=skipped (e.g. `archived`, `no-master`)."
-    value: ${{ steps.bootstrap.outputs.skip_reason }}
   applied:
     description: "Comma-separated list of step ids that actually mutated state (vs. were already correct)."
-    value: ${{ steps.bootstrap.outputs.applied }}
   warnings:
     description: "Newline-separated divergence warnings — settings or rulesets that were overwritten because they didn't match the org baseline."
-    value: ${{ steps.bootstrap.outputs.warnings }}
 
 runs:
   using: node24

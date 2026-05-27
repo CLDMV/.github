@@ -49,6 +49,24 @@ on:
                 type: boolean
                 required: false
                 default: true
+            advanced_security:
+                description: "GitHub Advanced Security policy. off = disable everywhere. public-only = enable on public repos (where GHAS is free), disable on private/internal. all = enable everywhere (PAID for private)."
+                type: choice
+                required: false
+                default: "off"
+                options:
+                    - "off"
+                    - "public-only"
+                    - "all"
+            secret_protection:
+                description: "Secret Protection (secret scanning + push protection) policy. Same shape as advanced_security. Enabling on private requires advanced_security on too."
+                type: choice
+                required: false
+                default: "off"
+                options:
+                    - "off"
+                    - "public-only"
+                    - "all"
             steps:
                 description: "Subset of phases to run, comma-separated. Default runs everything."
                 required: false
@@ -255,6 +273,8 @@ jobs:
                   github_token: ${{ steps.app-token.outputs.token }}
                   dry_run: ${{ github.event.inputs.dry_run }}
                   steps: ${{ github.event.inputs.steps }}
+                  advanced_security: ${{ github.event.inputs.advanced_security }}
+                  secret_protection: ${{ github.event.inputs.secret_protection }}
 
     summary:
         name: "📊 Aggregate summary"
