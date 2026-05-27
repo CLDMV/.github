@@ -28,13 +28,22 @@ on:
     workflow_dispatch:
         inputs:
             repos:
-                description: 'Comma-separated `owner/name` list. Leave blank to use `repos_file`. Example: `CLDMV/foo,CLDMV/bar`'
+                description: 'OVERRIDE: comma-separated `owner/name` list. Leave blank for auto-discovery of the whole org. Example: `CLDMV/foo,CLDMV/bar`'
                 required: false
                 default: ""
             repos_file:
-                description: 'Path in THIS repo to a newline-delimited list of `owner/name` entries. Blank lines and `#` comments allowed. Example: `data/onboarding-batches/batch-1.txt`'
+                description: 'OVERRIDE: path in THIS repo to a newline-delimited list of `owner/name` entries. Blank lines and `#` comments allowed. Example: `data/onboarding-batches/batch-1.txt`. Leave blank for auto-discovery.'
                 required: false
                 default: ""
+            exclude:
+                description: "Comma-separated `owner/name` entries to skip from auto-discovery. Ignored when `repos` / `repos_file` is set (those are already explicit lists)."
+                required: false
+                default: ""
+            include_forks:
+                description: "Include forks in auto-discovery. Default off — forks shouldn't carry the org's release flow."
+                type: boolean
+                required: false
+                default: false
             dry_run:
                 description: "Log every PUT/POST/PATCH/DELETE that *would* fire without actually applying. Default `true` — explicit opt-in required to mutate."
                 type: boolean
@@ -59,9 +68,25 @@ jobs:
         outputs:
             repos: ${{ steps.resolve.outputs.repos }}
             count: ${{ steps.resolve.outputs.count }}
+            mode: ${{ steps.resolve.outputs.mode }}
         steps:
             - name: Checkout (for repos_file lookup)
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+
+            - name: Create App token (org-wide read for auto-discovery)
+              id: app-token
+              # Needed for the GET /orgs/{org}/repos call in auto-discovery
+              # mode. When `repos` or `repos_file` is set, we still mint the
+              # token (cheap) so the workflow flow stays uniform — the API
+              # call just doesn't fire.
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+                  owner: ${{ github.repository_owner }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
             - name: Resolve repo list
               id: resolve
@@ -69,31 +94,81 @@ jobs:
               env:
                   REPOS_INLINE: ${{ github.event.inputs.repos }}
                   REPOS_FILE: ${{ github.event.inputs.repos_file }}
+                  EXCLUDE: ${{ github.event.inputs.exclude }}
+                  INCLUDE_FORKS: ${{ github.event.inputs.include_forks }}
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  GH_OWNER: ${{ github.repository_owner }}
+                  THIS_REPO: ${{ github.repository }}
               run: |
                   set -euo pipefail
+
+                  if [ -n "${REPOS_INLINE}" ] && [ -n "${REPOS_FILE}" ]; then
+                      echo "::error::Set either 'repos' or 'repos_file' (or neither, for auto-discovery) — not both." >&2
+                      exit 1
+                  fi
+
+                  mode=""
                   raw=""
                   if [ -n "${REPOS_INLINE}" ]; then
+                      mode="explicit-inline"
                       raw=$(printf '%s' "$REPOS_INLINE" | tr ',' '\n')
                   elif [ -n "${REPOS_FILE}" ]; then
+                      mode="explicit-file"
                       if [ ! -f "$REPOS_FILE" ]; then
                           echo "::error::repos_file '$REPOS_FILE' not found in this repo" >&2
                           exit 1
                       fi
                       raw=$(cat "$REPOS_FILE")
                   else
-                      echo "::error::Provide either 'repos' or 'repos_file' input" >&2
-                      exit 1
+                      # AUTO-DISCOVERY: every non-archived repo in the org.
+                      # `--paginate` walks all pages; default per_page=30 is
+                      # fine, gh handles the link-header chase. Forks excluded
+                      # unless include_forks=true. Archived always excluded.
+                      mode="auto-discover"
+                      include_forks="${INCLUDE_FORKS:-false}"
+                      fork_jq='select(.fork == false)'
+                      if [ "$include_forks" = "true" ]; then
+                          fork_jq='.'
+                      fi
+                      raw=$(gh api --paginate "orgs/$GH_OWNER/repos?per_page=100&type=all" \
+                          --jq ".[] | select(.archived == false) | $fork_jq | .full_name")
+                      if [ -z "$raw" ]; then
+                          echo "::error::Auto-discovery returned no repos for org '$GH_OWNER'. Bot App may lack org:read or have no repos installed." >&2
+                          exit 1
+                      fi
                   fi
+
                   # Drop comments + blanks, normalize whitespace, dedupe.
                   list=$(printf '%s\n' "$raw" \
                       | sed -E 's/#.*$//' \
                       | tr -d '\r' \
                       | awk 'NF' \
                       | sort -u)
+
+                  # Auto-discovery always skips this repo (running the bootstrap
+                  # against itself while a dispatch is mid-flight would race).
+                  # Explicit modes don't filter — the user opted in by name.
+                  if [ "$mode" = "auto-discover" ]; then
+                      list=$(printf '%s\n' "$list" | grep -vxF "$THIS_REPO" || true)
+                  fi
+
+                  # Apply user-supplied excludes (auto-discovery only; explicit
+                  # modes ignore this — the user already picked the list).
+                  if [ "$mode" = "auto-discover" ] && [ -n "${EXCLUDE}" ]; then
+                      while IFS=',' read -r -a excl_arr; do
+                          for excl in "${excl_arr[@]}"; do
+                              excl_trim=$(printf '%s' "$excl" | tr -d '[:space:]')
+                              [ -z "$excl_trim" ] && continue
+                              list=$(printf '%s\n' "$list" | grep -vxF "$excl_trim" || true)
+                          done
+                      done <<< "$EXCLUDE"
+                  fi
+
                   if [ -z "$list" ]; then
                       echo "::error::Empty repo list after filtering" >&2
                       exit 1
                   fi
+
                   # Validate owner/name shape.
                   while IFS= read -r entry; do
                       if ! printf '%s' "$entry" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
@@ -101,15 +176,26 @@ jobs:
                           exit 1
                       fi
                   done <<< "$list"
+
                   count=$(printf '%s\n' "$list" | wc -l)
+
+                  # Matrix cap (GitHub Actions limit = 256). For larger orgs,
+                  # use repos_file batches instead.
+                  if [ "$count" -gt 256 ]; then
+                      echo "::warning::$count repos exceeds GitHub Actions matrix cap (256). Truncating; split into batches via repos_file for full coverage." >&2
+                      list=$(printf '%s\n' "$list" | head -n 256)
+                      count=256
+                  fi
+
                   json=$(printf '%s\n' "$list" | jq -R . | jq -sc .)
                   echo "count=$count" >> "$GITHUB_OUTPUT"
                   echo "repos=$json" >> "$GITHUB_OUTPUT"
+                  echo "mode=$mode" >> "$GITHUB_OUTPUT"
                   {
                       echo "## 📋 Onboarding batch"
                       echo ""
+                      echo "**Source:** \`$mode\`"
                       echo "**Count:** $count repo(s)"
-                      echo ""
                       echo "**Dry run:** \`${{ github.event.inputs.dry_run }}\`"
                       echo ""
                       echo '<details><summary>Target repos</summary>'
