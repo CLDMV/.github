@@ -21,6 +21,7 @@ const COMMITS_INPUT = (() => {
 })();
 const COMMIT_RANGE_INPUT = process.env.COMMIT_RANGE_INPUT;
 const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "true";
+const GROUP_BY_PR = process.env.GROUP_BY_PR === "true";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY;
 
@@ -393,6 +394,101 @@ async function augmentCommitsWithPRRefs(commits, owner, repo, token) {
 	return commits;
 }
 
+/**
+ * Look up a pull request's merge_commit_sha. Returns the short SHA (7 chars)
+ * when the PR landed via "Create a merge commit" (next/hotfixes policy on v4),
+ * null when it was rebase- or squash-merged (no merge commit exists) or on
+ * lookup failure. Results are cached per call to avoid N requests for the
+ * same PR when its commits span multiple sections.
+ *
+ * @param {number} prNumber
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {Map<number,string|null>} cache
+ * @returns {Promise<string|null>} Short merge SHA or null.
+ */
+async function getPRMergeShortSha(prNumber, owner, repo, token, cache) {
+	if (cache.has(prNumber)) return cache.get(prNumber);
+	try {
+		const pr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
+		const sha = pr && typeof pr.merge_commit_sha === "string" && pr.merge_commit_sha ? pr.merge_commit_sha.slice(0, 7) : null;
+		cache.set(prNumber, sha);
+		return sha;
+	} catch (err) {
+		console.log(`⚠️ Could not look up merge SHA for #${prNumber}: ${err.message}`);
+		cache.set(prNumber, null);
+		return null;
+	}
+}
+
+/**
+ * Render a section's commits grouped by their associated PR number. Each PR
+ * group looks like:
+ *
+ *   - #48 (7d06c21)
+ *     - fix(changelog): drop merge commits... (7ccdfde)
+ *     - fix(changelog): another commit... (deadbee)
+ *
+ * The parent line carries the PR's merge SHA when one exists (merge-commit
+ * landed) and omits the parens otherwise (rebase- or squash-merged PRs have
+ * no merge commit). PRs are sorted newest-first by number. Commits that
+ * don't carry a `(#N)` ref — direct pushes, augmentation failures — are
+ * emitted at the bottom of the section as flat bullets.
+ *
+ * @param {Array} sectionCommits
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {Map<number,string|null>} prShaCache
+ * @returns {Promise<string>}
+ */
+async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prShaCache) {
+	if (!Array.isArray(sectionCommits) || sectionCommits.length === 0) return "";
+
+	const byPR = new Map();
+	const noPR = [];
+	for (const c of sectionCommits) {
+		const subject = (c && typeof c.subject === "string" ? c.subject : "") || "";
+		const m = subject.match(/\(#(\d+)\)/);
+		if (m) {
+			const n = Number(m[1]);
+			if (!byPR.has(n)) byPR.set(n, []);
+			byPR.get(n).push(c);
+		} else {
+			noPR.push(c);
+		}
+	}
+
+	const prNumbers = Array.from(byPR.keys()).sort((a, b) => b - a);
+
+	// Blank line between PR groups makes GitHub render each group as its own
+	// "loose" list item — visually separated, but the nested commits stay
+	// attached to their parent bullet. Matches the confirmed PR-body shape.
+	const groups = [];
+	for (const n of prNumbers) {
+		const shortSha = owner && repo && token ? await getPRMergeShortSha(n, owner, repo, token, prShaCache) : null;
+		let group = shortSha ? `- #${n} (${shortSha})\n` : `- #${n}\n`;
+		for (const c of byPR.get(n)) {
+			// Strip the trailing `(#N)` since it's already on the parent line.
+			const subject = (c.subject || "").replace(/\s*\(#\d+\)\s*$/, "");
+			group += `  - ${subject} (${c.hash})\n`;
+		}
+		groups.push(group);
+	}
+
+	let out = groups.join("\n");
+
+	if (noPR.length > 0) {
+		if (out.length > 0) out += "\n";
+		for (const c of noPR) {
+			out += `- ${c.subject} (${c.hash})\n`;
+		}
+	}
+
+	return out;
+}
+
 function extractPullRequestNumber(text) {
 	if (!text) {
 		return null;
@@ -735,7 +831,7 @@ async function convertAuthorToGitHubLink(author, email, token) {
  * @param {string} token - GitHub API token for user lookups
  * @returns {Promise<string>} Generated changelog content
  */
-async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false) {
+async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false, groupByPR = false) {
 	console.log(`🔍 DEBUG: generateComprehensiveChangelog called with:`);
 	console.log(`  - commitRange: ${commitRange}`);
 	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + " commits" : "provided but not array") : "null"}`);
@@ -867,18 +963,36 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// /commits/{sha}/pulls. Augmentation is best-effort: API failures
 	// or absent owner/repo/token degrade gracefully to the un-annotated
 	// subject.
-	{
-		const [augOwner, augRepo] = (GITHUB_REPOSITORY || "").split("/");
-		commits = await augmentCommitsWithPRRefs(commits, augOwner, augRepo, token);
+	const [augOwner, augRepo] = (GITHUB_REPOSITORY || "").split("/");
+	commits = await augmentCommitsWithPRRefs(commits, augOwner, augRepo, token);
+
+	// Shared per-call cache so a PR whose commits span multiple sections only
+	// costs one /pulls/{N} lookup. Only used when groupByPR is true.
+	const prShaCache = new Map();
+
+	/**
+	 * Emit a section's commit list. When groupByPR is on, commits are grouped
+	 * under their PR number with the PR's merge SHA on the parent line.
+	 * Otherwise the original flat `- subject (hash)` form is preserved.
+	 * @param {Array} sectionCommits
+	 * @returns {Promise<string>}
+	 */
+	async function renderSection(sectionCommits) {
+		if (groupByPR) {
+			return renderSectionGroupedByPR(sectionCommits, augOwner, augRepo, token, prShaCache);
+		}
+		let out = "";
+		for (const c of sectionCommits) {
+			out += `- ${c.subject} (${c.hash})\n`;
+		}
+		return out;
 	}
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
 	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
 	if (breakingCommits.length > 0) {
-		breakingCommits.forEach((c) => {
-			changelog += `- ${c.subject} (${c.hash})\n`;
-		});
+		changelog += await renderSection(breakingCommits);
 	} else {
 		changelog += "_No breaking changes_\n";
 	}
@@ -888,9 +1002,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	changelog += "### ✨ Features\n";
 	const featureCommits = commits.filter((c) => c.category === "feature");
 	if (featureCommits.length > 0) {
-		featureCommits.forEach((c) => {
-			changelog += `- ${c.subject} (${c.hash})\n`;
-		});
+		changelog += await renderSection(featureCommits);
 	} else {
 		changelog += "_No new features_\n";
 	}
@@ -900,9 +1012,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	changelog += "### 🐛 Bug Fixes\n";
 	const fixCommits = commits.filter((c) => c.category === "fix");
 	if (fixCommits.length > 0) {
-		fixCommits.forEach((c) => {
-			changelog += `- ${c.subject} (${c.hash})\n`;
-		});
+		changelog += await renderSection(fixCommits);
 	} else {
 		changelog += "_No bug fixes_\n";
 	}
@@ -914,9 +1024,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		(c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release" && c.category !== "merge"
 	);
 	if (otherCommits.length > 0) {
-		otherCommits.forEach((c) => {
-			changelog += `- ${c.subject} (${c.hash})\n`;
-		});
+		changelog += await renderSection(otherCommits);
 	} else {
 		changelog += "_No other changes_\n";
 	}
@@ -928,9 +1036,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	);
 	if (releaseCommits.length > 0) {
 		changelog += "### 🏷️ Release Information\n";
-		releaseCommits.forEach((c) => {
-			changelog += `- ${c.subject} (${c.hash})\n`;
-		});
+		changelog += await renderSection(releaseCommits);
 		changelog += "\n";
 	}
 
@@ -967,7 +1073,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			console.log(`📋 Using commit range: ${commitRange}`);
 		}
 
-		const changelog = await generateComprehensiveChangelog(commitRange, commits, GITHUB_TOKEN, USE_SINGLE_COMMIT_MESSAGE);
+		const changelog = await generateComprehensiveChangelog(commitRange, commits, GITHUB_TOKEN, USE_SINGLE_COMMIT_MESSAGE, GROUP_BY_PR);
 		console.log("📄 Generated comprehensive changelog");
 
 		// Output the changelog content using a unique delimiter
