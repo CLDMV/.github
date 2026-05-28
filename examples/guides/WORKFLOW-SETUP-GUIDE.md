@@ -27,6 +27,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
 | Automation | [Dependabot config](#-dependabot-config) | `automation/dependabot.yml` | (config file) | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes` |
 | Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`) |
+| Automation | [Member Auto-Enable Auto-Merge](#-member-auto-enable-auto-merge) | `automation/member-auto-merge.yml` | PR by org member | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes`; does NOT approve |
 | Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
 | Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
 | Automation | [Stale](#-stale) | `automation/stale.yml` | daily cron | Marks/closes inactive issues + PRs |
@@ -195,9 +196,11 @@ Normalizes contributor PR titles to Conventional Commits format (the release flo
 One-shot setup, run once per repo via the Actions tab. Thin wrapper around the shared `org-bootstrap-repo` composite that applies the full v4 org baseline:
 
 - Creates `next` + `hotfixes` from master HEAD if missing.
-- Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`.
+- Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`. PR-merge dialog defaults: `merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY` — so whichever method the per-branch [ruleset](https://cldmv.github.io/.github/tools/ruleset-generator/) allows, the resulting commit carries the PR title + body verbatim. For release PRs (squashed to master), that puts the categorized changelog directly into the master commit message.
 - Enables security toggles: Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting.
 - Replaces the three rulesets (`Protect Master/Next/Hotfixes`) with the org canonical defaults from `data/rulesets/*.json` (or, equivalently, what the [browser ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) emits with default options).
+
+**Not managed — one manual UI toggle required:** Settings → General → Pull Requests → **"Auto-close issues with merged linked pull requests"** (recommended ON). GitHub doesn't expose this setting via REST, GraphQL, or `gh repo edit` ([community/community#188598](https://github.com/community/community/discussions/188598)), so the bootstrap prints it as a reminder line in the run summary's "Manual one-time toggles" section every run.
 
 Idempotent — re-running is safe. Overwrite-with-warn policy: existing diverged values are overwritten and surfaced in the run summary so the audit trail captures what changed. Defaults `dry_run: true`.
 
@@ -342,7 +345,7 @@ On every PR against master/main, diffs the dependency manifest and blocks the PR
 
 ### 🏅 OpenSSF Scorecard
 
-**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `ossf/scorecard-action@v3.4.0` + `github/codeql-action/upload-sarif@v3`
+**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `ossf/scorecard-action@v3.4.0` + `github/codeql-action/upload-sarif@v4`
 
 Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:32 UTC, on push to default, and manually. Results publish to the public scoreboard at `securityscorecards.dev`.
 
@@ -414,6 +417,30 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
   4. This auto-merge workflow approves + auto-merges into `hotfixes`.
 
 The net effect: security updates ship via the hotfix lane without anyone clicking anything; routine bumps batch into `next` for the next release.
+
+---
+
+### 👥 Member Auto-Enable Auto-Merge
+
+**File:** `automation/member-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-member-auto-merge.yml@v4`
+
+Auto-enables GitHub's "auto-merge" flag on PRs opened by org members (`author_association` ∈ MEMBER, OWNER, COLLABORATOR) against `next` or `hotfixes`, scoped to the standard branch-prefix conventions (`feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`, `docs/`, `ci/`, `perf/`, `test/`, `style/`). Removes the per-PR friction of clicking "Enable auto-merge" so the PR transitions to the merge queue as soon as the standard ruleset prerequisites (required approving review + `✅ Required PR Check`) are satisfied.
+
+**Does NOT approve the PR.** The human-review gate stays intact — contrast with `dependabot-auto-merge` which bot-approves Dependabot bumps because they're mechanical. Member PRs still need a teammate's approval before the merge fires; this workflow only handles the "click the auto-merge button" step.
+
+**Default in v4: ON (opt-out).** Delete the workflow file if your team prefers each member to flip auto-merge on per-PR by hand.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs**
+- **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled by `release-flow-v4/v4-bootstrap.yml`).
+- A ruleset on `next` / `hotfixes` with required status checks AND a required-approving-review count ≥ 1 (the default v4 rulesets do both). The action refuses to enable auto-merge on a branch without required checks; the ruleset's approval requirement is what keeps a human in the loop after auto-merge is enabled.
+
+**Key inputs** — `merge_method` (default `MERGE`, matches the v4 next/hotfixes ruleset's `allowed_merge_methods: ["merge"]`), `allowed_associations` (default `MEMBER,OWNER,COLLABORATOR` — add `CONTRIBUTOR` to also cover first-time non-member contributors), `branch_prefixes` (matches `local-feature-pr.yml`'s prefix list), `target_branches` (default `next,hotfixes`).
+
+**Why merge and not squash:** an empirical squash-test on a 1-commit PR confirmed GitHub's squash creates a brand-new commit signed by the merging actor (the bot, when fired via the App token), replacing the contributor's GPG signature and demoting the contributor to a `Co-authored-by:` trailer. The v4 design preserves contributor signatures on the integration branches via merge-commit-only — `merge_method: "MERGE"` is the consequence.
 
 ---
 

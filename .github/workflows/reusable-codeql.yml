@@ -61,12 +61,6 @@ permissions:
     contents: read
     actions: read # required for private repos
 
-# Opt in early to Node 24 for github/codeql-action/*@v3 (which still runs on
-# Node 20). Silences the Node-20-deprecation warning until codeql-action v4
-# ships in December 2026.
-env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
     # GitHub Actions expressions have no `split()` builtin, so we round-trip
     # the comma-sep `languages` input through a small Node action that emits
@@ -131,7 +125,7 @@ jobs:
                   fi
 
             - name: Initialize CodeQL
-              uses: github/codeql-action/init@v3
+              uses: github/codeql-action/init@v4
               with:
                   languages: ${{ matrix.language }}
                   queries: ${{ inputs.queries }}
@@ -140,7 +134,7 @@ jobs:
 
             - name: Autobuild
               if: inputs.build_mode == 'autobuild'
-              uses: github/codeql-action/autobuild@v3
+              uses: github/codeql-action/autobuild@v4
 
             - name: Manual build
               if: inputs.build_mode == 'manual' && inputs.manual_build_command != ''
@@ -148,6 +142,6 @@ jobs:
               run: ${{ inputs.manual_build_command }}
 
             - name: Analyze
-              uses: github/codeql-action/analyze@v3
+              uses: github/codeql-action/analyze@v4
               with:
                   category: "/language:${{ matrix.language }}"

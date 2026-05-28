@@ -25,6 +25,15 @@ import {
  */
 export const COMMENT_SENTINEL = "_Auto-normalized PR title:_";
 
+/**
+ * Bot logins whose PRs we DO want to normalize. The default Bot-skip rule in
+ * `shouldSkip` exists to leave external bots (dependabot, github-actions,
+ * etc.) alone, but cldmv-bot opens our own auto-PRs via local-feature-pr.yml
+ * and those titles need to follow the commit set as more commits land.
+ * @public
+ */
+export const NORMALIZE_BOT_ALLOWLIST = new Set(["cldmv-bot[bot]"]);
+
 const CONVENTIONAL_TITLE_RE = /^([a-z]+)(?:\(([^)]*)\))?(!)?:\s+(.+)$/;
 
 /**
@@ -50,7 +59,9 @@ export function extractTitleParts(title) {
 /**
  * Decide whether to skip normalization based on PR context, before any API
  * traffic. The four skip conditions from §6.4 of the design doc are:
- *   1. PR author is a Bot (cldmv-bot, github-actions, dependabot, etc.)
+ *   1. PR author is a Bot (github-actions, dependabot, etc.) — EXCEPT logins
+ *      in NORMALIZE_BOT_ALLOWLIST (cldmv-bot opens our own feature PRs and
+ *      its titles must follow the commit set).
  *   2. Release PR — base = master AND head ∈ { next, hotfix }
  *   3. Title starts with "release:" — escape-hatch override
  *   4. (Not handled here; "title already conforms" is checked later)
@@ -58,13 +69,16 @@ export function extractTitleParts(title) {
  * @public
  * @param {object} ctx
  * @param {string} [ctx.userType] - PR author `user.type` ("User"|"Bot")
+ * @param {string} [ctx.userLogin] - PR author `user.login` (e.g., "cldmv-bot[bot]")
  * @param {string} [ctx.baseRef] - PR base branch
  * @param {string} [ctx.headRef] - PR head branch
  * @param {string} [ctx.title] - Current PR title
  * @returns {{ skip: boolean, reason: string }}
  */
-export function shouldSkip({ userType, baseRef, headRef, title }) {
-	if (userType === "Bot") return { skip: true, reason: "PR author is a Bot" };
+export function shouldSkip({ userType, userLogin, baseRef, headRef, title }) {
+	if (userType === "Bot" && !NORMALIZE_BOT_ALLOWLIST.has(userLogin)) {
+		return { skip: true, reason: "PR author is a Bot" };
+	}
 	if (baseRef === "master" && (headRef === "next" || headRef === "hotfixes")) {
 		return { skip: true, reason: "Release PR (next/hotfixes → master) — owned by the release flow" };
 	}
@@ -132,18 +146,20 @@ export function summaryFromSubject(subject) {
 }
 
 /**
- * Find the FIRST commit (chronologically — assumes input is reverse-chrono
- * so we use findLast) whose parsed type matches `targetType`. Used to pick a
- * representative summary for the new title.
+ * Find the FIRST commit (chronologically) whose parsed type matches
+ * `targetType`. Used to pick a representative summary for the new title so
+ * the title stays pinned to what the PR was originally about — a follow-up
+ * `feat:` commit doesn't bump the title to itself; only escalating to a
+ * higher tier (e.g. fix → feat) rewrites it, via `titleConforms`.
  *
  * @public
  */
 export function findRepresentativeCommit(commits, targetType) {
 	if (!Array.isArray(commits) || !targetType) return null;
-	// `commits` is typically returned newest-first by the GitHub API; the
-	// "first" commit in the PR (the one the contributor wrote first) is at
-	// the end. findLast picks the chronologically-oldest matching one.
-	return commits.findLast((c) => {
+	// `commits` comes from the PR commits API, which returns OLDEST-first
+	// (chronological order, matching the GitHub "Commits" tab). So plain
+	// `find` returns the earliest matching commit — the one we want.
+	return commits.find((c) => {
 		const p = parseCommit(c?.subject ?? c?.commit?.message ?? "", c?.body ?? "");
 		return p && p.type === targetType;
 	}) || null;
@@ -187,6 +203,7 @@ async function main() {
 	let baseRef = getInput("base-ref");
 	let headRef = getInput("head-ref");
 	let userType = getInput("user-type");
+	let userLogin = getInput("user-login");
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 
 	const pr = await fetchPR(owner, repo, prNumber, token);
@@ -194,8 +211,9 @@ async function main() {
 	if (!baseRef) baseRef = pr?.base?.ref || "";
 	if (!headRef) headRef = pr?.head?.ref || "";
 	if (!userType) userType = pr?.user?.type || "";
+	if (!userLogin) userLogin = pr?.user?.login || "";
 
-	const skip = shouldSkip({ userType, baseRef, headRef, title: currentTitle });
+	const skip = shouldSkip({ userType, userLogin, baseRef, headRef, title: currentTitle });
 	if (skip.skip) {
 		console.log(`⏭️  Skipped: ${skip.reason}`);
 		setOutputs({ rewritten: "false", "new-title": currentTitle, skipped: "true", "skip-reason": skip.reason });

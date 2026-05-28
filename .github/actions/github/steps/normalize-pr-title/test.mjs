@@ -49,9 +49,19 @@ eq(extractTitleParts(""), null, "empty title → null");
 
 console.log("\nshouldSkip:");
 eq(
-	shouldSkip({ userType: "Bot", baseRef: "next", headRef: "feat/x", title: "feat: x" }),
+	shouldSkip({ userType: "Bot", userLogin: "dependabot[bot]", baseRef: "next", headRef: "deps/x", title: "chore: x" }),
 	{ skip: true, reason: "PR author is a Bot" },
-	"bot user → skip"
+	"non-allowlisted bot user → skip"
+);
+eq(
+	shouldSkip({ userType: "Bot", userLogin: "cldmv-bot[bot]", baseRef: "next", headRef: "feat/x", title: "test: x" }),
+	{ skip: false, reason: "" },
+	"cldmv-bot is allowlisted → no skip (our auto-PRs need normalization)"
+);
+eq(
+	shouldSkip({ userType: "Bot", userLogin: "cldmv-bot[bot]", baseRef: "master", headRef: "next", title: "release: v3.3.0" }),
+	{ skip: true, reason: "Release PR (next/hotfixes → master) — owned by the release flow" },
+	"cldmv-bot release PR still skipped by the base/head rule"
 );
 eq(
 	shouldSkip({ userType: "User", baseRef: "master", headRef: "next", title: "release: v3.3.0" }),
@@ -102,20 +112,25 @@ eq(summaryFromSubject("feat: add foo"), "add foo", "plain feat strips prefix");
 eq(summaryFromSubject("fix(scope)!: bar"), "bar", "scoped+breaking strips prefix");
 eq(summaryFromSubject("just a regular subject"), "just a regular subject", "non-conventional passes through");
 
-console.log("\nfindRepresentativeCommit (uses findLast → chrono-oldest match):");
-const fixturesReverseChrono = [
-	{ subject: "chore: cleanup", body: "" },        // newest
-	{ subject: "feat: add bar", body: "" },         // newer of two feats
+console.log("\nfindRepresentativeCommit (PR commits API order = oldest-first):");
+const fixturesChrono = [
+	{ subject: "feat: add foo", body: "" },         // oldest feat — should be picked
 	{ subject: "fix: a small fix", body: "" },
-	{ subject: "feat: add foo", body: "" }          // oldest feat — should be picked
+	{ subject: "feat: add bar", body: "" },         // newer feat — not picked
+	{ subject: "chore: cleanup", body: "" }         // newest
 ];
 eq(
-	findRepresentativeCommit(fixturesReverseChrono, "feat")?.subject,
+	findRepresentativeCommit(fixturesChrono, "feat")?.subject,
 	"feat: add foo",
-	"oldest matching feat picked"
+	"oldest matching feat picked (title stays pinned to original intent)"
 );
 eq(
-	findRepresentativeCommit(fixturesReverseChrono, "docs"),
+	findRepresentativeCommit(fixturesChrono, "fix")?.subject,
+	"fix: a small fix",
+	"matches a non-feat type too"
+);
+eq(
+	findRepresentativeCommit(fixturesChrono, "docs"),
 	null,
 	"no docs commit → null"
 );

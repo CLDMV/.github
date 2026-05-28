@@ -1,7 +1,9 @@
 /**
  * @fileoverview Per-repo bootstrap. Applies the v4 org baseline to ONE repo:
  *   - create next/hotfixes if missing
- *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods)
+ *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods,
+ *     and PR-merge dialog defaults: title=PR title, body=PR description for
+ *     both merge and squash — the per-branch ruleset picks which method runs)
  *   - enable always-free security toggles (Dependabot alerts + security
  *     updates, private vulnerability reporting, Dependabot security update
  *     PRs)
@@ -14,6 +16,13 @@
  *
  * Overwrites diverged values and emits a warning per divergence so the
  * audit trail captures what changed. Idempotent — re-running is safe.
+ *
+ * Manual one-time toggles (NOT managed by this action because GitHub does
+ * not expose them via REST, GraphQL, or gh CLI — confirmed against the
+ * docs and community/community#188598):
+ *   - Settings → General → Pull Requests → "Auto-close issues with merged
+ *     linked pull requests" (recommended ON). Surfaced as a reminder line
+ *     in the bootstrap summary so it's not silently missed.
  *
  * Called by:
  *   - local-org-onboarding.yml (matrix fanout across many repos)
@@ -28,6 +37,7 @@ import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-genera
 
 const warnings = [];
 const applied = [];
+const manualSteps = [];
 
 function warn(msg) {
 	warnings.push(msg);
@@ -41,6 +51,14 @@ function note(msg) {
 function ok(msg, stepId) {
 	console.log(`✅ ${msg}`);
 	if (stepId) applied.push(stepId);
+}
+
+// Surface a manual one-time toggle that this action cannot manage (GitHub
+// doesn't expose the setting via any API surface). Distinct from warn() so
+// it doesn't read as "we overwrote your value" — there's nothing to overwrite.
+function manual(msg) {
+	manualSteps.push(msg);
+	console.log(`📝 MANUAL: ${msg}`);
 }
 
 function finish(status, reason = "") {
@@ -61,6 +79,11 @@ function finish(status, reason = "") {
 			appendSummary("");
 			appendSummary(`**Warnings (divergence from baseline — overwritten):**`);
 			for (const w of warnings) appendSummary(`- ${w}`);
+		}
+		if (manualSteps.length) {
+			appendSummary("");
+			appendSummary(`**Manual one-time toggles (GitHub doesn't expose these via API — check the repo UI once):**`);
+			for (const m of manualSteps) appendSummary(`- ${m}`);
 		}
 	}
 	process.exit(status === "failed" ? 1 : 0);
@@ -164,7 +187,19 @@ async function main() {
 			allow_merge_commit: true,
 			allow_rebase_merge: false,
 			allow_update_branch: true,
-			web_commit_signoff_required: false
+			web_commit_signoff_required: false,
+			// Default the PR-merge dialog to "title = PR title, body = PR
+			// description" for both methods. Per-branch ruleset
+			// `allowed_merge_methods` picks which method runs on which
+			// branch; these defaults shape the commit message that
+			// method produces. The release-PR body is the categorized
+			// changelog, so squash-merging next→master into a single
+			// commit with PR_BODY puts that changelog into the master
+			// commit message — readable directly in `git log master`.
+			merge_commit_title: "PR_TITLE",
+			merge_commit_message: "PR_BODY",
+			squash_merge_commit_title: "PR_TITLE",
+			squash_merge_commit_message: "PR_BODY"
 		};
 		const diff = {};
 		for (const [k, v] of Object.entries(expected)) {
@@ -181,6 +216,14 @@ async function main() {
 			note("repo settings already match baseline");
 			applied.push("settings.already-correct");
 		}
+
+		// Surface the one PR-settings toggle GitHub doesn't expose via API.
+		// Repeats every run because we can't read its current state to
+		// suppress the reminder once it's been flipped — that's the price
+		// of GitHub's API gap. Worded as a check, not an alarm.
+		manual(
+			"Settings → General → Pull Requests → \"Auto-close issues with merged linked pull requests\" — confirm ON (UI-only; not in REST/GraphQL/gh CLI)."
+		);
 	}
 
 	// ── SECURITY ──────────────────────────────────────────────────────────
