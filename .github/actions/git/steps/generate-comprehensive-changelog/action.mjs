@@ -343,6 +343,20 @@ function filterAlreadyAppliedByPatchId(commits, commitRange) {
 	}
 }
 
+/**
+ * Resolve a commit SHA to its introducing PR number, ignoring the long-running
+ * release PR. GitHub's /commits/{sha}/pulls returns every PR a commit appears
+ * in (introducing PR AND any release PR currently bundling it), in arbitrary
+ * order. Picking prs[0] blindly misattributes ~half the commits to the release
+ * PR; this helper filters release-style PRs (base=master, head ∈ {next,
+ * hotfixes}) and prefers merged-then-oldest within what remains.
+ *
+ * @param {string} sha - Commit SHA (any length GitHub accepts).
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token - PAT or App installation token.
+ * @returns {Promise<number|null>} Introducing PR number, or null on no-match / lookup failure.
+ */
 async function findAssociatedPullNumber(sha, owner, repo, token) {
 	// Caller (augmentCommitsWithPRRefs) already validates sha/owner/repo/token,
 	// so no internal precondition check — CodeQL would flag it as dead code.
