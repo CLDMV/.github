@@ -19,7 +19,12 @@
 #   - `next` + `hotfixes` branches created from master HEAD if missing
 #   - repo settings: allow_auto_merge=true, delete_branch_on_merge=false,
 #     allow_squash_merge=true, allow_merge_commit=true,
-#     allow_rebase_merge=false, allow_update_branch=true
+#     allow_rebase_merge=false, allow_update_branch=true; plus PR-merge
+#     dialog defaults (merge_commit_title / squash_merge_commit_title =
+#     PR_TITLE, merge_commit_message / squash_merge_commit_message =
+#     PR_BODY) so the resulting commit captures the PR title + body
+#     verbatim (release-PR body = the categorized changelog → lands on
+#     master). Per-branch ruleset allowed_merge_methods picks the method.
 #   - security toggles: dependabot alerts + security updates, secret
 #     scanning + push protection, private vulnerability reporting
 #   - rulesets: replaces the three rulesets (Protect Master/Next/Hotfixes)

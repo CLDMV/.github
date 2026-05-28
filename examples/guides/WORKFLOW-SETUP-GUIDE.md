@@ -195,7 +195,7 @@ Normalizes contributor PR titles to Conventional Commits format (the release flo
 One-shot setup, run once per repo via the Actions tab. Thin wrapper around the shared `org-bootstrap-repo` composite that applies the full v4 org baseline:
 
 - Creates `next` + `hotfixes` from master HEAD if missing.
-- Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`.
+- Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`. PR-merge dialog defaults: `merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY` — so whichever method the per-branch [ruleset](https://cldmv.github.io/.github/tools/ruleset-generator/) allows, the resulting commit carries the PR title + body verbatim. For release PRs (squashed to master), that puts the categorized changelog directly into the master commit message.
 - Enables security toggles: Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting.
 - Replaces the three rulesets (`Protect Master/Next/Hotfixes`) with the org canonical defaults from `data/rulesets/*.json` (or, equivalently, what the [browser ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) emits with default options).
 

@@ -1,7 +1,9 @@
 /**
  * @fileoverview Per-repo bootstrap. Applies the v4 org baseline to ONE repo:
  *   - create next/hotfixes if missing
- *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods)
+ *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods,
+ *     and PR-merge dialog defaults: title=PR title, body=PR description for
+ *     both merge and squash — the per-branch ruleset picks which method runs)
  *   - enable always-free security toggles (Dependabot alerts + security
  *     updates, private vulnerability reporting, Dependabot security update
  *     PRs)
@@ -185,7 +187,19 @@ async function main() {
 			allow_merge_commit: true,
 			allow_rebase_merge: false,
 			allow_update_branch: true,
-			web_commit_signoff_required: false
+			web_commit_signoff_required: false,
+			// Default the PR-merge dialog to "title = PR title, body = PR
+			// description" for both methods. Per-branch ruleset
+			// `allowed_merge_methods` picks which method runs on which
+			// branch; these defaults shape the commit message that
+			// method produces. The release-PR body is the categorized
+			// changelog, so squash-merging next→master into a single
+			// commit with PR_BODY puts that changelog into the master
+			// commit message — readable directly in `git log master`.
+			merge_commit_title: "PR_TITLE",
+			merge_commit_message: "PR_BODY",
+			squash_merge_commit_title: "PR_TITLE",
+			squash_merge_commit_message: "PR_BODY"
 		};
 		const diff = {};
 		for (const [k, v] of Object.entries(expected)) {
