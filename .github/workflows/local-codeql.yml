@@ -35,12 +35,6 @@ permissions:
     contents: read
     actions: read
 
-# Opt in early to Node 24 for github/codeql-action/*@v3 (which still runs on
-# Node 20). Silences the Node-20-deprecation warning until codeql-action v4
-# ships in December 2026.
-env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 concurrency:
     group: local-codeql-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
@@ -79,13 +73,13 @@ jobs:
             # workspace (checked-out tree). Use the checked-in config file under
             # `.github/codeql/`.
             - name: Initialize CodeQL
-              uses: github/codeql-action/init@v3
+              uses: github/codeql-action/init@v4
               with:
                   languages: javascript-typescript
                   queries: security-extended,security-and-quality
                   config-file: .github/codeql/codeql-config.yml
 
             - name: Analyze
-              uses: github/codeql-action/analyze@v3
+              uses: github/codeql-action/analyze@v4
               with:
                   category: "/language:javascript-typescript"
