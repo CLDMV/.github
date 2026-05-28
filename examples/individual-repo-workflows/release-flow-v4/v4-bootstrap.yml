@@ -25,6 +25,12 @@
 #   - rulesets: replaces the three rulesets (Protect Master/Next/Hotfixes)
 #     with the org canonical defaults
 #
+# What is NOT applied (GitHub doesn't expose it via REST / GraphQL / gh CLI
+# — confirmed against community/community#188598; the bootstrap surfaces
+# this as a 'Manual one-time toggles' line in the run summary):
+#   - Settings → General → Pull Requests → "Auto-close issues with merged
+#     linked pull requests" (recommended ON). Toggle in the repo UI once.
+#
 # Idempotent — re-running is safe. Default `dry_run: true` previews
 # everything before applying.
 #

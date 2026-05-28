@@ -15,6 +15,13 @@
  * Overwrites diverged values and emits a warning per divergence so the
  * audit trail captures what changed. Idempotent — re-running is safe.
  *
+ * Manual one-time toggles (NOT managed by this action because GitHub does
+ * not expose them via REST, GraphQL, or gh CLI — confirmed against the
+ * docs and community/community#188598):
+ *   - Settings → General → Pull Requests → "Auto-close issues with merged
+ *     linked pull requests" (recommended ON). Surfaced as a reminder line
+ *     in the bootstrap summary so it's not silently missed.
+ *
  * Called by:
  *   - local-org-onboarding.yml (matrix fanout across many repos)
  *   - examples/.../v4-bootstrap.yml (per-repo dispatch)
@@ -28,6 +35,7 @@ import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-genera
 
 const warnings = [];
 const applied = [];
+const manualSteps = [];
 
 function warn(msg) {
 	warnings.push(msg);
@@ -41,6 +49,14 @@ function note(msg) {
 function ok(msg, stepId) {
 	console.log(`✅ ${msg}`);
 	if (stepId) applied.push(stepId);
+}
+
+// Surface a manual one-time toggle that this action cannot manage (GitHub
+// doesn't expose the setting via any API surface). Distinct from warn() so
+// it doesn't read as "we overwrote your value" — there's nothing to overwrite.
+function manual(msg) {
+	manualSteps.push(msg);
+	console.log(`📝 MANUAL: ${msg}`);
 }
 
 function finish(status, reason = "") {
@@ -61,6 +77,11 @@ function finish(status, reason = "") {
 			appendSummary("");
 			appendSummary(`**Warnings (divergence from baseline — overwritten):**`);
 			for (const w of warnings) appendSummary(`- ${w}`);
+		}
+		if (manualSteps.length) {
+			appendSummary("");
+			appendSummary(`**Manual one-time toggles (GitHub doesn't expose these via API — check the repo UI once):**`);
+			for (const m of manualSteps) appendSummary(`- ${m}`);
 		}
 	}
 	process.exit(status === "failed" ? 1 : 0);
@@ -181,6 +202,14 @@ async function main() {
 			note("repo settings already match baseline");
 			applied.push("settings.already-correct");
 		}
+
+		// Surface the one PR-settings toggle GitHub doesn't expose via API.
+		// Repeats every run because we can't read its current state to
+		// suppress the reminder once it's been flipped — that's the price
+		// of GitHub's API gap. Worded as a check, not an alarm.
+		manual(
+			"Settings → General → Pull Requests → \"Auto-close issues with merged linked pull requests\" — confirm ON (UI-only; not in REST/GraphQL/gh CLI)."
+		);
 	}
 
 	// ── SECURITY ──────────────────────────────────────────────────────────

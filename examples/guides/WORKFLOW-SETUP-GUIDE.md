@@ -199,6 +199,8 @@ One-shot setup, run once per repo via the Actions tab. Thin wrapper around the s
 - Enables security toggles: Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting.
 - Replaces the three rulesets (`Protect Master/Next/Hotfixes`) with the org canonical defaults from `data/rulesets/*.json` (or, equivalently, what the [browser ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) emits with default options).
 
+**Not managed — one manual UI toggle required:** Settings → General → Pull Requests → **"Auto-close issues with merged linked pull requests"** (recommended ON). GitHub doesn't expose this setting via REST, GraphQL, or `gh repo edit` ([community/community#188598](https://github.com/community/community/discussions/188598)), so the bootstrap prints it as a reminder line in the run summary's "Manual one-time toggles" section every run.
+
 Idempotent — re-running is safe. Overwrite-with-warn policy: existing diverged values are overwritten and surfaced in the run summary so the audit trail captures what changed. Defaults `dry_run: true`.
 
 **For onboarding many repos at once**, prefer `local-org-onboarding.yml` in `CLDMV/.github` — it fans out across a list of target repos in parallel, applying the same baseline.
