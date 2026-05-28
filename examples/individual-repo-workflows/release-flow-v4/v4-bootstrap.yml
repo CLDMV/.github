@@ -19,11 +19,22 @@
 #   - `next` + `hotfixes` branches created from master HEAD if missing
 #   - repo settings: allow_auto_merge=true, delete_branch_on_merge=false,
 #     allow_squash_merge=true, allow_merge_commit=true,
-#     allow_rebase_merge=false, allow_update_branch=true
+#     allow_rebase_merge=false, allow_update_branch=true; plus PR-merge
+#     dialog defaults (merge_commit_title / squash_merge_commit_title =
+#     PR_TITLE, merge_commit_message / squash_merge_commit_message =
+#     PR_BODY) so the resulting commit captures the PR title + body
+#     verbatim (release-PR body = the categorized changelog → lands on
+#     master). Per-branch ruleset allowed_merge_methods picks the method.
 #   - security toggles: dependabot alerts + security updates, secret
 #     scanning + push protection, private vulnerability reporting
 #   - rulesets: replaces the three rulesets (Protect Master/Next/Hotfixes)
 #     with the org canonical defaults
+#
+# What is NOT applied (GitHub doesn't expose it via REST / GraphQL / gh CLI
+# — confirmed against community/community#188598; the bootstrap surfaces
+# this as a 'Manual one-time toggles' line in the run summary):
+#   - Settings → General → Pull Requests → "Auto-close issues with merged
+#     linked pull requests" (recommended ON). Toggle in the repo UI once.
 #
 # Idempotent — re-running is safe. Default `dry_run: true` previews
 # everything before applying.
