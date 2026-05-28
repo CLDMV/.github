@@ -27,6 +27,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
 | Automation | [Dependabot config](#-dependabot-config) | `automation/dependabot.yml` | (config file) | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes` |
 | Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`) |
+| Automation | [Member Auto-Enable Auto-Merge](#-member-auto-enable-auto-merge) | `automation/member-auto-merge.yml` | PR by org member | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes`; does NOT approve |
 | Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
 | Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
 | Automation | [Stale](#-stale) | `automation/stale.yml` | daily cron | Marks/closes inactive issues + PRs |
@@ -416,6 +417,30 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
   4. This auto-merge workflow approves + auto-merges into `hotfixes`.
 
 The net effect: security updates ship via the hotfix lane without anyone clicking anything; routine bumps batch into `next` for the next release.
+
+---
+
+### 👥 Member Auto-Enable Auto-Merge
+
+**File:** `automation/member-auto-merge.yml` &nbsp;·&nbsp; **Calls:** `reusable-member-auto-merge.yml@v4`
+
+Auto-enables GitHub's "auto-merge" flag on PRs opened by org members (`author_association` ∈ MEMBER, OWNER, COLLABORATOR) against `next` or `hotfixes`, scoped to the standard branch-prefix conventions (`feat/`, `fix/`, `hotfix/`, `chore/`, `refactor/`, `docs/`, `ci/`, `perf/`, `test/`, `style/`). Removes the per-PR friction of clicking "Enable auto-merge" so the PR transitions to the merge queue as soon as the standard ruleset prerequisites (required approving review + `✅ Required PR Check`) are satisfied.
+
+**Does NOT approve the PR.** The human-review gate stays intact — contrast with `dependabot-auto-merge` which bot-approves Dependabot bumps because they're mechanical. Member PRs still need a teammate's approval before the merge fires; this workflow only handles the "click the auto-merge button" step.
+
+**Default in v4: ON (opt-out).** Delete the workflow file if your team prefers each member to flip auto-merge on per-PR by hand.
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — bot App credentials.
+
+**Prereqs**
+- **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled by `release-flow-v4/v4-bootstrap.yml`).
+- A ruleset on `next` / `hotfixes` with required status checks AND a required-approving-review count ≥ 1 (the default v4 rulesets do both). The action refuses to enable auto-merge on a branch without required checks; the ruleset's approval requirement is what keeps a human in the loop after auto-merge is enabled.
+
+**Key inputs** — `merge_method` (default `MERGE`, matches the v4 next/hotfixes ruleset's `allowed_merge_methods: ["merge"]`), `allowed_associations` (default `MEMBER,OWNER,COLLABORATOR` — add `CONTRIBUTOR` to also cover first-time non-member contributors), `branch_prefixes` (matches `local-feature-pr.yml`'s prefix list), `target_branches` (default `next,hotfixes`).
+
+**Why merge and not squash:** an empirical squash-test on a 1-commit PR confirmed GitHub's squash creates a brand-new commit signed by the merging actor (the bot, when fired via the App token), replacing the contributor's GPG signature and demoting the contributor to a `Co-authored-by:` trailer. The v4 design preserves contributor signatures on the integration branches via merge-commit-only — `merge_method: "MERGE"` is the consequence.
 
 ---
 

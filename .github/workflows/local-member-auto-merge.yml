@@ -1,0 +1,68 @@
+#
+# @Project: workflows
+# @Filename: /local-member-auto-merge.yml
+# @Date: 2026-05-28 00:00:00 -07:00 (1780210800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Dogfood for THIS repo (CLDMV/.github) — auto-enables GitHub's auto-merge
+# flag on PRs opened by org members against `next` or `hotfixes`, scoped
+# to the standard branch-prefix conventions.
+#
+# Does NOT approve the PR — the next/hotfixes ruleset's required-approving-
+# review count (1) keeps a human in the loop. This just removes the per-PR
+# friction of clicking "Enable auto-merge".
+name: 🚀 Local Member Auto-Enable Auto-Merge
+
+# SECURITY NOTE: pull_request_target runs in the BASE repo's context with
+# WRITE permissions and access to secrets. SAFE for THIS workflow because
+# it is API-only — the member-auto-merge action never checks out the PR
+# head and never executes PR content. DO NOT add a checkout step.
+on:
+    pull_request_target:
+        types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+    contents: read
+    pull-requests: write
+
+# Collapse a burst of pushes to one run per PR; the latest state always wins.
+concurrency:
+    group: member-auto-merge-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    enable:
+        # Pre-filter at workflow level so this doesn't spin up for every PR.
+        # The action repeats these checks defensively, so trimming here is
+        # safe — anything we miss skips inside the action with clear logs.
+        if: |
+            github.event.pull_request.draft == false &&
+            (
+                github.event.pull_request.author_association == 'MEMBER' ||
+                github.event.pull_request.author_association == 'OWNER' ||
+                github.event.pull_request.author_association == 'COLLABORATOR'
+            ) &&
+            (
+                github.event.pull_request.base.ref == 'next' ||
+                github.event.pull_request.base.ref == 'hotfixes'
+            )
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Enable auto-merge
+              uses: CLDMV/.github/.github/actions/github/jobs/member-auto-merge@v4
+              with:
+                  github_token: ${{ steps.app-token.outputs.token }}
+                  merge_method: "MERGE"

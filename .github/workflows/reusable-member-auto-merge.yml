@@ -1,0 +1,88 @@
+#
+# @Project: workflows
+# @Filename: /reusable-member-auto-merge.yml
+# @Date: 2026-05-28 00:00:00 -07:00 (1780210800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Member Auto-Enable Auto-Merge (org-level, reusable).
+#
+# Auto-enables GitHub's "auto-merge" flag on PRs opened by org members
+# against the v4 integration branches (`next` and `hotfixes`), scoped to
+# the standard branch-prefix conventions (feat/, fix/, hotfix/, chore/, …).
+#
+# What this does:           Sets the auto-merge flag on the PR.
+# What this DOES NOT do:    Approve the PR — the human-review gate stays
+#                           intact. The merge fires when the ruleset's
+#                           prerequisites are satisfied (required approving
+#                           review count + required status checks).
+#
+# Contrast with `reusable-dependabot-auto-merge.yml`, which also approves
+# as the bot — Dependabot bumps are mechanical and have no human author
+# to gate on, so bot-approve is appropriate. Human-authored member PRs
+# need a human approval.
+name: 🚀 Member Auto-Enable Auto-Merge (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            merge_method:
+                description: "MERGE | SQUASH | REBASE (default MERGE — matches the next/hotfixes ruleset)"
+                required: false
+                type: string
+                default: "MERGE"
+            allowed_associations:
+                description: "Comma-sep author_association values: MEMBER,OWNER,COLLABORATOR (default), CONTRIBUTOR, etc."
+                required: false
+                type: string
+                default: "MEMBER,OWNER,COLLABORATOR"
+            target_branches:
+                description: "Comma-sep base branches"
+                required: false
+                type: string
+                default: "next,hotfixes"
+            branch_prefixes:
+                description: "Comma-sep head-branch prefixes (no trailing slash)"
+                required: false
+                type: string
+                default: "feat,feature,fix,hotfix,chore,refactor,docs,ci,perf,test,style"
+            require_branch_protection:
+                description: "Refuse if no required status checks (safety)"
+                required: false
+                type: boolean
+                default: true
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    enable:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Enable auto-merge
+              uses: CLDMV/.github/.github/actions/github/jobs/member-auto-merge@v4
+              with:
+                  github_token: ${{ steps.app-token.outputs.token }}
+                  merge_method: ${{ inputs.merge_method }}
+                  allowed_associations: ${{ inputs.allowed_associations }}
+                  target_branches: ${{ inputs.target_branches }}
+                  branch_prefixes: ${{ inputs.branch_prefixes }}
+                  require_branch_protection: ${{ inputs.require_branch_protection }}
