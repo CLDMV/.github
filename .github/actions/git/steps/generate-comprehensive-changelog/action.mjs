@@ -291,7 +291,11 @@ function filterMergeCommits(commits, commitRange) {
 	if (!Array.isArray(commits) || commits.length === 0) return commits;
 	if (!commitRange || !commitRange.includes("..")) return commits;
 	try {
-		const out = gitCommand(`git log --merges --format=%H ${commitRange}`, true);
+		// `%h` (short SHA) matches what get-commit-range stores in c.hash
+		// (sliced to 7 chars). Using `%H` (full 40-char) here would silently
+		// no-op the filter: mergeSet.has(c.hash) is always false when one
+		// side is 40 chars and the other 7.
+		const out = gitCommand(`git log --merges --format=%h ${commitRange}`, true);
 		const mergeSet = new Set(
 			String(out)
 				.split("\n")
@@ -344,10 +348,34 @@ async function findAssociatedPullNumber(sha, owner, repo, token) {
 	// so no internal precondition check — CodeQL would flag it as dead code.
 	try {
 		const prs = await api("GET", `/commits/${sha}/pulls`, null, { token, owner, repo });
-		if (Array.isArray(prs) && prs.length > 0 && typeof prs[0].number === "number") {
-			return prs[0].number;
-		}
-		return null;
+		if (!Array.isArray(prs) || prs.length === 0) return null;
+
+		// A commit can appear in BOTH the feature PR that introduced it AND
+		// the long-running release PR (next→master / hotfixes→master) that
+		// currently bundles it. GitHub returns both in arbitrary order, so
+		// picking prs[0] blindly misattributes commits to the release PR ~
+		// half the time and even causes the release PR to show up as a
+		// "group" inside its own changelog body.
+		//
+		// Filter out release-style PRs so only introducing PRs remain.
+		// Within what's left, prefer merged over open (the introducing PR is
+		// almost always merged by the time we render), then prefer the
+		// lowest number (the oldest PR — the one that actually introduced
+		// the commit, in the stacked-PR case).
+		const isReleasePR = (pr) => {
+			const base = pr?.base?.ref;
+			const head = pr?.head?.ref;
+			return base === "master" && (head === "next" || head === "hotfixes");
+		};
+		const candidates = prs.filter((p) => !isReleasePR(p) && typeof p?.number === "number");
+		if (candidates.length === 0) return null;
+		candidates.sort((a, b) => {
+			const aMerged = !!a.merged_at;
+			const bMerged = !!b.merged_at;
+			if (aMerged !== bMerged) return aMerged ? -1 : 1; // merged first
+			return a.number - b.number; // older PR first
+		});
+		return candidates[0].number;
 	} catch (err) {
 		console.log(`⚠️ Could not look up PR for ${String(sha).slice(0, 7)}: ${err.message}`);
 		return null;
@@ -395,55 +423,24 @@ async function augmentCommitsWithPRRefs(commits, owner, repo, token) {
 }
 
 /**
- * Look up a pull request's merge_commit_sha. Returns the short SHA (7 chars)
- * when the PR landed via "Create a merge commit" (next/hotfixes policy on v4),
- * null when it was rebase- or squash-merged (no merge commit exists) or on
- * lookup failure. Results are cached per call to avoid N requests for the
- * same PR when its commits span multiple sections.
- *
- * @param {number} prNumber
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {Map<number,string|null>} cache
- * @returns {Promise<string|null>} Short merge SHA or null.
- */
-async function getPRMergeShortSha(prNumber, owner, repo, token, cache) {
-	if (cache.has(prNumber)) return cache.get(prNumber);
-	try {
-		const pr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
-		const sha = pr && typeof pr.merge_commit_sha === "string" && pr.merge_commit_sha ? pr.merge_commit_sha.slice(0, 7) : null;
-		cache.set(prNumber, sha);
-		return sha;
-	} catch (err) {
-		console.log(`⚠️ Could not look up merge SHA for #${prNumber}: ${err.message}`);
-		cache.set(prNumber, null);
-		return null;
-	}
-}
-
-/**
  * Render a section's commits grouped by their associated PR number. Each PR
  * group looks like:
  *
- *   - #48 (7d06c21)
+ *   - #48
  *     - fix(changelog): drop merge commits... (7ccdfde)
  *     - fix(changelog): another commit... (deadbee)
  *
- * The parent line carries the PR's merge SHA when one exists (merge-commit
- * landed) and omits the parens otherwise (rebase- or squash-merged PRs have
- * no merge commit). PRs are sorted newest-first by number. Commits that
- * don't carry a `(#N)` ref — direct pushes, augmentation failures — are
- * emitted at the bottom of the section as flat bullets.
+ * PRs are sorted newest-first by number. Commits that don't carry a `(#N)`
+ * ref — direct pushes to the integration branch, augmentation failures —
+ * are emitted at the bottom of the section as flat bullets.
  *
  * @param {Array} sectionCommits
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
- * @param {Map<number,string|null>} prShaCache
  * @returns {Promise<string>}
  */
-async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prShaCache) {
+async function renderSectionGroupedByPR(sectionCommits, owner, repo, token) {
 	if (!Array.isArray(sectionCommits) || sectionCommits.length === 0) return "";
 
 	const byPR = new Map();
@@ -473,18 +470,12 @@ async function renderSectionGroupedByPR(sectionCommits, owner, repo, token, prSh
 
 	// Blank line between PR groups makes GitHub render each group as its own
 	// "loose" list item — visually separated, but the nested commits stay
-	// attached to their parent bullet. Matches the confirmed PR-body shape.
-	//
-	// Every commit in the PR's group is listed as a child, INCLUDING the
-	// squash/merge commit whose SHA matches the parent line. The parent
-	// `#N` is only a GitHub render-time link — the actual commit subject
-	// text isn't there for `git log --grep` / changelog-text-search. So
-	// the children carry the searchable text; the parent carries the PR
-	// link + merge SHA for navigation.
+	// attached to their parent bullet. The parent `#N` is only a GitHub
+	// render-time link; the children carry the searchable subject text +
+	// commit SHAs.
 	const groups = [];
 	for (const n of prNumbers) {
-		const shortSha = owner && repo && token ? await getPRMergeShortSha(n, owner, repo, token, prShaCache) : null;
-		let group = shortSha ? `- #${n} (${shortSha})\n` : `- #${n}\n`;
+		let group = `- #${n}\n`;
 		for (const c of byPR.get(n)) {
 			// Strip the trailing `(#N)` since it's already on the parent line.
 			const subject = (c.subject || "").replace(/\s*\(#\d+\)\s*$/, "");
@@ -982,20 +973,16 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	const [augOwner, augRepo] = (GITHUB_REPOSITORY || "").split("/");
 	commits = await augmentCommitsWithPRRefs(commits, augOwner, augRepo, token);
 
-	// Shared per-call cache so a PR whose commits span multiple sections only
-	// costs one /pulls/{N} lookup. Only used when groupByPR is true.
-	const prShaCache = new Map();
-
 	/**
 	 * Emit a section's commit list. When groupByPR is on, commits are grouped
-	 * under their PR number with the PR's merge SHA on the parent line.
-	 * Otherwise the original flat `- subject (hash)` form is preserved.
+	 * under their PR number with each commit as an indented child. Otherwise
+	 * the original flat `- subject (hash)` form is preserved.
 	 * @param {Array} sectionCommits
 	 * @returns {Promise<string>}
 	 */
 	async function renderSection(sectionCommits) {
 		if (groupByPR) {
-			return renderSectionGroupedByPR(sectionCommits, augOwner, augRepo, token, prShaCache);
+			return renderSectionGroupedByPR(sectionCommits, augOwner, augRepo, token);
 		}
 		let out = "";
 		for (const c of sectionCommits) {
