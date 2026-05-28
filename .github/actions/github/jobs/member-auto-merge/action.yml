@@ -1,0 +1,40 @@
+#
+# @Project: member-auto-merge
+# @Filename: /action.yml
+# @Date: 2026-05-28 00:00:00 -07:00 (1780210800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Member Auto-Enable Auto-Merge"
+description: "Auto-enable GitHub's 'auto-merge' flag on PRs opened by org members against next/hotfixes (or any configured target branches), scoped to the standard branch-prefix conventions. Does NOT approve the PR — branch protection / rulesets still gate the actual merge on required approvals + checks."
+
+inputs:
+  github_token:
+    description: "App token (must have pull-requests: write; contents: write only if auto-merge fires merge commits the App needs to sign)"
+    required: true
+  merge_method:
+    description: "MERGE | SQUASH | REBASE — GraphQL enum for PullRequestMergeMethod. Default MERGE matches the v4 next/hotfixes ruleset (allowed_merge_methods: [merge])."
+    required: false
+    default: "MERGE"
+  allowed_associations:
+    description: "Comma-separated GitHub author_association values that may have auto-merge auto-enabled. Default MEMBER,OWNER,COLLABORATOR — anyone with write access to the org or repo. Add CONTRIBUTOR to also cover first-time non-member contributors (use with care)."
+    required: false
+    default: "MEMBER,OWNER,COLLABORATOR"
+  target_branches:
+    description: "Comma-separated base branches to act on. Default next,hotfixes — the v4 integration branches."
+    required: false
+    default: "next,hotfixes"
+  branch_prefixes:
+    description: "Comma-separated head-branch prefixes (no trailing slash) that opt the PR in. Default mirrors local-feature-pr.yml's prefix list."
+    required: false
+    default: "feat,feature,fix,hotfix,chore,refactor,docs,ci,perf,test,style"
+  require_branch_protection:
+    description: "Refuse to enable auto-merge if no required status checks are configured on the base branch. Default true (safety)."
+    required: false
+    default: "true"
+
+runs:
+  using: node24
+  main: action.mjs
