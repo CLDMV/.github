@@ -1,5 +1,5 @@
 name: "Normalize PR Title"
-description: "Rewrite a contributor PR's title to conform to Conventional Commits format, derived from the highest-priority commit in the PR. Skips bot-authored PRs, the long-running release PRs (next/hotfixes → master), and titles starting with 'release:'."
+description: "Rewrite a contributor PR's title to conform to Conventional Commits format, derived from the highest-priority commit in the PR. Skips bot-authored PRs (except cldmv-bot, which opens our own auto-PRs), the long-running release PRs (next/hotfixes → master), and titles starting with 'release:'."
 
 inputs:
   pr-number:
@@ -17,6 +17,9 @@ inputs:
     required: false
   user-type:
     description: "PR author's `user.type` from the event payload ('User' or 'Bot'). When empty, fetched from API."
+    required: false
+  user-login:
+    description: "PR author's `user.login` from the event payload (e.g., 'cldmv-bot[bot]'). Used to allowlist specific bot accounts past the generic Bot-skip rule. When empty, fetched from API."
     required: false
   dry-run:
     description: "When 'true', compute and log the would-be title but do not PATCH the PR or post any comment."
