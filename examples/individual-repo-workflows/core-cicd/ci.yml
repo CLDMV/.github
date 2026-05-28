@@ -271,10 +271,17 @@ jobs:
     steps:
       - name: Mirror reusable result
         env:
+          IS_MASTER_SYNC: ${{ needs.ci.outputs.is_master_sync }}
           DOCS_ONLY: ${{ needs.ci.outputs.docs_only }}
           CI_RESULT: ${{ needs.ci.result }}
         run: |
-          echo "ci.result=$CI_RESULT  docs_only=$DOCS_ONLY"
+          echo "ci.result=$CI_RESULT  docs_only=$DOCS_ONLY  is_master_sync=$IS_MASTER_SYNC"
+          # next/hotfixes was force-synced to master — head SHA matches the
+          # default branch, nothing new to test, green-light without running CI.
+          if [ "$IS_MASTER_SYNC" = "true" ]; then
+            echo "Branch tip matches master — Required PR Check passes without running CI."
+            exit 0
+          fi
           # Docs-only PR — the reusable skipped the heavy chain and exported
           # docs_only=true. Green-light Required PR Check so the ruleset
           # doesn't block a docs change.
