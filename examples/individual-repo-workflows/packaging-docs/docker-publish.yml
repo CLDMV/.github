@@ -51,6 +51,15 @@ jobs:
       dockerfile: ./Dockerfile
       pre_publish_command: ${{ github.event.inputs.pre_publish_command || 'npm test' }}
       push_latest: true
+      # CUSTOMIZE: opt-in to Trivy vuln scan as a pre-push gate. Requires
+      # single-platform build (don't set `platforms:` to a multi-value list).
+      # Findings stream to the Security tab via SARIF; push only fires when
+      # scan passes. Set scan_fail_on_severity: false for report-only mode.
+      # enable_container_scan: true
+      # scan_severity: "CRITICAL,HIGH"
+      # scan_fail_on_severity: true
+      # scan_ignore_unfixed: true
+      # scan_sarif_upload: true
     secrets:
       BOT_APP_ID: ${{ secrets.CLDMV_BOT_APP_ID }}
       BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

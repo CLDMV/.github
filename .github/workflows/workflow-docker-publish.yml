@@ -58,7 +58,37 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Optional comma-separated Docker platforms"
+                description: "Optional comma-separated Docker platforms. Incompatible with enable_container_scan: true when more than one platform is listed (docker buildx can only `load:` single-platform images for the local Trivy scan)."
+            enable_container_scan:
+                required: false
+                type: boolean
+                default: false
+                description: "When true, build the image to the local docker daemon, run Trivy against it, and push only if the scan passes. Pre-push gate. Requires single-platform build (platforms empty or one value). Opt-in to preserve backward compatibility."
+            scan_severity:
+                required: false
+                type: string
+                default: "CRITICAL,HIGH"
+                description: "Comma-sep Trivy severities to report (block when scan_fail_on_severity is true). Only used when enable_container_scan is true."
+            scan_fail_on_severity:
+                required: false
+                type: boolean
+                default: true
+                description: "Fail the job (and prevent the push) on any finding at scan_severity or above. Set false for report-only mode (still scans, still uploads SARIF, but push fires regardless)."
+            scan_ignore_unfixed:
+                required: false
+                type: boolean
+                default: true
+                description: "Skip vulnerabilities with no upstream fix. Default true so failing on unfixable vulns can't stall publishes indefinitely."
+            scan_sarif_upload:
+                required: false
+                type: boolean
+                default: true
+                description: "Upload Trivy SARIF results to the GitHub Security tab."
+            scan_sarif_category:
+                required: false
+                type: string
+                default: "trivy"
+                description: "SARIF category for Code-Scanning grouping. Lets multiple scans in one repo coexist without overwriting each other's results."
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App Client ID for CLDMV bot"
@@ -89,9 +119,17 @@ jobs:
         permissions:
             contents: read
             packages: write
+            # security-events: write only needed when enable_container_scan +
+            # scan_sarif_upload are both true (Upload SARIF step). Granted
+            # unconditionally so callers don't need to flip permission when
+            # they toggle the input. No-op when the scan branch is skipped.
+            security-events: write
         outputs:
             image: ${{ steps.resolve-image.outputs.image }}
-            digest: ${{ steps.build.outputs.digest }}
+            # Pick whichever build step actually ran. When scan is on we
+            # build twice (load locally, then push using cache); the push
+            # step's digest is the authoritative one for the published image.
+            digest: ${{ steps.build.outputs.digest || steps.push-prescan.outputs.digest }}
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6
@@ -157,8 +195,99 @@ jobs:
                       type=raw,value=latest,enable=${{ inputs.push_latest }}
                       type=sha
 
+            # ── Scan-vs-platforms compatibility gate ─────────────────────
+            # docker buildx `load: true` can only load single-platform images
+            # into the local daemon (manifest lists aren't loadable). When
+            # scan is on we MUST load locally to scan, so multi-platform is
+            # incompatible. Fail loudly with a clear remediation rather than
+            # silently skipping the scan or doing a slower OCI-tarball dance.
+            - name: Verify scan-vs-platforms compatibility
+              if: inputs.enable_container_scan == true && contains(inputs.platforms, ',')
+              shell: bash
+              run: |
+                  echo "::error::enable_container_scan: true is incompatible with multi-platform builds (platforms: '${{ inputs.platforms }}'). Either remove the comma-separated platforms (single-platform build), or set enable_container_scan: false."
+                  exit 1
+
+            # ── Branch 1: scan enabled — build locally, scan, push ───────
+            # buildx with cache-from/cache-to: type=gha makes the second
+            # (push) invocation reuse every layer the first invocation built,
+            # so the cost is one build + scan, not two builds.
+            - name: Build Docker image (local, pre-scan)
+              if: inputs.enable_container_scan == true
+              uses: docker/build-push-action@v7
+              with:
+                  context: ${{ inputs.docker_context }}
+                  file: ${{ inputs.dockerfile }}
+                  push: false
+                  load: true
+                  platforms: ${{ inputs.platforms }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha,scope=docker-publish
+                  cache-to: type=gha,mode=max,scope=docker-publish
+
+            # All tags emitted by docker/metadata-action point at the same
+            # built image, so Trivy only needs to scan one of them. Take the
+            # first non-empty line — `tags` is a multi-line string.
+            - name: Compute primary scan tag
+              id: scan-tag
+              if: inputs.enable_container_scan == true
+              shell: bash
+              env:
+                  TAGS: ${{ steps.meta.outputs.tags }}
+              run: |
+                  set -euo pipefail
+                  primary=$(printf '%s\n' "$TAGS" | grep -v '^$' | head -n1)
+                  if [ -z "$primary" ]; then
+                      echo "::error::metadata-action produced no tags; cannot pick a scan target."
+                      exit 1
+                  fi
+                  echo "image=$primary" >> "$GITHUB_OUTPUT"
+
+            - name: Trivy scan (pre-push gate)
+              if: inputs.enable_container_scan == true
+              # SHA-pinned to v0.35.0 per the March 2026 supply-chain
+              # advisory (76 of 77 tags force-pushed to credential stealers;
+              # v0.35.0 was protected by GitHub's immutable-releases feature).
+              # Matches the pin in reusable-container-scan.yml; re-verify the
+              # SHA against the upstream advisory before any future bump.
+              # https://github.com/aquasecurity/trivy-action/security/advisories
+              uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+              with:
+                  image-ref: ${{ steps.scan-tag.outputs.image }}
+                  format: ${{ inputs.scan_sarif_upload && 'sarif' || 'table' }}
+                  output: ${{ inputs.scan_sarif_upload && 'trivy.sarif' || '' }}
+                  severity: ${{ inputs.scan_severity }}
+                  ignore-unfixed: ${{ inputs.scan_ignore_unfixed }}
+                  exit-code: ${{ inputs.scan_fail_on_severity && '1' || '0' }}
+
+            - name: Upload Trivy SARIF
+              # `always()` so SARIF lands in the Security tab even when the
+              # scan step exited 1 from a finding above scan_severity —
+              # otherwise the gate-failure case loses its evidence.
+              if: inputs.enable_container_scan == true && inputs.scan_sarif_upload && always()
+              uses: github/codeql-action/upload-sarif@v4
+              with:
+                  sarif_file: trivy.sarif
+                  category: ${{ inputs.scan_sarif_category }}
+
+            - name: Push pre-scanned image
+              id: push-prescan
+              if: inputs.enable_container_scan == true
+              uses: docker/build-push-action@v7
+              with:
+                  context: ${{ inputs.docker_context }}
+                  file: ${{ inputs.dockerfile }}
+                  push: true
+                  platforms: ${{ inputs.platforms }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha,scope=docker-publish
+
+            # ── Branch 2: scan disabled — single build+push (unchanged) ──
             - name: Build and push Docker image
               id: build
+              if: inputs.enable_container_scan == false
               uses: docker/build-push-action@v7
               with:
                   context: ${{ inputs.docker_context }}
@@ -172,6 +301,6 @@ jobs:
               uses: CLDMV/.github/.github/actions/docker/steps/publish-summary@v4
               with:
                   image: ${{ steps.resolve-image.outputs.image }}
-                  digest: ${{ steps.build.outputs.digest }}
+                  digest: ${{ steps.build.outputs.digest || steps.push-prescan.outputs.digest }}
                   registry-user: ${{ steps.auth.outputs.username }}
                   pre-publish-command: ${{ inputs.pre_publish_command }}

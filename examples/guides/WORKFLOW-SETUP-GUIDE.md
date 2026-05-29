@@ -518,6 +518,8 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 
 **Key inputs** — `image_namespace` (default `cldmv`), `pre_publish_command`, `dockerfile` path.
 
+**Optional pre-push vulnerability gate.** Set `enable_container_scan: true` to run Trivy against the image *before* it's pushed. The workflow builds locally (`docker buildx ... --load`), scans the loaded image, optionally uploads SARIF to the GitHub Security tab, and only pushes when the scan exits 0. Knobs: `scan_severity` (default `CRITICAL,HIGH`), `scan_fail_on_severity` (default `true` — set `false` for report-only), `scan_ignore_unfixed` (default `true`), `scan_sarif_upload` (default `true`), `scan_sarif_category` (default `trivy`). **Single-platform only:** `docker buildx --load` can't load manifest lists, so `enable_container_scan: true` + a multi-value `platforms:` is rejected with an explicit error. For a multi-platform image that also needs scanning, call `reusable-container-scan.yml@v4` separately after a regular publish run.
+
 ---
 
 ### 📊 Bundle Size
