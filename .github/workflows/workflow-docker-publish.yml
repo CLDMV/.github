@@ -58,12 +58,12 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Optional comma-separated Docker platforms. Incompatible with enable_container_scan: true when more than one platform is listed (docker buildx can only `load:` single-platform images for the local Trivy scan)."
+                description: "Optional comma-separated Docker platforms."
             enable_container_scan:
                 required: false
                 type: boolean
                 default: false
-                description: "When true, build the image to the local docker daemon, run Trivy against it, and push only if the scan passes. Pre-push gate. Requires single-platform build (platforms empty or one value). Opt-in to preserve backward compatibility."
+                description: "When true, build the image to an OCI tarball, run Trivy against the tarball, and only push to the registry (via crane) if the scan passes. Pre-push gate. Multi-platform supported (the OCI tarball preserves the manifest list). Opt-in to preserve backward compatibility."
             scan_severity:
                 required: false
                 type: string
@@ -195,56 +195,24 @@ jobs:
                       type=raw,value=latest,enable=${{ inputs.push_latest }}
                       type=sha
 
-            # ── Scan-vs-platforms compatibility gate ─────────────────────
-            # docker buildx `load: true` can only load single-platform images
-            # into the local daemon (manifest lists aren't loadable). When
-            # scan is on we MUST load locally to scan, so multi-platform is
-            # incompatible. Fail loudly with a clear remediation rather than
-            # silently skipping the scan or doing a slower OCI-tarball dance.
-            - name: Verify scan-vs-platforms compatibility
-              if: inputs.enable_container_scan == true && contains(inputs.platforms, ',')
-              shell: bash
-              run: |
-                  echo "::error::enable_container_scan: true is incompatible with multi-platform builds (platforms: '${{ inputs.platforms }}'). Either remove the comma-separated platforms (single-platform build), or set enable_container_scan: false."
-                  exit 1
-
-            # ── Branch 1: scan enabled — build locally, scan, push ───────
-            # buildx with cache-from/cache-to: type=gha makes the second
-            # (push) invocation reuse every layer the first invocation built,
-            # so the cost is one build + scan, not two builds.
-            - name: Build Docker image (local, pre-scan)
+            # ── Branch 1: scan enabled — build to OCI tarball, scan, push via crane ─
+            # The OCI tarball is the build artifact: produced once, consumed by
+            # both Trivy (--input mode) and crane (push from oci-archive).
+            # Multi-platform-safe because OCI archives support manifest lists
+            # natively, unlike the legacy docker tarball / local daemon.
+            - name: Build Docker image to OCI tarball
               if: inputs.enable_container_scan == true
               uses: docker/build-push-action@v7
               with:
                   context: ${{ inputs.docker_context }}
                   file: ${{ inputs.dockerfile }}
                   push: false
-                  load: true
+                  outputs: type=oci,dest=/tmp/image.tar
                   platforms: ${{ inputs.platforms }}
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha,scope=docker-publish
-                  cache-to: type=gha,mode=max,scope=docker-publish
 
-            # All tags emitted by docker/metadata-action point at the same
-            # built image, so Trivy only needs to scan one of them. Take the
-            # first non-empty line — `tags` is a multi-line string.
-            - name: Compute primary scan tag
-              id: scan-tag
-              if: inputs.enable_container_scan == true
-              shell: bash
-              env:
-                  TAGS: ${{ steps.meta.outputs.tags }}
-              run: |
-                  set -euo pipefail
-                  primary=$(printf '%s\n' "$TAGS" | grep -v '^$' | head -n1)
-                  if [ -z "$primary" ]; then
-                      echo "::error::metadata-action produced no tags; cannot pick a scan target."
-                      exit 1
-                  fi
-                  echo "image=$primary" >> "$GITHUB_OUTPUT"
-
-            - name: Trivy scan (pre-push gate)
+            - name: Trivy scan OCI tarball (pre-push gate)
               if: inputs.enable_container_scan == true
               # SHA-pinned to v0.35.0 per the March 2026 supply-chain
               # advisory (76 of 77 tags force-pushed to credential stealers;
@@ -254,7 +222,7 @@ jobs:
               # https://github.com/aquasecurity/trivy-action/security/advisories
               uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
               with:
-                  image-ref: ${{ steps.scan-tag.outputs.image }}
+                  input: /tmp/image.tar
                   format: ${{ inputs.scan_sarif_upload && 'sarif' || 'table' }}
                   output: ${{ inputs.scan_sarif_upload && 'trivy.sarif' || '' }}
                   severity: ${{ inputs.scan_severity }}
@@ -271,18 +239,46 @@ jobs:
                   sarif_file: trivy.sarif
                   category: ${{ inputs.scan_sarif_category }}
 
-            - name: Push pre-scanned image
+            # imjasonh/setup-crane is maintained by a go-containerregistry
+            # author (Google). SHA-pinned (not @v0.5) so a tag re-point can't
+            # silently swap the tool — matches the security posture used for
+            # aquasecurity/trivy-action above. Re-verify the SHA before bumping.
+            - name: Setup crane
+              if: inputs.enable_container_scan == true
+              uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987 # v0.5
+
+            # crane push reads the OCI archive directly and copies it to the
+            # registry. Multi-platform manifest lists are pushed intact — no
+            # docker daemon, no per-platform loop. Authenticated via the
+            # `Log in to container registry` step above (crane reads the
+            # same ~/.docker/config.json the docker login step wrote).
+            - name: Push OCI tarball to registry via crane
               id: push-prescan
               if: inputs.enable_container_scan == true
-              uses: docker/build-push-action@v7
-              with:
-                  context: ${{ inputs.docker_context }}
-                  file: ${{ inputs.dockerfile }}
-                  push: true
-                  platforms: ${{ inputs.platforms }}
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=gha,scope=docker-publish
+              shell: bash
+              env:
+                  TAGS: ${{ steps.meta.outputs.tags }}
+              run: |
+                  set -euo pipefail
+                  pushed=0
+                  first_tag=""
+                  while IFS= read -r tag; do
+                      [ -z "$tag" ] && continue
+                      echo "🚚 crane push /tmp/image.tar $tag"
+                      crane push /tmp/image.tar "$tag"
+                      pushed=$((pushed + 1))
+                      [ -z "$first_tag" ] && first_tag="$tag"
+                  done <<< "$TAGS"
+                  if [ "$pushed" -eq 0 ]; then
+                      echo "::error::metadata-action produced no tags; nothing to push."
+                      exit 1
+                  fi
+                  # Resolve the digest from the registry so the Summary step
+                  # surfaces the same value docker/build-push-action would
+                  # have written. `crane digest <ref>` queries the remote.
+                  digest=$(crane digest "$first_tag")
+                  echo "digest=$digest" >> "$GITHUB_OUTPUT"
+                  echo "✅ Pushed $pushed tag(s). Digest: $digest"
 
             # ── Branch 2: scan disabled — single build+push (unchanged) ──
             - name: Build and push Docker image

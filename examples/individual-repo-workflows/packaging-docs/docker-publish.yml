@@ -51,10 +51,10 @@ jobs:
       dockerfile: ./Dockerfile
       pre_publish_command: ${{ github.event.inputs.pre_publish_command || 'npm test' }}
       push_latest: true
-      # CUSTOMIZE: opt-in to Trivy vuln scan as a pre-push gate. Requires
-      # single-platform build (don't set `platforms:` to a multi-value list).
-      # Findings stream to the Security tab via SARIF; push only fires when
-      # scan passes. Set scan_fail_on_severity: false for report-only mode.
+      # CUSTOMIZE: opt-in to Trivy vuln scan as a pre-push gate. Builds to an
+      # OCI tarball, scans it, and pushes via crane only when the scan passes
+      # (supports multi-platform). Findings stream to the Security tab via
+      # SARIF; set scan_fail_on_severity: false for report-only mode.
       # enable_container_scan: true
       # scan_severity: "CRITICAL,HIGH"
       # scan_fail_on_severity: true
