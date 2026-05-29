@@ -518,6 +518,8 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 
 **Key inputs** — `image_namespace` (default `cldmv`), `pre_publish_command`, `dockerfile` path.
 
+**Optional pre-push vulnerability gate.** Set `enable_container_scan: true` to run Trivy against the image *before* it's pushed. The workflow builds the image once into an OCI tarball (`outputs: type=oci`), feeds the tarball to Trivy via its native `--input` mode, optionally uploads SARIF to the GitHub Security tab, and only pushes when the scan exits 0. The same OCI artifact is then shipped to the registry by [`crane push`](https://github.com/google/go-containerregistry/tree/main/cmd/crane) (SHA-pinned `imjasonh/setup-crane`) — multi-platform manifest lists are preserved intact, so the gate works for single- and multi-platform builds with one code path. Knobs: `scan_severity` (default `CRITICAL,HIGH`), `scan_fail_on_severity` (default `true` — set `false` for report-only), `scan_ignore_unfixed` (default `true`), `scan_sarif_upload` (default `true`), `scan_sarif_category` (default `trivy`).
+
 ---
 
 ### 📊 Bundle Size
