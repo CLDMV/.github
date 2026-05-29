@@ -44,7 +44,12 @@ jobs:
                   persist-credentials: false
 
             - name: Run Scorecard
-              uses: ossf/scorecard-action@v3.4.0
+              # SHA-pinned to v2.4.3 (published 2025-09-30). There is no v3.x;
+              # the action has never released past v2.4.x. SHA-pin (not the
+              # mutable tag) matches the security posture for other third-party
+              # security actions in this repo (trivy, crane). Re-verify against
+              # https://github.com/ossf/scorecard-action/releases before bumping.
+              uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
               with:
                   results_file: results.sarif
                   results_format: sarif

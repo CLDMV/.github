@@ -16,12 +16,23 @@
 #     dependabot security updates, private vulnerability reporting)
 #   - the three rulesets replaced with the org canonical defaults
 #
+# Job order:
+#   1. plan + bootstrap-self run in parallel.
+#   2. plan resolves the target-repo list (always filters THIS repo out).
+#   3. bootstrap-self dogfoods the baseline on THIS repo before the fanout.
+#      If it fails, the matrix never runs — protects the rest of the org
+#      from a baseline that can't apply cleanly to its source of truth.
+#   4. bootstrap (matrix) fans out across the rest of the list.
+#   5. summary always runs, regardless of which jobs above failed.
+#
+# Concurrency: serialized at the workflow level. A second dispatch while
+# one is mid-flight queues behind it instead of racing on shared state
+# (org rulesets, App token, this repo's own settings).
+#
 # Overwrite-with-warn policy: existing diverged values are overwritten and
 # logged in the run summary so the audit trail captures what changed.
 #
-# Run order: triage repos first ("dirt heads", in-flight PRs, etc.), then
-# add the ready ones to a batch file and dispatch this workflow against
-# that batch. Re-running is safe — every step in the composite is idempotent.
+# Re-running is safe — every step in the composite is idempotent.
 name: 🏗️ Org Onboarding (v4 Fanout)
 
 on:
@@ -78,6 +89,15 @@ on:
 
 permissions:
     contents: read
+
+# Serialize concurrent dispatches at the workflow level. Two onboarding
+# runs going at once would race on shared state (org-level rulesets, the
+# bot's installation token, this repo's own settings via bootstrap-self).
+# `cancel-in-progress: false` queues the second dispatch instead of killing
+# the first — safer than dropping a run mid-mutation.
+concurrency:
+    group: org-onboarding-${{ github.workflow }}
+    cancel-in-progress: false
 
 jobs:
     plan:
@@ -163,12 +183,18 @@ jobs:
                       | awk 'NF' \
                       | sort -u)
 
-                  # Auto-discovery always skips this repo (running the bootstrap
-                  # against itself while a dispatch is mid-flight would race).
-                  # Explicit modes don't filter — the user opted in by name.
-                  if [ "$mode" = "auto-discover" ]; then
-                      list=$(printf '%s\n' "$list" | grep -vxF "$THIS_REPO" || true)
-                  fi
+                  # The matrix NEVER bootstraps this repo regardless of mode —
+                  # `bootstrap-self` (a dedicated pre-matrix job) already does
+                  # it. Letting the matrix include it too would double-apply
+                  # every mutation (delete-and-recreate the rulesets twice in
+                  # the same run, the second pass against the first pass's
+                  # state, fighting itself). Filtering here keeps the rule
+                  # "self goes through bootstrap-self; everything else goes
+                  # through the matrix" clean for explicit, file, and
+                  # auto-discover modes alike. If a user explicitly types this
+                  # repo's name in `repos:`, they still get bootstrapped via
+                  # bootstrap-self — just not twice.
+                  list=$(printf '%s\n' "$list" | grep -vxF "$THIS_REPO" || true)
 
                   # Apply user-supplied excludes (auto-discovery only; explicit
                   # modes ignore this — the user already picked the list).
@@ -226,9 +252,45 @@ jobs:
                       echo "</details>"
                   } >> "$GITHUB_STEP_SUMMARY"
 
+    # Dogfood the latest baseline on the source-of-truth repo BEFORE fanning
+    # out to the rest of the org. If something in the action is broken — a
+    # new setting GitHub rejects, a malformed ruleset shape, an API contract
+    # drift — it fails here, the matrix never fires, and the rest of the org
+    # is protected from a bad baseline. Side-benefit: this repo no longer
+    # drifts silently because the matrix skips it. Runs in parallel with
+    # `plan`; the matrix waits on both via `needs: [plan, bootstrap-self]`.
+    bootstrap-self:
+        name: "🪞 Bootstrap self (CLDMV/.github)"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token (this repo's owner)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+                  owner: ${{ github.repository_owner }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+
+            - name: Bootstrap this repo
+              id: bootstrap
+              uses: CLDMV/.github/.github/actions/github/jobs/org-bootstrap-repo@v4
+              with:
+                  target_repo: ${{ github.repository }}
+                  github_token: ${{ steps.app-token.outputs.token }}
+                  dry_run: ${{ github.event.inputs.dry_run }}
+                  steps: ${{ github.event.inputs.steps }}
+                  code_security: ${{ github.event.inputs.code_security }}
+                  secret_protection: ${{ github.event.inputs.secret_protection }}
+
     bootstrap:
         name: "🏗️ ${{ matrix.repo }}"
-        needs: plan
+        # `bootstrap-self` is the dogfood gate — if the baseline can't apply
+        # cleanly to the source-of-truth repo, the matrix doesn't fire and
+        # no other repos get the broken baseline.
+        needs: [plan, bootstrap-self]
         if: needs.plan.outputs.count != '0'
         runs-on: ubuntu-latest
         # `max-parallel` honors the user's `concurrency` input; matrix continues
@@ -278,8 +340,12 @@ jobs:
 
     summary:
         name: "📊 Aggregate summary"
-        needs: [plan, bootstrap]
-        if: always() && needs.plan.outputs.count != '0'
+        # `always()` so we still emit the summary when bootstrap-self failed
+        # and the matrix was skipped — the user needs to see WHY the matrix
+        # didn't run. Plan + bootstrap-self always exist; bootstrap may be
+        # skipped when count is 0 (self-only run).
+        needs: [plan, bootstrap-self, bootstrap]
+        if: always()
         runs-on: ubuntu-latest
         steps:
             - name: Aggregate per-repo status
@@ -290,5 +356,6 @@ jobs:
                       echo ""
                       echo "See individual per-repo job pages for the warn-on-diff details — each repo's run summary lists every divergence that was overwritten."
                       echo ""
-                      echo "**Bootstrap job overall:** \`${{ needs.bootstrap.result }}\`"
+                      echo "**Self-bootstrap (CLDMV/.github):** \`${{ needs.bootstrap-self.result }}\`"
+                      echo "**Matrix bootstrap overall:** \`${{ needs.bootstrap.result }}\` (count=${{ needs.plan.outputs.count }})"
                   } >> "$GITHUB_STEP_SUMMARY"

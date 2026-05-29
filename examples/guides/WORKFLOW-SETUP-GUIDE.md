@@ -345,7 +345,7 @@ On every PR against master/main, diffs the dependency manifest and blocks the PR
 
 ### 🏅 OpenSSF Scorecard
 
-**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `ossf/scorecard-action@v3.4.0` + `github/codeql-action/upload-sarif@v4`
+**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `ossf/scorecard-action@v2.4.3` (SHA-pinned) + `github/codeql-action/upload-sarif@v4`
 
 Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:32 UTC, on push to default, and manually. Results publish to the public scoreboard at `securityscorecards.dev`.
 
