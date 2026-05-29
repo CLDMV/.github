@@ -214,13 +214,14 @@ jobs:
 
             - name: Trivy scan OCI tarball (pre-push gate)
               if: inputs.enable_container_scan == true
-              # SHA-pinned to v0.35.0 per the March 2026 supply-chain
-              # advisory (76 of 77 tags force-pushed to credential stealers;
-              # v0.35.0 was protected by GitHub's immutable-releases feature).
-              # Matches the pin in reusable-container-scan.yml; re-verify the
-              # SHA against the upstream advisory before any future bump.
+              # SHA-pinned to v0.36.0 (published 2026-04-22). Matches the
+              # pin in reusable-container-scan.yml; keep them in lockstep
+              # for security responses. Pre-advisory tags were vulnerable to
+              # force-push (March 2026 incident); v0.36.0 ships with
+              # GitHub's immutable-releases protection. Re-verify the SHA
+              # against the upstream advisory before any future bump.
               # https://github.com/aquasecurity/trivy-action/security/advisories
-              uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+              uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
               with:
                   input: /tmp/image.tar
                   format: ${{ inputs.scan_sarif_upload && 'sarif' || 'table' }}
