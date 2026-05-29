@@ -56,24 +56,24 @@ on:
                 required: false
                 default: false
             dry_run:
-                description: "Dry-run: preview every mutation (PUT/POST/PATCH/DELETE) without firing it. Default `true` — leave checked to preview, UNCHECK to actually apply changes."
+                description: "Dry-run: preview every mutation (PUT/POST/PATCH/DELETE) without firing it. Default `false` — actually applies changes. CHECK to preview only."
                 type: boolean
                 required: false
-                default: true
+                default: false
             code_security:
-                description: "GitHub Code Security policy (the paid product that gates CodeQL alerts on private repos; free on public). off = disable everywhere. public-only = enable on public repos (free), disable on private (paid). all = enable everywhere (paid for private)."
+                description: "GitHub Code Security policy (the paid product that gates CodeQL alerts on private repos; free on public). off = disable everywhere. public-only = enable on public repos (free), disable on private (paid). all = enable everywhere (paid for private). Default `public-only` — enable on every public repo at no cost, leave private repos alone."
                 type: choice
                 required: false
-                default: "off"
+                default: "public-only"
                 options:
                     - "off"
                     - "public-only"
                     - "all"
             secret_protection:
-                description: "GitHub Secret Protection policy (secret scanning + push protection — paid on private, free on public). Same off | public-only | all shape as code_security."
+                description: "GitHub Secret Protection policy (secret scanning + push protection — paid on private, free on public). Same off | public-only | all shape as code_security. Default `public-only` — same rationale: free on public, opt-in for private."
                 type: choice
                 required: false
-                default: "off"
+                default: "public-only"
                 options:
                     - "off"
                     - "public-only"
