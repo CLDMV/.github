@@ -58,7 +58,37 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Optional comma-separated Docker platforms"
+                description: "Optional comma-separated Docker platforms."
+            enable_container_scan:
+                required: false
+                type: boolean
+                default: false
+                description: "When true, build the image to an OCI tarball, run Trivy against the tarball, and only push to the registry (via crane) if the scan passes. Pre-push gate. Multi-platform supported (the OCI tarball preserves the manifest list). Opt-in to preserve backward compatibility."
+            scan_severity:
+                required: false
+                type: string
+                default: "CRITICAL,HIGH"
+                description: "Comma-sep Trivy severities to report (block when scan_fail_on_severity is true). Only used when enable_container_scan is true."
+            scan_fail_on_severity:
+                required: false
+                type: boolean
+                default: true
+                description: "Fail the job (and prevent the push) on any finding at scan_severity or above. Set false for report-only mode (still scans, still uploads SARIF, but push fires regardless)."
+            scan_ignore_unfixed:
+                required: false
+                type: boolean
+                default: true
+                description: "Skip vulnerabilities with no upstream fix. Default true so failing on unfixable vulns can't stall publishes indefinitely."
+            scan_sarif_upload:
+                required: false
+                type: boolean
+                default: true
+                description: "Upload Trivy SARIF results to the GitHub Security tab."
+            scan_sarif_category:
+                required: false
+                type: string
+                default: "trivy"
+                description: "SARIF category for Code-Scanning grouping. Lets multiple scans in one repo coexist without overwriting each other's results."
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App Client ID for CLDMV bot"
@@ -89,9 +119,17 @@ jobs:
         permissions:
             contents: read
             packages: write
+            # security-events: write only needed when enable_container_scan +
+            # scan_sarif_upload are both true (Upload SARIF step). Granted
+            # unconditionally so callers don't need to flip permission when
+            # they toggle the input. No-op when the scan branch is skipped.
+            security-events: write
         outputs:
             image: ${{ steps.resolve-image.outputs.image }}
-            digest: ${{ steps.build.outputs.digest }}
+            # Pick whichever build step actually ran. When scan is on we
+            # build twice (load locally, then push using cache); the push
+            # step's digest is the authoritative one for the published image.
+            digest: ${{ steps.build.outputs.digest || steps.push-prescan.outputs.digest }}
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6
@@ -157,8 +195,96 @@ jobs:
                       type=raw,value=latest,enable=${{ inputs.push_latest }}
                       type=sha
 
+            # ── Branch 1: scan enabled — build to OCI tarball, scan, push via crane ─
+            # The OCI tarball is the build artifact: produced once, consumed by
+            # both Trivy (--input mode) and crane (push from oci-archive).
+            # Multi-platform-safe because OCI archives support manifest lists
+            # natively, unlike the legacy docker tarball / local daemon.
+            - name: Build Docker image to OCI tarball
+              if: inputs.enable_container_scan == true
+              uses: docker/build-push-action@v7
+              with:
+                  context: ${{ inputs.docker_context }}
+                  file: ${{ inputs.dockerfile }}
+                  push: false
+                  outputs: type=oci,dest=/tmp/image.tar
+                  platforms: ${{ inputs.platforms }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+
+            - name: Trivy scan OCI tarball (pre-push gate)
+              if: inputs.enable_container_scan == true
+              # SHA-pinned to v0.36.0 (published 2026-04-22). Matches the
+              # pin in reusable-container-scan.yml; keep them in lockstep
+              # for security responses. Pre-advisory tags were vulnerable to
+              # force-push (March 2026 incident); v0.36.0 ships with
+              # GitHub's immutable-releases protection. Re-verify the SHA
+              # against the upstream advisory before any future bump.
+              # https://github.com/aquasecurity/trivy-action/security/advisories
+              uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+              with:
+                  input: /tmp/image.tar
+                  format: ${{ inputs.scan_sarif_upload && 'sarif' || 'table' }}
+                  output: ${{ inputs.scan_sarif_upload && 'trivy.sarif' || '' }}
+                  severity: ${{ inputs.scan_severity }}
+                  ignore-unfixed: ${{ inputs.scan_ignore_unfixed }}
+                  exit-code: ${{ inputs.scan_fail_on_severity && '1' || '0' }}
+
+            - name: Upload Trivy SARIF
+              # `always()` so SARIF lands in the Security tab even when the
+              # scan step exited 1 from a finding above scan_severity —
+              # otherwise the gate-failure case loses its evidence.
+              if: inputs.enable_container_scan == true && inputs.scan_sarif_upload && always()
+              uses: github/codeql-action/upload-sarif@v4
+              with:
+                  sarif_file: trivy.sarif
+                  category: ${{ inputs.scan_sarif_category }}
+
+            # imjasonh/setup-crane is maintained by a go-containerregistry
+            # author (Google). SHA-pinned (not @v0.5) so a tag re-point can't
+            # silently swap the tool — matches the security posture used for
+            # aquasecurity/trivy-action above. Re-verify the SHA before bumping.
+            - name: Setup crane
+              if: inputs.enable_container_scan == true
+              uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987 # v0.5
+
+            # crane push reads the OCI archive directly and copies it to the
+            # registry. Multi-platform manifest lists are pushed intact — no
+            # docker daemon, no per-platform loop. Authenticated via the
+            # `Log in to container registry` step above (crane reads the
+            # same ~/.docker/config.json the docker login step wrote).
+            - name: Push OCI tarball to registry via crane
+              id: push-prescan
+              if: inputs.enable_container_scan == true
+              shell: bash
+              env:
+                  TAGS: ${{ steps.meta.outputs.tags }}
+              run: |
+                  set -euo pipefail
+                  pushed=0
+                  first_tag=""
+                  while IFS= read -r tag; do
+                      [ -z "$tag" ] && continue
+                      echo "🚚 crane push /tmp/image.tar $tag"
+                      crane push /tmp/image.tar "$tag"
+                      pushed=$((pushed + 1))
+                      [ -z "$first_tag" ] && first_tag="$tag"
+                  done <<< "$TAGS"
+                  if [ "$pushed" -eq 0 ]; then
+                      echo "::error::metadata-action produced no tags; nothing to push."
+                      exit 1
+                  fi
+                  # Resolve the digest from the registry so the Summary step
+                  # surfaces the same value docker/build-push-action would
+                  # have written. `crane digest <ref>` queries the remote.
+                  digest=$(crane digest "$first_tag")
+                  echo "digest=$digest" >> "$GITHUB_OUTPUT"
+                  echo "✅ Pushed $pushed tag(s). Digest: $digest"
+
+            # ── Branch 2: scan disabled — single build+push (unchanged) ──
             - name: Build and push Docker image
               id: build
+              if: inputs.enable_container_scan == false
               uses: docker/build-push-action@v7
               with:
                   context: ${{ inputs.docker_context }}
@@ -172,6 +298,6 @@ jobs:
               uses: CLDMV/.github/.github/actions/docker/steps/publish-summary@v4
               with:
                   image: ${{ steps.resolve-image.outputs.image }}
-                  digest: ${{ steps.build.outputs.digest }}
+                  digest: ${{ steps.build.outputs.digest || steps.push-prescan.outputs.digest }}
                   registry-user: ${{ steps.auth.outputs.username }}
                   pre-publish-command: ${{ inputs.pre_publish_command }}
