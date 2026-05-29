@@ -52,7 +52,7 @@ jobs:
                   # commits, and standard merge commits. Customize per repo if
                   # your conventions differ.
                   allowed_patterns: |
-                      ^release: v\d+\.\d+\.\d+( \(#\d+\))?$
+                      ^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$
                       ^chore(\([^)]+\))?: .+
                       ^Merge pull request #\d+ from .+
                   # Canonical label names from CLDMV/.github's data/github-labels.json
