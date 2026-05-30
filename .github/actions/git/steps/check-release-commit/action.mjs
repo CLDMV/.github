@@ -79,28 +79,17 @@ function findReleaseCommits(commits) {
 }
 
 /**
- * Check if commits contain conventional commits that warrant automatic release
+ * Check if commits contain anything that warrants an automatic release PR.
+ * Any non-merge commit qualifies — chore/docs/style/refactor/test/ci batches
+ * still need to flow through the persistent release PR (and trigger at least
+ * a patch bump) so the work surfaces in the changelog and ships to master
+ * via the normal release path. analyzeVersionBump() picks the right bump
+ * level from the same set; this gate only decides whether to proceed.
  * @param {Array} commits - Array of commit objects
- * @returns {boolean} True if there are feat/feature, fix, perf, revert, or breaking commits
+ * @returns {boolean} True if any commit in the range is not a merge commit.
  */
 function hasConventionalCommits(commits) {
-	return commits.some((commit) => {
-		// Exclude merge commits and maintenance commits
-		if (commit.category === "merge" || commit.category === "maintenance") {
-			return false;
-		}
-		// Include breaking, feature, fix, perf, or revert commits
-		// These all represent user-facing changes that warrant a release
-		if (commit.category === "breaking" || commit.category === "feature" || commit.category === "fix") {
-			return true;
-		}
-		// Also check by raw type as a fallback (in case the commit wasn't categorized properly).
-		// feat/feature → feature, perf → perf, revert → revert
-		if (commit.type === "feat" || commit.type === "feature" || commit.type === "perf" || commit.type === "revert") {
-			return true;
-		}
-		return false;
-	});
+	return commits.some((commit) => commit.category !== "merge");
 }
 
 /**

@@ -15,6 +15,12 @@
 			"type": "deletion"
 		},
 		{
+			"type": "creation"
+		},
+		{
+			"type": "update"
+		},
+		{
 			"type": "non_fast_forward"
 		},
 		{
