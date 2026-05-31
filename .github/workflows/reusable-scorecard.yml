@@ -1,0 +1,82 @@
+#
+# @Project: workflows
+# @Filename: /reusable-scorecard.yml
+# @Date: 2026-05-31 00:00:00 -07:00 (1780210800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# OpenSSF Scorecard (org-level, reusable).
+#
+# Scans the repo against ~18 security best-practice checks (branch protection,
+# signed releases, dependency update tooling, no binary artifacts in repo,
+# etc.) and emits a 0-10 score + SARIF. The marketplace action is OpenSSF's own
+# research output; reimplementing it would mean re-deriving an external
+# project, so we wrap it.
+#
+# Centralizing it here is the whole point: the SHA-pinned scorecard-action
+# version lives in ONE place instead of being copied into every consumer's
+# workflow, where it drifts (a bogus `@v3.4.0` that never existed is exactly
+# how that drift surfaces). Consumers call this at `@v4` and inherit version
+# bumps automatically.
+#
+# Triggers (branch_protection_rule / schedule / push to default) stay in the
+# CALLER, per OpenSSF's recommended setup.
+name: 🔬 OpenSSF Scorecard (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            publish_results:
+                # NOTE: publishing uses OIDC (id-token). When a job runs inside
+                # a reusable workflow, the OIDC token's `job_workflow_ref` claim
+                # resolves to THIS file's ref, not the caller's. Scorecard's
+                # publish step accepts that, but verify the public badge still
+                # updates after adopting the reusable; set false to skip the
+                # transparency-log publish (SARIF still uploads to the Security
+                # tab) for private repos or if publishing misbehaves.
+                description: "Publish results to the OpenSSF transparency log (powers the public Scorecard badge). Requires id-token: write on the caller."
+                required: false
+                type: boolean
+                default: true
+            sarif_category:
+                description: "SARIF category for Code-Scanning grouping"
+                required: false
+                type: string
+                default: "scorecard"
+
+permissions:
+    security-events: write # upload SARIF results
+    id-token: write # publish to OpenSSF transparency log
+    contents: read
+    actions: read
+
+jobs:
+    analyze:
+        name: "🔬 Scorecard Analysis"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+              with:
+                  persist-credentials: false
+
+            - name: Run Scorecard
+              # SHA-pinned to v2.4.3 (published 2025-09-30). There is no v3.x;
+              # the action has never released past v2.4.x — a mistaken `@v3.4.0`
+              # fails to resolve at runtime. SHA-pin (not the mutable tag)
+              # matches the posture for other third-party security actions here
+              # (trivy). Re-verify against
+              # https://github.com/ossf/scorecard-action/releases before bumping.
+              uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+              with:
+                  results_file: results.sarif
+                  results_format: sarif
+                  publish_results: ${{ inputs.publish_results }}
+
+            - name: Upload SARIF
+              uses: github/codeql-action/upload-sarif@v4
+              with:
+                  sarif_file: results.sarif
+                  category: ${{ inputs.sarif_category }}

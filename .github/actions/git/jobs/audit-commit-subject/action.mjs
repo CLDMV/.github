@@ -10,6 +10,18 @@
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
+// Canonical release-flow patterns — the SINGLE source of truth. Used when the
+// caller passes no `allowed_patterns` (or an empty one), so the value isn't
+// duplicated in action.yml or in the reusable-master-commit-audit.yml wrapper
+// (where an empty passthrough would otherwise override an action.yml default).
+// Matches: `release: vX.Y.Z` with an optional ` - <subject>` suffix and `(#N)`,
+// `chore:` maintenance commits, and standard GitHub merge commits.
+const DEFAULT_ALLOWED_PATTERNS = [
+	String.raw`^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$`,
+	String.raw`^chore(\([^)]+\))?: .+`,
+	String.raw`^Merge pull request #\d+ from .+`
+].join("\n");
+
 function parsePatterns(raw) {
 	return raw
 		.split(/\r?\n/)
@@ -28,10 +40,11 @@ function parsePatterns(raw) {
 
 try {
 	const sha = getInput("commit_sha", { required: true });
-	// Defaulted in action.yml to the canonical release-flow patterns; consumers
-	// need not pass this unless their conventions differ. The empty-set guard
-	// below still catches an explicit empty override.
-	const patternsRaw = getInput("allowed_patterns");
+	// Empty/omitted → canonical default (DEFAULT_ALLOWED_PATTERNS). An empty
+	// string is treated as "use the default" so reusable-workflow passthroughs
+	// (which always supply the input, empty when not overridden) don't trip the
+	// empty-set guard. Pass a non-empty value to override.
+	const patternsRaw = getInput("allowed_patterns").trim() || DEFAULT_ALLOWED_PATTERNS;
 	const labelsRaw = getInput("issue_labels") || "";
 	const assignee = getInput("issue_assignee") || "";
 	const token = getInput("github_token", { required: true });
