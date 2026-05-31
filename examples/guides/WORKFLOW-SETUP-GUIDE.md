@@ -309,7 +309,7 @@ After every push to default, validates the commit subject against the expected r
 
 **Required secrets** — none beyond `GITHUB_TOKEN` (automatically provided).
 
-**Key inputs** — `allowed_patterns` (regex list — customize per repo), `issue_labels` (default `bot:audit,priority:high`), `issue_assignee` (optional).
+**Key inputs** — `allowed_patterns` (optional; defaults to the canonical release-flow set — release commits with an optional ` - <subject>` suffix and `(#N)`, `chore:` commits, and merge commits. Omit it so pattern fixes ship with the pinned `@v4` ref; override only if your repo's conventions differ), `issue_labels` (default `type: ci,priority: high`), `issue_assignee` (optional).
 
 ---
 
