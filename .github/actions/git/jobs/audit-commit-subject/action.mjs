@@ -28,7 +28,10 @@ function parsePatterns(raw) {
 
 try {
 	const sha = getInput("commit_sha", { required: true });
-	const patternsRaw = getInput("allowed_patterns", { required: true });
+	// Defaulted in action.yml to the canonical release-flow patterns; consumers
+	// need not pass this unless their conventions differ. The empty-set guard
+	// below still catches an explicit empty override.
+	const patternsRaw = getInput("allowed_patterns");
 	const labelsRaw = getInput("issue_labels") || "";
 	const assignee = getInput("issue_assignee") || "";
 	const token = getInput("github_token", { required: true });
