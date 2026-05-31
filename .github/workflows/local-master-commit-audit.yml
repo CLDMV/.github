@@ -38,6 +38,9 @@ jobs:
               uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v4
               with:
                   commit_sha: ${{ github.sha }}
+                  # Intentional override of the action's canonical default: this
+                  # repo lands conventional `feat:`/`fix:`/`docs:`/`refactor:`
+                  # commits directly on master, so the audit must allow them too.
                   allowed_patterns: |
                       ^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$
                       ^chore(\([^)]+\))?: .+
