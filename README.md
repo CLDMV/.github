@@ -58,6 +58,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   ├── reusable-codeql.yml                      # CodeQL SAST
 │   ├── reusable-dependency-review.yml           # PR-time CVE diff
 │   ├── reusable-container-scan.yml              # Trivy
+│   ├── reusable-scorecard.yml                   # OpenSSF Scorecard (SHA-pinned action)
 │   ├── reusable-stale.yml                       # Roll-our-own stale sweep
 │   ├── reusable-dependabot-auto-merge.yml       # Dependabot auto-merge (rebases into next/hotfixes)
 │   ├── reusable-pr-labeler.yml                  # Path-based PR labels
@@ -67,6 +68,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   ├── reusable-release-notifier.yml            # Discord / Slack / webhook fan-out (release: published)
 │   ├── reusable-pr-notifier.yml                 # Discord / Slack / webhook fan-out (pull_request: opened)
 │   ├── reusable-branch-retention.yml            # Prune merged branches
+│   ├── reusable-master-commit-audit.yml         # Audit default-branch commit subjects
 │   └── reusable-cla.yml                         # CLA bot (central ledger, per-version signing)
 └── actions/                                     # reusable actions (Node)
     ├── common/  git/  github/  npm/  node/  docker/  coverage/  workflows/
@@ -165,6 +167,7 @@ Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/indi
 | `reusable-codeql.yml` | GitHub static analysis (SAST). Push + PR + weekly schedule. |
 | `reusable-dependency-review.yml` | At PR-time, flag new deps with CVEs from GitHub Advisory DB. |
 | `reusable-container-scan.yml` | Trivy vulnerability scan; plugs into docker-publish flow. |
+| `reusable-scorecard.yml` | OpenSSF Scorecard. SHA-pinned `scorecard-action` lives here (one source of truth — there is no v3.x); consumers call it and can't drift the version. `publish_results` input (default `true`) toggles the public transparency-log publish. |
 | `reusable-stale.yml` | Daily auto-stale/auto-close for inactive issues and PRs. Roll-our-own (no `actions/stale` dep). |
 | `reusable-dependabot-auto-merge.yml` | Approve + auto-merge patch/minor Dependabot PRs after CI passes. |
 | `reusable-pr-labeler.yml` | Path-based PR labels feeding the existing label catalog. |
@@ -174,6 +177,7 @@ Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/indi
 | `reusable-release-notifier.yml` | On `release:published`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_RELEASES_<VIS>_WEBHOOK` — set the secret to enable; unset = no-op. Repo secret overrides org. |
 | `reusable-pr-notifier.yml` | On `pull_request:opened`, fan out to Discord / Slack / generic webhook. One secret per `<TYPE>_PR_<VIS>_WEBHOOK`. Same secret precedence as the release notifier. |
 | `reusable-branch-retention.yml` | On PR merge: prune most head branches; keep last N of `release/*` / `hotfix/*`. |
+| `reusable-master-commit-audit.yml` | On push to default: audit the commit subject against the release-flow pattern set (canonical default lives in the `audit-commit-subject` action); file a deduped Issue on a miss. Centralizes steps + action ref so consumer copies can't drift. |
 | `reusable-cla.yml` | Per-CLA-version signing via "I agree" comment, with per-repo override support. Default scope (no consumer `CLA.md`): bot uses org-wide CLA from the private `CLDMV/.cla-signatures` ledger; one signature covers every CLDMV repo until major.minor is bumped. Override scope (consumer has root `CLA.md`): bot enforces that text and bootstraps an immutable snapshot in the ledger on first signature; drift (text changes without a version bump) is rejected. Org members exempt. |
 
 ## 🏗️ Orchestrator Pattern

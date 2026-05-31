@@ -1,7 +1,7 @@
 #
 # @Project: @cldmv/.github
 # @Filename: /examples/individual-repo-workflows/security/scorecard.yml
-# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
+# @Date: 2026-05-31 00:00:00 -07:00 (1780210800)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
@@ -9,15 +9,11 @@
 
 # Individual repo: .github/workflows/scorecard.yml
 #
-# OpenSSF Scorecard — scans the repo against ~18 security best-practice
-# checks (branch protection, signed releases, dependency-review, no binary
-# artifacts in repo, etc.) and produces a score 0-10.
-#
-# Trust signal for OSS consumers. Scorecard's checks are OpenSSF's research
-# output; reimplementing them would mean re-deriving an external project.
-# We wrap the marketplace action.
-#
-# Batch 4.3 from tmp/plan-future-workflows.md.
+# OpenSSF Scorecard — scans the repo against ~18 security best-practice checks
+# and produces a 0-10 score. Thin caller: the steps and the SHA-pinned
+# scorecard-action version live in reusable-scorecard.yml@v4, so the action
+# version can't drift in this copy (it just calls the org reusable). Triggers
+# stay here, per OpenSSF's recommended setup.
 name: 🔬 OpenSSF Scorecard
 
 on:
@@ -28,35 +24,16 @@ on:
         branches: [master, main]
     workflow_dispatch:
 
-permissions: read-all
+# Caller must grant what the reusable needs — notably id-token: write for the
+# OpenSSF transparency-log publish.
+permissions:
+    security-events: write
+    id-token: write
+    contents: read
+    actions: read
 
 jobs:
     analyze:
-        runs-on: ubuntu-latest
-        permissions:
-            security-events: write
-            id-token: write # publish to OpenSSF transparency log
-            contents: read
-        steps:
-            - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
-              with:
-                  persist-credentials: false
-
-            - name: Run Scorecard
-              # SHA-pinned to v2.4.3 (published 2025-09-30). There is no v3.x;
-              # the action has never released past v2.4.x. SHA-pin (not the
-              # mutable tag) matches the security posture for other third-party
-              # security actions in this repo (trivy, crane). Re-verify against
-              # https://github.com/ossf/scorecard-action/releases before bumping.
-              uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
-              with:
-                  results_file: results.sarif
-                  results_format: sarif
-                  publish_results: true
-
-            - name: Upload SARIF
-              uses: github/codeql-action/upload-sarif@v4
-              with:
-                  sarif_file: results.sarif
-                  category: scorecard
+        uses: CLDMV/.github/.github/workflows/reusable-scorecard.yml@v4
+        with:
+            publish_results: true # set false for private repos / to skip the public badge
