@@ -15,12 +15,9 @@ inputs:
     description: "Full commit SHA to audit"
     required: true
   allowed_patterns:
-    description: "Multi-line list of JS-regex patterns. Match-any semantics: if ANY pattern matches the subject, the audit passes. Omit to use the canonical release-flow default below (release commits with an optional ` - <subject>` suffix and `(#N)`, `chore:` maintenance commits, and standard merge commits). Override only if your repo's conventions differ — but prefer the default so pattern fixes propagate via the pinned action ref instead of drifting in per-repo copies."
+    description: "Multi-line list of JS-regex patterns. Match-any semantics: if ANY pattern matches the subject, the audit passes. Omit or pass empty to use the canonical release-flow default (release commits with an optional ` - <subject>` suffix and `(#N)`, `chore:` maintenance commits, and standard merge commits) — defined once in action.mjs as DEFAULT_ALLOWED_PATTERNS. Override only if your repo's conventions differ — but prefer the default so pattern fixes propagate via the pinned action ref instead of drifting in per-repo copies."
     required: false
-    default: |
-      ^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$
-      ^chore(\([^)]+\))?: .+
-      ^Merge pull request #\d+ from .+
+    default: ""
   issue_labels:
     description: "Comma-sep labels to apply to auto-filed issues. Must match canonical names in your org's label catalog (this default uses CLDMV/.github's data/github-labels.json conventions: `type: ci`, `priority: high` — note the space after each colon)."
     required: false
