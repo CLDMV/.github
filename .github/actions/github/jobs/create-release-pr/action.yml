@@ -113,6 +113,13 @@ runs:
       with:
         # Use file path to avoid "Argument list too long" when passing large commit JSON as env var
         commits-file: ${{ steps.commit-check.outputs.commits-file }}
+        # Pass the base..head range so the generator's structural merge-commit
+        # filter + patch-id dedup can run — both no-op without a `..` range,
+        # which left the PR-title-named merge commits (next's merge-commit flow
+        # produces `feat: … (#N)` merge commits, not `Merge pull request …`)
+        # duplicated alongside their originals in freshly-created release PRs.
+        # Same range update-release-pr passes; same one used at "commit types".
+        commit-range: ${{ steps.divergence.outputs.merge-base }}..HEAD
         # Bot App token — drives the PR-ref augmentation (looks up the
         # source PR for each commit so the grouped output can fold the
         # original branch commits under their squashed parent). Without

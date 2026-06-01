@@ -16,8 +16,11 @@ export function categorizeCommits(commitRange, allCommits = null) {
 		if (!allCommits) {
 			console.log(`🔍 DEBUG: About to execute git log for range: ${commitRange}`);
 			// Use a more reliable separator pattern - newline + special marker
+			// PARENTS:%P (space-separated parent SHAs) drives structural
+			// merge-commit detection below — placed AFTER DATE so it doesn't
+			// shift the hash/subject/body/author index parsing.
 			allCommits = gitCommand(
-				`git log ${commitRange} --pretty=format:"COMMIT_START%n%H%n%s%n%B%nAUTHOR:%an%nEMAIL:%ae%nDATE:%ad%nCOMMIT_END" --date=iso`,
+				`git log ${commitRange} --pretty=format:"COMMIT_START%n%H%n%s%n%B%nAUTHOR:%an%nEMAIL:%ae%nDATE:%ad%nPARENTS:%P%nCOMMIT_END" --date=iso`,
 				true
 			);
 
@@ -83,16 +86,33 @@ export function categorizeCommits(commitRange, allCommits = null) {
 				let scope = null;
 				let isBreaking = false;
 
-				// Skip merge commits - they shouldn't be in changelogs
-				if (
-					subject.startsWith("Merge ") ||
-					subject.includes("merge conflict") ||
-					subject.toLowerCase().includes("resolve conflict") ||
-					/^Merge branch '.+' into .+$/.test(subject) ||
-					/^Merge pull request #\d+/.test(subject)
-				) {
-					category = "merge";
-					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → merge (skipped from changelog)`);
+				// Skip merge commits structurally (≥2 parents) — they're not
+				// change-bearing and shouldn't be in changelogs. Subject-based
+				// detection (the old `Merge pull request …` match) is unreliable:
+				// the v4 flow merges feature PRs into next with merge commits
+				// AND the repo sets merge_commit_title: PR_TITLE, so those merge
+				// commits are titled `feat: … (#N)` — a subject check misses them
+				// and the conventional categorizer below would file them as real
+				// features/fixes (the duplicate lines seen in release PR bodies).
+				// Parent count is unambiguous. Returning early also keeps the
+				// later categorization from overwriting this category. "merge" is
+				// excluded from every changelog section downstream.
+				const parentsLine = lines.find((line) => line.startsWith("PARENTS:"));
+				const parentCount = parentsLine ? parentsLine.replace("PARENTS:", "").trim().split(/\s+/).filter(Boolean).length : 0;
+				if (parentCount >= 2) {
+					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → merge (${parentCount} parents, skipped from changelog)`);
+					return {
+						hash: hash.substring(0, 7),
+						subject,
+						body: body || "",
+						author,
+						email,
+						date,
+						category: "merge",
+						type: null,
+						scope: null,
+						isBreaking: false
+					};
 				}
 
 				// Parse conventional commit format
