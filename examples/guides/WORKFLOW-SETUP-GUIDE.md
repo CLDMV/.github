@@ -301,15 +301,15 @@ To opt out entirely: delete the `Notify on release-PR version bump` step in your
 
 ### 🕵️ Master Commit Audit
 
-**File:** `release-companions/master-commit-audit.yml` &nbsp;·&nbsp; **Calls:** the `audit-commit-subject@v4` action directly
+**File:** `release-companions/master-commit-audit.yml` &nbsp;·&nbsp; **Calls:** `reusable-master-commit-audit.yml@v4`
 
-After every push to default, validates the commit subject against the expected release-flow pattern and files a GitHub Issue if it doesn't match. Catches manual master commits and release-flow regressions.
+After every push to default, validates the commit subject against the expected release-flow pattern and files a GitHub Issue if it doesn't match. Catches manual master commits and release-flow regressions. Thin caller — steps, action ref, and the canonical pattern set all live in the reusable, so nothing drifts in your copy.
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — none beyond `GITHUB_TOKEN` (automatically provided).
+**Required secrets** — none required; optionally pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` (mapped from your `CLDMV_BOT_APP_*` secrets) to file the issue as your bot App instead of `github-actions[bot]`.
 
-**Key inputs** — `allowed_patterns` (optional; defaults to the canonical release-flow set — release commits with an optional ` - <subject>` suffix and `(#N)`, `chore:` commits, and merge commits. Omit it so pattern fixes ship with the pinned `@v4` ref; override only if your repo's conventions differ), `issue_labels` (default `type: ci,priority: high`), `issue_assignee` (optional).
+**Key inputs** — `allowed_patterns` (optional override; omit to inherit the canonical default — release commits with an optional ` - <subject>` suffix and `(#N)`, `chore:` commits, and merge commits — which lives once in the `audit-commit-subject` action, so pattern fixes ship via the pinned `@v4` ref), `issue_labels` (default `type: ci,priority: high`), `issue_assignee` (optional).
 
 ---
 
@@ -345,15 +345,17 @@ On every PR against master/main, diffs the dependency manifest and blocks the PR
 
 ### 🏅 OpenSSF Scorecard
 
-**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `ossf/scorecard-action@v2.4.3` (SHA-pinned) + `github/codeql-action/upload-sarif@v4`
+**File:** `security/scorecard.yml` &nbsp;·&nbsp; **Calls:** `reusable-scorecard.yml@v4`
 
-Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:32 UTC, on push to default, and manually. Results publish to the public scoreboard at `securityscorecards.dev`.
+Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:32 UTC, on push to default, and manually. Results publish to the public scoreboard at `securityscorecards.dev`. Thin caller — the SHA-pinned `scorecard-action` version lives in the reusable (`@v2.4.3`; there is no v3.x), so it can't drift in your copy.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — none for public repos. Private repos need a `SCORECARD_TOKEN` PAT with read access.
 
-**Prereqs** — public repo (or set `publish_results: false` and configure `SCORECARD_TOKEN`).
+**Key inputs** — `publish_results` (default `true`; set `false` to skip the public OpenSSF transparency-log publish — SARIF still uploads to the Security tab), `sarif_category` (default `scorecard`).
+
+**Prereqs** — caller must grant `id-token: write` for publishing (the example does). Public repo, or set `publish_results: false`.
 
 ---
 
