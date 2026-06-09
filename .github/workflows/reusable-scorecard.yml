@@ -58,7 +58,11 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+              # OSSF Scorecard's publish step verifies the analysis job and
+              # allows only a fixed set of steps; a custom composite action (our
+              # checkout-code) trips "job has unallowed step" -> publish HTTP 400.
+              # Use actions/checkout directly here.
+              uses: actions/checkout@v6
               with:
                   persist-credentials: false
 
