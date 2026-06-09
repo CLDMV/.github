@@ -99,7 +99,7 @@
 		"name": "type: bug",
 		"color": "d73a4a",
 		"description": "Something is broken or not behaving as expected",
-		"aliases": ["bug", "defect", "error", "fault", "regression", "broken", "patch"]
+		"aliases": ["bug", "defect", "error", "fault", "regression", "broken"]
 	},
 	{
 		"name": "type: discussion",
