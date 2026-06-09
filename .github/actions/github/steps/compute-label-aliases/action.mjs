@@ -8,7 +8,7 @@
  *   - bump type alias: "patch"|"minor"|"major"|"explicit"
  *   - per-commit-type aliases derived from `types-present`, mapped to the
  *     release-PR-owned label namespace:
- *       feat   → "feat"   (resolves to "type: feature request")
+ *       feat   → "feat"   (resolves to "type: feature")
  *       fix    → "bug"    (resolves to "type: bug")
  *       perf   → "bug"
  *       revert → "bug"
