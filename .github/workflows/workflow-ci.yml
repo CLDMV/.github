@@ -296,10 +296,16 @@ jobs:
     coverage-badge:
         name: "📊 Coverage & Badge Push"
         needs: [ paths-gate, commit-gate, ci ]
+        # NOTE: a `type: boolean` input arrives as the STRING "true"/"false"
+        # when a consumer passes it through a `${{ }}` expression — the standard
+        # template does `enable_*: ${{ github.event.inputs.* != 'false' }}` — so
+        # a bare `inputs.* == true` silently evaluates false and the job skips
+        # (green, no error). Accept both the boolean and string forms.
         if: >
             needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
-            == 'success' && inputs.enable_coverage_badge == true &&
+            == 'success' && (inputs.enable_coverage_badge == true ||
+            inputs.enable_coverage_badge == 'true') &&
             github.event_name == 'push' && github.ref ==
             format('refs/heads/{0}', inputs.default_branch)
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v4
@@ -330,10 +336,13 @@ jobs:
     coverage-pr-comment:
         name: "PR Coverage Badge"
         needs: [ paths-gate, commit-gate, ci ]
+        # NOTE: see coverage-badge above — a `${{ }}`-passed boolean input
+        # arrives as the STRING "true", so a bare `== true` skips the job.
         if: >
             needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
-            == 'success' && inputs.enable_coverage_pr_comment == true &&
+            == 'success' && (inputs.enable_coverage_pr_comment == true ||
+            inputs.enable_coverage_pr_comment == 'true') &&
             github.event_name == 'pull_request'
         uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v4
         with:
