@@ -217,7 +217,7 @@ runs:
         commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
 
     # Extract the set of conventional-commit types present in the PR range so a
-    # mixed PR (e.g. feat: + fix:) gets BOTH type: feature request + type: bug
+    # mixed PR (e.g. feat: + fix:) gets BOTH type: feature + type: bug
     # — not just the label corresponding to the bump-type (the highest).
     # Filters bot/merge/release commits + the auto chore-bump (loop noise).
     - name: Compute commit types in PR range
@@ -290,4 +290,4 @@ runs:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
         labels: ${{ steps.final-labels.outputs.labels }}
-        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature request,! release → master,! hotfix release → master"
+        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! hotfix release → master"
