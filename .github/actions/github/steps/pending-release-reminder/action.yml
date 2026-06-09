@@ -13,7 +13,7 @@ inputs:
   issue-labels:
     description: "Comma-separated labels applied to the filed reminder issue."
     required: false
-    default: "priority: high,type: release"
+    default: "priority: high,release"
   dedup-window:
     description: "Dedup bucket granularity: 'week' (default), 'day', or 'month'. One reminder per branch per bucket."
     required: false

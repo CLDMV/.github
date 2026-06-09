@@ -132,10 +132,16 @@
 		"aliases": ["epic", "initiative", "milestone", "theme", "umbrella", "meta"]
 	},
 	{
+		"name": "type: feature",
+		"color": "1a7f37",
+		"description": "Implements new functionality — a PR or issue that adds a feature",
+		"aliases": ["feat", "feature", "new feature"]
+	},
+	{
 		"name": "type: feature request",
 		"color": "fbca04",
 		"description": "A request to add new functionality that does not currently exist",
-		"aliases": ["feature", "feature request", "feat", "new feature", "request", "fr"]
+		"aliases": ["feature request", "request", "fr"]
 	},
 	{
 		"name": "type: future feature",
@@ -208,5 +214,11 @@
 		"color": "2e7d32",
 		"description": "Touches test files, fixtures, or test infrastructure",
 		"aliases": ["area:tests", "tests", "testing", "spec"]
+	},
+	{
+		"name": "stale",
+		"color": "795548",
+		"description": "No activity for an extended period; will be auto-closed if it stays inactive",
+		"aliases": ["inactive", "no activity", "abandoned", "dormant"]
 	}
 ]

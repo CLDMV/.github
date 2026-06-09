@@ -143,6 +143,24 @@ jobs:
                   base-ref: origin/${{ steps.target.outputs.target }}
                   head-ref: HEAD
 
+            - name: Detect feature commits in range
+              id: feat
+              if: steps.target.outputs.target != ''
+              shell: bash
+              env:
+                  COMMITS: ${{ steps.commits.outputs.commits }}
+              run: |
+                  # `type: feature` is applied when the range contains a feature,
+                  # mirroring the changelog's own "Features" section: get-commit-
+                  # range tags `feat:` (and content-categorized add/new) commits
+                  # as category "feature". Reuses the already-computed commits.
+                  has_feature=false
+                  if printf '%s' "$COMMITS" | jq -e 'any(.[]; .category == "feature")' >/dev/null 2>&1; then
+                      has_feature=true
+                  fi
+                  echo "has_feature=$has_feature" >> "$GITHUB_OUTPUT"
+                  echo "📊 feature detected in range: $has_feature"
+
             - name: Generate categorized changelog body
               id: changelog
               if: steps.target.outputs.target != ''
@@ -190,6 +208,10 @@ jobs:
                   if [ -n "${{ steps.target.outputs.flow_label }}" ]; then
                       gh pr edit "$pr_url" --add-label "${{ steps.target.outputs.flow_label }}" || true
                   fi
+                  # Apply `type: feature` when the range implements a feature.
+                  if [ "${{ steps.feat.outputs.has_feature }}" = "true" ]; then
+                      gh pr edit "$pr_url" --add-label "type: feature" || true
+                  fi
                   {
                       echo "### 🔀 Auto-opened PR"
                       echo ""
@@ -213,6 +235,12 @@ jobs:
                       gh pr edit "$PR_NUMBER" \
                           --repo "$GITHUB_REPOSITORY" \
                           --add-label "${{ steps.target.outputs.flow_label }}" || true
+                  fi
+                  # Apply `type: feature` when the range implements a feature.
+                  if [ "${{ steps.feat.outputs.has_feature }}" = "true" ]; then
+                      gh pr edit "$PR_NUMBER" \
+                          --repo "$GITHUB_REPOSITORY" \
+                          --add-label "type: feature" || true
                   fi
                   echo "::notice::Refreshed PR #${PR_NUMBER} body"
                   {
