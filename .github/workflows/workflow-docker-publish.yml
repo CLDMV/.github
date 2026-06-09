@@ -201,7 +201,7 @@ jobs:
             # Multi-platform-safe because OCI archives support manifest lists
             # natively, unlike the legacy docker tarball / local daemon.
             - name: Build Docker image to OCI tarball
-              if: inputs.enable_container_scan == true
+              if: (inputs.enable_container_scan == true || inputs.enable_container_scan == 'true')
               uses: docker/build-push-action@v7
               with:
                   context: ${{ inputs.docker_context }}
@@ -213,7 +213,7 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
 
             - name: Trivy scan OCI tarball (pre-push gate)
-              if: inputs.enable_container_scan == true
+              if: (inputs.enable_container_scan == true || inputs.enable_container_scan == 'true')
               # SHA-pinned to v0.36.0 (published 2026-04-22). Matches the
               # pin in reusable-container-scan.yml; keep them in lockstep
               # for security responses. Pre-advisory tags were vulnerable to
@@ -234,7 +234,7 @@ jobs:
               # `always()` so SARIF lands in the Security tab even when the
               # scan step exited 1 from a finding above scan_severity —
               # otherwise the gate-failure case loses its evidence.
-              if: inputs.enable_container_scan == true && inputs.scan_sarif_upload && always()
+              if: (inputs.enable_container_scan == true || inputs.enable_container_scan == 'true') && inputs.scan_sarif_upload && always()
               uses: github/codeql-action/upload-sarif@v4
               with:
                   sarif_file: trivy.sarif
@@ -245,7 +245,7 @@ jobs:
             # silently swap the tool — matches the security posture used for
             # aquasecurity/trivy-action above. Re-verify the SHA before bumping.
             - name: Setup crane
-              if: inputs.enable_container_scan == true
+              if: (inputs.enable_container_scan == true || inputs.enable_container_scan == 'true')
               uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987 # v0.5
 
             # crane push reads the OCI archive directly and copies it to the
@@ -255,7 +255,7 @@ jobs:
             # same ~/.docker/config.json the docker login step wrote).
             - name: Push OCI tarball to registry via crane
               id: push-prescan
-              if: inputs.enable_container_scan == true
+              if: (inputs.enable_container_scan == true || inputs.enable_container_scan == 'true')
               shell: bash
               env:
                   TAGS: ${{ steps.meta.outputs.tags }}
