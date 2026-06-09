@@ -14,7 +14,7 @@
 	{
 		"name": "! feature → next",
 		"color": "33691e",
-		"description": "v4 flow: contributor PR targeting the next integration branch (feat/fix/chore/refactor/docs/ci/perf/test/style/release branches)",
+		"description": "v4 flow: contributor PR targeting the next integration branch",
 		"aliases": ["flow: feature", "feature → next", "feat → next"]
 	},
 	{
