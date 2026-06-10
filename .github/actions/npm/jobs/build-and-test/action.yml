@@ -18,6 +18,12 @@ inputs:
     description: "Command to build package"
     required: false
     default: "npm run build:ci"
+  build-subpackages-command:
+    description: "Optional command run after the main build to carve satellite packages
+      into dist-packages/<name>/. Leave empty (default) to skip, or fold the carve into
+      build-command instead. See docs/conventions/satellite-packages.md."
+    required: false
+    default: ""
   skip-performance-tests:
     description: "Skip performance tests during CI"
     required: false
@@ -83,6 +89,15 @@ runs:
         build-command: ${{ inputs.build-command }}
         environment: production
 
+    # Carve satellite packages from the build output into dist-packages/<name>/.
+    # Optional; satellites also supported by folding the carve into build-command.
+    # Runs after the build so dist/ is present, and before artifact upload so the
+    # staged dirs ride the same artifact. See docs/conventions/satellite-packages.md.
+    - name: Build satellite packages
+      if: inputs.build-subpackages-command != ''
+      shell: bash
+      run: ${{ inputs.build-subpackages-command }}
+
     - name: Create npm package
       id: create-package
       uses: CLDMV/.github/.github/actions/npm/steps/create-package@v4
@@ -103,6 +118,7 @@ runs:
           build/
           *.tgz
           package-contents/
+          dist-packages/
           package.json
           package-lock.json
           yarn.lock
