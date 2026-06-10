@@ -75,6 +75,13 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
+            build_subpackages_command:
+                description: "Optional command run after the main build to carve satellite
+                    packages into dist-packages/<name>/. Empty (default) skips it. See
+                    docs/conventions/satellite-packages.md."
+                required: false
+                type: string
+                default: ""
 
             # Test control options
             skip_performance_tests:
@@ -157,6 +164,7 @@ jobs:
                   package-manager: ${{ inputs.package_manager }}
                   test-command: ${{ inputs.test_command }}
                   build-command: ${{ inputs.build_command }}
+                  build-subpackages-command: ${{ inputs.build_subpackages_command }}
                   skip-performance-tests: ${{ inputs.skip_performance_tests }}
                   test-environment: ${{ inputs.test_environment }}
                   enable-embedded-tests: ${{ inputs.enable_embedded_tests }}

@@ -6,6 +6,12 @@ inputs:
     description: "Version number for the release (auto-detected from package.json if not provided)"
     required: false
     default: ""
+  tag-name:
+    description: "Override the git tag / release tag. Defaults to v<version> (core scheme).
+      Satellite packages pass their own scheme, e.g. @cldmv/slothlet-i18n@<version>. See
+      docs/conventions/satellite-packages.md."
+    required: false
+    default: ""
   package-name:
     description: "Name of the package being released"
     required: true
@@ -130,7 +136,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag: v${{ steps.prepare.outputs.version }}
+        tag: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
         sha: ${{ steps.prepare.outputs.commit-sha }}
         message: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
@@ -180,7 +186,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag_name: v${{ steps.prepare.outputs.version }}
+        tag_name: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
         name: ${{ steps.names.outputs.release-name }}
         body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
@@ -194,7 +200,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
-        VERSION: v${{ steps.prepare.outputs.version }}
+        VERSION: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
 
     - name: Verify tag signature
       if: inputs.dry-run != 'true'
@@ -203,7 +209,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
-        tag: v${{ steps.prepare.outputs.version }}
+        tag: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
 
     - name: Dry run validation
       if: inputs.dry-run == 'true'

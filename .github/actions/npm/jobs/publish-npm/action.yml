@@ -30,6 +30,11 @@ inputs:
     description: "Name of the build artifact to download"
     required: false
     default: "build-artifacts"
+  package-dir:
+    description: "Directory within the artifact to publish from (default: package-contents).
+      Satellites pass their own staged dir, e.g. dist-packages/<name>."
+    required: false
+    default: "package-contents"
 
 outputs:
   published:
@@ -61,6 +66,7 @@ runs:
         dry-run: ${{ inputs.dry-run }}
         auth-token: ${{ inputs.npm-token }}
         artifact-name: ${{ inputs.artifact-name }}
+        package-dir: ${{ inputs.package-dir }}
 
     - name: NPM publishing summary
       if: always()

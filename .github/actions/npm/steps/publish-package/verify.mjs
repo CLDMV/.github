@@ -7,19 +7,23 @@
 
 import fs from "node:fs";
 
-console.log("📦 Verifying package contents from artifacts...");
+// Directory within the downloaded artifact to publish from. Defaults to
+// package-contents (the core package); satellites pass their own staged dir.
+const packageDir = process.env.PACKAGE_DIR || "package-contents";
 
-if (fs.existsSync("package-contents") && fs.statSync("package-contents").isDirectory()) {
-	console.log("✅ Package contents directory found in artifacts");
-	console.log("📋 Files in package-contents:");
-	for (const name of fs.readdirSync("package-contents")) console.log(`  ${name}`);
+console.log(`📦 Verifying package contents from artifacts (${packageDir})...`);
 
-	if (!fs.existsSync("package-contents/package.json")) {
-		console.error("::error::No package.json found in package-contents");
+if (fs.existsSync(packageDir) && fs.statSync(packageDir).isDirectory()) {
+	console.log(`✅ Package contents directory found in artifacts: ${packageDir}`);
+	console.log(`📋 Files in ${packageDir}:`);
+	for (const name of fs.readdirSync(packageDir)) console.log(`  ${name}`);
+
+	if (!fs.existsSync(`${packageDir}/package.json`)) {
+		console.error(`::error::No package.json found in ${packageDir}`);
 		process.exit(1);
 	}
 } else {
-	console.error("::error::Package contents directory not found in artifacts");
+	console.error(`::error::Package contents directory not found in artifacts: ${packageDir}`);
 	console.log("Available files:");
 	for (const name of fs.readdirSync(".")) console.log(`  ${name}`);
 	process.exit(1);
