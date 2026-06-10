@@ -20,18 +20,21 @@ try {
 	const sourceOnly = process.env.RELEASE_SOURCE_ONLY === "true";
 	const repository = process.env.REPOSITORY;
 	const { owner, repo } = parseRepo(repository);
-	const releaseUrl = `${process.env.SERVER_URL}/${repository}/releases/tag/v${version}`;
+	// Resolved tag: defaults to the core v<version> scheme, but honours a tag-name
+	// override (satellites use @scope/name@version) so dry-run reports the real tag.
+	const tag = process.env.TAG_NAME || `v${version}`;
+	const releaseUrl = `${process.env.SERVER_URL}/${repository}/releases/tag/${tag}`;
 
 	// Tag creation validation.
 	appendSummary("🧪 **DRY RUN**: Tag creation validation");
-	appendSummary(`  - ✅ Tag name: v${version}`);
+	appendSummary(`  - ✅ Tag name: ${tag}`);
 	appendSummary(`  - ✅ Commit SHA: ${commitSha}`);
 	appendSummary(`  - ✅ GPG configuration: ${gpgEnabled ? "Enabled" : "Disabled"}`);
 
 	console.log("🧪 DRY RUN MODE: Validating GitHub release creation");
 	console.log("");
 	console.log("✅ Validation Results:");
-	console.log(`  - Tag name: v${version}`);
+	console.log(`  - Tag name: ${tag}`);
 	console.log(`  - Release name: ${releaseName}`);
 	console.log(`  - Prerelease: ${isPrerelease}`);
 	console.log("  - GitHub token: Available and authenticated");
@@ -48,20 +51,18 @@ try {
 	}
 
 	// Report whether the tag already exists locally.
-	const tagExists = execSync(`git tag -l "v${version}"`).toString().trim() === `v${version}`;
-	console.log(tagExists ? `  - Tag v${version}: ⚠️ Already exists (will be updated)` : `  - Tag v${version}: ✅ Will be created`);
+	const tagExists = execSync(`git tag -l "${tag}"`).toString().trim() === tag;
+	console.log(tagExists ? `  - Tag ${tag}: ⚠️ Already exists (will be updated)` : `  - Tag ${tag}: ✅ Will be created`);
 
 	// Report whether the release already exists.
 	let releaseExists = false;
 	try {
-		await api("GET", `/releases/tags/v${version}`, null, { token, owner, repo });
+		await api("GET", `/releases/tags/${tag}`, null, { token, owner, repo });
 		releaseExists = true;
 	} catch {
 		releaseExists = false;
 	}
-	console.log(
-		releaseExists ? `  - Release v${version}: ⚠️ Already exists (will be updated)` : `  - Release v${version}: ✅ Will be created`
-	);
+	console.log(releaseExists ? `  - Release ${tag}: ⚠️ Already exists (will be updated)` : `  - Release ${tag}: ✅ Will be created`);
 
 	console.log(sourceOnly ? "  - Package assets: ⏭️ Source-only release (no assets)" : "  - Package assets: ✅ Will be attached (.tar.gz and .zip)");
 	console.log("");
@@ -74,7 +75,7 @@ try {
 	appendSummary("  - ✅ Release notes generated successfully");
 	appendSummary("  - ✅ All prerequisites met for release creation");
 	appendSummary("");
-	appendSummary(`💡 **Would create**: [v${version}](${releaseUrl})`);
+	appendSummary(`💡 **Would create**: [${tag}](${releaseUrl})`);
 	appendSummary("🧪 **DRY RUN**: Tag signature validation skipped");
 	appendSummary("  - ✅ GPG configuration would be verified in real run");
 

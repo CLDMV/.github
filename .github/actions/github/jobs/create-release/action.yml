@@ -219,6 +219,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         VERSION: ${{ steps.prepare.outputs.version }}
+        TAG_NAME: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
         COMMIT_SHA: ${{ steps.prepare.outputs.commit-sha }}
         RELEASE_NAME: ${{ steps.names.outputs.release-name }}
         IS_PRERELEASE: ${{ inputs.is-prerelease }}
