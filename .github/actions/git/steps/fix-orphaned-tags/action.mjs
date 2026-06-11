@@ -112,7 +112,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 			if (allCommits) {
 				const lines = allCommits.split("\n").filter((line) => line.trim());
 				for (const line of lines) {
-					const [sha, message, author, timestamp] = line.split("|");
+					const [sha, message, author] = line.split("|");
 
 					// Skip if it's the same commit
 					if (sha === orphanedCommit) continue;
@@ -133,7 +133,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 		if (allCommits) {
 			const lines = allCommits.split("\n").filter((line) => line.trim());
 			for (const line of lines) {
-				const [sha, message, author, timestamp] = line.split("|");
+				const [sha, message] = line.split("|");
 
 				// Skip if it's the same commit
 				if (sha === orphanedCommit) continue;
@@ -236,8 +236,7 @@ function fixOrphanedTag(tagObj) {
 }
 
 // Initialize variables for summary generation
-let fixedCount = 0;
-let updatedTagsDetailed = TAGS_DETAILED;
+let updatedTagsDetailed;
 let fixedTagsArray = [];
 
 console.log("🔗 Checking and fixing orphaned tags...");
@@ -256,9 +255,6 @@ if (TAGS_DETAILED.length === 0) {
 	}
 
 	// Continue to summary generation instead of exiting
-	fixedCount = 0;
-	updatedTagsDetailed = TAGS_DETAILED;
-	fixedTagsArray = [];
 	console.log("🔍 Continuing to summary generation...");
 } else {
 	console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for orphaned commits...`);
@@ -281,7 +277,6 @@ if (TAGS_DETAILED.length === 0) {
 		}
 
 		// Continue to summary generation instead of exiting
-		fixedCount = 0;
 		updatedTagsDetailed = TAGS_DETAILED;
 		fixedTagsArray = [];
 		console.log("🔍 Continuing to summary generation...");
@@ -322,7 +317,6 @@ if (TAGS_DETAILED.length === 0) {
 		}
 
 		// Set variables for summary generation
-		fixedCount = fixedTags.length;
 		updatedTagsDetailed = updatedTagsList;
 		fixedTagsArray = fixedTags;
 	}

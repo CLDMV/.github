@@ -12,7 +12,6 @@ import { api, parseRepo } from "../../api/_api/core.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const GITHUB_TOKEN = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-const USE_DEFAULT_TOKEN = process.env.INPUT_USE_DEFAULT_TOKEN === "true";
 const GPG_ENABLED = process.env.INPUT_GPG_ENABLED === "true";
 const TAGGER_NAME = process.env.INPUT_TAGGER_NAME || "CLDMV Bot";
 const TAGGER_EMAIL = process.env.INPUT_TAGGER_EMAIL || "cldmv-bot@users.noreply.github.com";

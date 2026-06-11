@@ -251,7 +251,7 @@ try {
 	console.log(JSON.stringify(summaryData, null, 2));
 
 	// Set GitHub outputs
-	const outputs = setGitHubOutputs(summaryData);
+	setGitHubOutputs(summaryData);
 
 	// Generate and write the detailed summary
 	const summaryText = generateSummary(summaryData);
