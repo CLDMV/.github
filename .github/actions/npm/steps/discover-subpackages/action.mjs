@@ -45,7 +45,9 @@ function expandGlob(pattern) {
 	const idx = pat.lastIndexOf("/");
 	const base = idx === -1 ? "." : pat.slice(0, idx);
 	const seg = idx === -1 ? pat : pat.slice(idx + 1);
-	const re = new RegExp("^" + seg.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+	// Escape every regex metacharacter except `*` (our only wildcard, mapped to .*
+	// below). `?` must be escaped too, else it acts as a regex quantifier.
+	const re = new RegExp("^" + seg.replace(/[.+^${}()|[\]\\?]/g, "\\$&").replace(/\*/g, ".*") + "$");
 	let dirents;
 	try {
 		dirents = fs.readdirSync(base, { withFileTypes: true });
