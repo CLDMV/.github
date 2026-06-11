@@ -6,7 +6,7 @@
  * @module @cldmv/.github.github.jobs.create-release.dry-run
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { appendSummary, setOutputs } from "../../../common/common/core.mjs";
 
@@ -50,8 +50,9 @@ try {
 		process.exit(1);
 	}
 
-	// Report whether the tag already exists locally.
-	const tagExists = execSync(`git tag -l "${tag}"`).toString().trim() === tag;
+	// Report whether the tag already exists locally. execFileSync (argv array, no
+	// shell) keeps the env-derived tag out of a command string — CodeQL #100.
+	const tagExists = execFileSync("git", ["tag", "-l", tag]).toString().trim() === tag;
 	console.log(tagExists ? `  - Tag ${tag}: ⚠️ Already exists (will be updated)` : `  - Tag ${tag}: ✅ Will be created`);
 
 	// Report whether the release already exists.
