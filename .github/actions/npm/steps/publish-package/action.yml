@@ -76,6 +76,8 @@ runs:
       run: node "${{ github.action_path }}/verify.mjs"
       env:
         PACKAGE_DIR: ${{ inputs.package-dir }}
+        EXPECTED_NAME: ${{ inputs.package-name }}
+        EXPECTED_VERSION: ${{ inputs.version }}
 
     - name: Setup Node.js for ${{ inputs.registry-name }}
       uses: actions/setup-node@v6
