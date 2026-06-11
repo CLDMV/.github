@@ -23,7 +23,9 @@ try {
 	// Resolved tag: defaults to the core v<version> scheme, but honours a tag-name
 	// override (satellites use @scope/name@version) so dry-run reports the real tag.
 	const tag = process.env.TAG_NAME || `v${version}`;
-	const releaseUrl = `${process.env.SERVER_URL}/${repository}/releases/tag/${tag}`;
+	// Satellite tags (@scope/name@version) contain "/" and "@" — encode the tag in
+	// any URL path segment so it stays a single segment. No-op for core v<version>.
+	const releaseUrl = `${process.env.SERVER_URL}/${repository}/releases/tag/${encodeURIComponent(tag)}`;
 
 	// Tag creation validation.
 	appendSummary("🧪 **DRY RUN**: Tag creation validation");
@@ -58,7 +60,7 @@ try {
 	// Report whether the release already exists.
 	let releaseExists = false;
 	try {
-		await api("GET", `/releases/tags/${tag}`, null, { token, owner, repo });
+		await api("GET", `/releases/tags/${encodeURIComponent(tag)}`, null, { token, owner, repo });
 		releaseExists = true;
 	} catch {
 		releaseExists = false;

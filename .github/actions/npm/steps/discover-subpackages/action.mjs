@@ -97,6 +97,16 @@ if (!raw) {
 const seen = new Set();
 entries = entries.filter((e) => (seen.has(e.dir) ? false : (seen.add(e.dir), true)));
 
+// Fail fast on duplicate package names — two distinct directories resolving to the
+// same name (or a repeated name in the JSON list) would publish/tag that package
+// twice in the matrix, producing partial failures. Each satellite must be unique.
+const names = entries.map((e) => e.name);
+const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
+if (dupes.length) {
+	console.error(`::error::Duplicate satellite package name(s): ${dupes.join(", ")}. Each satellite directory must resolve to a unique package name.`);
+	process.exit(1);
+}
+
 setOutput("matrix", JSON.stringify(entries));
 setOutput("has-extras", entries.length > 0 ? "true" : "false");
 

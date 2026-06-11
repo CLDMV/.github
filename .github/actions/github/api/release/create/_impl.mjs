@@ -160,6 +160,9 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	const wantsDraft = toBoolean(is_draft, false);
 	const wantsPrerelease = toBoolean(is_prerelease, false);
 	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
+	// Satellite tags (@scope/name@version) contain "/" and "@"; encode the tag in
+	// URL path segments so the lookups below resolve. No-op for core v<version>.
+	const encTag = encodeURIComponent(tag_name);
 
 	/**
 	 * Standard GitHub API headers using current API version.
@@ -191,7 +194,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		const delayMs = 5000;
 		let tagReady = false;
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-			const tagCheckResponse = await fetch(`https://api.github.com/repos/${repo}/git/refs/tags/${tag_name}`, {
+			const tagCheckResponse = await fetch(`https://api.github.com/repos/${repo}/git/refs/tags/${encTag}`, {
 				method: "GET",
 				headers: apiHeaders()
 			});
@@ -209,7 +212,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	}
 
 	// Check if release already exists
-	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tag_name}`, {
+	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${encTag}`, {
 		method: "GET",
 		headers: apiHeaders()
 	});
