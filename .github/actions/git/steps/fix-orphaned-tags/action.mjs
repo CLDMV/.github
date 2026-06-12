@@ -244,17 +244,10 @@ console.log("🔗 Checking and fixing orphaned tags...");
 if (TAGS_DETAILED.length === 0) {
 	console.log("ℹ️ No tags to process");
 
-	// Set outputs
-	console.log("updated-tags-detailed=[]");
-	console.log("fixed-count=0");
-	console.log("fixed-tags=[]");
+	// Nothing to analyze; fall through to the shared output block below so
+	// summary-json (the output action.yml declares) is emitted on this path too.
+	updatedTagsDetailed = [];
 
-	const githubOutput = process.env.GITHUB_OUTPUT;
-	if (githubOutput) {
-		writeFileSync(githubOutput, "updated-tags-detailed=[]\n" + "fixed-count=0\n" + "fixed-tags=[]\n", { flag: "a" });
-	}
-
-	// Continue to summary generation instead of exiting
 	console.log("🔍 Continuing to summary generation...");
 } else {
 	console.log(`🔍 Analyzing ${TAGS_DETAILED.length} tags for orphaned commits...`);
@@ -320,64 +313,64 @@ if (TAGS_DETAILED.length === 0) {
 		updatedTagsDetailed = updatedTagsList;
 		fixedTagsArray = fixedTags;
 	}
-
-	// Set outputs
-	const updatedTagsJson = JSON.stringify(updatedTagsDetailed);
-	const fixedTagsJson = JSON.stringify(fixedTagsArray);
-
-	// Create detailed summary JSON with title, description, and pre-formatted lines
-	const summaryData = {
-		title: "🔗 Orphaned Tag Analysis",
-		description:
-			fixedTagsArray.length > 0 ? "The following orphaned tags were retargeted:" : "Analyzed version tags for orphaned references.",
-		fixed_count: fixedTagsArray.length,
-		lines: [],
-		stats_template: "🔗 Orphaned tag fixes: {count}",
-		notes: []
-	};
-
-	// Create pre-formatted lines for each fixed tag
-	for (const tagName of fixedTagsArray) {
-		const originalTag = TAGS_DETAILED.find((t) => t.name === tagName);
-		const fixedTag = updatedTagsDetailed.find((t) => t.name === tagName);
-
-		if (originalTag && fixedTag) {
-			const line = `- **${tagName}** → **${fixedTag.commitSha.substring(0, 7)}** (was: ${originalTag.commitSha.substring(0, 7)})`;
-			summaryData.lines.push(line);
-		}
-	}
-
-	// Add appropriate notes
-	if (fixedTagsArray.length > 0) {
-		summaryData.notes.push(`Successfully retargeted ${fixedTagsArray.length} orphaned tag(s)`);
-	} else {
-		summaryData.lines.push("- ✅ **No issues found**: All version tags point to reachable commits");
-		summaryData.notes.push("All analyzed tags are properly targeting reachable commits");
-	}
-
-	const summaryJson = JSON.stringify(summaryData);
-
-	console.log(`🔍 DEBUG: Orphaned tags action summary data:`);
-	console.log(JSON.stringify(summaryData, null, 2));
-
-	console.log(`updated-tags-detailed=${updatedTagsJson}`);
-	console.log(`fixed-count=${fixedTagsArray.length}`);
-	console.log(`fixed-tags=${fixedTagsJson}`);
-	console.log(`summary-json=${summaryJson}`); // Write to GitHub output file
-	const githubOutput = process.env.GITHUB_OUTPUT;
-	if (githubOutput) {
-		writeFileSync(
-			githubOutput,
-			`updated-tags-detailed=${updatedTagsJson}\n` +
-				`fixed-count=${fixedTagsArray.length}\n` +
-				`fixed-tags=${fixedTagsJson}\n` +
-				`summary-json=${summaryJson}\n`,
-			{ flag: "a" }
-		);
-		console.log("🔍 DEBUG: Orphaned tags action outputs written to GITHUB_OUTPUT");
-	} else {
-		console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
-	}
-
-	console.log("🔍 DEBUG: Orphaned tags action completed successfully");
 }
+
+// Set outputs
+const updatedTagsJson = JSON.stringify(updatedTagsDetailed);
+const fixedTagsJson = JSON.stringify(fixedTagsArray);
+
+// Create detailed summary JSON with title, description, and pre-formatted lines
+const summaryData = {
+	title: "🔗 Orphaned Tag Analysis",
+	description:
+		fixedTagsArray.length > 0 ? "The following orphaned tags were retargeted:" : "Analyzed version tags for orphaned references.",
+	fixed_count: fixedTagsArray.length,
+	lines: [],
+	stats_template: "🔗 Orphaned tag fixes: {count}",
+	notes: []
+};
+
+// Create pre-formatted lines for each fixed tag
+for (const tagName of fixedTagsArray) {
+	const originalTag = TAGS_DETAILED.find((t) => t.name === tagName);
+	const fixedTag = updatedTagsDetailed.find((t) => t.name === tagName);
+
+	if (originalTag && fixedTag) {
+		const line = `- **${tagName}** → **${fixedTag.commitSha.substring(0, 7)}** (was: ${originalTag.commitSha.substring(0, 7)})`;
+		summaryData.lines.push(line);
+	}
+}
+
+// Add appropriate notes
+if (fixedTagsArray.length > 0) {
+	summaryData.notes.push(`Successfully retargeted ${fixedTagsArray.length} orphaned tag(s)`);
+} else {
+	summaryData.lines.push("- ✅ **No issues found**: All version tags point to reachable commits");
+	summaryData.notes.push("All analyzed tags are properly targeting reachable commits");
+}
+
+const summaryJson = JSON.stringify(summaryData);
+
+console.log(`🔍 DEBUG: Orphaned tags action summary data:`);
+console.log(JSON.stringify(summaryData, null, 2));
+
+console.log(`updated-tags-detailed=${updatedTagsJson}`);
+console.log(`fixed-count=${fixedTagsArray.length}`);
+console.log(`fixed-tags=${fixedTagsJson}`);
+console.log(`summary-json=${summaryJson}`); // Write to GitHub output file
+const githubOutput = process.env.GITHUB_OUTPUT;
+if (githubOutput) {
+	writeFileSync(
+		githubOutput,
+		`updated-tags-detailed=${updatedTagsJson}\n` +
+			`fixed-count=${fixedTagsArray.length}\n` +
+			`fixed-tags=${fixedTagsJson}\n` +
+			`summary-json=${summaryJson}\n`,
+		{ flag: "a" }
+	);
+	console.log("🔍 DEBUG: Orphaned tags action outputs written to GITHUB_OUTPUT");
+} else {
+	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
+}
+
+console.log("🔍 DEBUG: Orphaned tags action completed successfully");
