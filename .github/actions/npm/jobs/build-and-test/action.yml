@@ -95,8 +95,10 @@ runs:
     # staged dirs ride the same artifact. See docs/conventions/satellite-packages.md.
     - name: Build satellite packages
       if: inputs.build-subpackages-command != ''
-      shell: bash
-      run: ${{ inputs.build-subpackages-command }}
+      uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
+      with:
+        build-command: ${{ inputs.build-subpackages-command }}
+        environment: production
 
     - name: Create npm package
       id: create-package

@@ -35,7 +35,7 @@ Each satellite gets its own GitHub Release object, signed to match the core's ta
 
 Satellites are opt-in per repo via a single string input, `extra_packages`, forwarded from `workflow-publish.yml` to `reusable-publishing.yml`. It accepts **either** form, auto-detected:
 
-- **Glob** — a path pattern (one or more, whitespace-separated). Every matching directory that contains a `package.json` is published.
+- **Glob** — one or more whitespace-separated patterns. Matching is deliberately simple: a single `*` wildcard in the **final** path segment (e.g. `dist-packages/*` or `dist-packages/slothlet-*`); `**`/nested globs are not supported and `?` matches a literal `?`. Every matching directory that contains a `package.json` is published.
 
   ```yaml
   extra_packages: "dist-packages/*"

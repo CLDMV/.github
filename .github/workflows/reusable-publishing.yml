@@ -540,17 +540,20 @@ jobs:
 
     publish-extras:
         name: "🛰️ Publish ${{ matrix.name }}"
-        # Runs after the core publish. `!cancelled()` lets this evaluate even when a
-        # core publish job was legitimately skipped (e.g. npm disabled, or version
-        # unchanged); the result != 'failure' guards hold satellites back only when a
-        # core publish actually FAILED. fail-fast:false isolates satellites from each
-        # other — one bad satellite never blocks the core release or its siblings.
-        needs: [ detect-version, detect-repo-config, discover-extras, publish-npm, publish-github-packages ]
+        # Runs after the core publish AND the core release. `!cancelled()` lets this
+        # evaluate even when a core job was legitimately skipped (e.g. npm disabled,
+        # release creation off, or version unchanged); the result != 'failure' guards
+        # hold satellites back only when a core job actually FAILED — so satellite
+        # tags/releases never ride a missing core release. fail-fast:false isolates
+        # satellites from each other — one bad satellite never blocks the core
+        # release or its siblings.
+        needs: [ detect-version, detect-repo-config, discover-extras, publish-npm, publish-github-packages, create-release ]
         if: |
             !cancelled()
             && needs.discover-extras.outputs.has-extras == 'true'
             && needs.publish-npm.result != 'failure'
             && needs.publish-github-packages.result != 'failure'
+            && needs.create-release.result != 'failure'
             && (
               inputs.dry_run == true ||
               needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
@@ -622,6 +625,14 @@ jobs:
               with:
                   name: ${{ steps.names.outputs.artifact-name }}
                   path: artifact
+
+            # Pin Node before packing so the attached tarball is produced by the
+            # requested npm version, not whatever the runner image defaults to.
+            - name: Setup Node.js (deterministic pack)
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
 
             - name: Pack satellite tarball
               if: inputs.run_create_release == true && inputs.dry_run != true
