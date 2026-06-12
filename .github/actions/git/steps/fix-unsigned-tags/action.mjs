@@ -6,9 +6,9 @@
  */
 
 import { writeFileSync } from "fs";
-import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
+import { gitCommand } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
-import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../github/api/_api/gpg.mjs";
+import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 console.log("🔍 DEBUG: Unsigned tags action starting...");
 
@@ -104,8 +104,7 @@ function fixUnsignedTag(tagObj) {
 }
 
 // Initialize variables for summary generation
-let fixedCount = 0;
-let updatedTagsDetailed = TAGS_DETAILED;
+let updatedTagsDetailed;
 let fixedTagsArray = [];
 
 console.log("🔐 Checking and fixing unsigned/unannotated tags...");
@@ -124,7 +123,6 @@ if (TAGS_DETAILED.length === 0) {
 	}
 
 	// Continue to summary generation instead of exiting
-	fixedCount = 0;
 	updatedTagsDetailed = TAGS_DETAILED;
 	fixedTagsArray = [];
 	console.log("🔍 Continuing to summary generation...");
@@ -149,7 +147,6 @@ if (TAGS_DETAILED.length === 0) {
 		}
 
 		// Continue to summary generation instead of exiting
-		fixedCount = 0;
 		updatedTagsDetailed = TAGS_DETAILED;
 		fixedTagsArray = [];
 		console.log("🔍 Continuing to summary generation...");
@@ -207,7 +204,6 @@ if (TAGS_DETAILED.length === 0) {
 		}
 
 		// Set variables for summary generation
-		fixedCount = fixedTags.length;
 		updatedTagsDetailed = updatedTagsList;
 		fixedTagsArray = fixedTags;
 	}

@@ -6,8 +6,7 @@ import {
 	createRefToCommit,
 	forceMoveRefToCommit,
 	createAnnotatedTag,
-	createRefForTagObject,
-	forceMoveRefToTagObject
+	createRefForTagObject
 } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
 

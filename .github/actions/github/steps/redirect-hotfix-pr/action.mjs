@@ -44,9 +44,10 @@ export function compilePattern(source) {
 export function isDependabotSecurityPR({ userLogin, prBody }) {
 	if (userLogin !== "dependabot[bot]") return false;
 	if (!prBody) return false;
+	// A GHSA advisory URL always embeds the GHSA id, so this bare-id check already
+	// covers the URL form — a separate (unanchored) URL regex adds nothing.
 	const ghsaId = /\bGHSA-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}\b/;
-	const advisoryUrl = /\bhttps?:\/\/github\.com\/advisories\/GHSA-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}\b/i;
-	return ghsaId.test(prBody) || advisoryUrl.test(prBody);
+	return ghsaId.test(prBody);
 }
 
 /**

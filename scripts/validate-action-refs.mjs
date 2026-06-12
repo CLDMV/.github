@@ -25,28 +25,19 @@
  */
 
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
-import { execSync } from "node:child_process";
+import { resolve, join } from "node:path";
+import { execSync, execFileSync } from "node:child_process";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 const SELF_REPO = "CLDMV/.github"; // self-references resolve to local paths
 
 // ---- helpers ---------------------------------------------------------------
 
-/** Append a line to the GHA step summary when running in Actions. */
-function appendSummary(text) {
-	if (!process.env.GITHUB_STEP_SUMMARY) return;
-	try {
-		require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + "\n");
-	} catch {
-		/* ignore */
-	}
-}
-
 /** List every workflow + action.yml file in the repo. */
 function listYamlFiles() {
-	const out = execSync(
-		`find ${REPO_ROOT}/.github/workflows ${REPO_ROOT}/.github/actions -name '*.yml' -type f`,
+	const out = execFileSync(
+		"find",
+		[`${REPO_ROOT}/.github/workflows`, `${REPO_ROOT}/.github/actions`, "-name", "*.yml", "-type", "f"],
 		{ encoding: "utf8" }
 	);
 	return out.trim().split("\n").filter(Boolean);
