@@ -81,7 +81,7 @@ export function categorizeCommits(commitRange, allCommits = null) {
 
 				const lower = subject.toLowerCase();
 
-				let category = "other";
+				let category;
 				let type = null;
 				let scope = null;
 				let isBreaking = false;
@@ -326,7 +326,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				console.log(`🔍 DEBUG: Using fallback range instead`);
 				baseRef = fallbackBase;
 				commitRange = fallbackRange;
-				hasCommits = true;
 
 				console.log("🔍 DEBUG: First few commits in fallback range:");
 				const fallbackSummary = gitCommand(`git log ${fallbackRange} --oneline -5`, true);

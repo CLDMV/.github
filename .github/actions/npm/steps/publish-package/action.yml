@@ -36,6 +36,12 @@ inputs:
     description: "Name of the build artifact to download"
     required: false
     default: "build-artifacts"
+  package-dir:
+    description: "Directory within the downloaded artifact to publish from. Defaults to
+      package-contents (the npm-pack-expanded core package). Satellite packages pass their
+      own staged directory, e.g. dist-packages/<name>."
+    required: false
+    default: "package-contents"
 
 outputs:
   published:
@@ -68,6 +74,10 @@ runs:
     - name: Verify package contents
       shell: bash
       run: node "${{ github.action_path }}/verify.mjs"
+      env:
+        PACKAGE_DIR: ${{ inputs.package-dir }}
+        EXPECTED_NAME: ${{ inputs.package-name }}
+        EXPECTED_VERSION: ${{ inputs.version }}
 
     - name: Setup Node.js for ${{ inputs.registry-name }}
       uses: actions/setup-node@v6
@@ -78,7 +88,7 @@ runs:
     - name: Publish to ${{ inputs.registry-name }}
       id: publish
       shell: bash
-      working-directory: package-contents
+      working-directory: ${{ inputs.package-dir }}
       env:
         PACKAGE_NAME: ${{ inputs.package-name }}
         PACKAGE_VERSION: ${{ inputs.version }}

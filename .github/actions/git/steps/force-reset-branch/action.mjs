@@ -21,7 +21,7 @@
  * @module @cldmv/.github.git.steps.force-reset-branch
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getInput, setOutputs } from "../../../common/common/core.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
 
@@ -178,13 +178,13 @@ export function isRefNotFound(message) {
 
 // ---- side-effecting main flow (gated to script entry only) ----------------
 
-function run(cmd) {
-	return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+function run(file, args) {
+	return execFileSync(file, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
-function runCapturingStderr(cmd) {
+function runCapturingStderr(file, args) {
 	try {
-		const stdout = execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+		const stdout = execFileSync(file, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 		return { ok: true, stdout, stderr: "" };
 	} catch (e) {
 		return { ok: false, stdout: e.stdout?.toString() || "", stderr: e.stderr?.toString() || e.message };
@@ -194,7 +194,7 @@ function runCapturingStderr(cmd) {
 /** Read the target branch's current remote SHA via ls-remote ("" if absent/error). */
 function remoteSha(remote, targetBranch) {
 	try {
-		return parseLsRemoteSha(run(`git ls-remote ${remote} refs/heads/${targetBranch}`), targetBranch);
+		return parseLsRemoteSha(run("git", ["ls-remote", remote, `refs/heads/${targetBranch}`]), targetBranch);
 	} catch {
 		return "";
 	}
@@ -240,9 +240,9 @@ function cliForceReset({ targetBranch, sourceRef, token, repository, maxRetries 
 	let attempts = 0;
 	let result;
 	while (true) {
-		const pushCmd = `git ${buildPushArgs({ remote, sourceRef, targetBranch, expectedSha }).join(" ")}`;
-		console.log(`▶️  ${redactToken(pushCmd)}`);
-		result = runCapturingStderr(pushCmd);
+		const pushArgs = buildPushArgs({ remote, sourceRef, targetBranch, expectedSha });
+		console.log(`▶️  ${redactToken(`git ${pushArgs.join(" ")}`)}`);
+		result = runCapturingStderr("git", pushArgs);
 		if (result.ok) break;
 		if (attempts >= maxRetries || !isLeaseFailure(result.stderr)) break;
 		attempts++;

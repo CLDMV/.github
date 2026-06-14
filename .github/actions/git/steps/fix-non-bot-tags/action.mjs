@@ -124,7 +124,6 @@ function fixNonBotTag(tagObj) {
 console.log("🤖 Analyzing and fixing non-bot tag signatures...");
 
 // Initialize variables for summary generation
-let fixedCount = 0;
 let updatedTagsDetailed = [];
 let fixedTagsArray = [];
 
@@ -141,7 +140,6 @@ if (TAGS_DETAILED.length === 0) {
 	});
 
 	// Continue to summary generation instead of exiting
-	fixedCount = 0;
 	updatedTagsDetailed = TAGS_DETAILED;
 	fixedTagsArray = [];
 	console.log("🔍 Continuing to summary generation...");
@@ -199,7 +197,6 @@ if (TAGS_DETAILED.length === 0) {
 		}
 
 		// Set variables for summary generation
-		fixedCount = fixedTags.length;
 		fixedTagsArray = fixedTags;
 	}
 }

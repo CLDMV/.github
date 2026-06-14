@@ -1,0 +1,21 @@
+name: "Discover Satellite Subpackages"
+description: "Resolve the extra_packages input (JSON array or glob) into a publish matrix of
+  { name, dir } entries, reading each directory's package.json for its name."
+
+inputs:
+  extra-packages:
+    description: "Either a JSON array of { name, dir } entries, or one/more whitespace-
+      separated glob patterns (e.g. dist-packages/*). Empty resolves to no satellites. See
+      docs/conventions/satellite-packages.md."
+    required: false
+    default: ""
+
+outputs:
+  matrix:
+    description: "JSON array of { name, dir } satellite entries for strategy.matrix.include."
+  has-extras:
+    description: "'true' when at least one satellite was resolved, else 'false'."
+
+runs:
+  using: "node24"
+  main: "action.mjs"

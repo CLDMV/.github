@@ -139,6 +139,7 @@ These `workflow-*.yml` files are what consumer repos invoke via `uses: CLDMV/.gi
 - **Triggers** (in the consumer repo's `publish.yml`): push to default branch with a release-merge commit.
 - **Dry-run**: see [`examples/guides/DRY-RUN-GUIDE.md`](examples/guides/DRY-RUN-GUIDE.md). Validates the full pipeline (auth, prerequisites, version metadata) without actually publishing or tagging.
 - **Usage**: `CLDMV/.github/.github/workflows/workflow-publish.yml@v4`
+- **Satellite packages** (optional): publish extra packages carved from the same build output — slices of the main tarball shipped as their own npm + GitHub Packages packages at the **same version and commit** as the core, each with its own `@scope/name@version` tag and GitHub Release. Opt in with `extra_packages` (a JSON `{ name, dir }` array, or a `dist-packages/*` glob) plus, when the carve isn't folded into `build_command`, `build_subpackages_command`. Full design, tag scheme, and the first-publish/trusted-publisher bootstrap: [`docs/conventions/satellite-packages.md`](docs/conventions/satellite-packages.md); a worked block is in the [`core-cicd/publish.yml`](examples/individual-repo-workflows/core-cicd/publish.yml) example.
 
 ### Update Major Version Tags Workflow (`workflow-update-major-version-tags.yml`)
 

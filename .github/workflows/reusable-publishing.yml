@@ -102,6 +102,17 @@ on:
                 type: string
                 default: ""
 
+            # Satellite packages (published alongside the core, same version/commit)
+            extra_packages:
+                description: "Satellite packages to publish alongside the core. Either a JSON
+                    array of { name, dir } entries, or one/more whitespace-separated globs
+                    (e.g. dist-packages/*). Empty (default) disables. Each rides the build
+                    artifact and gets its own npm + GitHub Packages publish and a prefixed
+                    tag + GitHub Release. See docs/conventions/satellite-packages.md."
+                required: false
+                type: string
+                default: ""
+
             # Release parameters (for create-release job)
             is_prerelease:
                 description: "Whether this is a prerelease"
@@ -269,6 +280,44 @@ jobs:
                   custom-npm-command: ${{ inputs.publish_command_npm }}
                   custom-github-packages-command: ${{ inputs.publish_command_github_packages }}
                   github-token: ${{ github.token }}
+
+    discover-extras:
+        name: "🛰️ Discover Satellite Packages"
+        # Only when satellites are requested and there's actually a new version to
+        # publish (mirrors the core publish gate). Downloads the build artifact to
+        # expand globs against the staged dist-packages/ directories.
+        if: |
+            inputs.extra_packages != '' && (
+              inputs.dry_run == true ||
+              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
+            )
+        runs-on: ubuntu-latest
+        needs: [ detect-version ]
+        outputs:
+            matrix: ${{ steps.discover.outputs.matrix }}
+            has-extras: ${{ steps.discover.outputs.has-extras }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Calculate artifact names
+              id: names
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  package-name: ${{ inputs.package_name }}
+                  version: ${{ needs.detect-version.outputs.version }}
+
+            - name: Download build artifacts
+              uses: actions/download-artifact@v7
+              with:
+                  name: ${{ steps.names.outputs.artifact-name }}
+
+            - name: Discover satellite packages
+              id: discover
+              uses: CLDMV/.github/.github/actions/npm/steps/discover-subpackages@v4
+              with:
+                  extra-packages: ${{ inputs.extra_packages }}
 
     publish-npm:
         name: "📦 Publish to NPM"
@@ -483,6 +532,136 @@ jobs:
               with:
                   debug: ${{ inputs.debug }}
                   github_token: ${{ steps.app-token.outputs.token }}
+                  gpg_enabled: ${{ inputs.use_gpg }}
+                  tagger_name: ${{ secrets.TAGGER_NAME }}
+                  tagger_email: ${{ secrets.TAGGER_EMAIL }}
+                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+                  gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+    publish-extras:
+        name: "🛰️ Publish ${{ matrix.name }}"
+        # Runs after the core publish AND the core release. `!cancelled()` lets this
+        # evaluate even when a core job was legitimately skipped (e.g. npm disabled,
+        # release creation off, or version unchanged); the result != 'failure' guards
+        # hold satellites back only when a core job actually FAILED — so satellite
+        # tags/releases never ride a missing core release. fail-fast:false isolates
+        # satellites from each other — one bad satellite never blocks the core
+        # release or its siblings.
+        needs: [ detect-version, detect-repo-config, discover-extras, publish-npm, publish-github-packages, create-release ]
+        if: |
+            !cancelled()
+            && needs.discover-extras.outputs.has-extras == 'true'
+            && needs.publish-npm.result != 'failure'
+            && needs.publish-github-packages.result != 'failure'
+            && needs.create-release.result != 'failure'
+            && (
+              inputs.dry_run == true ||
+              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
+            )
+        runs-on: ubuntu-latest
+        permissions:
+            id-token: write # NPM trusted publishers (OIDC) — provenance parity with core
+            contents: write # Create the satellite's tag + GitHub Release
+            packages: write # Publish to GitHub Packages
+        strategy:
+            fail-fast: false
+            matrix:
+                include: ${{ fromJSON(needs.discover-extras.outputs.matrix || '[]') }}
+        steps:
+            - name: Calculate artifact names
+              id: names
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  package-name: ${{ inputs.package_name }}
+                  version: ${{ needs.detect-version.outputs.version }}
+
+            - name: Publish ${{ matrix.name }} to NPM
+              if: inputs.run_publish_npm == true
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-npm@v4
+              with:
+                  package-name: ${{ matrix.name }}
+                  version: ${{ needs.detect-version.outputs.version }}
+                  node-version: ${{ inputs.node_version }}
+                  package-manager: ${{ inputs.package_manager }}
+                  publish-command: ${{ needs.detect-repo-config.outputs.npm-command }}
+                  package-dir: ${{ matrix.dir }}
+                  dry-run: ${{ inputs.dry_run }}
+                  npm-token: ${{ secrets.NPM_TOKEN }}
+                  artifact-name: ${{ steps.names.outputs.artifact-name }}
+
+            - name: Publish ${{ matrix.name }} to GitHub Packages
+              if: inputs.run_publish_github_packages == true
+              uses: CLDMV/.github/.github/actions/npm/jobs/publish-github-packages@v4
+              with:
+                  package-name: ${{ matrix.name }}
+                  version: ${{ needs.detect-version.outputs.version }}
+                  node-version: ${{ inputs.node_version }}
+                  package-manager: ${{ inputs.package_manager }}
+                  publish-command: ${{ needs.detect-repo-config.outputs.github-packages-command }}
+                  package-dir: ${{ matrix.dir }}
+                  dry-run: ${{ inputs.dry_run }}
+                  github-token: ${{ github.token }}
+                  artifact-name: ${{ steps.names.outputs.artifact-name }}
+
+            # --- Per-satellite release: prefixed tag + GitHub Release + tarball asset ---
+            - name: Create App token (auto-detect)
+              if: inputs.run_create_release == true
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            # Pack the satellite tarball from the build artifact into RUNNER_TEMP so it
+            # survives create-release's own (clean) checkout, then attach it as a release
+            # asset. Skipped on dry-run (no asset needed).
+            - name: Download build artifacts (release asset)
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              uses: actions/download-artifact@v7
+              with:
+                  name: ${{ steps.names.outputs.artifact-name }}
+                  path: artifact
+
+            # Pin Node before packing so the attached tarball is produced by the
+            # requested npm version, not whatever the runner image defaults to.
+            - name: Setup Node.js (deterministic pack)
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+
+            - name: Pack satellite tarball
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              id: pack
+              shell: bash
+              env:
+                  SAT_DIR: ${{ matrix.dir }}
+              run: |
+                  set -euo pipefail
+                  dest="${RUNNER_TEMP}/sat-asset"
+                  mkdir -p "$dest"
+                  tgz=$(npm pack "./artifact/${SAT_DIR}" --pack-destination "$dest" --silent | tail -n1)
+                  echo "tarball=${dest}/${tgz}" >> "$GITHUB_OUTPUT"
+                  echo "📦 Packed ${SAT_DIR} -> ${dest}/${tgz}"
+
+            - name: Create satellite release
+              if: inputs.run_create_release == true
+              uses: CLDMV/.github/.github/actions/github/jobs/create-release@v4
+              with:
+                  version: ${{ needs.detect-version.outputs.version }}
+                  tag-name: ${{ format('{0}@{1}', matrix.name, needs.detect-version.outputs.version) }}
+                  package-name: ${{ matrix.name }}
+                  # Satellites carry no build of their own; the asset is the packed dir.
+                  release-source-only: true
+                  assets: ${{ steps.pack.outputs.tarball }}
+                  release-notes: ${{ format('Part of [`{0}` v{1}]({2}/{3}/releases/tag/v{1}) — built from the same commit and published at the same version.', inputs.package_name, needs.detect-version.outputs.version, github.server_url, github.repository) }}
+                  node-version: ${{ inputs.node_version }}
+                  dry-run: ${{ inputs.dry_run }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   gpg_enabled: ${{ inputs.use_gpg }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}

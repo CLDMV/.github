@@ -14,7 +14,9 @@ try {
 	// Resolve the release ID, falling back to a lookup by tag.
 	let releaseId = process.env.RELEASE_ID || "";
 	if (!releaseId) {
-		const release = await api("GET", `/releases/tags/${version}`, null, { token, owner, repo });
+		// VERSION carries the resolved tag; satellite tags (@scope/name@version)
+		// contain "/" and "@" — encode so the path stays a single segment.
+		const release = await api("GET", `/releases/tags/${encodeURIComponent(version)}`, null, { token, owner, repo });
 		releaseId = release?.id ? String(release.id) : "";
 	}
 	if (!releaseId) {
