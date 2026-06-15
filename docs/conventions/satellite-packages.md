@@ -99,7 +99,10 @@ Do this **before** the satellite's first release — not after a release half-fa
 Then, once per new satellite name:
 
 ```bash
-# 1. Build + carve so dist-packages/<name>/ exists (however the repo runs the carve).
+# Replace the UPPERCASE placeholders below: NAME (the satellite's unscoped name,
+# e.g. its dist-packages/ dir), SCOPE (your npm scope), OWNER/REPO, PUBLISH_WORKFLOW.yml.
+
+# 1. Build + carve so dist-packages/NAME/ exists (however the repo runs the carve).
 #    Each satellite's package.json needs a `repository` field (required for provenance —
 #    see Auth, provenance, and channels). Access is NOT read from package.json: the
 #    workflow derives --access from repo visibility, and the bootstrap sets it in step 3.
@@ -108,27 +111,27 @@ npm run build:ci && npm run build:subpackages
 # 2. The carve stamps the satellite at the current core version. Drop the bootstrap
 #    publish to a throwaway version so it can't collide with the upcoming real release
 #    or claim the `latest` dist-tag:
-#       edit dist-packages/<name>/package.json  →  "version": "0.0.0"
+#       edit dist-packages/NAME/package.json  ->  "version": "0.0.0"
 
 # 3. Authenticate (interactive login prompts for the 2FA OTP; a granular publish token
-#    also works) and publish ONCE — on a non-latest tag — to CREATE the package. Pass
-#    --access explicitly to match how the workflow publishes (it derives --access from
-#    repo visibility): `public` for a public package, `restricted` for a private one.
+#    also works) and publish ONCE — on a non-latest tag — to CREATE the package. Set
+#    --access to match how the workflow publishes (it derives --access from repo
+#    visibility): use "public" for a public package, or "restricted" for a private one.
 npm login
-npm publish ./dist-packages/<name> --tag bootstrap --access <public|restricted>
+npm publish ./dist-packages/NAME --tag bootstrap --access public
 
 # 4. Now that the package exists, register the trusted publisher (npm >= 11.10.0,
-#    released 2026-02 — or npmjs.com → the package → Settings → Trusted publishing).
+#    released 2026-02 — or npmjs.com -> the package -> Settings -> Trusted publishing).
 #    A permission flag (--allow-publish) is REQUIRED; the command fails without one.
-npm trust github @scope/<name> \
-  --repository <owner>/<repo> \
-  --file <publish-workflow>.yml \
+npm trust github @SCOPE/NAME \
+  --repository OWNER/REPO \
+  --file PUBLISH_WORKFLOW.yml \
   --allow-publish
-#    Add --environment <env> if the publish job runs in a named GitHub environment.
+#    Add --environment ENV if the publish job runs in a named GitHub environment.
 
 # 5. Verify.
-npm view @scope/<name> version
-npm trust list @scope/<name>
+npm view @SCOPE/NAME version
+npm trust list @SCOPE/NAME
 ```
 
 A satellite's trusted-publisher values mirror the core package's: satellites publish through the identical workflow in the same repo, so set `--repository` / `--file` (and `--environment`, if the job uses one) to match the core package's own trusted-publisher configuration — that pairing already works for the core.
