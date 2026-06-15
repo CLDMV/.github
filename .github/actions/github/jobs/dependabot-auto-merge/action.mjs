@@ -105,8 +105,13 @@ try {
 		appendSummary(`ℹ️ PR #${prNumber}: no longer open; nothing to auto-merge.`);
 		process.exit(0);
 	}
-	const baseRef = livePr.base?.ref || pr.base?.ref;
-	const prNodeId = livePr.node_id || pr.node_id;
+	const baseRef = livePr.base?.ref ?? pr.base?.ref;
+	const prNodeId = livePr.node_id ?? pr.node_id;
+	// Fail safe on an unexpected payload rather than calling /rules/branches/undefined
+	// or sending prId: undefined to GraphQL.
+	if (!baseRef || !prNodeId) {
+		throw new Error(`Could not resolve the live base branch or node id for PR #${prNumber} (base=${JSON.stringify(baseRef)}, nodeId present=${Boolean(prNodeId)}). Refusing to act — the GitHub API returned an unexpected PR payload.`);
+	}
 	if (baseRef !== pr.base?.ref) {
 		console.log(`🔎 PR #${prNumber} base is now "${baseRef}" (event snapshot said "${pr.base?.ref}") — using the live base.`);
 	}
