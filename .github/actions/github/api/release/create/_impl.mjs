@@ -390,7 +390,17 @@ async function uploadAssets({ token, repo, release_id, upload_url, assets, debug
 
 			if (!uploadResponse.ok) {
 				const errorText = await uploadResponse.text();
-				console.error(`Failed to upload ${fileName}: ${uploadResponse.status} ${errorText}`);
+				// An asset with this name already exists on the release — GitHub returns
+				// 422 already_exists. This is the normal case on a re-run after a partial
+				// failure: release assets are immutable per (tag, name) and the satellite
+				// tarballs are deterministic from the same artifact, so the existing asset
+				// is already correct. Treat it as a benign no-op instead of logging a scary
+				// error on every retry. Any other non-OK status is still a real failure.
+				if (uploadResponse.status === 422 && /already_exists/.test(errorText)) {
+					console.log(`ℹ️ Asset ${fileName} already present on the release — skipping (idempotent re-run).`);
+				} else {
+					console.error(`Failed to upload ${fileName}: ${uploadResponse.status} ${errorText}`);
+				}
 			} else {
 				debugLog(`Uploaded asset: ${fileName}`);
 			}
