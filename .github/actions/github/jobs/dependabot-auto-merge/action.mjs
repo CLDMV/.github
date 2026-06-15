@@ -9,6 +9,7 @@
 
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError } from "./_impl.mjs";
 
 /** GraphQL helper for enablePullRequestAutoMerge (REST has no equivalent). */
 async function graphql(token, query, variables) {
@@ -30,16 +31,6 @@ async function graphql(token, query, variables) {
 		throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
 	}
 	return result.data;
-}
-
-/** Parse Dependabot PR title for "from X.Y.Z to A.B.C" and compute bump type. */
-function parseSemverBump(title) {
-	const match = title.match(/from (\d+)\.(\d+)\.(\d+)\b.*?\bto (\d+)\.(\d+)\.(\d+)\b/);
-	if (!match) return null;
-	const [, om, on, op, nm, nn, np] = match.map((s, i) => (i === 0 ? s : Number(s)));
-	if (om !== nm) return { type: "major", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
-	if (on !== nn) return { type: "minor", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
-	return { type: "patch", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
 }
 
 try {
@@ -74,6 +65,11 @@ try {
 
 	const repository = process.env.GITHUB_REPOSITORY || "";
 	const [owner, repo] = repository.split("/");
+	// Fail safe if the env didn't parse to owner/repo — otherwise api() would fall
+	// back to a repo-less URL and a 404 there would be misread as "no branch rules".
+	if (!owner || !repo) {
+		throw new Error(`GITHUB_REPOSITORY is not in "owner/repo" form (got "${repository}"). Refusing to act — cannot resolve the repository for protection checks.`);
+	}
 	const prNumber = pr.number;
 
 	const bump = parseSemverBump(pr.title);
@@ -135,18 +131,13 @@ try {
 			// error (403/permission, network) means protection state is UNKNOWN —
 			// fail safe and don't auto-merge, but distinguish it from "confirmed
 			// unprotected" so the cause is actionable.
-			if (err.message.includes("-> 404")) {
+			if (isNotFoundError(err.message)) {
 				throw new Error(`Base branch "${baseRef}" has no effective branch rules (classic protection and rulesets both empty). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`);
 			}
 			throw new Error(`Could not read branch rules for "${baseRef}" (${err.message}). Refusing to enable auto-merge — protection state is unknown. Ensure the token has "Administration: read" (repository rules) on the repo, or set require_branch_protection: false to override.`);
 		}
 
-		const effective = Array.isArray(rules) ? rules : [];
-		const requiredCheckContexts = effective
-			.filter((r) => r.type === "required_status_checks")
-			.flatMap((r) => r.parameters?.required_status_checks || [])
-			.map((c) => c.context)
-			.filter(Boolean);
+		const requiredCheckContexts = requiredCheckContextsFromRules(rules);
 
 		// Require CI gating specifically: a `required_status_checks` rule with at least
 		// one check. An approval-based rule is NOT a sufficient gate here — this action
