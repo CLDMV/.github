@@ -104,7 +104,7 @@ The satellite matrix runs **after** the core publish and release, with `fail-fas
 - does not cancel sibling satellites;
 - marks the overall run failed (red) so it is visible and retryable.
 
-Because publish is idempotent, re-running the release republishes only the satellite that failed.
+Because publish is idempotent, re-running the release republishes only the satellite that failed. For this to hold, satellite discovery and publishing are deliberately **not** gated on the core version. The core publish/release jobs skip cleanly when `version == npm-latest` (nothing new to ship), but the satellite jobs must not borrow that gate: once the core is published, a re-run to recover a failed satellite *also* has `version == npm-latest`, and a core-keyed gate would skip the satellites and strand the failure. Instead the satellite matrix always re-enters, and each leg's own idempotency (already-published version ⇒ pseudo-success skip; tag/release creation upsert) makes the re-run a no-op for the satellites already out and a real publish for the one(s) missing — on either "re-run all jobs" or a fresh trigger. The trade-off is that satellite discovery runs on every publish trigger (not only on version bumps); on an unchanged version this is a green no-op, not a failure.
 
 ## Rollout
 
