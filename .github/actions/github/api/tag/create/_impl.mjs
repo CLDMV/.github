@@ -101,9 +101,16 @@ export async function run({
 		const shouldAnnotate = gpg_enabled || (message && message !== tag);
 		debugLog(`create/_impl: shouldAnnotate=${shouldAnnotate} (gpg_enabled=${gpg_enabled}, message differs=${message !== tag})`);
 
-		if (shouldAnnotate && tagger_name && tagger_email && !state.exists) {
+		if (shouldAnnotate && tagger_name && tagger_email) {
 			debugLog(`create/_impl: Creating annotated tag with API...`);
-			// Only create annotated tag if ref doesn't exist (tag objects are immutable)
+			// Always (re)create the annotated tag object and point the ref at it. Tag
+			// objects are immutable, but creating a fresh one and moving the ref onto
+			// it on a re-run is correct and keeps the tag ANNOTATED. Gating this on
+			// `!state.exists` was a bug: when the ref already existed (a re-run) it
+			// fell through to the lightweight branch below and force-moved the ref to a
+			// bare commit, silently DOWNGRADING a previously annotated/signed tag to a
+			// lightweight one. The ref upsert (create, else force-move) is handled
+			// right below, so an existing ref is fine here.
 			const tagger = { name: tagger_name, email: tagger_email };
 			debugLog(`create/_impl: Tagger object: ${JSON.stringify(tagger)}`);
 
