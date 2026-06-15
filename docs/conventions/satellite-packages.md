@@ -55,6 +55,8 @@ A leading `[` or `{` selects JSON; anything else is treated as a glob. Empty (th
 
 Satellite name and version are read from each directory's `package.json`; the version is asserted equal to the core version (lockstep).
 
+A brand-new satellite name must be bootstrapped with a one-time manual first publish before it can be released automatically — set this up before the first release, not after one half-fails. See [Bootstrapping a new satellite (first publish)](#bootstrapping-a-new-satellite-first-publish).
+
 ## Where satellites come from: the build artifact
 
 The publish jobs do not run against the repo checkout. `build-and-test` runs `npm pack`, expands the tarball into `package-contents/`, and uploads it as the build artifact; the publish jobs download that artifact and publish from it. Satellites ride the same mechanism:
@@ -82,19 +84,64 @@ Satellites reuse the core's auth and registry wiring verbatim:
 - **GitHub Packages** — same `--access` (derived from repo visibility) and `GITHUB_TOKEN`.
 - **dist-tag / channel** — satellites inherit the core's dist-tag. There is no separate prerelease/beta channel for satellites.
 
-Idempotency is inherited from the publish step: a re-run of a version already on the registry is a pseudo-success (skip), so re-running a release after fixing one satellite safely republishes only what is missing.
-
-### First publish of a new satellite name
-
-OIDC trusted publishing cannot bootstrap a name npm has never seen. For each new satellite:
-
-1. Publish the first version once with a granular `NPM_TOKEN` (a one-shot dispatch, or locally).
-2. On npmjs, configure the trusted publisher → repo `CLDMV/<repo>`, the publish workflow.
-3. Subsequent releases publish via OIDC with provenance, token-less, matching core.
-
 For provenance to validate, each satellite `package.json` **must** set `repository` (with `repository.directory`) pointing at the core repo. This also links the GitHub Packages entry to the repo.
 
+Idempotency is inherited from the publish step: a re-run of a version already on the registry is a pseudo-success (skip), so re-running a release after fixing one satellite safely republishes only what is missing.
+
+## Bootstrapping a new satellite (first publish)
+
+npm's OIDC trusted publishing **cannot create a package name it has never seen** — there is no initial-publish-over-OIDC yet (tracked in [npm/cli#8544](https://github.com/npm/cli/issues/8544), still open as of 2026-06). And both the npmjs.com UI and the `npm trust` CLI **require the package to already exist** before a trusted publisher can be configured for it — there is no way to pre-register one against a name npm has never seen. So each brand-new satellite *name* needs a **one-time, manual first publish** to create the package; every release after that is automated and token-less via OIDC, in lockstep with the core.
+
+Do this **before** the satellite's first release — not after a release half-fails on a name npm can't create. It is per brand-new name only: existing satellites need nothing, and a satellite leg that fails mid-release is recoverable by simply re-running, since the satellite jobs are not gated on the core version and every publish step is idempotent (see [Failure semantics](#failure-semantics)).
+
+**Prerequisites.** An npm account with **write access to the `@scope`** (standard Developer-team membership in the npm org) and **account-level 2FA enabled** — trusted-publishing setup mandates 2FA, and granular tokens configured to bypass 2FA are not accepted for it.
+
+Then, once per new satellite name:
+
+```bash
+# Replace the UPPERCASE placeholders below: NAME (the satellite's unscoped name,
+# e.g. its dist-packages/ dir), SCOPE (your npm scope), OWNER/REPO, PUBLISH_WORKFLOW.yml,
+# and ACCESS (public or restricted, to match repo visibility).
+
+# 1. Build + carve so dist-packages/NAME/ exists (however the repo runs the carve).
+#    Each satellite's package.json needs a `repository` field (required for provenance —
+#    see Auth, provenance, and channels). Access is NOT read from package.json: the
+#    workflow derives --access from repo visibility, and the bootstrap sets it in step 3.
+npm run build:ci && npm run build:subpackages
+
+# 2. The carve stamps the satellite at the current core version. Drop the bootstrap
+#    publish to a throwaway version so it can't collide with the upcoming real release
+#    or claim the `latest` dist-tag:
+#       edit dist-packages/NAME/package.json  ->  "version": "0.0.0"
+
+# 3. Authenticate (interactive login prompts for the 2FA OTP; a granular publish token
+#    also works) and publish ONCE — on a non-latest tag — to CREATE the package. Set
+#    ACCESS to match how the workflow publishes (it derives --access from repo
+#    visibility): "public" for a public package, or "restricted" for a private one.
+npm login
+npm publish ./dist-packages/NAME --tag bootstrap --access ACCESS
+
+# 4. Now that the package exists, register the trusted publisher (npm >= 11.10.0,
+#    released 2026-02 — or npmjs.com -> the package -> Settings -> Trusted publishing).
+#    A permission flag (--allow-publish) is REQUIRED; the command fails without one.
+npm trust github @SCOPE/NAME \
+  --repository OWNER/REPO \
+  --file PUBLISH_WORKFLOW.yml \
+  --allow-publish
+#    Add --environment ENV if the publish job runs in a named GitHub environment.
+
+# 5. Verify.
+npm view @SCOPE/NAME version
+npm trust list @SCOPE/NAME
+```
+
+A satellite's trusted-publisher values mirror the core package's: satellites publish through the identical workflow in the same repo, so set `--repository` / `--file` (and `--environment`, if the job uses one) to match the core package's own trusted-publisher configuration — that pairing already works for the core.
+
+From the next release on, the workflow publishes that satellite over OIDC with provenance, at the core version, alongside the core. The throwaway `0.0.0` / `bootstrap` publish is harmless: the first real release publishes the lockstep version and takes `latest`; drop the placeholder afterwards with `npm dist-tag rm @SCOPE/NAME bootstrap` if you like.
+
 GitHub Packages needs no equivalent bootstrap — a new scoped name publishes on first push with `packages: write`.
+
+When npm ships initial-publish-over-OIDC ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), this manual step goes away — you'll register the trusted publisher first and let the first release create the package. Until then, the manual first publish is required.
 
 ## Failure semantics
 
