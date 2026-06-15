@@ -100,8 +100,9 @@ Then, once per new satellite name:
 
 ```bash
 # 1. Build + carve so dist-packages/<name>/ exists (however the repo runs the carve).
-#    Each satellite's package.json already sets publishConfig.access "public" and a
-#    `repository` field (required for provenance — see Auth, provenance, and channels).
+#    Each satellite's package.json needs a `repository` field (required for provenance —
+#    see Auth, provenance, and channels). Access is NOT read from package.json: the
+#    workflow derives --access from repo visibility, and the bootstrap sets it in step 3.
 npm run build:ci && npm run build:subpackages
 
 # 2. The carve stamps the satellite at the current core version. Drop the bootstrap
@@ -110,9 +111,11 @@ npm run build:ci && npm run build:subpackages
 #       edit dist-packages/<name>/package.json  →  "version": "0.0.0"
 
 # 3. Authenticate (interactive login prompts for the 2FA OTP; a granular publish token
-#    also works) and publish ONCE — on a non-latest tag — to CREATE the package.
+#    also works) and publish ONCE — on a non-latest tag — to CREATE the package. Pass
+#    --access explicitly to match how the workflow publishes (it derives --access from
+#    repo visibility): `public` for a public package, `restricted` for a private one.
 npm login
-npm publish ./dist-packages/<name> --tag bootstrap
+npm publish ./dist-packages/<name> --tag bootstrap --access public
 
 # 4. Now that the package exists, register the trusted publisher (npm >= 11.10.0,
 #    released 2026-02 — or npmjs.com → the package → Settings → Trusted publishing).
