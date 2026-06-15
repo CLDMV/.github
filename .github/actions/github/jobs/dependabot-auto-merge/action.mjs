@@ -147,17 +147,17 @@ try {
 			.flatMap((r) => r.parameters?.required_status_checks || [])
 			.map((c) => c.context)
 			.filter(Boolean);
-		const hasPullRequestRule = effective.some((r) => r.type === "pull_request");
 
-		if (requiredCheckContexts.length === 0 && !hasPullRequestRule) {
-			throw new Error(`Base branch "${baseRef}" has no effective "required_status_checks" or "pull_request" rule (checked classic protection + rulesets). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`);
+		// Require CI gating specifically: a `required_status_checks` rule with at least
+		// one check. An approval-based rule is NOT a sufficient gate here — this action
+		// approves the PR as the bot, so any `pull_request` rule (even one requiring
+		// reviews, and certainly one with required_approving_review_count: 0) is
+		// satisfied by that approval and would let auto-merge fire with no CI. So
+		// required_status_checks is the only signal that actually holds the merge.
+		if (requiredCheckContexts.length === 0) {
+			throw new Error(`Base branch "${baseRef}" has no effective required status checks (checked classic protection + rulesets). Refusing to enable auto-merge — without CI gating it would merge immediately, and the bot's own approval satisfies any approval-only rule. Add a required-status-checks ruleset / branch protection, or set require_branch_protection: false to override.`);
 		}
-
-		if (requiredCheckContexts.length > 0) {
-			console.log(`✅ Base "${baseRef}" is protected — required checks (ruleset/classic): ${requiredCheckContexts.join(", ")}`);
-		} else {
-			console.log(`⚠️ Base "${baseRef}" has a pull_request rule but no required status checks — auto-merge will respect the PR/approval gate, but CI is not enforced by a required check.`);
-		}
+		console.log(`✅ Base "${baseRef}" requires checks (ruleset/classic): ${requiredCheckContexts.join(", ")}`);
 	}
 
 	// Approve the PR as the bot
