@@ -91,6 +91,26 @@ try {
 		process.exit(0);
 	}
 
+	// Re-fetch the PR for its LIVE state. `event.pull_request` (read from
+	// GITHUB_EVENT_PATH) is a snapshot frozen when the run first triggered, and a
+	// "Re-run" replays that original payload — so its base.ref is stale whenever the
+	// PR was retargeted after the event fired. Concretely: Dependabot opens a
+	// SECURITY update against the default branch (master), the base is later moved
+	// to hotfixes, and a re-run STILL sees base.ref="master" from the snapshot —
+	// checking (and potentially auto-merging against) the wrong branch. Gate on the
+	// freshly-read base/state instead of the snapshot.
+	const livePr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
+	if (livePr.state !== "open" || livePr.merged) {
+		console.log(`ℹ️ PR #${prNumber} is no longer open (state=${livePr.state}, merged=${Boolean(livePr.merged)}); skipping.`);
+		appendSummary(`ℹ️ PR #${prNumber}: no longer open; nothing to auto-merge.`);
+		process.exit(0);
+	}
+	const baseRef = livePr.base?.ref || pr.base?.ref;
+	const prNodeId = livePr.node_id || pr.node_id;
+	if (baseRef !== pr.base?.ref) {
+		console.log(`🔎 PR #${prNumber} base is now "${baseRef}" (event snapshot said "${pr.base?.ref}") — using the live base.`);
+	}
+
 	// Safety: refuse to enable auto-merge unless the PR's base branch is actually
 	// protected. Merging immediately without CI gating is the dangerous case.
 	//
@@ -99,10 +119,9 @@ try {
 	// when the branch is governed by a Ruleset — which is how CLDMV repos protect
 	// next / hotfixes / master. `/rules/branches/<b>` returns the EFFECTIVE rules
 	// for the branch from ALL sources (classic protection + rulesets), so it is
-	// the correct single source of truth. The base branch comes from the PR's own
-	// `base.ref` (set above), never a hardcoded constant.
+	// the correct single source of truth. `baseRef` is the PR's LIVE base (re-read
+	// above), never the stale snapshot and never a hardcoded constant.
 	if (requireBP) {
-		const baseRef = pr.base.ref;
 		let rules;
 		try {
 			rules = await api("GET", `/rules/branches/${encodeURIComponent(baseRef)}`, null, { token, owner, repo });
@@ -155,7 +174,7 @@ try {
 		}
 	`;
 	await graphql(token, mutation, {
-		prId: pr.node_id,
+		prId: prNodeId,
 		method: mergeMethod
 	});
 
