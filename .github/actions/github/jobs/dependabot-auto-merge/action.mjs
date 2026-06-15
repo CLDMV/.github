@@ -9,6 +9,7 @@
 
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError } from "./_impl.mjs";
 
 /** GraphQL helper for enablePullRequestAutoMerge (REST has no equivalent). */
 async function graphql(token, query, variables) {
@@ -30,16 +31,6 @@ async function graphql(token, query, variables) {
 		throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
 	}
 	return result.data;
-}
-
-/** Parse Dependabot PR title for "from X.Y.Z to A.B.C" and compute bump type. */
-function parseSemverBump(title) {
-	const match = title.match(/from (\d+)\.(\d+)\.(\d+)\b.*?\bto (\d+)\.(\d+)\.(\d+)\b/);
-	if (!match) return null;
-	const [, om, on, op, nm, nn, np] = match.map((s, i) => (i === 0 ? s : Number(s)));
-	if (om !== nm) return { type: "major", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
-	if (on !== nn) return { type: "minor", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
-	return { type: "patch", from: `${om}.${on}.${op}`, to: `${nm}.${nn}.${np}` };
 }
 
 try {
@@ -74,6 +65,11 @@ try {
 
 	const repository = process.env.GITHUB_REPOSITORY || "";
 	const [owner, repo] = repository.split("/");
+	// Fail safe if the env didn't parse to owner/repo — otherwise api() would fall
+	// back to a repo-less URL and a 404 there would be misread as "no branch rules".
+	if (!owner || !repo) {
+		throw new Error(`GITHUB_REPOSITORY is not in "owner/repo" form (got "${repository}"). Refusing to act — cannot resolve the repository for protection checks.`);
+	}
 	const prNumber = pr.number;
 
 	const bump = parseSemverBump(pr.title);
@@ -91,22 +87,68 @@ try {
 		process.exit(0);
 	}
 
-	// Safety: refuse to enable auto-merge if the base branch has no required
-	// status checks. Silent auto-merge without CI gating is the dangerous case.
+	// Re-fetch the PR for its LIVE state. `event.pull_request` (read from
+	// GITHUB_EVENT_PATH) is a snapshot frozen when the run first triggered, and a
+	// "Re-run" replays that original payload — so its base.ref is stale whenever the
+	// PR was retargeted after the event fired. Concretely: Dependabot opens a
+	// SECURITY update against the default branch (master), the base is later moved
+	// to hotfixes, and a re-run STILL sees base.ref="master" from the snapshot —
+	// checking (and potentially auto-merging against) the wrong branch. Gate on the
+	// freshly-read base/state instead of the snapshot.
+	const livePr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
+	if (livePr.state !== "open" || livePr.merged) {
+		console.log(`ℹ️ PR #${prNumber} is no longer open (state=${livePr.state}, merged=${Boolean(livePr.merged)}); skipping.`);
+		appendSummary(`ℹ️ PR #${prNumber}: no longer open; nothing to auto-merge.`);
+		process.exit(0);
+	}
+	const baseRef = livePr.base?.ref ?? pr.base?.ref;
+	const prNodeId = livePr.node_id ?? pr.node_id;
+	// Fail safe on an unexpected payload rather than calling /rules/branches/undefined
+	// or sending prId: undefined to GraphQL.
+	if (!baseRef || !prNodeId) {
+		throw new Error(`Could not resolve the live base branch or node id for PR #${prNumber} (base=${JSON.stringify(baseRef)}, nodeId present=${Boolean(prNodeId)}). Refusing to act — the GitHub API returned an unexpected PR payload.`);
+	}
+	if (baseRef !== pr.base?.ref) {
+		console.log(`🔎 PR #${prNumber} base is now "${baseRef}" (event snapshot said "${pr.base?.ref}") — using the live base.`);
+	}
+
+	// Safety: refuse to enable auto-merge unless the PR's base branch is actually
+	// protected. Merging immediately without CI gating is the dangerous case.
+	//
+	// Detection is RULESET-AWARE. The classic `/branches/<b>/protection` endpoint
+	// only reports *classic* branch protection and 404s ("Branch not protected")
+	// when the branch is governed by a Ruleset — which is how CLDMV repos protect
+	// next / hotfixes / master. `/rules/branches/<b>` returns the EFFECTIVE rules
+	// for the branch from ALL sources (classic protection + rulesets), so it is
+	// the correct single source of truth. `baseRef` is the PR's LIVE base (re-read
+	// above), never the stale snapshot and never a hardcoded constant.
 	if (requireBP) {
+		let rules;
 		try {
-			const protection = await api("GET", `/branches/${pr.base.ref}/protection`, null, { token, owner, repo });
-			const requiredChecks = protection?.required_status_checks?.contexts || [];
-			if (requiredChecks.length === 0) {
-				throw new Error(`Base branch "${pr.base.ref}" has no required status checks configured. Refusing to enable auto-merge — this would merge immediately without CI gating. Configure branch protection or set require_branch_protection: false to override.`);
-			}
-			console.log(`✅ Base "${pr.base.ref}" requires checks: ${requiredChecks.join(", ")}`);
+			rules = await api("GET", `/rules/branches/${encodeURIComponent(baseRef)}`, null, { token, owner, repo });
 		} catch (err) {
-			if (err.message.includes("404")) {
-				throw new Error(`Base branch "${pr.base.ref}" has no branch-protection rule. ${err.message}`);
+			// A 404 means the branch genuinely has no effective rules. Any other
+			// error (403/permission, network) means protection state is UNKNOWN —
+			// fail safe and don't auto-merge, but distinguish it from "confirmed
+			// unprotected" so the cause is actionable.
+			if (isNotFoundError(err.message)) {
+				throw new Error(`Base branch "${baseRef}" has no effective branch rules (classic protection and rulesets both empty). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`);
 			}
-			throw err;
+			throw new Error(`Could not read branch rules for "${baseRef}" (${err.message}). Refusing to enable auto-merge — protection state is unknown. Ensure the token has "Administration: read" (repository rules) on the repo, or set require_branch_protection: false to override.`);
 		}
+
+		const requiredCheckContexts = requiredCheckContextsFromRules(rules);
+
+		// Require CI gating specifically: a `required_status_checks` rule with at least
+		// one check. An approval-based rule is NOT a sufficient gate here — this action
+		// approves the PR as the bot, so any `pull_request` rule (even one requiring
+		// reviews, and certainly one with required_approving_review_count: 0) is
+		// satisfied by that approval and would let auto-merge fire with no CI. So
+		// required_status_checks is the only signal that actually holds the merge.
+		if (requiredCheckContexts.length === 0) {
+			throw new Error(`Base branch "${baseRef}" has no effective required status checks (checked classic protection + rulesets). Refusing to enable auto-merge — without CI gating it would merge immediately, and the bot's own approval satisfies any approval-only rule. Add a required-status-checks ruleset / branch protection, or set require_branch_protection: false to override.`);
+		}
+		console.log(`✅ Base "${baseRef}" requires checks (ruleset/classic): ${requiredCheckContexts.join(", ")}`);
 	}
 
 	// Approve the PR as the bot
@@ -128,7 +170,7 @@ try {
 		}
 	`;
 	await graphql(token, mutation, {
-		prId: pr.node_id,
+		prId: prNodeId,
 		method: mergeMethod
 	});
 
