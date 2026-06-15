@@ -115,7 +115,7 @@ npm run build:ci && npm run build:subpackages
 #    --access explicitly to match how the workflow publishes (it derives --access from
 #    repo visibility): `public` for a public package, `restricted` for a private one.
 npm login
-npm publish ./dist-packages/<name> --tag bootstrap --access public
+npm publish ./dist-packages/<name> --tag bootstrap --access <public|restricted>
 
 # 4. Now that the package exists, register the trusted publisher (npm >= 11.10.0,
 #    released 2026-02 — or npmjs.com → the package → Settings → Trusted publishing).
