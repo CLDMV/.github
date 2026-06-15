@@ -3,6 +3,7 @@ import { sh } from "../../../../common/common/core.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
 import {
 	getRefTag,
+	getTagObject,
 	createRefToCommit,
 	forceMoveRefToCommit,
 	createAnnotatedTag,
@@ -71,6 +72,38 @@ export async function run({
 	push = true
 }) {
 	debugLog(`create/_impl.run: Called with message="${message}"`);
+
+	// Idempotency / tag-protection safety. The tags created here are IMMUTABLE
+	// release tags (the rolling vN / vN.Y tags are MOVED by a separate action, not
+	// this one). If the remote tag already points at the target commit it is already
+	// correct, so skip creating and (force-)pushing it. This makes a re-run a true
+	// no-op for tags already out, avoids needlessly re-signing an immutable tag, and
+	// — crucially for retry — never trips a tag-protection rule that forbids
+	// overwriting an existing tag (the force-push a retry would otherwise issue is
+	// what reds the job). Only relevant when we would push; a local-only tag
+	// (push=false) still goes through the normal path. The pre-check is best-effort:
+	// any error falls through to the normal create path, which has its own handling.
+	if (push) {
+		try {
+			const state = await getRefTag({ token, repo, tag });
+			if (state.exists) {
+				let targetCommit = state.refSha;
+				if (state.objectType === "tag" && state.refSha) {
+					// Annotated tag: deref the tag object to the commit it points at.
+					const obj = await getTagObject({ token, repo, tagObjectSha: state.refSha });
+					targetCommit = obj.exists ? obj.tag?.object?.sha || "" : "";
+				}
+				if (targetCommit && targetCommit === sha) {
+					console.log(`✅ Tag ${tag} already points at ${sha} — skipping (immutable release tag already present).`);
+					return { tag_obj_sha: state.objectType === "tag" ? state.refSha : "", ref_sha: state.refSha };
+				}
+				debugLog(`create/_impl: tag ${tag} exists at ${targetCommit || "?"} but target is ${sha} — will (re)create.`);
+			}
+		} catch (e) {
+			debugLog(`create/_impl: idempotency pre-check failed (${e.message}); proceeding to create.`);
+		}
+	}
+
 	// Fallback to API lightweight tag if push via git isn't possible
 	try {
 		return runGitSmartTag({
