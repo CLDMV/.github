@@ -27,15 +27,16 @@ export function parseSemverBump(title) {
  * of a non-array or malformed payload — anything unexpected yields no contexts.
  * @public
  * @param {unknown} rules - The parsed API response.
- * @returns {string[]} The required check context names (blank/missing dropped).
+ * @returns {string[]} The required check context names, trimmed; blank,
+ *   whitespace-only, missing, or non-string contexts are dropped.
  */
 export function requiredCheckContextsFromRules(rules) {
 	const effective = Array.isArray(rules) ? rules : [];
 	return effective
 		.filter((r) => r && r.type === "required_status_checks")
 		.flatMap((r) => (r.parameters && Array.isArray(r.parameters.required_status_checks) ? r.parameters.required_status_checks : []))
-		.map((c) => c && c.context)
-		.filter(Boolean);
+		.map((c) => (c && typeof c.context === "string" ? c.context.trim() : ""))
+		.filter((ctx) => ctx.length > 0);
 }
 
 /**

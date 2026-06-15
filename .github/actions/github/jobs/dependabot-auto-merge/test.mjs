@@ -45,6 +45,11 @@ eq(
 	[],
 	"blank/missing contexts filtered out"
 );
+eq(
+	requiredCheckContextsFromRules([{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "  " }, { context: " ci " }] } }]),
+	["ci"],
+	"whitespace-only dropped, surrounding whitespace trimmed"
+);
 
 console.log("isNotFoundError:");
 eq(isNotFoundError("GET /rules/branches/next -> 404: Not Found"), true, "404 → true");
