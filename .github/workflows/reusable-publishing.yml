@@ -283,14 +283,17 @@ jobs:
 
     discover-extras:
         name: "🛰️ Discover Satellite Packages"
-        # Only when satellites are requested and there's actually a new version to
-        # publish (mirrors the core publish gate). Downloads the build artifact to
-        # expand globs against the staged dist-packages/ directories.
-        if: |
-            inputs.extra_packages != '' && (
-              inputs.dry_run == true ||
-              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
-            )
+        # Runs whenever satellites are requested — intentionally NOT gated on the
+        # core version. The core-version clause conflated "a new CORE version was
+        # published" with "the satellites are published": once the core is out and
+        # one satellite leg fails, a re-run has version == npm-latest, so the old
+        # gate skipped discovery and the failed satellite never retried. Each
+        # satellite publish + release step is idempotent (a version already on the
+        # registry is a pseudo-success skip; tag/release creation upsert), so always
+        # discovering and letting publish-extras re-enter the full matrix republishes
+        # only what is actually missing. Downloads the build artifact to expand globs
+        # against the staged dist-packages/ directories.
+        if: inputs.extra_packages != ''
         runs-on: ubuntu-latest
         needs: [ detect-version ]
         outputs:
@@ -547,6 +550,17 @@ jobs:
         # tags/releases never ride a missing core release. fail-fast:false isolates
         # satellites from each other — one bad satellite never blocks the core
         # release or its siblings.
+        #
+        # Intentionally NOT gated on the core version (`version != npm-latest`). That
+        # clause keyed satellite publishing to "is there a new CORE release", so a
+        # re-run after a partial satellite failure (core already published, one
+        # satellite still missing) had version == npm-latest and skipped the
+        # satellites — the failed one never retried. Each satellite publish + release
+        # step is idempotent (already-published version => pseudo-success skip; tag/
+        # release creation upsert), so re-running the full matrix republishes only the
+        # satellite(s) actually missing, on either re-run-all or a fresh trigger.
+        # Skipped core jobs report result 'skipped' (not 'failure'), so the guards
+        # above still let the satellites proceed.
         needs: [ detect-version, detect-repo-config, discover-extras, publish-npm, publish-github-packages, create-release ]
         if: |
             !cancelled()
@@ -554,10 +568,6 @@ jobs:
             && needs.publish-npm.result != 'failure'
             && needs.publish-github-packages.result != 'failure'
             && needs.create-release.result != 'failure'
-            && (
-              inputs.dry_run == true ||
-              needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
-            )
         runs-on: ubuntu-latest
         permissions:
             id-token: write # NPM trusted publishers (OIDC) — provenance parity with core
