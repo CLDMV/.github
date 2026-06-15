@@ -100,7 +100,8 @@ Then, once per new satellite name:
 
 ```bash
 # Replace the UPPERCASE placeholders below: NAME (the satellite's unscoped name,
-# e.g. its dist-packages/ dir), SCOPE (your npm scope), OWNER/REPO, PUBLISH_WORKFLOW.yml.
+# e.g. its dist-packages/ dir), SCOPE (your npm scope), OWNER/REPO, PUBLISH_WORKFLOW.yml,
+# and ACCESS (public or restricted, to match repo visibility).
 
 # 1. Build + carve so dist-packages/NAME/ exists (however the repo runs the carve).
 #    Each satellite's package.json needs a `repository` field (required for provenance —
@@ -115,10 +116,10 @@ npm run build:ci && npm run build:subpackages
 
 # 3. Authenticate (interactive login prompts for the 2FA OTP; a granular publish token
 #    also works) and publish ONCE — on a non-latest tag — to CREATE the package. Set
-#    --access to match how the workflow publishes (it derives --access from repo
-#    visibility): use "public" for a public package, or "restricted" for a private one.
+#    ACCESS to match how the workflow publishes (it derives --access from repo
+#    visibility): "public" for a public package, or "restricted" for a private one.
 npm login
-npm publish ./dist-packages/NAME --tag bootstrap --access public
+npm publish ./dist-packages/NAME --tag bootstrap --access ACCESS
 
 # 4. Now that the package exists, register the trusted publisher (npm >= 11.10.0,
 #    released 2026-02 — or npmjs.com -> the package -> Settings -> Trusted publishing).
@@ -136,7 +137,7 @@ npm trust list @SCOPE/NAME
 
 A satellite's trusted-publisher values mirror the core package's: satellites publish through the identical workflow in the same repo, so set `--repository` / `--file` (and `--environment`, if the job uses one) to match the core package's own trusted-publisher configuration — that pairing already works for the core.
 
-From the next release on, the workflow publishes that satellite over OIDC with provenance, at the core version, alongside the core. The throwaway `0.0.0` / `bootstrap` publish is harmless: the first real release publishes the lockstep version and takes `latest`; drop the placeholder afterwards with `npm dist-tag rm @scope/<name> bootstrap` if you like.
+From the next release on, the workflow publishes that satellite over OIDC with provenance, at the core version, alongside the core. The throwaway `0.0.0` / `bootstrap` publish is harmless: the first real release publishes the lockstep version and takes `latest`; drop the placeholder afterwards with `npm dist-tag rm @SCOPE/NAME bootstrap` if you like.
 
 GitHub Packages needs no equivalent bootstrap — a new scoped name publishes on first push with `packages: write`.
 
