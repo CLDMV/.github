@@ -24,6 +24,60 @@
 		"aliases": ["flow: hotfix", "hotfix → hotfixes"]
 	},
 	{
+		"name": "! fix → next",
+		"color": "33691e",
+		"description": "v4 flow: fix contributor PR targeting the next integration branch",
+		"aliases": ["flow: fix", "fix → next"]
+	},
+	{
+		"name": "! docs → next",
+		"color": "33691e",
+		"description": "v4 flow: docs contributor PR targeting the next integration branch",
+		"aliases": ["flow: docs", "docs → next"]
+	},
+	{
+		"name": "! chore → next",
+		"color": "33691e",
+		"description": "v4 flow: chore contributor PR targeting the next integration branch",
+		"aliases": ["flow: chore", "chore → next"]
+	},
+	{
+		"name": "! refactor → next",
+		"color": "33691e",
+		"description": "v4 flow: refactor contributor PR targeting the next integration branch",
+		"aliases": ["flow: refactor", "refactor → next"]
+	},
+	{
+		"name": "! ci → next",
+		"color": "33691e",
+		"description": "v4 flow: ci contributor PR targeting the next integration branch",
+		"aliases": ["flow: ci", "ci → next"]
+	},
+	{
+		"name": "! perf → next",
+		"color": "33691e",
+		"description": "v4 flow: perf contributor PR targeting the next integration branch",
+		"aliases": ["flow: perf", "perf → next"]
+	},
+	{
+		"name": "! test → next",
+		"color": "33691e",
+		"description": "v4 flow: test contributor PR targeting the next integration branch",
+		"aliases": ["flow: test", "test → next"]
+	},
+	{
+		"name": "! style → next",
+		"color": "33691e",
+		"description": "v4 flow: style contributor PR targeting the next integration branch",
+		"aliases": ["flow: style", "style → next"]
+	},
+	{
+		"name": "! release → next",
+		"color": "33691e",
+		"description": "v4 flow: release contributor PR targeting the next integration branch",
+		"aliases": ["flow: release-next", "release → next"]
+	},
+	{
 		"name": "good first issue",
 		"color": "7057ff",
 		"description": "A great starting point for new contributors with limited experience",
