@@ -76,21 +76,34 @@ jobs:
                   # The flow_label sorts first in the PR's label list
                   # (the leading `!` precedes every letter alphabetically)
                   # so a glance at any PR's badges reveals which lane it's in.
+                  # Lane (target) AND declared type both come from the branch
+                  # prefix — the v4 convention requires a typed prefix, so a
+                  # `docs/*` branch is a docs change, `fix/*` a fix, etc. The flow
+                  # label is `! <type> → <lane>` so it reflects what the PR actually
+                  # is, not a blanket "feature". (Previously every next-lane branch
+                  # got `! feature → next`, mislabelling docs/fix/chore PRs.)
                   case "$branch" in
-                      hotfix/*)
-                          target="hotfixes"
-                          flow_label="! hotfix → hotfixes"
-                          ;;
-                      feat/*|feature/*|fix/*|release/*|chore/*|refactor/*|docs/*|ci/*|perf/*|test/*|style/*)
-                          target="next"
-                          flow_label="! feature → next"
-                          ;;
+                      hotfix/*)              target="hotfixes"; type="hotfix"   ;;
+                      feat/*|feature/*)      target="next";     type="feature"  ;;
+                      fix/*)                 target="next";     type="fix"       ;;
+                      docs/*)                target="next";     type="docs"      ;;
+                      chore/*)               target="next";     type="chore"     ;;
+                      refactor/*)            target="next";     type="refactor"  ;;
+                      ci/*)                  target="next";     type="ci"        ;;
+                      perf/*)                target="next";     type="perf"      ;;
+                      test/*)                target="next";     type="test"      ;;
+                      style/*)               target="next";     type="style"     ;;
+                      release/*)             target="next";     type="release"   ;;
                       *)
-                          target=""
-                          flow_label=""
+                          target=""; type=""; flow_label=""
                           echo "::notice::Branch '$branch' does not match any auto-PR pattern; skipping."
                           ;;
                   esac
+                  # Leading `!` sorts the flow label first in the PR's badge list,
+                  # so a glance reveals both the change type and its lane.
+                  if [ -n "$target" ]; then
+                      flow_label="! ${type} → ${target}"
+                  fi
                   echo "target=$target" >> "$GITHUB_OUTPUT"
                   echo "flow_label=$flow_label" >> "$GITHUB_OUTPUT"
 
