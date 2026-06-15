@@ -91,21 +91,48 @@ try {
 		process.exit(0);
 	}
 
-	// Safety: refuse to enable auto-merge if the base branch has no required
-	// status checks. Silent auto-merge without CI gating is the dangerous case.
+	// Safety: refuse to enable auto-merge unless the PR's base branch is actually
+	// protected. Merging immediately without CI gating is the dangerous case.
+	//
+	// Detection is RULESET-AWARE. The classic `/branches/<b>/protection` endpoint
+	// only reports *classic* branch protection and 404s ("Branch not protected")
+	// when the branch is governed by a Ruleset — which is how CLDMV repos protect
+	// next / hotfixes / master. `/rules/branches/<b>` returns the EFFECTIVE rules
+	// for the branch from ALL sources (classic protection + rulesets), so it is
+	// the correct single source of truth. The base branch comes from the PR's own
+	// `base.ref` (set above), never a hardcoded constant.
 	if (requireBP) {
+		const baseRef = pr.base.ref;
+		let rules;
 		try {
-			const protection = await api("GET", `/branches/${pr.base.ref}/protection`, null, { token, owner, repo });
-			const requiredChecks = protection?.required_status_checks?.contexts || [];
-			if (requiredChecks.length === 0) {
-				throw new Error(`Base branch "${pr.base.ref}" has no required status checks configured. Refusing to enable auto-merge — this would merge immediately without CI gating. Configure branch protection or set require_branch_protection: false to override.`);
-			}
-			console.log(`✅ Base "${pr.base.ref}" requires checks: ${requiredChecks.join(", ")}`);
+			rules = await api("GET", `/rules/branches/${encodeURIComponent(baseRef)}`, null, { token, owner, repo });
 		} catch (err) {
-			if (err.message.includes("404")) {
-				throw new Error(`Base branch "${pr.base.ref}" has no branch-protection rule. ${err.message}`);
+			// A 404 means the branch genuinely has no effective rules. Any other
+			// error (403/permission, network) means protection state is UNKNOWN —
+			// fail safe and don't auto-merge, but distinguish it from "confirmed
+			// unprotected" so the cause is actionable.
+			if (err.message.includes("-> 404")) {
+				throw new Error(`Base branch "${baseRef}" has no effective branch rules (classic protection and rulesets both empty). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`);
 			}
-			throw err;
+			throw new Error(`Could not read branch rules for "${baseRef}" (${err.message}). Refusing to enable auto-merge — protection state is unknown. Ensure the token has "Administration: read" (repository rules) on the repo, or set require_branch_protection: false to override.`);
+		}
+
+		const effective = Array.isArray(rules) ? rules : [];
+		const requiredCheckContexts = effective
+			.filter((r) => r.type === "required_status_checks")
+			.flatMap((r) => r.parameters?.required_status_checks || [])
+			.map((c) => c.context)
+			.filter(Boolean);
+		const hasPullRequestRule = effective.some((r) => r.type === "pull_request");
+
+		if (requiredCheckContexts.length === 0 && !hasPullRequestRule) {
+			throw new Error(`Base branch "${baseRef}" has no effective "required_status_checks" or "pull_request" rule (checked classic protection + rulesets). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`);
+		}
+
+		if (requiredCheckContexts.length > 0) {
+			console.log(`✅ Base "${baseRef}" is protected — required checks (ruleset/classic): ${requiredCheckContexts.join(", ")}`);
+		} else {
+			console.log(`⚠️ Base "${baseRef}" has a pull_request rule but no required status checks — auto-merge will respect the PR/approval gate, but CI is not enforced by a required check.`);
 		}
 	}
 
