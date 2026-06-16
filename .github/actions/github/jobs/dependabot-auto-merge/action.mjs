@@ -9,7 +9,7 @@
 
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod } from "./_impl.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError } from "./_impl.mjs";
 
 /** GraphQL helper for enablePullRequestAutoMerge (REST has no equivalent). */
 async function graphql(token, query, variables) {
@@ -190,7 +190,14 @@ try {
 		appendSummary(`🚀 **Auto-merge enabled** on PR #${prNumber}: ${bump.type} bump ${bump.from} → ${bump.to}`);
 		process.exit(0);
 	} catch (autoMergeError) {
-		console.log(`ℹ️ Could not queue auto-merge (${autoMergeError.message}). Trying a direct merge (${mergeMethod}) — the merge endpoint still enforces required checks.`);
+		// Only fall back to a direct merge when auto-merge couldn't queue *because the
+		// PR is already mergeable* (GitHub: "clean"/"unstable status"). Any other
+		// failure — repo auto-merge disabled, missing permissions, etc. — must surface
+		// loudly rather than be papered over by a merge attempt.
+		if (!isAlreadyMergeableError(autoMergeError.message)) {
+			throw autoMergeError;
+		}
+		console.log(`ℹ️ Auto-merge can't queue — PR already mergeable (${autoMergeError.message}). Merging directly (${mergeMethod}); the merge endpoint still enforces required checks.`);
 		try {
 			await api("PUT", `/pulls/${prNumber}/merge`, { merge_method: mergeMethod, sha: livePr.head?.sha }, { token, owner, repo });
 		} catch (mergeError) {

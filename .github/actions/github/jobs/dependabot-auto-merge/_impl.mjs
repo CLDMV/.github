@@ -81,3 +81,17 @@ export function chooseMergeMethod(configured, allowed) {
 	if (!Array.isArray(allowed) || allowed.length === 0) return want;
 	return allowed.includes(want) ? want : allowed[0];
 }
+
+/**
+ * Whether an enablePullRequestAutoMerge error means the PR is ALREADY mergeable
+ * (no required gate left to wait on) — GitHub reports "clean status" or "unstable
+ * status" in that case. Only then is a direct-merge fallback appropriate; other
+ * failures (repo auto-merge disabled, missing permissions, …) must surface, not
+ * trigger a merge.
+ * @public
+ * @param {unknown} message - The thrown error's message.
+ * @returns {boolean}
+ */
+export function isAlreadyMergeableError(message) {
+	return typeof message === "string" && /\b(?:clean|unstable) status\b/i.test(message);
+}

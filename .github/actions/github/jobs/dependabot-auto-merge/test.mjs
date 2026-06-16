@@ -4,7 +4,7 @@
  * Run directly: `node test.mjs` in this directory. Exits non-zero on failure.
  */
 
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod } from "./_impl.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError } from "./_impl.mjs";
 
 let failures = 0;
 
@@ -79,6 +79,13 @@ eq(chooseMergeMethod("squash", []), "squash", "unrestricted ruleset → honor co
 eq(chooseMergeMethod("", ["rebase"]), "rebase", "empty config → first allowed");
 eq(chooseMergeMethod("", []), "merge", "empty config + unrestricted → defaults to merge");
 eq(chooseMergeMethod("", ["merge", "squash"]), "merge", "empty config → merge default when allowed");
+
+console.log("isAlreadyMergeableError:");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in unstable status"}]'), true, "unstable status → fall back");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in clean status"}]'), true, "clean status → fall back");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Auto merge is not allowed for this repository"}]'), false, "auto-merge disabled → rethrow");
+eq(isAlreadyMergeableError("GraphQL 403: Resource not accessible by integration"), false, "permission error → rethrow");
+eq(isAlreadyMergeableError(undefined), false, "non-string → rethrow");
 
 if (failures) {
 	console.error(`\n${failures} test(s) failed.`);
