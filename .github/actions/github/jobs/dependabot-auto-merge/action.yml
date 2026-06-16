@@ -16,9 +16,11 @@ inputs:
     required: false
     default: "patch,minor"
   merge_method:
-    description: "squash | merge | rebase"
+    description: "Preferred merge method (merge | squash | rebase). Defaults to merge —
+      Dependabot PRs target the integration branches (next / hotfixes), whose rulesets
+      are merge-only. The action narrows this to a method the target branch permits."
     required: false
-    default: "squash"
+    default: "merge"
   also_for_actors:
     description: "Comma-sep additional bot logins to auto-merge (e.g. 'renovate[bot]')"
     required: false

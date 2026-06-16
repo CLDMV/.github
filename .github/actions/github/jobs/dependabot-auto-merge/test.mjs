@@ -4,7 +4,7 @@
  * Run directly: `node test.mjs` in this directory. Exits non-zero on failure.
  */
 
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError } from "./_impl.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError } from "./_impl.mjs";
 
 let failures = 0;
 
@@ -56,6 +56,36 @@ eq(isNotFoundError("GET /rules/branches/next -> 404: Not Found"), true, "404 →
 eq(isNotFoundError("GET /rules/branches/next -> 403: Forbidden"), false, "403 → false");
 eq(isNotFoundError("GET /rules/branches/next -> 500: error"), false, "500 → false");
 eq(isNotFoundError(undefined), false, "non-string → false");
+
+console.log("allowedMergeMethodsFromRules:");
+eq(
+	allowedMergeMethodsFromRules([{ type: "pull_request", parameters: { allowed_merge_methods: ["merge"] } }]),
+	["merge"],
+	"reads allowed_merge_methods from the pull_request rule"
+);
+eq(
+	allowedMergeMethodsFromRules([{ type: "pull_request", parameters: { allowed_merge_methods: ["SQUASH", "Merge"] } }]),
+	["squash", "merge"],
+	"lowercases method names"
+);
+eq(allowedMergeMethodsFromRules([{ type: "required_status_checks", parameters: {} }]), [], "no pull_request rule → empty");
+eq(allowedMergeMethodsFromRules(null), [], "non-array → empty");
+
+console.log("chooseMergeMethod:");
+eq(chooseMergeMethod("squash", ["merge"]), "merge", "configured squash not allowed → falls back to merge");
+eq(chooseMergeMethod("squash", ["squash", "merge"]), "squash", "configured squash allowed → kept");
+eq(chooseMergeMethod("SQUASH", ["merge"]), "merge", "case-insensitive configured input");
+eq(chooseMergeMethod("squash", []), "squash", "unrestricted ruleset → honor config");
+eq(chooseMergeMethod("", ["rebase"]), "rebase", "empty config → first allowed");
+eq(chooseMergeMethod("", []), "merge", "empty config + unrestricted → defaults to merge");
+eq(chooseMergeMethod("", ["merge", "squash"]), "merge", "empty config → merge default when allowed");
+
+console.log("isAlreadyMergeableError:");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in unstable status"}]'), true, "unstable status → fall back");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in clean status"}]'), true, "clean status → fall back");
+eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Auto merge is not allowed for this repository"}]'), false, "auto-merge disabled → rethrow");
+eq(isAlreadyMergeableError("GraphQL 403: Resource not accessible by integration"), false, "permission error → rethrow");
+eq(isAlreadyMergeableError(undefined), false, "non-string → rethrow");
 
 if (failures) {
 	console.error(`\n${failures} test(s) failed.`);
