@@ -77,7 +77,7 @@ export function allowedMergeMethodsFromRules(rules) {
  * @returns {string} Lowercase merge method (merge|squash|rebase).
  */
 export function chooseMergeMethod(configured, allowed) {
-	const want = String(configured || "squash").toLowerCase();
+	const want = String(configured || "merge").toLowerCase();
 	if (!Array.isArray(allowed) || allowed.length === 0) return want;
 	return allowed.includes(want) ? want : allowed[0];
 }

@@ -77,6 +77,8 @@ eq(chooseMergeMethod("squash", ["squash", "merge"]), "squash", "configured squas
 eq(chooseMergeMethod("SQUASH", ["merge"]), "merge", "case-insensitive configured input");
 eq(chooseMergeMethod("squash", []), "squash", "unrestricted ruleset → honor config");
 eq(chooseMergeMethod("", ["rebase"]), "rebase", "empty config → first allowed");
+eq(chooseMergeMethod("", []), "merge", "empty config + unrestricted → defaults to merge");
+eq(chooseMergeMethod("", ["merge", "squash"]), "merge", "empty config → merge default when allowed");
 
 if (failures) {
 	console.error(`\n${failures} test(s) failed.`);

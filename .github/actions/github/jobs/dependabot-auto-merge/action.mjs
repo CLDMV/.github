@@ -35,7 +35,7 @@ async function graphql(token, query, variables) {
 
 try {
 	const bumpTypesRaw = getInput("bump_types") || "patch,minor";
-	const mergeMethodInput = (getInput("merge_method") || "squash").toLowerCase();
+	const mergeMethodInput = (getInput("merge_method") || "merge").toLowerCase();
 	const alsoActorsRaw = getInput("also_for_actors") || "";
 	const requireBP = (getInput("require_branch_protection") || "true").toLowerCase() === "true";
 	const token = getInput("github_token", { required: true });
