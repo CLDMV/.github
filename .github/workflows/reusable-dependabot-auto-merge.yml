@@ -28,10 +28,12 @@ on:
                 type: string
                 default: "patch,minor"
             merge_method:
-                description: "squash | merge | rebase"
+                description: "Preferred merge method (merge | squash | rebase). Defaults to
+                    merge — Dependabot PRs target next / hotfixes, whose rulesets are
+                    merge-only; the action narrows this to a method the branch permits."
                 required: false
                 type: string
-                default: "squash"
+                default: "merge"
             also_for_actors:
                 description: "Comma-sep additional bot logins to auto-merge"
                 required: false
