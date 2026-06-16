@@ -9,7 +9,7 @@
 
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError } from "./_impl.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod } from "./_impl.mjs";
 
 /** GraphQL helper for enablePullRequestAutoMerge (REST has no equivalent). */
 async function graphql(token, query, variables) {
@@ -35,7 +35,7 @@ async function graphql(token, query, variables) {
 
 try {
 	const bumpTypesRaw = getInput("bump_types") || "patch,minor";
-	const mergeMethod = (getInput("merge_method") || "squash").toUpperCase(); // GraphQL enum
+	const mergeMethodInput = (getInput("merge_method") || "squash").toLowerCase();
 	const alsoActorsRaw = getInput("also_for_actors") || "";
 	const requireBP = (getInput("require_branch_protection") || "true").toLowerCase() === "true";
 	const token = getInput("github_token", { required: true });
@@ -122,6 +122,7 @@ try {
 	// for the branch from ALL sources (classic protection + rulesets), so it is
 	// the correct single source of truth. `baseRef` is the PR's LIVE base (re-read
 	// above), never the stale snapshot and never a hardcoded constant.
+	let allowedMerge = [];
 	if (requireBP) {
 		let rules;
 		try {
@@ -149,6 +150,14 @@ try {
 			throw new Error(`Base branch "${baseRef}" has no effective required status checks (checked classic protection + rulesets). Refusing to enable auto-merge — without CI gating it would merge immediately, and the bot's own approval satisfies any approval-only rule. Add a required-status-checks ruleset / branch protection, or set require_branch_protection: false to override.`);
 		}
 		console.log(`✅ Base "${baseRef}" requires checks (ruleset/classic): ${requiredCheckContexts.join(", ")}`);
+		allowedMerge = allowedMergeMethodsFromRules(rules);
+	}
+
+	// Choose a merge method the branch actually permits — e.g. a merge-only
+	// hotfixes ruleset rejects squash. Honors the configured method when allowed.
+	const mergeMethod = chooseMergeMethod(mergeMethodInput, allowedMerge);
+	if (mergeMethod !== mergeMethodInput) {
+		console.log(`ℹ️ Configured merge method "${mergeMethodInput}" isn't permitted on "${baseRef}"; using "${mergeMethod}" (ruleset allows: ${allowedMerge.join(", ") || "any"}).`);
 	}
 
 	// Approve the PR as the bot
@@ -160,7 +169,13 @@ try {
 		{ token, owner, repo }
 	);
 
-	// Enable auto-merge via GraphQL (REST doesn't support "queue for merge when ready")
+	// Queue auto-merge via GraphQL (REST has no "merge when ready"). This works
+	// while a REQUIRED gate is still pending. If the PR's required gates are
+	// ALREADY satisfied (checks green by the time we run, plus our own approval),
+	// GitHub reports it "clean"/"unstable" and refuses to queue auto-merge — there
+	// is nothing left to wait for. Fall back to a direct merge: the merge endpoint
+	// re-enforces branch protection (it refuses if a required check isn't met), so
+	// the fallback can never merge an ungated PR.
 	console.log(`⏳ Enabling auto-merge (${mergeMethod})`);
 	const mutation = `
 		mutation EnableAutoMerge($prId: ID!, $method: PullRequestMergeMethod!) {
@@ -169,14 +184,22 @@ try {
 			}
 		}
 	`;
-	await graphql(token, mutation, {
-		prId: prNodeId,
-		method: mergeMethod
-	});
-
-	console.log(`🚀 Auto-merge enabled on PR #${prNumber}`);
-	appendSummary(`🚀 **Auto-merge enabled** on PR #${prNumber}: ${bump.type} bump ${bump.from} → ${bump.to}`);
-	process.exit(0);
+	try {
+		await graphql(token, mutation, { prId: prNodeId, method: mergeMethod.toUpperCase() });
+		console.log(`🚀 Auto-merge enabled on PR #${prNumber}`);
+		appendSummary(`🚀 **Auto-merge enabled** on PR #${prNumber}: ${bump.type} bump ${bump.from} → ${bump.to}`);
+		process.exit(0);
+	} catch (autoMergeError) {
+		console.log(`ℹ️ Could not queue auto-merge (${autoMergeError.message}). Trying a direct merge (${mergeMethod}) — the merge endpoint still enforces required checks.`);
+		try {
+			await api("PUT", `/pulls/${prNumber}/merge`, { merge_method: mergeMethod, sha: livePr.head?.sha }, { token, owner, repo });
+		} catch (mergeError) {
+			throw new Error(`Could not auto-merge or directly merge PR #${prNumber}. Auto-merge: ${autoMergeError.message} | Direct merge: ${mergeError.message}`);
+		}
+		console.log(`🚀 Merged PR #${prNumber} directly (${mergeMethod}) — required gates already satisfied.`);
+		appendSummary(`🚀 **Merged** PR #${prNumber} (${mergeMethod}): ${bump.type} bump ${bump.from} → ${bump.to}`);
+		process.exit(0);
+	}
 } catch (error) {
 	console.error(`::error::${error.message}`);
 	process.exit(1);

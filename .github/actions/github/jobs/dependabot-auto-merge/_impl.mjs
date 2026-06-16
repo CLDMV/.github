@@ -50,3 +50,34 @@ export function requiredCheckContextsFromRules(rules) {
 export function isNotFoundError(message) {
 	return typeof message === "string" && message.includes("-> 404");
 }
+
+/**
+ * Extract the merge methods a branch's ruleset permits, from a
+ * `GET /rules/branches/<b>` response — the `pull_request` rule's
+ * `allowed_merge_methods`. Returns lowercase names (merge|squash|rebase); an
+ * empty array means the ruleset does not restrict the method (honor the config).
+ * @public
+ * @param {unknown} rules - The parsed API response.
+ * @returns {string[]}
+ */
+export function allowedMergeMethodsFromRules(rules) {
+	const effective = Array.isArray(rules) ? rules : [];
+	const prRule = effective.find((r) => r && r.type === "pull_request");
+	const methods = prRule && prRule.parameters && Array.isArray(prRule.parameters.allowed_merge_methods) ? prRule.parameters.allowed_merge_methods : [];
+	return methods.map((m) => String(m).toLowerCase()).filter(Boolean);
+}
+
+/**
+ * Choose a merge method the branch actually permits: honor the configured method
+ * when it is allowed (or when the ruleset doesn't restrict methods), else fall
+ * back to the first allowed one (e.g. squash → merge on a merge-only branch).
+ * @public
+ * @param {string} configured - Configured method (any case).
+ * @param {string[]} allowed - Lowercase allowed methods; empty = unrestricted.
+ * @returns {string} Lowercase merge method (merge|squash|rebase).
+ */
+export function chooseMergeMethod(configured, allowed) {
+	const want = String(configured || "squash").toLowerCase();
+	if (!Array.isArray(allowed) || allowed.length === 0) return want;
+	return allowed.includes(want) ? want : allowed[0];
+}
