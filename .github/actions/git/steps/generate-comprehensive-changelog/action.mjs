@@ -2,7 +2,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
-import { filterBotCommits } from "../../../common/utilities/bot-detection.mjs";
+import { filterBotCommits, isDependencyUpdate } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
 // Get inputs from environment.
@@ -1005,7 +1005,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
-	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
+	const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && !isDependencyUpdate(c.subject));
 	if (breakingCommits.length > 0) {
 		changelog += await renderSection(breakingCommits);
 	} else {
@@ -1015,7 +1015,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Features - use proper categorization (exclude merge commits)
 	changelog += "### ✨ Features\n";
-	const featureCommits = commits.filter((c) => c.category === "feature");
+	const featureCommits = commits.filter((c) => c.category === "feature" && !isDependencyUpdate(c.subject));
 	if (featureCommits.length > 0) {
 		changelog += await renderSection(featureCommits);
 	} else {
@@ -1025,7 +1025,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Bug Fixes - use proper categorization (exclude merge commits)
 	changelog += "### 🐛 Bug Fixes\n";
-	const fixCommits = commits.filter((c) => c.category === "fix");
+	const fixCommits = commits.filter((c) => c.category === "fix" && !isDependencyUpdate(c.subject));
 	if (fixCommits.length > 0) {
 		changelog += await renderSection(fixCommits);
 	} else {
@@ -1033,10 +1033,27 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	}
 	changelog += "\n";
 
-	// Other Changes - maintenance and other categories (but NOT release or merge commits)
+	// Dependencies - Dependabot/Renovate dependency bumps get their own section
+	// rather than being folded into Other Changes. Merge commits are already
+	// filtered out above, so this only picks up the real bump commits.
+	changelog += "### 📦 Dependencies\n";
+	const dependencyCommits = commits.filter((c) => c.category !== "merge" && isDependencyUpdate(c.subject));
+	if (dependencyCommits.length > 0) {
+		changelog += await renderSection(dependencyCommits);
+	} else {
+		changelog += "_No dependency updates_\n";
+	}
+	changelog += "\n";
+
+	// Other Changes - maintenance and other categories (but NOT release, merge,
+	// or dependency-update commits — those have their own section above)
 	changelog += "### 🔧 Other Changes\n";
 	const otherCommits = commits.filter(
-		(c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release" && c.category !== "merge"
+		(c) =>
+			(c.category === "maintenance" || c.category === "other") &&
+			c.type !== "release" &&
+			c.category !== "merge" &&
+			!isDependencyUpdate(c.subject)
 	);
 	if (otherCommits.length > 0) {
 		changelog += await renderSection(otherCommits);
