@@ -947,18 +947,16 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	let changelog = "## 🚀 What's Changed\n\n";
 
-	// Strip ALL bot-authored / automated commits from the human-facing
-	// changelog. filterBotCommits checks two things:
-	//   1. isBotAuthor — author or email matches a known bot pattern
-	//      (cldmv-bot, github-actions, dependabot, renovate, snyk, etc.;
-	//      any '[bot]' substring catches GitHub App identities generically).
-	//   2. isAutomatedCommit — subject matches known automation patterns
-	//      ('chore: bump version', 'chore(release):', 'release:',
-	//      'merge branch', 'merge pull request', auto-generated dep updates).
-	// Together this drops every bot-trail commit the release flow itself
-	// produces (version bumps, release commits, merge commits) plus any
-	// upstream bot bumps. The PR title communicates the version; the section
-	// bodies should describe the human-authored changes, nothing else.
+	// Strip the release flow's own bot-trail (version bumps, `release:` commits,
+	// merge commits) and other bot noise — but KEEP dependency updates.
+	// filterBotCommits keeps a commit when it is human-authored OR a
+	// Dependabot/Renovate dependency bump (isDependencyUpdate); everything else
+	// flagged by isBotCommit (bot author, or an automation subject like
+	// 'chore: bump version' / 'release:' / 'merge …') is dropped. Dependency
+	// updates are real changelog content — a release is often named after one,
+	// so dropping them (the prior behaviour) left them missing from the notes
+	// while the title still mentioned the bump. The PR title communicates the
+	// version; the section bodies describe the human + dependency changes.
 	commits = filterBotCommits(commits);
 
 	// Drop merge commits — they're structural artifacts of the v4
