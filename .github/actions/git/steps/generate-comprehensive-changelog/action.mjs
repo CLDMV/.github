@@ -2,7 +2,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
-import { filterBotCommits } from "../../../common/utilities/bot-detection.mjs";
+import { filterBotCommits, isDependencyUpdate } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
 // Get inputs from environment.
@@ -947,18 +947,16 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	let changelog = "## 🚀 What's Changed\n\n";
 
-	// Strip ALL bot-authored / automated commits from the human-facing
-	// changelog. filterBotCommits checks two things:
-	//   1. isBotAuthor — author or email matches a known bot pattern
-	//      (cldmv-bot, github-actions, dependabot, renovate, snyk, etc.;
-	//      any '[bot]' substring catches GitHub App identities generically).
-	//   2. isAutomatedCommit — subject matches known automation patterns
-	//      ('chore: bump version', 'chore(release):', 'release:',
-	//      'merge branch', 'merge pull request', auto-generated dep updates).
-	// Together this drops every bot-trail commit the release flow itself
-	// produces (version bumps, release commits, merge commits) plus any
-	// upstream bot bumps. The PR title communicates the version; the section
-	// bodies should describe the human-authored changes, nothing else.
+	// Strip the release flow's own bot-trail (version bumps, `release:` commits,
+	// merge commits) and other bot noise — but KEEP dependency updates.
+	// filterBotCommits keeps a commit when it is human-authored OR a
+	// Dependabot/Renovate dependency bump (isDependencyUpdate); everything else
+	// flagged by isBotCommit (bot author, or an automation subject like
+	// 'chore: bump version' / 'release:' / 'merge …') is dropped. Dependency
+	// updates are real changelog content — a release is often named after one,
+	// so dropping them (the prior behaviour) left them missing from the notes
+	// while the title still mentioned the bump. The PR title communicates the
+	// version; the section bodies describe the human + dependency changes.
 	commits = filterBotCommits(commits);
 
 	// Drop merge commits — they're structural artifacts of the v4
@@ -1007,7 +1005,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
 	changelog += "### 💥 Breaking Changes\n";
-	const breakingCommits = commits.filter((c) => c.category === "breaking" || c.isBreaking);
+	const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && !isDependencyUpdate(c.subject));
 	if (breakingCommits.length > 0) {
 		changelog += await renderSection(breakingCommits);
 	} else {
@@ -1017,7 +1015,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Features - use proper categorization (exclude merge commits)
 	changelog += "### ✨ Features\n";
-	const featureCommits = commits.filter((c) => c.category === "feature");
+	const featureCommits = commits.filter((c) => c.category === "feature" && !isDependencyUpdate(c.subject));
 	if (featureCommits.length > 0) {
 		changelog += await renderSection(featureCommits);
 	} else {
@@ -1027,7 +1025,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 
 	// Bug Fixes - use proper categorization (exclude merge commits)
 	changelog += "### 🐛 Bug Fixes\n";
-	const fixCommits = commits.filter((c) => c.category === "fix");
+	const fixCommits = commits.filter((c) => c.category === "fix" && !isDependencyUpdate(c.subject));
 	if (fixCommits.length > 0) {
 		changelog += await renderSection(fixCommits);
 	} else {
@@ -1035,10 +1033,27 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	}
 	changelog += "\n";
 
-	// Other Changes - maintenance and other categories (but NOT release or merge commits)
+	// Dependencies - Dependabot/Renovate dependency bumps get their own section
+	// rather than being folded into Other Changes. Merge commits are already
+	// filtered out above, so this only picks up the real bump commits.
+	changelog += "### 📦 Dependencies\n";
+	const dependencyCommits = commits.filter((c) => c.category !== "merge" && isDependencyUpdate(c.subject));
+	if (dependencyCommits.length > 0) {
+		changelog += await renderSection(dependencyCommits);
+	} else {
+		changelog += "_No dependency updates_\n";
+	}
+	changelog += "\n";
+
+	// Other Changes - maintenance and other categories (but NOT release, merge,
+	// or dependency-update commits — those have their own section above)
 	changelog += "### 🔧 Other Changes\n";
 	const otherCommits = commits.filter(
-		(c) => (c.category === "maintenance" || c.category === "other") && c.type !== "release" && c.category !== "merge"
+		(c) =>
+			(c.category === "maintenance" || c.category === "other") &&
+			c.type !== "release" &&
+			c.category !== "merge" &&
+			!isDependencyUpdate(c.subject)
 	);
 	if (otherCommits.length > 0) {
 		changelog += await renderSection(otherCommits);
