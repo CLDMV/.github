@@ -113,6 +113,37 @@ export function isBotCommit(commit) {
 }
 
 /**
+ * Check if a commit is a dependency update (Dependabot / Renovate).
+ *
+ * These are bot-authored but ARE meaningful changelog content — a release is
+ * often named after a dependency bump — so the changelog keeps them even though
+ * `isBotCommit` is true. Deliberately does NOT match the release flow's own
+ * trail: "chore: bump version to X" has no "from <x> to <y>" and no deps scope,
+ * so it stays filtered.
+ *
+ * @param {string} subject - The commit subject line.
+ * @returns {boolean} True if the subject looks like a dependency update.
+ */
+export function isDependencyUpdate(subject) {
+	if (!subject || typeof subject !== "string") return false;
+	const s = subject.trim();
+
+	// Conventional deps prefix: "deps:", "deps-dev:", "build(deps-dev):",
+	// "chore(deps):", "fix(deps):", "ci(deps):" (Dependabot/Renovate).
+	if (/^(?:build|chore|fix|ci|deps)\(deps[^)]*\)!?:/i.test(s)) return true;
+	if (/^deps(?:-dev)?!?:/i.test(s)) return true;
+
+	// Dependabot bump signature: "bump <pkg> from <x> to <y>" — note the
+	// required "from", which excludes the release flow's "bump version to <x>".
+	if (/\bbump\s+.+\sfrom\s+\S+\s+to\s+\S+/i.test(s)) return true;
+
+	// Renovate: "update [dependency] <pkg> to v1.2.3".
+	if (/\bupdate\s+(?:dependency\s+)?\S+\s+to\s+v?\d/i.test(s)) return true;
+
+	return false;
+}
+
+/**
  * Check if a contributor identity is an internal placeholder label.
  * @param {string} author - Commit author name
  * @param {string} email - Commit author email
@@ -140,12 +171,18 @@ export function isInternalPlaceholder(author, email) {
 }
 
 /**
- * Filter out bot commits from an array of commits
+ * Filter out bot commits from an array of commits — but KEEP dependency updates.
+ *
+ * Bot-authored dependency bumps (Dependabot/Renovate) are real changelog
+ * content, so they are retained even though `isBotCommit` is true. The release
+ * flow's own trail (version bumps, `release:` commits, merge commits) has no
+ * dependency-update shape and is still dropped.
+ *
  * @param {Array} commits - Array of commit objects
- * @returns {Array} Array of commits with bot commits filtered out
+ * @returns {Array} Human commits plus bot-authored dependency updates
  */
 export function filterBotCommits(commits) {
-	return commits.filter((commit) => !isBotCommit(commit));
+	return commits.filter((commit) => !isBotCommit(commit) || isDependencyUpdate(commit && commit.subject));
 }
 
 /**
