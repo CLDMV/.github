@@ -147,12 +147,15 @@ export function buildNext(opts) {
 export function buildHotfix(opts) {
 	// Same merge-commit-only policy as next: preserves the PR's signed
 	// commits intact. The master squash absorbs the merge-commit noise.
+	// Like next, this OMITS required_linear_history on purpose: that rule
+	// forbids merge commits, which would deadlock the merge-commit-only
+	// policy below (allowed_merge_methods: ["merge"]) — nothing could ever
+	// merge into hotfixes, including bot auto-merge of redirected security PRs.
 	const rules = [
 		{ type: "deletion" },
 		{ type: "non_fast_forward" },
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["merge"] }),
-		{ type: "required_linear_history" },
 		codeScanningRule(),
 		requiredStatusChecksRule()
 	];
