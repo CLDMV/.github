@@ -357,11 +357,11 @@ Everything else is hardcoded into the templates from v4's intended flow:
 |---|---|---|---|
 | `non_fast_forward` (block force-push) | yes | yes (bot bypass added manually) | yes (bot bypass added manually) |
 | `required_signatures` (GPG) | yes | yes | yes |
-| `required_linear_history` | yes | **no** (allows §7.2 API merge commits) | yes |
+| `required_linear_history` | yes | **no** (allows §7.2 API merge commits) | **no** (same merge-commit policy as next) |
 | `required_status_checks: ["✅ Required PR Check"]` | yes | yes | yes |
 | `code_scanning` (CodeQL `high_or_higher`) | yes | yes | yes |
 | `copilot_code_review` (asked) | optional | no | optional |
-| `allowed_merge_methods: ["squash"]` | yes | yes | yes |
+| `allowed_merge_methods` | `["squash"]` | `["merge"]` | `["merge"]` |
 | `required_review_thread_resolution` | yes | yes | yes |
 | `dismiss_stale_reviews_on_push` | yes | yes | yes |
 | `require_last_push_approval` | no | no | no |

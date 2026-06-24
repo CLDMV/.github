@@ -180,7 +180,7 @@
 <ul>
 <li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
 <li>Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit; <code>next</code> and <code>hotfixes</code> use <code>["merge"]</code> only — "Create a merge commit" preserves the PR's original signed commits intact. GitHub's "Rebase and merge" web-UI button re-creates commits server-side and <em>strips GPG signatures</em>, so it's deliberately disallowed on the staging branches. The slightly noisier git log on <code>next</code>/<code>hotfixes</code> is invisible at the master level: the master squash collapses the entire range (merge commits included) into one clean signed commit per release.</li>
-<li><code>next.json</code> intentionally omits <code>required_linear_history</code> so §7.2's master-into-next API merge can produce a merge commit when needed.</li>
+<li><code>next.json</code> and <code>hotfixes.json</code> both intentionally omit <code>required_linear_history</code> — they are merge-commit-only (<code>["merge"]</code>), and that rule forbids merge commits (it would deadlock every merge, including bot auto-merge of redirected security PRs). On <code>next</code> this also lets §7.2's master-into-next API merge produce a merge commit when needed.</li>
 <li>The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or blank the App ID, to opt out). It is never added to <code>master</code>.</li>
 </ul>
 </div>

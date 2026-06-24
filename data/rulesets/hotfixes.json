@@ -41,9 +41,6 @@
 			}
 		},
 		{
-			"type": "required_linear_history"
-		},
-		{
 			"type": "code_scanning",
 			"parameters": {
 				"code_scanning_tools": [
