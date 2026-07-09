@@ -1,0 +1,30 @@
+#
+# @Project: close-resolved-issues
+# @Filename: /action.yml
+# @Date: 2026-07-08 00:00:00 -07:00 (1783494000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Close Resolved Issues"
+description: "Once a release lands on the default branch, resolve the release PR from the commit's trailing `(#N)` and walk its bundled source PRs (commit messages, PR description, and PR comments) for BOTH `<!-- gh-broker:resolves:N,M --> ` markers and native-style Fixes/Closes/Resolves #N keywords, attributing each to its actual source PR. Closes every referenced issue that's still open, commenting with the release version and the resolving PR. Needed because GitHub's own keyword auto-close never fires in the next/hotfixes staging flow (contributor PRs merge into a non-default branch, and the release squash carries a changelog, not per-issue keywords). No GraphQL closing-reference mutation — addClosingIssueReference isn't a real API — issues are closed directly via REST."
+
+inputs:
+  release-version:
+    description: "Release version/tag to cite in the closing comment (e.g. v4.16.0)."
+    required: true
+  commit-sha:
+    description: "Commit to resolve the release PR from (its trailing `(#N)`). Defaults to $GITHUB_SHA."
+    required: false
+  github-token:
+    description: "App installation token with issues: write and pull-requests: read."
+    required: true
+
+outputs:
+  closed:
+    description: "Comma-sep list of issue numbers closed this run (empty when nothing to close, or when the commit had no resolvable release-PR reference)."
+
+runs:
+  using: node24
+  main: action.mjs
