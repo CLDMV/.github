@@ -199,23 +199,6 @@ runs:
         title-suffix: ${{ steps.release-check.outputs.title-suffix }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
 
-    # Walk the same commit range for `Fixes/Closes/Resolves #N` keywords AND
-    # each merged source PR's own closingIssuesReferences, then GraphQL-link
-    # any missing references to the release PR. Result: the Development
-    # sidebar shows the right issues, and when the release PR squashes to
-    # master, GitHub fires auto-close on each one — without changing the
-    # PR body. Additive only; a maintainer's manual link is never removed.
-    # Best-effort: a failure here logs but doesn't block the rest of the
-    # release-PR refresh (changelog + labels + notification still run).
-    - name: Sync closing-issue references
-      if: steps.release-check.outputs.should-create-pr == 'true'
-      continue-on-error: true
-      uses: CLDMV/.github/.github/actions/github/steps/sync-closing-issues@v4
-      with:
-        github-token: ${{ inputs.github-token }}
-        pr-number: ${{ inputs.pr-number }}
-        commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
-
     # Extract the set of conventional-commit types present in the PR range so a
     # mixed PR (e.g. feat: + fix:) gets BOTH type: feature + type: bug
     # — not just the label corresponding to the bump-type (the highest).
