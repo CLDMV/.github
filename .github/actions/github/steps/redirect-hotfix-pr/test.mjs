@@ -4,7 +4,16 @@
  * Run: `node test.mjs`. No network — only exercises exported functions.
  */
 
-import { compilePattern, shouldSkip, buildCommentBody, isDependabotSecurityPR, COMMENT_SENTINEL } from "./action.mjs";
+import {
+	compilePattern,
+	shouldSkip,
+	buildCommentBody,
+	isDependabotSecurityPR,
+	buildReplacementBranchName,
+	buildReplacementPrBody,
+	buildSupersededCommentBody,
+	COMMENT_SENTINEL
+} from "./action.mjs";
 
 let failures = 0;
 
@@ -160,6 +169,22 @@ eq(depBody.includes("Dependabot"), true, "dependabot-security comment mentions D
 // Default kind for backwards compat
 const defaultBody = buildCommentBody("next", "hotfixes");
 eq(defaultBody.includes("head branch looks like a hotfix"), true, "buildCommentBody defaults to hotfix kind");
+
+console.log("\nbuildReplacementBranchName:");
+eq(buildReplacementBranchName(186), "hotfix-redirect/pr-186", "keys the branch name on the PR number");
+eq(buildReplacementBranchName(186), buildReplacementBranchName(186), "deterministic for the same PR number");
+eq(buildReplacementBranchName(180) === buildReplacementBranchName(186), false, "different PR numbers never collide");
+
+console.log("\nbuildReplacementPrBody:");
+const replacementBody = buildReplacementPrBody(186, "Bumps esbuild from 0.28.0 to 0.28.1.");
+eq(replacementBody.includes("Supersedes #186"), true, "replacement body references the original PR number");
+eq(replacementBody.includes("Bumps esbuild from 0.28.0 to 0.28.1."), true, "replacement body includes the original body");
+eq(buildReplacementPrBody(186, "").startsWith("_Supersedes #186._"), true, "handles an empty original body without throwing");
+
+console.log("\nbuildSupersededCommentBody:");
+const supersededBody = buildSupersededCommentBody(999);
+eq(supersededBody.startsWith(COMMENT_SENTINEL), true, "superseded comment starts with sentinel");
+eq(supersededBody.includes("#999"), true, "superseded comment references the replacement PR number");
 
 console.log("\nCOMMENT_SENTINEL:");
 eq(typeof COMMENT_SENTINEL === "string" && COMMENT_SENTINEL.length > 0, true, "sentinel is non-empty");
