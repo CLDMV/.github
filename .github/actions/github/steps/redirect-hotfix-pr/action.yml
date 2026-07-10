@@ -1,5 +1,5 @@
 name: "Redirect Hotfix PR"
-description: "Change a PR's base branch from the default ('next' under v4) to 'hotfixes' when either: (a) the head branch matches a hotfix/security pattern, or (b) the PR is a Dependabot security advisory update (author = dependabot[bot] AND body references a GHSA advisory). Routine Dependabot bumps without GHSA references still skip. Idempotent; skips PRs already targeting the hotfixes branch."
+description: "Redirect a PR to the hotfix lane ('hotfixes' under v4) when either: (a) the head branch matches a hotfix/security pattern (plain base PATCH), or (b) the PR is a Dependabot security advisory update (author = dependabot[bot] AND body references a GHSA advisory) — cherry-picked onto a fresh branch cut from the target branch's own tip and opened as a replacement PR, since Dependabot's branch forks from 'next' and a plain base PATCH would merge that unrelated history into the hotfix lane. Routine Dependabot bumps without GHSA references still skip. Idempotent; skips PRs already targeting the hotfixes branch. Requires the working directory to be a git checkout with a configured git identity (needed for the cherry-pick + push path)."
 
 inputs:
   pr-number:
@@ -30,16 +30,30 @@ inputs:
     description: "When 'true', log the would-be redirection but do not PATCH the PR or post a comment."
     required: false
     default: "false"
+  bump-types:
+    description: "Comma-sep allowed bump types for auto-merging the cherry-picked replacement PR (dependabot-security redirects only): patch, minor, major."
+    required: false
+    default: "patch,minor"
+  merge-method:
+    description: "Preferred merge method (merge | squash | rebase) for the replacement PR. Narrowed to what the target branch's ruleset permits."
+    required: false
+    default: "merge"
+  require-branch-protection:
+    description: "Refuse to enable auto-merge on the replacement PR if the target branch has no required status checks. Default true (safety)."
+    required: false
+    default: "true"
 
 outputs:
   redirected:
-    description: "'true' if the PR base was changed"
+    description: "'true' if the PR base was changed (or, for dependabot-security, if a replacement PR was opened)"
   new-base:
     description: "Base branch after the action (possibly unchanged)"
   skipped:
     description: "'true' if the action exited early due to a skip condition"
   skip-reason:
-    description: "Human-readable reason when skipped is 'true'"
+    description: "Human-readable reason when skipped is 'true' (also set on a cherry-pick conflict)"
+  replacement-pr:
+    description: "Number of the cherry-picked replacement PR opened for a dependabot-security redirect; empty otherwise"
 
 runs:
   using: "node24"

@@ -186,7 +186,16 @@ Job:
 2. If PR's current base ref differs from intended AND wasn't explicitly set by the contributor, call `PATCH /pulls/{n}` to change base.
 3. Post an explanatory comment, deduped by querying existing comments for a sentinel phrase (e.g., `"_Auto-redirected PR base:_"`) — same comment-query approach as §6.4 (no body markers, no commit leak).
 4. **Respect manual override.** If the contributor explicitly set the target via the GitHub UI (we can't perfectly detect this), they can change it back — the workflow won't re-fire on `edited` events.
-5. **Skip bot-created PRs** via `user.type == "Bot"` (consistent with §6.4).
+5. **Skip bot-created PRs** via `user.type == "Bot"` (consistent with §6.4), **except** a Dependabot PR whose body references a GHSA advisory (security update) — see the note below.
+
+**Dependabot security exception — not a plain base PATCH.** Dependabot forks its update branch from whatever `dependabot.yml` sets as `target-branch` (`next`, so routine bumps pool with everyone else's work) — there's no per-update "security only" target, so this redirect-after-the-fact is the only way to route security bumps to the hotfix lane at all. But by the time a security PR gets redirected, `next` may have already diverged from `hotfixes` (picked up other pooled work), and Dependabot's branch carries that as ancestry. A plain `PATCH /pulls/{n}` (base only) doesn't rebase the branch — merging it as-is would drag that unrelated `next` history into `hotfixes`, which is supposed to stay rooted at master, with no human in the loop to notice (these PRs are zero-touch auto-merged, §6.9). So for this case only, `redirect-hotfix-pr` instead:
+
+1. Fetches the PR's own commits (`GET /pulls/{n}/commits`).
+2. Cherry-picks them (`git cherry-pick -x`) onto a fresh branch cut from `hotfixes`' current tip.
+3. Opens a replacement PR (`head=<cherry-picked branch>`, `base=hotfixes`) referencing the original, copies labels, and runs it through the same approve+auto-merge flow (§6.9).
+4. Closes the original PR with an explanatory comment linking the replacement.
+
+On a cherry-pick conflict, it does **not** fall back to a plain base PATCH (that would reintroduce the exact contamination this avoids) — it leaves the PR on its current base and comments asking for manual handling.
 
 Default-branch decision: **keep `master` as the repo's default branch.** This workflow handles redirection invisibly so contributors don't need to know about `next`. Alternative (change default to `next`) is documented in §10 if preferred.
 
