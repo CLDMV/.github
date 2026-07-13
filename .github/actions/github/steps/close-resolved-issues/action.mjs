@@ -17,10 +17,12 @@
  *      merge-commit — pull its trailing `(#N)` (the source PR) and sweep its
  *      full message (subject+body) for `Fixes/Closes/Resolves #N` keywords,
  *      attributed to that same source PR.
- *   3. For each source PR found, also sweep its own description and comments
- *      for BOTH a `<!-- gh-broker:resolves:N,M --> ` marker and the same
- *      keyword forms — catches issues named after the fact (a comment) or in
- *      the PR description rather than the commit message.
+ *   3. For each source PR found, sweep its description, its comments, AND its
+ *      own constituent commit messages (`/pulls/{n}/commits`) for BOTH a
+ *      `<!-- gh-broker:resolves:N,M -->` marker and the same keyword forms,
+ *      attributed to that source PR. Scanning the PR's commits is essential:
+ *      in the v4 merge-flow the closing keyword lives in the PR's individual
+ *      commit bodies (whose subjects have no `(#N)`), which step 2 skips.
  *   4. Close every referenced issue that's still open, commenting with the
  *      release version and the resolving PR.
  *
@@ -110,6 +112,24 @@ export function extractCloseKeywords(text) {
 	return found;
 }
 
+/**
+ * Gather every text blob to sweep for one source PR: its description, each of
+ * its comment bodies, and each of its constituent commit messages. Including
+ * the commit messages is the whole point — in the v4 merge-flow the closing
+ * keyword lives only in a PR's individual commit bodies (see the module
+ * overview), never in its auto-generated changelog description or its merge
+ * commit, so a source PR that omits commit messages here silently drops every
+ * issue it resolves.
+ * @public
+ */
+export function sourcePRTexts({ body, comments, commits } = {}) {
+	return [
+		body || "",
+		...(comments || []).map((c) => c?.body || ""),
+		...(commits || []).map((c) => c?.commit?.message || "")
+	];
+}
+
 async function listRangeCommits(owner, repo, base, head, token) {
 	const all = [];
 	let page = 1;
@@ -180,23 +200,34 @@ async function main() {
 	}
 	console.log(`🔗 Source PR(s) bundled in this release: ${sourcePRs.size ? [...sourcePRs].sort((a, b) => a - b).map((n) => `#${n}`).join(", ") : "<none>"}`);
 
-	// Pass 2: for each source PR, also sweep its own description and comments
-	// for the gh-broker:resolves: marker AND the same keyword forms — catches
-	// issues named in a follow-up comment or only in the PR description
-	// rather than the commit message itself.
+	// Pass 2: for each source PR, sweep its description, its comments, AND its
+	// own constituent commit messages for the gh-broker:resolves: marker AND the
+	// same keyword forms, all attributed to that source PR.
+	//
+	// The commit-message sweep is the part Pass 1 cannot do. In the v4 merge-flow
+	// a PR lands on next/hotfixes as a merge commit whose subject carries the (#N)
+	// but whose message does NOT repeat the Fixes/Closes/Resolves #N keyword; the
+	// keyword lives in the PR's individual (parents==1) commits, whose
+	// conventional-commit subjects have no (#N). Pass 1 attributes a commit only
+	// via a subject (#N), so it skips those commits and their keyword is lost.
+	// Reading /pulls/{n}/commits recovers every keyword from the PR's real
+	// commits, which is what GitHub's native auto-close would have done had they
+	// landed on the default branch. GitHub keeps the pre-squash commits on the PR
+	// too, so this also covers squash-flow repos.
 	for (const sourcePR of sourcePRs) {
 		try {
-			const [sourcePRData, comments] = await Promise.all([
+			const [sourcePRData, comments, prCommits] = await Promise.all([
 				api("GET", `/pulls/${sourcePR}`, null, { token, owner, repo }),
-				paginate(`/issues/${sourcePR}/comments`, { token, owner, repo })
+				paginate(`/issues/${sourcePR}/comments`, { token, owner, repo }),
+				paginate(`/pulls/${sourcePR}/commits`, { token, owner, repo })
 			]);
-			const texts = [sourcePRData?.body || "", ...comments.items.map((c) => c?.body || "")];
+			const texts = sourcePRTexts({ body: sourcePRData?.body, comments: comments.items, commits: prCommits.items });
 			for (const text of texts) {
 				collectInto(issueSources, extractResolvesMarkers, text, sourcePR);
 				collectInto(issueSources, extractCloseKeywords, text, sourcePR);
 			}
 		} catch (err) {
-			console.log(`⚠️ Could not read PR #${sourcePR} (description/comments): ${err.message}`);
+			console.log(`⚠️ Could not read PR #${sourcePR} (description/comments/commits): ${err.message}`);
 		}
 	}
 	console.log(`🎯 Candidate issue(s) to close: ${issueSources.size}`);
