@@ -5,7 +5,7 @@
  * closing-keyword parser. Run: `node test.mjs`.
  */
 
-import { extractMergedPRRefs, extractTrailingPRRef, extractResolvesMarkers, extractCloseKeywords } from "./action.mjs";
+import { extractMergedPRRefs, extractTrailingPRRef, extractResolvesMarkers, extractCloseKeywords, sourcePRTexts } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -68,6 +68,26 @@ eq(extractCloseKeywords("closes issue #123"), new Set(), "extra word between key
 eq(extractCloseKeywords("just a normal message, no keyword"), new Set(), "no keyword");
 eq(extractCloseKeywords(""), new Set(), "empty string");
 eq(extractCloseKeywords(null), new Set(), "null input");
+
+console.log("\nsourcePRTexts:");
+eq(
+	sourcePRTexts({ body: "desc", comments: [{ body: "a comment" }], commits: [{ commit: { message: "fix: x\n\nFixes #5" } }] }),
+	["desc", "a comment", "fix: x\n\nFixes #5"],
+	"gathers description, comment bodies, and commit messages in order"
+);
+eq(
+	sourcePRTexts({ body: null, comments: [], commits: [{ commit: { message: "feat: y\n\nCloses #9" } }] }),
+	["", "feat: y\n\nCloses #9"],
+	"commit message is included even when the PR body/comments carry no keyword (the v4 merge-flow case)"
+);
+eq(sourcePRTexts({ body: "b" }), ["b"], "missing comments/commits arrays are tolerated");
+eq(sourcePRTexts({}), [""], "empty input -> single empty body");
+eq(sourcePRTexts(), [""], "no argument -> single empty body");
+eq(
+	sourcePRTexts({ body: "b", comments: [{}, { body: null }], commits: [{}, { commit: {} }] }),
+	["b", "", "", "", ""],
+	"missing body/message fields coerce to empty strings"
+);
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);
