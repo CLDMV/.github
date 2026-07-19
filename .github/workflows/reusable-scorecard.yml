@@ -49,27 +49,39 @@ on:
                 type: string
                 default: "scorecard"
 
-# NOTE: security-events: write is deliberately NOT declared here. GitHub Actions
-# hard-fails a reusable workflow's run at startup (zero jobs created, conclusion
-# startup_failure) if this file's own top-level `permissions:` requests something
-# the caller doesn't grant — it doesn't silently downgrade for this kind of static
-# workflow-level declaration. scorecard-action's publish step (fired when
-# publish_results: true, the default) independently REJECTS submission from any
-# workflow whose token has security-events: write — see
-# https://github.com/ossf/scorecard-action#workflow-restrictions. Those two facts
-# make a static, unconditional security-events: write requirement here
-# incompatible with the default (public-badge) use case for every caller. Omitting
-# the block entirely means this workflow's jobs simply inherit whatever the caller
-# grants — no static ceiling to violate either way.
-permissions:
-    id-token: write # publish to OpenSSF transparency log
-    contents: read
-    actions: read
-
+# NOTE: security-events: write is deliberately NOT declared here (job-level or
+# otherwise). GitHub Actions hard-fails a reusable workflow's run at startup
+# (zero jobs created, conclusion startup_failure) if this file requests
+# something the caller doesn't grant — it doesn't silently downgrade for a
+# static declaration. scorecard-action's publish step (fired when
+# publish_results: true, the default) independently REJECTS submission from
+# any workflow whose token has security-events: write — see
+# https://github.com/ossf/scorecard-action#workflow-restrictions. Those two
+# facts make a static, unconditional security-events: write requirement here
+# incompatible with the default (public-badge) use case for every caller.
+# Omitting it entirely means this workflow's job simply inherits whatever the
+# caller grants — no static ceiling to violate either way.
+#
+# No workflow-level `permissions:` block here at all — OSSF's own example
+# workflow (https://github.com/ossf/scorecard-action#example-workflow) scopes
+# id-token/security-events to the SPECIFIC job running the action, with the
+# workflow itself carrying no elevated permissions. scorecard-action's publish
+# step verifies this: its rejection message ("global perm is set to write:
+# permission for X is set to write") is checking whether a write permission
+# was granted at the WORKFLOW (global) level rather than job-scoped — not
+# whether that permission is present at all. A prior version of this file
+# granted id-token: write (and contents/actions) at the workflow level, which
+# satisfied GitHub's own permission-inheritance rules fine but tripped this
+# specific scorecard-action check regardless. Declaring them on the `analyze`
+# job instead (below) matches the documented pattern and satisfies both.
 jobs:
     analyze:
         name: "🔬 Scorecard Analysis"
         runs-on: ubuntu-latest
+        permissions:
+            id-token: write # publish to OpenSSF transparency log; job-scoped per OSSF's own example
+            contents: read
+            actions: read
         steps:
             - name: Checkout
               # OSSF Scorecard's publish step verifies the analysis job and
