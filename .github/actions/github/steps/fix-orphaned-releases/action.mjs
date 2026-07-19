@@ -158,19 +158,31 @@ function findTargetCommit(tagName, targetCommitish) {
 			}
 		}
 
-		// Fallback: try the target_commitish from the release if no release commit found
+		// Fallback: try the target_commitish from the release if no release commit found.
+		// target_commitish is a branch name (e.g. "master") for any release created
+		// without pinning a specific commit — GitHub returns the branch name, not a
+		// SHA, in that case. actions/checkout leaves the working tree in detached-HEAD
+		// state at the triggering SHA; it does not create a local branch pointer, only
+		// the remote-tracking ref (origin/master). A bare `git rev-parse master` then
+		// fails with "unknown revision" even though the history is fully present via
+		// fetch-depth: 0. Try the remote-tracking form first — it covers both a branch
+		// name (origin/master resolves, master alone doesn't) and an actual SHA
+		// (origin/<sha> is simply not a valid ref and fails harmlessly, falling through
+		// to the bare form below, which resolves a real SHA fine).
 		if (targetCommitish && targetCommitish !== "null") {
-			try {
-				const commit = gitCommand(`git rev-parse ${targetCommitish}`, true);
-				if (commit && commit.trim()) {
-					console.log(`⚠️ Using target_commitish as fallback: ${commit.trim()}`);
-					console.log(`📝 Consider checking if this commit has the correct release content`);
-					return commit.trim();
-				}
-			} catch (error) {
-				if (DEBUG) {
-					console.log(`Target commitish ${targetCommitish} not found: ${error.message}`);
-				}
+			const originRef = `origin/${targetCommitish}`;
+			const originCommit = gitCommand(`git rev-parse ${originRef}`, true);
+			if (originCommit && originCommit.trim()) {
+				console.log(`⚠️ Using target_commitish as fallback: ${originCommit.trim()} (resolved via ${originRef})`);
+				console.log(`📝 Consider checking if this commit has the correct release content`);
+				return originCommit.trim();
+			}
+
+			const commit = gitCommand(`git rev-parse ${targetCommitish}`, true);
+			if (commit && commit.trim()) {
+				console.log(`⚠️ Using target_commitish as fallback: ${commit.trim()}`);
+				console.log(`📝 Consider checking if this commit has the correct release content`);
+				return commit.trim();
 			}
 		}
 
@@ -271,8 +283,18 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			// Ignore cleanup errors
 		}
 
-		// Check for common permission issues
-		if (error.message.includes("403") || error.message.includes("Permission") || error.message.includes("denied")) {
+		// Check for common permission issues. GitHub's own rejection for a tag whose
+		// target commit touches a workflow file reads "refusing to allow a GitHub App
+		// to create or update workflow `<path>` without `workflows` permission" — all
+		// lowercase, no "403"/"denied", so it doesn't match the generic check below.
+		// This is an App-installation setting, not anything fixable from workflow
+		// YAML or this script: the bot App needs the Workflows permission granted
+		// (and the org installation re-approved) before a tag pointing at a commit
+		// that touches .github/workflows/** can be created.
+		if (/refusing to allow .* without .*workflow.* permission/i.test(error.message)) {
+			console.error(`💡 Push rejected: the target commit touches a workflow file, and this GitHub App installation lacks the "Workflows" permission.`);
+			console.error(`   Fix: grant Workflows: write to the bot App's installation (org Settings → GitHub Apps → permissions), then re-approve and re-run.`);
+		} else if (error.message.includes("403") || error.message.includes("Permission") || error.message.includes("denied")) {
 			console.error(`💡 Push failed due to insufficient permissions.`);
 		}
 
