@@ -159,40 +159,22 @@ function neutralizeJsdocTagMentions(content) {
 /**
  * Find a release for `tag_name`, published OR draft.
  *
- * GET /repos/{repo}/releases/tags/{tag} is documented to not return a release
- * that is currently a draft (GitHub deliberately excludes drafts from tag
- * lookups). Relying on that endpoint alone means a stale draft is invisible
- * to this check forever — every future run reads "doesn't exist" and creates
- * a brand-new duplicate release for the same tag instead of fixing the
- * orphaned one. Fall back to paging through the full releases list (which
+ * Deliberately does NOT use GET /repos/{repo}/releases/tags/{tag} — that
+ * endpoint is documented to not return a release that is currently a draft
+ * (GitHub excludes drafts from tag lookups by design). A stale draft would
+ * be invisible to that check forever: every future run would read "doesn't
+ * exist" and create a brand-new duplicate release for the same tag instead
+ * of fixing the orphaned one. Paging through the full releases list (which
  * DOES include drafts for a token with push access) and matching tag_name in
- * memory whenever the direct lookup 404s.
+ * memory is the only reliable way to find an existing release regardless of
+ * its draft state.
  * @param {object} params
  * @param {string} params.repo - "owner/repo".
- * @param {string} params.tag_name - Raw tag name to match against `release.tag_name`.
- * @param {string} params.encTag - URL-encoded tag name for the direct lookup.
+ * @param {string} params.tag_name - Tag name to match against `release.tag_name`.
  * @param {() => Record<string,string>} params.apiHeaders - Header builder.
  * @returns {Promise<object|null>} The matching release (any state), or null if none exists.
  */
-async function findExistingRelease({ repo, tag_name, encTag, apiHeaders }) {
-	const directResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${encTag}`, {
-		method: "GET",
-		headers: apiHeaders()
-	});
-
-	if (directResponse.ok) {
-		return await directResponse.json();
-	}
-
-	if (directResponse.status !== 404) {
-		const errorText = await directResponse.text();
-		throw new Error(`Failed to check for existing release: ${directResponse.status} ${errorText}`);
-	}
-
-	// 404 here means "no PUBLISHED release at this tag" — it does NOT mean no
-	// release exists at all. Search drafts (and anything else the tag-scoped
-	// endpoint might miss) via the list endpoint before concluding "none".
-	debugLog(`No published release at ${tag_name} via direct lookup — scanning /releases for a draft with the same tag_name...`);
+async function findExistingRelease({ repo, tag_name, apiHeaders }) {
 	for (let page = 1; page <= 10; page++) {
 		const listResponse = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`, {
 			method: "GET",
@@ -207,7 +189,7 @@ async function findExistingRelease({ repo, tag_name, encTag, apiHeaders }) {
 		const pageItems = await listResponse.json();
 		const match = pageItems.find((r) => r.tag_name === tag_name);
 		if (match) {
-			debugLog(`Found existing release for ${tag_name} via list scan (ID: ${match.id}, draft: ${match.draft}, page ${page})`);
+			debugLog(`Found existing release for ${tag_name} (ID: ${match.id}, draft: ${match.draft}, page ${page})`);
 			return match;
 		}
 
@@ -280,14 +262,10 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		}
 	}
 
-	// Check if release already exists. GET /releases/tags/{tag} is documented
-	// to NOT return a release when it is currently a draft — so a stale draft
-	// left by any prior attempt (a timing hiccup, a cancelled run, GitHub's own
-	// "untagged SHA" draft-by-default behavior noted above, etc.) reads as
-	// "doesn't exist" here. Left unhandled, that makes the bug self-perpetuating:
-	// every subsequent run creates ANOTHER brand-new release for the same tag
-	// instead of fixing the orphaned draft, which never gets touched again.
-	const existingRelease = await findExistingRelease({ repo, tag_name, encTag, apiHeaders });
+	// Check if release already exists — see findExistingRelease() for why this
+	// lists releases instead of using the tag-scoped lookup (which is blind to
+	// drafts by GitHub's own design).
+	const existingRelease = await findExistingRelease({ repo, tag_name, apiHeaders });
 
 	let releaseData;
 
