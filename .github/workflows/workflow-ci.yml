@@ -62,7 +62,7 @@ on:
             lts_only_matrix:
                 required: false
                 type: boolean
-                default: false
+                default: true
                 description: "Only include even-numbered (LTS) Node.js major versions in the
                     test matrix"
             package_manager:
