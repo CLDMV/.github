@@ -29,7 +29,7 @@ The repository has a single git-tag namespace, and `vX.Y.Z` belongs to the core.
 @cldmv/slothlet-types@1.2.3  ← satellite tag
 ```
 
-Each satellite gets its own GitHub Release object, signed to match the core's tag signing. The release **body is minimal** — a one-line pointer to the core release — to avoid triplicating an identical changelog at the same version. Each satellite's npm tarball is attached to its release as an asset.
+Each satellite gets its own GitHub Release object, signed to match the core's tag signing. The release **body is minimal** — a one-line pointer to the core release — to avoid triplicating an identical changelog at the same version. Each satellite's npm tarball is attached to its release as an asset. The release **title is prefixed with the package name** (e.g. `@cldmv/slothlet-i18n v1.2.3`), since the bare `vX.Y.Z` title that's correct for the core release would otherwise make every satellite indistinguishable from the core and from each other. Satellite releases also explicitly set `make_latest: false`, so a satellite published after the core (they always are — `publish-extras` depends on `create-release`) never steals GitHub's "Latest release" badge from it.
 
 ## Discovery: the `extra_packages` input
 
