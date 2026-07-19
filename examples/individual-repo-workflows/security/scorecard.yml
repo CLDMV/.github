@@ -26,8 +26,19 @@ on:
 
 # Caller must grant what the reusable needs — notably id-token: write for the
 # OpenSSF transparency-log publish.
+#
+# Do NOT add security-events: write here while publish_results: true below.
+# scorecard-action's publish step rejects submissions from a workflow whose
+# token has security-events write access (it verifies the caller can't have
+# tampered with results before they hit the public transparency log) — the
+# webapp call fails with "workflow verification failed: global perm is set
+# to write: permission for security-events is set to write". That trade-off
+# means the reusable's own SARIF-to-Security-tab upload step has no
+# permission to run in this configuration; the public OpenSSF badge is the
+# thing this default enables, so consumers take that trade-off by default.
+# Only add security-events: write back if publish_results is set to false
+# instead (SARIF-to-Security-tab upload, no public badge).
 permissions:
-    security-events: write
     id-token: write
     contents: read
     actions: read
