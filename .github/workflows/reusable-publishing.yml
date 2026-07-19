@@ -705,6 +705,10 @@ jobs:
                   package-name: ${{ matrix.name }}
                   # Satellites carry no build of their own; the asset is the packed dir.
                   release-source-only: true
+                  # Never let a satellite's release steal "Latest release" from core — core
+                  # is created first (needs: create-release) but satellites finishing after it
+                  # would otherwise claim GitHub's make_latest=true default.
+                  make-latest: "false"
                   assets: ${{ steps.pack.outputs.tarball }}
                   release-notes: ${{ format('Part of [`{0}` v{1}]({2}/{3}/releases/tag/v{1}) — built from the same commit and published at the same version.', inputs.package_name, needs.detect-version.outputs.version, github.server_url, github.repository) }}
                   node-version: ${{ inputs.node_version }}

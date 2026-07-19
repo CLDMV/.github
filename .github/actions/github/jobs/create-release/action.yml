@@ -23,6 +23,13 @@ inputs:
     description: "Whether this release should remain a draft"
     required: false
     default: "false"
+  make-latest:
+    description: "GitHub 'make_latest' release field: 'true' | 'false' | 'legacy'. Leave empty
+      to let GitHub apply its own default (true). Satellite packages
+      (docs/conventions/satellite-packages.md) must pass 'false' so a satellite release doesn't
+      steal the 'Latest release' badge from the core release."
+    required: false
+    default: ""
   package-manager:
     description: "Package manager (npm or yarn)"
     required: false
@@ -191,16 +198,8 @@ runs:
         body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
         is_draft: ${{ inputs.is-draft }}
+        make_latest: ${{ inputs.make-latest }}
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
-
-    - name: Enforce published release state
-      if: inputs.dry-run != 'true' && inputs.is-draft != 'true'
-      shell: bash
-      run: node "${{ github.action_path }}/enforce-published.mjs"
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
-        VERSION: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
 
     - name: Verify tag signature
       if: inputs.dry-run != 'true'
