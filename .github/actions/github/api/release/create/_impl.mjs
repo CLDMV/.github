@@ -156,9 +156,60 @@ function neutralizeJsdocTagMentions(content) {
 	return String(content).replace(tagPattern, "@​$1");
 }
 
-export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, assets, debug }) {
+/**
+ * Find a release for `tag_name`, published OR draft.
+ *
+ * Deliberately does NOT use GET /repos/{repo}/releases/tags/{tag} — that
+ * endpoint is documented to not return a release that is currently a draft
+ * (GitHub excludes drafts from tag lookups by design). A stale draft would
+ * be invisible to that check forever: every future run would read "doesn't
+ * exist" and create a brand-new duplicate release for the same tag instead
+ * of fixing the orphaned one. Paging through the full releases list (which
+ * DOES include drafts for a token with push access) and matching tag_name in
+ * memory is the only reliable way to find an existing release regardless of
+ * its draft state.
+ * @param {object} params
+ * @param {string} params.repo - "owner/repo".
+ * @param {string} params.tag_name - Tag name to match against `release.tag_name`.
+ * @param {() => Record<string,string>} params.apiHeaders - Header builder.
+ * @returns {Promise<object|null>} The matching release (any state), or null if none exists.
+ */
+async function findExistingRelease({ repo, tag_name, apiHeaders }) {
+	for (let page = 1; page <= 10; page++) {
+		const listResponse = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`, {
+			method: "GET",
+			headers: apiHeaders()
+		});
+
+		if (!listResponse.ok) {
+			const errorText = await listResponse.text();
+			throw new Error(`Failed to list releases while searching for ${tag_name}: ${listResponse.status} ${errorText}`);
+		}
+
+		const pageItems = await listResponse.json();
+		const match = pageItems.find((r) => r.tag_name === tag_name);
+		if (match) {
+			debugLog(`Found existing release for ${tag_name} (ID: ${match.id}, draft: ${match.draft}, page ${page})`);
+			return match;
+		}
+
+		if (pageItems.length < 100) break; // last page
+	}
+
+	return null;
+}
+
+export async function run({ token, repo, tag_name, name, body, is_prerelease, is_draft, make_latest, assets, debug }) {
 	const wantsDraft = toBoolean(is_draft, false);
 	const wantsPrerelease = toBoolean(is_prerelease, false);
+	// Tri-state: only include make_latest in the API payload when the caller
+	// explicitly asked for "true"/"false"/"legacy". Empty/unset means "don't
+	// send the field" — GitHub applies its own default (true) for the core
+	// release. Satellite releases pass "false" so they never steal the
+	// "Latest release" badge from the core release that created them.
+	const wantsMakeLatest = ["true", "false", "legacy"].includes(String(make_latest || "").trim().toLowerCase())
+		? String(make_latest).trim().toLowerCase()
+		: undefined;
 	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
 	// Satellite tags (@scope/name@version) contain "/" and "@"; encode the tag in
 	// URL path segments so the lookups below resolve. No-op for core v<version>.
@@ -211,25 +262,25 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 		}
 	}
 
-	// Check if release already exists
-	const existingReleaseResponse = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${encTag}`, {
-		method: "GET",
-		headers: apiHeaders()
-	});
+	// Check if release already exists — see findExistingRelease() for why this
+	// lists releases instead of using the tag-scoped lookup (which is blind to
+	// drafts by GitHub's own design).
+	const existingRelease = await findExistingRelease({ repo, tag_name, apiHeaders });
 
 	let releaseData;
 
-	if (existingReleaseResponse.ok) {
-		// Release already exists
-		releaseData = await existingReleaseResponse.json();
-		debugLog(`Release ${tag_name} already exists (ID: ${releaseData.id}). Updating it...`);
+	if (existingRelease) {
+		// Release already exists (published OR draft — see findExistingRelease).
+		releaseData = existingRelease;
+		debugLog(`Release ${tag_name} already exists (ID: ${releaseData.id}, draft: ${releaseData.draft}). Updating it...`);
 
 		// Update the existing release
 		const updatePayload = {
 			name,
 			body: finalBody,
 			draft: wantsDraft,
-			prerelease: wantsPrerelease
+			prerelease: wantsPrerelease,
+			...(wantsMakeLatest !== undefined ? { make_latest: wantsMakeLatest } : {})
 		};
 
 		debugLog(`Update payload:`, JSON.stringify(updatePayload, null, 2));
@@ -249,14 +300,15 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		debugLog(`Updated existing release: ${releaseData.id}`);
 		debugLog(`Release flags after update -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
-	} else if (existingReleaseResponse.status === 404) {
-		// Release doesn't exist, create new one
+	} else {
+		// Release doesn't exist (published or draft), create new one
 		const releasePayload = {
 			tag_name,
 			name,
 			body: finalBody,
 			draft: wantsDraft,
-			prerelease: wantsPrerelease
+			prerelease: wantsPrerelease,
+			...(wantsMakeLatest !== undefined ? { make_latest: wantsMakeLatest } : {})
 		};
 
 		debugLog(`Release payload:`, JSON.stringify(releasePayload, null, 2));
@@ -276,46 +328,81 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 
 		debugLog(`Created new release: ${releaseData.id}`);
 		debugLog(`Release flags after create -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
-	} else {
-		// Some other error checking for existing release
-		const errorText = await existingReleaseResponse.text();
-		throw new Error(`Failed to check for existing release: ${existingReleaseResponse.status} ${errorText}`);
 	}
 
 	// Respect caller intent: when draft=false is requested, always perform a final
 	// publish pass and verify persisted state from a fresh API read.
+	//
+	// This is the ONE enforcement pass (a near-duplicate second pass used to
+	// live in a separate "Enforce published release state" step —
+	// enforce-published.mjs — removed as redundant: both ran the identical
+	// PATCH+GET-verify sequence back to back for no added benefit).
+	//
+	// It retries the PATCH+verify pair rather than doing it once, because a
+	// single-shot verification immediately after the PATCH can observe a stale
+	// read (GitHub's own release-creation pipeline has more than one internal
+	// consistency domain — see the tag-readiness wait above, which exists for
+	// exactly this class of lag). Real-world evidence points to something
+	// slower than ordinary read lag, though: a job's own verification GET can
+	// report draft=false and still have the release read back as draft
+	// afterward (from the web/mobile UI, and from a fresh API call run
+	// later) — consistent with an async reconciliation between a freshly
+	// signed/annotated tag and the release object that lands after this
+	// job's original one-shot check already declared success. The wide retry
+	// window below is aimed at that slower class of lag, not just an
+	// immediate stale read.
 	if (releaseData?.id && !wantsDraft) {
-		debugLog(`Finalizing release ${releaseData.id} as non-draft (enforced publish pass)...`);
+		// Wide window (up to ~4 minutes total): the reversion this guards against
+		// appears to be an async GitHub-side reconciliation between a freshly
+		// signed/annotated tag and the release object, not a simple few-second
+		// read lag — a short retry window can verify success and still lose the
+		// race to a later silent revert. Only paid when something's actually
+		// wrong; a healthy publish exits the loop on attempt 1.
+		const maxAttempts = 15;
+		const retryDelayMs = 15000;
+		let verifiedPublished = false;
 
-		const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
-			method: "PATCH",
-			headers: apiHeaders(),
-			body: JSON.stringify({ draft: false })
-		});
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			debugLog(`Finalizing release ${releaseData.id} as non-draft (enforced publish pass, attempt ${attempt}/${maxAttempts})...`);
 
-		if (!publishResponse.ok) {
-			const errorText = await publishResponse.text();
-			throw new Error(`Failed to publish release: ${publishResponse.status} ${errorText}`);
+			const publishResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+				method: "PATCH",
+				headers: apiHeaders(),
+				body: JSON.stringify({ draft: false })
+			});
+
+			if (!publishResponse.ok) {
+				const errorText = await publishResponse.text();
+				throw new Error(`Failed to publish release: ${publishResponse.status} ${errorText}`);
+			}
+
+			releaseData = await publishResponse.json();
+			debugLog(`Release ${releaseData.id} publish PATCH applied (draft=${releaseData.draft})`);
+
+			const verifyResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+				method: "GET",
+				headers: apiHeaders()
+			});
+
+			if (!verifyResponse.ok) {
+				const errorText = await verifyResponse.text();
+				throw new Error(`Failed to verify release publish state: ${verifyResponse.status} ${errorText}`);
+			}
+
+			releaseData = await verifyResponse.json();
+			debugLog(`Release ${releaseData.id} verification -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
+
+			if (releaseData.draft !== true) {
+				verifiedPublished = true;
+				break;
+			}
+
+			debugLog(`Release ${releaseData.id} still reads draft after PATCH+verify (attempt ${attempt}/${maxAttempts}) — retrying in ${retryDelayMs}ms`);
+			await new Promise((r) => setTimeout(r, retryDelayMs));
 		}
 
-		releaseData = await publishResponse.json();
-		debugLog(`Release ${releaseData.id} publish PATCH applied (draft=${releaseData.draft})`);
-
-		const verifyResponse = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
-			method: "GET",
-			headers: apiHeaders()
-		});
-
-		if (!verifyResponse.ok) {
-			const errorText = await verifyResponse.text();
-			throw new Error(`Failed to verify release publish state: ${verifyResponse.status} ${errorText}`);
-		}
-
-		releaseData = await verifyResponse.json();
-		debugLog(`Release ${releaseData.id} verification -> draft: ${releaseData.draft}, prerelease: ${releaseData.prerelease}`);
-
-		if (releaseData.draft === true) {
-			throw new Error(`Release ${releaseData.id} is still draft after publish enforcement`);
+		if (!verifiedPublished) {
+			throw new Error(`Release ${releaseData.id} is still draft after ${maxAttempts} publish-enforcement attempts`);
 		}
 	}
 

@@ -12,6 +12,10 @@ try {
 	const body = process.env.INPUT_BODY || "";
 	const is_prerelease = String(process.env.INPUT_IS_PRERELEASE || "false").toLowerCase() === "true";
 	const is_draft = String(process.env.INPUT_IS_DRAFT || "false").toLowerCase() === "true";
+	// Tri-state passthrough (not boolean-coerced): "" means "omit the field, let
+	// GitHub apply its own default"; a satellite caller passes the literal
+	// string "false" to suppress make_latest.
+	const make_latest = (process.env.INPUT_MAKE_LATEST || "").trim().toLowerCase();
 	const assets = process.env.INPUT_ASSETS || "";
 
 	if (!token) throw new Error("GITHUB_TOKEN is required");
@@ -26,6 +30,7 @@ try {
 		body,
 		is_prerelease,
 		is_draft,
+		make_latest,
 		assets,
 		debug
 	});

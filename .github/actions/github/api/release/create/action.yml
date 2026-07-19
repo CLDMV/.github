@@ -24,6 +24,14 @@ inputs:
     description: "Whether this is a draft release"
     required: false
     default: "false"
+  make_latest:
+    description: "GitHub 'make_latest' release field: 'true' | 'false' | 'legacy'. Leave empty to
+      let GitHub apply its own default (true — the release created/updated becomes 'Latest').
+      Satellite packages (docs/conventions/satellite-packages.md) must pass 'false' so a
+      satellite release published after the core release doesn't steal the 'Latest release'
+      badge from it."
+    required: false
+    default: ""
   assets:
     description: "Comma-separated list of file paths to upload as release assets"
     required: false
