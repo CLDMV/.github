@@ -33,10 +33,13 @@ on:
                 # a reusable workflow, the OIDC token's `job_workflow_ref` claim
                 # resolves to THIS file's ref, not the caller's. Scorecard's
                 # publish step accepts that, but verify the public badge still
-                # updates after adopting the reusable; set false to skip the
-                # transparency-log publish (SARIF still uploads to the Security
-                # tab) for private repos or if publishing misbehaves.
-                description: "Publish results to the OpenSSF transparency log (powers the public Scorecard badge). Requires id-token: write on the caller."
+                # updates after adopting the reusable. These two modes are
+                # mutually exclusive, not independently toggleable: true = public
+                # badge, no SARIF-to-Security-tab upload (scorecard-action's
+                # publish step rejects submission from a security-events: write
+                # token). false = SARIF-to-Security-tab upload instead (caller
+                # must grant security-events: write itself), no public badge.
+                description: "Publish results to the OpenSSF transparency log (powers the public Scorecard badge). Requires id-token: write on the caller. Mutually exclusive with SARIF-to-Security-tab upload — see the permissions note below."
                 required: false
                 type: boolean
                 default: true
@@ -46,8 +49,19 @@ on:
                 type: string
                 default: "scorecard"
 
+# NOTE: security-events: write is deliberately NOT declared here. GitHub Actions
+# hard-fails a reusable workflow's run at startup (zero jobs created, conclusion
+# startup_failure) if this file's own top-level `permissions:` requests something
+# the caller doesn't grant — it doesn't silently downgrade for this kind of static
+# workflow-level declaration. scorecard-action's publish step (fired when
+# publish_results: true, the default) independently REJECTS submission from any
+# workflow whose token has security-events: write — see
+# https://github.com/ossf/scorecard-action#workflow-restrictions. Those two facts
+# make a static, unconditional security-events: write requirement here
+# incompatible with the default (public-badge) use case for every caller. Omitting
+# the block entirely means this workflow's jobs simply inherit whatever the caller
+# grants — no static ceiling to violate either way.
 permissions:
-    security-events: write # upload SARIF results
     id-token: write # publish to OpenSSF transparency log
     contents: read
     actions: read
@@ -79,7 +93,14 @@ jobs:
                   results_format: sarif
                   publish_results: ${{ inputs.publish_results }}
 
+            # Mutually exclusive with the public-badge publish above (see the
+            # permissions note): only attempt this when the caller opted OUT of
+            # publish_results, since only then might the caller have granted
+            # security-events: write. Callers wanting SARIF-to-Security-tab
+            # upload must set publish_results: false AND grant security-events:
+            # write themselves — this workflow no longer requests it for them.
             - name: Upload SARIF
+              if: ${{ !inputs.publish_results }}
               uses: github/codeql-action/upload-sarif@v4
               with:
                   sarif_file: results.sarif
