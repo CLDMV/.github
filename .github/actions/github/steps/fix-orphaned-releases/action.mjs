@@ -6,6 +6,7 @@
  */
 
 import { writeFileSync } from "fs";
+import { execSync } from "node:child_process";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote } from "../../api/_api/gpg.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
@@ -262,23 +263,30 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			gitCommand(`git tag -f ${tagName} ${targetCommit}`);
 		}
 
-		// Push using force push (same as working workflow) - this must succeed
+		// Push using force push (same as working workflow) - this must succeed.
+		// Uses execSync directly (not the shared gitCommand/sh helpers) because
+		// those run with stdio: ["ignore", "pipe", "inherit"] — stderr streams
+		// straight to the job log for readability but is never captured onto the
+		// thrown Error, so error.message is just "Command failed: <cmd>" with none
+		// of git's actual rejection text. The workflow-permission detection below
+		// needs the real stderr, so capture it here specifically.
 		console.log(`🚀 Pushing tag to remote: git push origin +refs/tags/${tagName}`);
 		let pushError = null;
+		let pushErrorText = "";
 		try {
-			const pushResult = gitCommand(`git push origin +refs/tags/${tagName}`, false);
-			// Check if push actually succeeded (gitCommand returns empty string on failure)
-			if (pushResult === "") {
-				pushError = new Error(`Failed to push tag ${tagName} to remote`);
-			}
+			execSync(`git push origin +refs/tags/${tagName}`, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
 		} catch (error) {
 			pushError = error;
+			pushErrorText = `${error.stdout?.toString() || ""}${error.stderr?.toString() || ""}`.trim() || error.message;
 		}
 
 		if (!pushError) {
 			console.log(`✅ Successfully created and pushed tag ${tagName}`);
 			return true;
 		}
+
+		console.error(`❌ Git command failed: git push origin +refs/tags/${tagName}`);
+		console.error(pushErrorText);
 
 		// GitHub's git-protocol push path has a known, still-unresolved bug (see
 		// https://github.com/orgs/community/discussions/151442) where it rejects a
@@ -295,8 +303,8 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		// pre-receive hook entirely: github/api/tag/create/_impl.mjs already carries
 		// this same git-push -> REST Git Data API fallback for this exact reason.
 		// Mirror it here rather than giving up on the git push error.
-		if (/refusing to allow .* without .*workflow.* permission/i.test(pushError.message)) {
-			console.warn(`⚠️ Git push rejected by GitHub's workflow-permission check (known platform bug for tags off the branch tip): ${pushError.message}`);
+		if (/refusing to allow .* without .*workflow.* permission/i.test(pushErrorText)) {
+			console.warn(`⚠️ Git push rejected by GitHub's workflow-permission check (known platform bug for tags off the branch tip): ${pushErrorText}`);
 			console.log(`🔁 Falling back to the REST Git Data API to create the tag (bypasses the git-protocol check)...`);
 
 			try {
@@ -324,7 +332,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			}
 		}
 
-		throw pushError;
+		throw new Error(pushErrorText || pushError.message);
 	} catch (error) {
 		console.error(`❌ Failed to create tag ${tagName}: ${error.message}`);
 
@@ -503,7 +511,7 @@ async function main() {
 
 	// Final status
 	if (failedReleases.length > 0) {
-		console.log(`❌ Failed to fix ${failedReleases.length} orphaned releases due to permissions`);
+		console.log(`❌ Failed to fix ${failedReleases.length} orphaned releases — see logs above for the reason`);
 		process.exit(1); // Exit with failure for proper error reporting
 	} else {
 		console.log(`✅ Fixed ${fixedCount} orphaned releases`);
