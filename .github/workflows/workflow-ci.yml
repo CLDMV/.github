@@ -301,7 +301,17 @@ jobs:
         # template does `enable_*: ${{ github.event.inputs.* != 'false' }}` — so
         # a bare `inputs.* == true` silently evaluates false and the job skips
         # (green, no error). Accept both the boolean and string forms.
+        #
+        # `!cancelled()` is load-bearing here too, same reason as on `ci` above:
+        # this job's transitive dependency chain runs through `ci`, which
+        # depends on `sync-gate` — and `sync-gate` skips on every push to
+        # `master` (it only runs for next/hotfixes). Without an explicit guard,
+        # GitHub's implicit `success()` wrapping treats that upstream skip as
+        # cascading forward through the whole chain, so this job silently
+        # skipped on every real push to master regardless of every other
+        # condition being true.
         if: >
+            !cancelled() &&
             needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && (inputs.enable_coverage_badge == true ||
@@ -338,7 +348,11 @@ jobs:
         needs: [ paths-gate, commit-gate, ci ]
         # NOTE: see coverage-badge above — a `${{ }}`-passed boolean input
         # arrives as the STRING "true", so a bare `== true` skips the job.
+        # `!cancelled()` guard: same cascade-skip reason as coverage-badge —
+        # this job's chain runs through `ci` → `sync-gate`, and `sync-gate`
+        # skips on this job's own trigger (pull_request), not just push.
         if: >
+            !cancelled() &&
             needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && (inputs.enable_coverage_pr_comment == true ||
