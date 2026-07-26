@@ -11,7 +11,11 @@
 #
 # When a PR opens from a `hotfix/*` or `security/*` head branch, change its
 # base to `hotfixes` so it joins the hotfix lane instead of the default base
-# (§5.2, §6.5). When a Dependabot PR references a GHSA advisory, it's
+# (§5.2, §6.5). When a Dependabot PR's base isn't its routine target-branch
+# ("next") — GitHub always overrides dependabot.yml's target-branch for
+# security updates, so landing on the default branch instead is itself the
+# signal (a literal GHSA reference in the body is only a secondary check,
+# since Dependabot's PR body doesn't reliably embed the id) — it's
 # cherry-picked onto a fresh branch cut from `hotfixes`' own tip and reopened
 # there instead — Dependabot always forks its branch from `next` (its
 # configured target-branch; there's no per-update "security only" target), so

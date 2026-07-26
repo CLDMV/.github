@@ -74,6 +74,44 @@ eq(
 	"case-insensitive matching on GHSA references"
 );
 
+// Primary signal: base-branch mismatch (real Dependabot security PR bodies
+// don't embed a GHSA id — confirmed on CLDMV/slothlet PRs #225/#230/#233).
+eq(
+	isDependabotSecurityPR({
+		userLogin: "dependabot[bot]",
+		prBody: "Bumps postcss from 8.5.15 to 8.5.23.",
+		baseRef: "master",
+		dependabotBase: "next"
+	}),
+	true,
+	"base != dependabot routine target, no GHSA text → true (base-mismatch signal)"
+);
+eq(
+	isDependabotSecurityPR({
+		userLogin: "dependabot[bot]",
+		prBody: "Bumps lodash from 4.17.20 to 4.17.21.",
+		baseRef: "next",
+		dependabotBase: "next"
+	}),
+	false,
+	"base == dependabot routine target, no GHSA text → false (routine bump)"
+);
+eq(
+	isDependabotSecurityPR({
+		userLogin: "dependabot[bot]",
+		prBody: "Bumps lodash to fix GHSA-aaaa-bbbb-cccc",
+		baseRef: "next",
+		dependabotBase: "next"
+	}),
+	true,
+	"base matches routine target but GHSA text present → true (secondary signal still fires)"
+);
+eq(
+	isDependabotSecurityPR({ userLogin: "dependabot[bot]", prBody: "Bumps postcss from 8.5.15 to 8.5.23.", baseRef: "master" }),
+	false,
+	"baseRef given but dependabotBase omitted → base-mismatch check skipped, falls through to (missing) GHSA text"
+);
+
 console.log("\nshouldSkip:");
 const pat = compilePattern("");
 
@@ -135,6 +173,24 @@ eq(
 	}),
 	{ skip: true, reason: "PR already targets 'hotfixes'", redirectKind: null },
 	"dependabot security already on hotfixes → skip"
+);
+
+// Reproduces the real gap found on CLDMV/slothlet (#225/#230/#233): a
+// Dependabot security-update PR whose body carries no GHSA text but whose
+// base landed on the default branch instead of the routine target-branch.
+eq(
+	shouldSkip({
+		userType: "Bot",
+		userLogin: "dependabot[bot]",
+		headRef: "dependabot/npm_and_yarn/postcss-8.5.23",
+		baseRef: "master",
+		targetBase: "hotfixes",
+		dependabotBase: "next",
+		headPattern: pat,
+		prBody: "Bumps postcss from 8.5.15 to 8.5.23."
+	}),
+	{ skip: false, reason: "", redirectKind: "dependabot-security" },
+	"dependabot security (base mismatch, no GHSA text) → proceed (kind=dependabot-security)"
 );
 
 // Existing skip paths still apply for non-bot non-matching

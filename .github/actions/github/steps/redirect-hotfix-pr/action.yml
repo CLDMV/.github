@@ -1,5 +1,5 @@
 name: "Redirect Hotfix PR"
-description: "Redirect a PR to the hotfix lane ('hotfixes' under v4) when either: (a) the head branch matches a hotfix/security pattern (plain base PATCH), or (b) the PR is a Dependabot security advisory update (author = dependabot[bot] AND body references a GHSA advisory) — cherry-picked onto a fresh branch cut from the target branch's own tip and opened as a replacement PR, since Dependabot's branch forks from 'next' and a plain base PATCH would merge that unrelated history into the hotfix lane. Routine Dependabot bumps without GHSA references still skip. Idempotent; skips PRs already targeting the hotfixes branch. Requires the working directory to be a git checkout with a configured git identity (needed for the cherry-pick + push path)."
+description: "Redirect a PR to the hotfix lane ('hotfixes' under v4) when either: (a) the head branch matches a hotfix/security pattern (plain base PATCH), or (b) the PR is a Dependabot security advisory update (author = dependabot[bot] AND its base isn't Dependabot's routine target-branch, e.g. it targeted the default branch instead of 'next' — the primary signal, since GitHub always overrides target-branch for security updates; a literal GHSA reference in the body is checked as a secondary signal) — cherry-picked onto a fresh branch cut from the target branch's own tip and opened as a replacement PR, since Dependabot's branch forks from 'next' and a plain base PATCH would merge that unrelated history into the hotfix lane. Routine Dependabot bumps targeting the routine branch still skip. Idempotent; skips PRs already targeting the hotfixes branch. Requires the working directory to be a git checkout with a configured git identity (needed for the cherry-pick + push path)."
 
 inputs:
   pr-number:
@@ -22,6 +22,10 @@ inputs:
     description: "Branch to redirect hotfix/security PRs to (the hotfix integration branch)."
     required: false
     default: "hotfixes"
+  dependabot-base:
+    description: "Branch Dependabot's routine (non-security) version updates target — dependabot.yml's configured `target-branch`. Used as the primary Dependabot-security detection signal: any Dependabot PR whose base differs from this is treated as a security override, since GitHub ignores `target-branch` for security updates."
+    required: false
+    default: "next"
   hotfix-branch-pattern:
     description: "Regex (no anchors needed; matched against the start of the head ref) for branches that should be redirected."
     required: false

@@ -13,9 +13,13 @@
 #
 # Two paths trigger a redirect (CLDMV/.github docs/conventions/release-flow-v4.md §5.2, §6.5):
 #   1. Head branch matches `hotfix/*` or `security/*` (human-driven hotfix flow).
-#   2. Author is `dependabot[bot]` AND the PR body references a GHSA security
-#      advisory (Dependabot's security-update PRs flow into the hotfix lane;
-#      routine version bumps stay on `next`).
+#   2. Author is `dependabot[bot]` AND its base isn't Dependabot's routine
+#      target-branch (default "next") — GitHub always overrides
+#      dependabot.yml's target-branch for security updates, so a base landing
+#      on the default branch instead of "next" is itself the signal
+#      (Dependabot's PR body doesn't reliably embed the GHSA id, so a literal
+#      GHSA reference is only a secondary check). Routine version bumps stay
+#      on `next`.
 #
 # The redirect-hotfix-pr action owns all detection logic — it skips non-matching
 # bot PRs, non-matching heads, and PRs already on `hotfixes`, and posts a
