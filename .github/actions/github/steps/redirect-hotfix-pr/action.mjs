@@ -3,8 +3,10 @@
  *   - The head branch matches the hotfix/security pattern (existing behavior,
  *     §6.5 of the v4 design — docs/conventions/release-flow-v4.md), OR
  *   - The PR is a Dependabot **security** update (author = dependabot[bot]
- *     AND body references a GHSA advisory). Dependabot routine bumps still
- *     skip; only security PRs are redirected.
+ *     AND its base isn't Dependabot's routine `target-branch` — see
+ *     isDependabotSecurityPR below for why base-mismatch, not body text, is
+ *     the detection signal). Dependabot routine bumps still skip; only
+ *     security PRs are redirected.
  *
  * The two kinds are handled differently on purpose:
  *
@@ -56,20 +58,35 @@ export function compilePattern(source) {
 }
 
 /**
- * Detect a Dependabot security-advisory PR. Dependabot includes references
- * to the relevant GHSA advisory in the PR body — either as a literal GHSA-id
- * token or as a link to `github.com/advisories/GHSA-…`. Routine version bumps
- * never include those references, so body-content inspection reliably
- * distinguishes the two.
+ * Detect a Dependabot security-advisory PR.
+ *
+ * Primary signal: GitHub's Dependabot security updates always target the
+ * repository's **default branch**, ignoring `dependabot.yml`'s configured
+ * `target-branch` (there is no per-update "security only" target — this is
+ * documented GitHub behavior, not a per-repo misconfiguration). So any
+ * Dependabot PR whose base isn't the routine target-branch is, by
+ * construction, a security override. This is checked first because it's
+ * grounded in behavior GitHub guarantees, not in Dependabot's PR body
+ * template — confirmed empirically (CLDMV/slothlet PRs #225/#230/#233) that
+ * current Dependabot security-update PR bodies do NOT embed a literal GHSA
+ * id or advisory URL, so body-text sniffing alone silently never fires.
+ *
+ * Secondary signal (OR'd in): a literal GHSA-id token or
+ * `github.com/advisories/GHSA-…` link in the body, kept for repos that don't
+ * set `target-branch` (so base-mismatch can never fire) or in case
+ * Dependabot's template later reintroduces the id.
  *
  * @public
  * @param {object} opts
  * @param {string} opts.userLogin - PR author's login (e.g. "dependabot[bot]")
- * @param {string} opts.prBody - PR body / description text
+ * @param {string} [opts.prBody] - PR body / description text
+ * @param {string} [opts.baseRef] - PR's current base branch
+ * @param {string} [opts.dependabotBase] - Branch Dependabot's routine version updates target (dependabot.yml's `target-branch`, e.g. "next")
  * @returns {boolean}
  */
-export function isDependabotSecurityPR({ userLogin, prBody }) {
+export function isDependabotSecurityPR({ userLogin, prBody, baseRef, dependabotBase }) {
 	if (userLogin !== "dependabot[bot]") return false;
+	if (dependabotBase && baseRef && baseRef !== dependabotBase) return true;
 	if (!prBody) return false;
 	// A GHSA advisory URL always embeds the GHSA id, so this bare-id check already
 	// covers the URL form — a separate (unanchored) URL regex adds nothing.
@@ -85,9 +102,9 @@ export function isDependabotSecurityPR({ userLogin, prBody }) {
  *
  * @public
  */
-export function shouldSkip({ userType, userLogin, headRef, baseRef, targetBase, headPattern, prBody }) {
+export function shouldSkip({ userType, userLogin, headRef, baseRef, targetBase, headPattern, prBody, dependabotBase }) {
 	// Dependabot security PRs override the usual bot-skip rule.
-	if (isDependabotSecurityPR({ userLogin, prBody })) {
+	if (isDependabotSecurityPR({ userLogin, prBody, baseRef, dependabotBase })) {
 		if (baseRef === targetBase) {
 			return { skip: true, reason: `PR already targets '${targetBase}'`, redirectKind: null };
 		}
@@ -255,6 +272,7 @@ async function main() {
 	const token = process.env.GITHUB_TOKEN || getInput("github-token", { required: true });
 	const prNumber = getInput("pr-number", { required: true });
 	const targetBase = getInput("target-base") || "hotfixes";
+	const dependabotBase = getInput("dependabot-base") || "next";
 	const headPattern = compilePattern(getInput("hotfix-branch-pattern"));
 	const dryRun = getBooleanInput("dry-run", false);
 	const bumpTypes = (getInput("bump-types") || "patch,minor").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -272,7 +290,7 @@ async function main() {
 	const userLogin = pr?.user?.login || "";
 	const prBody = pr?.body || "";
 
-	const skip = shouldSkip({ userType, userLogin, headRef, baseRef, targetBase, headPattern, prBody });
+	const skip = shouldSkip({ userType, userLogin, headRef, baseRef, targetBase, headPattern, prBody, dependabotBase });
 	if (skip.skip) {
 		console.log(`⏭️  Skipped: ${skip.reason}`);
 		setOutputs({ redirected: "false", "new-base": baseRef, skipped: "true", "skip-reason": skip.reason, "replacement-pr": "" });
