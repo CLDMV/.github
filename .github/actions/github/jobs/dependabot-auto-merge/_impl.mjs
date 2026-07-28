@@ -95,3 +95,29 @@ export function chooseMergeMethod(configured, allowed) {
 export function isAlreadyMergeableError(message) {
 	return typeof message === "string" && /\b(?:clean|unstable) status\b/i.test(message);
 }
+
+/**
+ * Whether a PR's base branch is a protected release branch that must NEVER
+ * receive a direct auto-merge. In the v4 staging-branch flow the default branch
+ * (master/main) takes commits only via the release/hotfix lanes — only `next`
+ * and `hotfixes` are valid auto-merge targets. GitHub opens Dependabot SECURITY
+ * updates against the default branch (ignoring dependabot.yml's `target-branch`),
+ * and redirect-hotfix-pr normally reroutes them to `hotfixes`; if that misses,
+ * auto-merge must decline and leave the PR open for manual handling rather than
+ * land it on the release branch. This is the defense-in-depth backstop behind
+ * redirect-hotfix-pr.
+ *
+ * Refuses the repository's live default branch (whatever it's named, when
+ * known) AND the conventional release-branch names `master`/`main` — the latter
+ * unconditionally, so the guard still fires when the default branch can't be
+ * resolved from the PR payload and never silently opens up.
+ * @public
+ * @param {string} baseRef - The PR's (live) base branch.
+ * @param {string} [defaultBranch] - The repository's default branch, when known.
+ * @returns {boolean} True when the base is protected (auto-merge must be refused).
+ */
+export function isProtectedBase(baseRef, defaultBranch) {
+	if (!baseRef) return false;
+	if (defaultBranch && baseRef === defaultBranch) return true;
+	return baseRef === "master" || baseRef === "main";
+}
