@@ -79,7 +79,20 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
-                description: "Command to build package"
+                description: "Command to build package (matrix test legs). May end with
+                    `ci:cleanup-src` for a dist-only publish — the coverage legs use
+                    `coverage_build_command` instead so they keep `src/`."
+            coverage_build_command:
+                required: false
+                type: string
+                default: "npm run build"
+                description: "Build command for the coverage-badge and coverage-pr-comment
+                    legs. Defaults to `npm run build` — a build that PRESERVES `src/`,
+                    because coverage is measured against `src/**`. Kept separate from
+                    `build_command` (which for src/dist-split repos deletes `src/` via
+                    `ci:cleanup-src`, leaving coverage nothing to measure and crashing the
+                    summary). Set empty to fall back to `build_command`; set
+                    `skip_build: true` for repos with no build."
             skip_build:
                 required: false
                 type: boolean
@@ -322,10 +335,13 @@ jobs:
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
-            # Coverage runs on a fresh runner — pass `build_command` so the
-            # local `dist/` exists before `test:types` resolves. Set
-            # `skip_build: true` upstream for repos with no build.
+            # Coverage runs on a fresh runner — pass the src-PRESERVING build
+            # (`coverage_build_command`) so `dist/` exists for `test:types` AND
+            # `src/` survives for the coverage run. `build_command` is threaded
+            # only as the explicit-empty fallback. Set `skip_build: true`
+            # upstream for repos with no build.
             build_command: ${{ inputs.build_command }}
+            coverage_build_command: ${{ inputs.coverage_build_command }}
             skip_build: ${{ inputs.skip_build }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}
@@ -362,9 +378,12 @@ jobs:
         with:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
-            # Coverage runs on a fresh runner — pass `build_command` so the
-            # local `dist/` exists before `test:types` resolves.
+            # Coverage runs on a fresh runner — pass the src-PRESERVING build
+            # (`coverage_build_command`) so `dist/` exists for `test:types` AND
+            # `src/` survives for the coverage run. `build_command` is threaded
+            # only as the explicit-empty fallback.
             build_command: ${{ inputs.build_command }}
+            coverage_build_command: ${{ inputs.coverage_build_command }}
             skip_build: ${{ inputs.skip_build }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}

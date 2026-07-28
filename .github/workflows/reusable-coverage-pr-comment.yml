@@ -41,15 +41,27 @@ on:
 
             # ── Commands ────────────────────────────────────────────────────────
             build_command:
-                description: "Command to build the package before type-checking. The
-                    Build step is a sibling matrix job, so its `dist/` is invisible
-                    here — repos whose `test:types` reads from compiled `dist/` (e.g.
-                    via a `./typegen` export) need this. Set `skip_build: true` to
-                    drop the step for repos with no build (the Install step alone
-                    is sufficient)."
+                description: "Fallback build command for the coverage leg, used only
+                    when `coverage_build_command` is set empty. Prefer setting
+                    `coverage_build_command` — this input is kept for backward
+                    compatibility. Set `skip_build: true` to drop the step for repos
+                    with no build."
                 required: false
                 type: string
                 default: "npm run build:ci"
+            coverage_build_command:
+                description: "Command to build BEFORE the coverage run. Defaults to
+                    `npm run build` — a build that PRESERVES `src/`, because coverage is
+                    measured against the instrumented source tree (coverage.include is
+                    typically `src/**`). Deliberately SEPARATE from the matrix-test
+                    `build_command` (default `npm run build:ci`), which legitimately ends
+                    with `ci:cleanup-src` and deletes `src/` for a dist-only publish —
+                    running that here leaves coverage nothing to measure and crashes the
+                    summary. Set empty to fall back to `build_command`; set
+                    `skip_build: true` for repos with no build."
+                required: false
+                type: string
+                default: "npm run build"
             type_check_command:
                 description: "Command to run type checking"
                 required: false
@@ -125,17 +137,22 @@ jobs:
               with:
                   package-manager: ${{ inputs.package_manager }}
 
-            # ── 4. Build ────────────────────────────────────────────────────────
+            # ── 4. Build (preserves src/ for coverage) ──────────────────────────
             # The matrix `Build` step in reusable-build-and-test.yml runs on a
             # sibling runner with no shared filesystem, so its `dist/` is
             # invisible here. Build locally before type-check / coverage so
             # consumers whose `test:types` resolves against compiled output
             # (e.g. via a `./typegen` package export pointing at `dist/`)
-            # don't fail with TS2307. Pass `skip_build: true` for repos with
-            # no build step.
+            # don't fail with TS2307. Uses `coverage_build_command` (default
+            # `npm run build`) — NOT the matrix `build_command`, which for
+            # src/dist-split repos ends with `ci:cleanup-src` and DELETES `src/`,
+            # leaving coverage.include `src/**` empty (the coverage summary then
+            # crashes on non-numeric percentages). Falls back to `build_command`
+            # only if `coverage_build_command` is explicitly emptied. Pass
+            # `skip_build: true` for repos with no build step.
             - name: Build
               if: ${{ !inputs.skip_build }}
-              run: ${{ inputs.build_command }}
+              run: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
 
             # ── 5. Type check ───────────────────────────────────────────────────
             - name: Type check
