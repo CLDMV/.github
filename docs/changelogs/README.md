@@ -13,6 +13,20 @@ Per-release changelogs for `@cldmv/.github`. **One file per minor version** (`vX
 
 | Version | Date | Headline |
 |---|---|---|
+| [v4.16.0](v4.16.0.md) | 2026-07-09 | Close resolved issues at release via gh-broker markers |
+| [v4.15.0](v4.15.0.md) | 2026-06-21 | Dependency updates get their own 📦 Dependencies changelog section |
+| [v4.14.0](v4.14.0.md) | 2026-06-14 | Satellite-package publishing — extra packages alongside the core |
+| [v4.13.0](v4.13.0.md) | 2026-06-09 | `type: feature` label auto-applied when a feature is detected in range |
+| [v4.12.0](v4.12.0.md) | 2026-06-01 | `reusable-scorecard` + `reusable-master-commit-audit` workflows |
+| [v4.11.0](v4.11.0.md) | 2026-05-29 | API-only propagation of Fixes/Closes references; bootstrap-self-first |
+| [v4.10.0](v4.10.0.md) | 2026-05-29 | Optional pre-push Trivy container-scan gate (`enable_container_scan`) |
+| [v4.9.0](v4.9.0.md) | 2026-05-28 | Member auto-merge to next/hotfixes; auto-close-linked-issues reminder |
+| [v4.8.0](v4.8.0.md) | 2026-05-27 | 3-way GHAS + Secret Protection bootstrap policy (off/public-only/all) |
+| [v4.7.0](v4.7.0.md) | 2026-05-27 | Dry-run input docs reword (org-onboarding auto-discover follow-on) |
+| [v4.6.0](v4.6.0.md) | 2026-05-27 | Org-onboarding auto-discovers org repos when no list is passed |
+| [v4.5.0](v4.5.0.md) | 2026-05-27 | Org-onboarding fan-out + per-repo bootstrap; notifier rewrite; source-PR grouping |
+| [v4.4.0](v4.4.0.md) | 2026-05-26 | Redirect Dependabot security PRs to the hotfix lane; CLA central-ledger override |
+| [v4.3.0](v4.3.0.md) | 2026-05-25 | Embedded-tests CI, PR-flow labels, auto-open-PR-on-push |
 | [v4.2.0](v4.2.0.md) | 2026-05-23 | Consumer v4-adoption — `release-flow-v4/` templates, v4-first scaffolding guide, doc reframe, label-sync + commit-type aggregation fixes |
 | [v4.1.0](v4.1.0.md) | 2026-05-22 | Ruleset generator pre-adds bot App to `next`/`hotfixes` bypass lists |
 | [v4.0.0](v4.0.0.md) | 2026-05-22 | Staging-branch release flow (persistent `next → master` and `hotfixes → master` PRs), retire v3 per-PR fan-out |
