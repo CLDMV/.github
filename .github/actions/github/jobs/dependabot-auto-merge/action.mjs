@@ -12,6 +12,7 @@
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
 import { approveAndEnableAutoMerge } from "../../api/_api/auto-merge.mjs";
+import { isProtectedBase } from "./_impl.mjs";
 
 try {
 	const bumpTypesRaw = getInput("bump_types") || "patch,minor";
@@ -75,6 +76,23 @@ try {
 	}
 	if (baseRef !== pr.base?.ref) {
 		console.log(`🔎 PR #${prNumber} base is now "${baseRef}" (event snapshot said "${pr.base?.ref}") — using the live base.`);
+	}
+
+	// Defense-in-depth: never auto-merge onto a protected release branch. In the
+	// v4 staging-branch flow the default branch (master/main) receives commits
+	// only via the release/hotfix lanes — never a direct Dependabot merge. GitHub
+	// opens Dependabot SECURITY updates against the default branch (ignoring
+	// dependabot.yml's target-branch); redirect-hotfix-pr normally reroutes them
+	// to hotfixes, but if that misses, this backstop leaves the PR open for manual
+	// handling instead of auto-landing it. Only next/hotfixes are valid targets.
+	const defaultBranch = livePr.base?.repo?.default_branch ?? pr.base?.repo?.default_branch ?? "";
+	if (isProtectedBase(baseRef, defaultBranch)) {
+		const where = defaultBranch && baseRef === defaultBranch ? `the default branch "${baseRef}"` : `the protected release branch "${baseRef}"`;
+		const msg = `PR #${prNumber} targets ${where}; refusing to auto-merge. Only 'next'/'hotfixes' are valid auto-merge targets in the staging-branch flow — leaving this PR open for manual handling.`;
+		console.log(`⏭️  ${msg}`);
+		console.log(`::warning::${msg}`);
+		appendSummary(`⚠️ **Auto-merge declined** — PR #${prNumber} targets ${where}. A Dependabot PR must not auto-land on the release branch; retarget it to \`hotfixes\` or merge it deliberately.`);
+		process.exit(0);
 	}
 
 	const result = await approveAndEnableAutoMerge({

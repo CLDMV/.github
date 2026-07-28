@@ -4,7 +4,7 @@
  * Run directly: `node test.mjs` in this directory. Exits non-zero on failure.
  */
 
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError } from "./_impl.mjs";
+import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError, isProtectedBase } from "./_impl.mjs";
 
 let failures = 0;
 
@@ -86,6 +86,25 @@ eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in clea
 eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Auto merge is not allowed for this repository"}]'), false, "auto-merge disabled → rethrow");
 eq(isAlreadyMergeableError("GraphQL 403: Resource not accessible by integration"), false, "permission error → rethrow");
 eq(isAlreadyMergeableError(undefined), false, "non-string → rethrow");
+
+console.log("isProtectedBase:");
+// The whole point of the guard: a Dependabot security PR that GitHub opened
+// against the default branch (master) must be refused so it can't auto-land.
+eq(isProtectedBase("master", "master"), true, "base == detected default branch → protected");
+eq(isProtectedBase("main", "main"), true, "base == detected default (main) → protected");
+eq(isProtectedBase("trunk", "trunk"), true, "base == detected default (renamed 'trunk') → protected");
+eq(isProtectedBase("next", "master"), false, "next is a valid auto-merge target → not protected");
+eq(isProtectedBase("hotfixes", "master"), false, "hotfixes is a valid auto-merge target → not protected");
+// master/main are refused unconditionally, even when the default can't be read
+// from the PR payload — the guard must never silently open up.
+eq(isProtectedBase("master", ""), true, "master with unknown default → protected (fallback)");
+eq(isProtectedBase("main", undefined), true, "main with unknown default → protected (fallback)");
+eq(isProtectedBase("next", ""), false, "next with unknown default → not protected");
+// A default named neither master nor main is still refused when detected...
+eq(isProtectedBase("trunk", ""), false, "unknown default + non-conventional base → not protected");
+// ...and master/main stay protected even when the real default is something else.
+eq(isProtectedBase("master", "next"), true, "master always protected even if default is 'next'");
+eq(isProtectedBase("", "master"), false, "empty base → not protected (handled elsewhere)");
 
 if (failures) {
 	console.error(`\n${failures} test(s) failed.`);

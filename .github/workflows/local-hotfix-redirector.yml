@@ -7,44 +7,26 @@
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# v4 hotfix lane: retarget hotfix/security PRs to the `hotfixes` branch.
+# v4 hotfix lane: retarget hotfix/security PRs to the `hotfixes` branch. Thin
+# caller — all job logic (token, checkout, git identity, redirect action) lives
+# in workflow-hotfix-redirector.yml, so bumping it carries new requirements
+# (e.g. the checkout + git identity the cherry-pick path needs) without editing
+# this file. The trigger + concurrency stay here (GitHub requires the trigger
+# to be declared locally).
 #
-# When a PR opens from a `hotfix/*` or `security/*` head branch, change its
-# base to `hotfixes` so it joins the hotfix lane instead of the default base
-# (§5.2, §6.5). When a Dependabot PR's base isn't its routine target-branch
-# ("next") — GitHub always overrides dependabot.yml's target-branch for
-# security updates, so landing on the default branch instead is itself the
-# signal (a literal GHSA reference in the body is only a secondary check,
-# since Dependabot's PR body doesn't reliably embed the id) — it's
-# cherry-picked onto a fresh branch cut from `hotfixes`' own tip and reopened
-# there instead — Dependabot always forks its branch from `next` (its
-# configured target-branch; there's no per-update "security only" target), so
-# a plain base PATCH would merge `next`'s unrelated pooled work into the
-# hotfix lane the moment `next` has diverged from `hotfixes`. The
-# redirect-hotfix-pr action owns all of this — it skips other bot-authored
-# PRs, non-matching heads, and PRs already on `hotfixes`, and posts a
-# one-time explanatory comment either way.
+# STATUS: v4 preview. Assumes `hotfixes` exists (v4-adopted repos only).
 #
-# STATUS: v4 preview. Assumes `hotfixes` exists (v4-adopted repos only) — same
-# assumption the action already made before this checkout was added.
+# SECURITY NOTE: pull_request_target runs in the BASE repo's context with WRITE
+# permissions + secrets. The reusable checks out `hotfixes` (a trusted base-repo
+# branch, NOT the PR head/fork) and only cherry-picks/pushes against it.
+#
+# `opened` only (NOT `edited`): if a maintainer manually re-targets the PR, we
+# must not fight them by redirecting again.
 name: 🔀 Local Hotfix PR Redirector (v4)
 
-# SECURITY NOTE: pull_request_target runs in the BASE repo's context with
-# WRITE permissions + secrets. The checkout below targets `hotfixes` — a
-# trusted branch of the base repo, NOT the PR's head/fork — and the action
-# only ever runs `git cherry-pick`/`push` against it; it never executes
-# anything from the PR branch (no install/build/test scripts). Do not change
-# the checkout `ref` to the PR head/merge ref.
-#
-# `opened` only (NOT `edited`): if a maintainer manually re-targets the PR,
-# we must not fight them by redirecting again.
 on:
     pull_request_target:
         types: [opened]
-
-permissions:
-    contents: write
-    pull-requests: write
 
 concurrency:
     group: hotfix-redirector-${{ github.event.pull_request.number }}
@@ -52,42 +34,10 @@ concurrency:
 
 jobs:
     redirect:
-        name: "🔀 Redirect to hotfixes"
-        runs-on: ubuntu-latest
-        steps:
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-                  # The dependabot-security path pushes a cherry-picked branch.
-                  permission_contents: "true"
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-
-            # `hotfixes` (a trusted base-repo branch, not the PR head) — the
-            # dependabot-security path cherry-picks onto its tip. Cheap no-op
-            # for the plain-PATCH "hotfix" path, which doesn't need it.
-            - name: Checkout hotfixes
-              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
-              with:
-                  ref: hotfixes
-                  fetch-depth: 0
-
-            - name: Setup bot git identity
-              uses: CLDMV/.github/.github/actions/github/steps/setup-git-identity@v4
-              with:
-                  app-slug: ${{ steps.app-token.outputs.app-slug }}
-                  github-token: ${{ steps.app-token.outputs.token }}
-
-            - name: Redirect hotfix/security PR to hotfixes
-              uses: CLDMV/.github/.github/actions/github/steps/redirect-hotfix-pr@v4
-              with:
-                  pr-number: ${{ github.event.pull_request.number }}
-                  github-token: ${{ steps.app-token.outputs.token }}
-                  head-ref: ${{ github.event.pull_request.head.ref }}
-                  base-ref: ${{ github.event.pull_request.base.ref }}
-                  user-type: ${{ github.event.pull_request.user.type }}
-                  target-base: hotfixes
+        permissions:
+            contents: write
+            pull-requests: write
+        uses: ./.github/workflows/workflow-hotfix-redirector.yml
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

@@ -178,6 +178,35 @@ export function buildSupersededCommentBody(newNumber, targetBase = "hotfixes") {
 	return `${COMMENT_SENTINEL} closed in favor of #${newNumber}, which cherry-picks this same change onto \`${targetBase}\`' own tip instead of merging this branch (forked from \`next\`) as-is — see #${newNumber} for why.`;
 }
 
+/**
+ * Given the observed git prerequisites for the dependabot-security cherry-pick
+ * path, return the human-readable reason they are insufficient, or "" when they
+ * are satisfied. Pure (no git calls) so it can be unit-tested; the git probing
+ * that produces these booleans lives in the side-effecting wrapper below.
+ *
+ * The cherry-pick path (unlike the plain-PATCH hotfix path) needs the calling
+ * workflow to have run a real checkout of the repo AND configured a git
+ * identity — see the module docstring. A caller workflow that predates those
+ * requirements (an out-of-date copied `local-*`/example template) would
+ * otherwise reach the cherry-pick with no checkout or no identity, where the
+ * failure is silent-ish: `git cherry-pick` runs via runCapturing, so a missing
+ * identity is misread as a *conflict*, posts a misleading "couldn't cherry-pick
+ * cleanly" comment, and exits 0 (green) — leaving the security PR on the default
+ * branch to be auto-merged. Detecting the missing prerequisite up front lets the
+ * caller fail loudly instead.
+ *
+ * @public
+ * @param {object} state
+ * @param {boolean} state.insideWorkTree - working directory is a git checkout.
+ * @param {boolean} state.hasIdentity - both user.name and user.email are configured.
+ * @returns {string} Empty when prerequisites are met; otherwise why not.
+ */
+export function missingCherryPickPrereq({ insideWorkTree, hasIdentity }) {
+	if (!insideWorkTree) return "the working directory is not a git checkout";
+	if (!hasIdentity) return "no git identity (user.name / user.email) is configured";
+	return "";
+}
+
 // ---- side-effecting main flow (gated to script entry only) ----------------
 
 async function fetchPR(owner, repo, prNumber, token) {
@@ -226,6 +255,21 @@ function runCapturing(file, args) {
 	} catch (e) {
 		return { ok: false, stdout: e.stdout?.toString() || "", stderr: e.stderr?.toString() || e.message };
 	}
+}
+
+/**
+ * Probe the git prerequisites the cherry-pick path needs (a checkout + a
+ * configured identity) and return the reason they're insufficient, or "" when
+ * they're met. The identity read is gated on being inside a work tree only to
+ * report the more fundamental "not a checkout" problem first — `git config`
+ * would otherwise succeed against global config even with no repo present.
+ * Pure decision logic lives in `missingCherryPickPrereq` (unit-tested).
+ */
+function checkCherryPickPrereqs() {
+	const insideWorkTree = runCapturing("git", ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
+	const name = insideWorkTree ? runCapturing("git", ["config", "--get", "user.name"]).stdout.trim() : "";
+	const email = insideWorkTree ? runCapturing("git", ["config", "--get", "user.email"]).stdout.trim() : "";
+	return missingCherryPickPrereq({ insideWorkTree, hasIdentity: Boolean(name) && Boolean(email) });
 }
 
 /**
@@ -319,6 +363,36 @@ async function main() {
 	// cut from targetBase's own tip instead of merging Dependabot's next-forked
 	// branch as-is.
 	console.log(`🔀 Redirecting PR #${prNumber} (Dependabot security advisory) by cherry-picking onto '${targetBase}'`);
+
+	// Fail LOUDLY (not a silent skip) when the caller workflow can't support the
+	// cherry-pick. An out-of-date caller — a copied `local-*`/example template
+	// from before checkout + git-identity were required — would otherwise reach
+	// `git cherry-pick` with no checkout / no identity, where the failure is
+	// silent-ish: runCapturing misreads the missing identity as a conflict, posts
+	// a misleading comment, and exits 0, leaving this security PR on the default
+	// branch to be auto-merged. A red X + explanatory comment is the correct
+	// signal — the fix is to update the caller, not to let the PR ride to master.
+	const prereqReason = checkCherryPickPrereqs();
+	if (prereqReason) {
+		try {
+			if (!(await hasSentinelComment(owner, repo, prNumber, token))) {
+				await postComment(
+					owner,
+					repo,
+					prNumber,
+					`${COMMENT_SENTINEL} could NOT redirect this Dependabot security update to \`${targetBase}\` because ${prereqReason}. The workflow calling \`redirect-hotfix-pr\` is out of date: it must run \`checkout-code\` (\`ref: ${targetBase}\`, \`fetch-depth: 0\`) and \`setup-git-identity\` (with \`permission_contents: true\` on the token) **before** this step. This PR is still targeting \`${baseRef}\` and must NOT be auto-merged there — handle it manually and update the workflow.`,
+					token
+				);
+			}
+		} catch (commentErr) {
+			console.error(`::warning::Could not post the stale-caller explanatory comment on PR #${prNumber}: ${commentErr.message}`);
+		}
+		setOutputs({ redirected: "false", "new-base": baseRef, skipped: "false", "skip-reason": `missing-prereq: ${prereqReason}`, "replacement-pr": "" });
+		throw new Error(
+			`redirect-hotfix-pr needs a git checkout of the repo AND a configured git identity to cherry-pick a Dependabot security update onto '${targetBase}', but ${prereqReason}. The calling workflow must run checkout-code (ref: ${targetBase}, fetch-depth: 0) and setup-git-identity (with permission_contents: true on the token) before this step — see local-hotfix-redirector.yml / examples/individual-repo-workflows/release-flow-v4/hotfix-redirector.yml for the current shape.`
+		);
+	}
+
 	const commitShas = await fetchPrCommitShas(owner, repo, prNumber, token);
 	if (commitShas.length === 0) {
 		throw new Error(`PR #${prNumber} has no commits to cherry-pick — refusing to act.`);

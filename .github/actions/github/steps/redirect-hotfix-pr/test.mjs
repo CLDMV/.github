@@ -12,6 +12,7 @@ import {
 	buildReplacementBranchName,
 	buildReplacementPrBody,
 	buildSupersededCommentBody,
+	missingCherryPickPrereq,
 	COMMENT_SENTINEL
 } from "./action.mjs";
 
@@ -241,6 +242,24 @@ console.log("\nbuildSupersededCommentBody:");
 const supersededBody = buildSupersededCommentBody(999);
 eq(supersededBody.startsWith(COMMENT_SENTINEL), true, "superseded comment starts with sentinel");
 eq(supersededBody.includes("#999"), true, "superseded comment references the replacement PR number");
+
+console.log("\nmissingCherryPickPrereq:");
+eq(missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: true }), "", "checkout + identity present → no missing prereq");
+eq(
+	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: true }),
+	"the working directory is not a git checkout",
+	"no checkout → reports the missing checkout (even if identity somehow present)"
+);
+eq(
+	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: false }),
+	"no git identity (user.name / user.email) is configured",
+	"checkout but no identity → reports the missing identity (the silent-conflict trap)"
+);
+eq(
+	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: false }),
+	"the working directory is not a git checkout",
+	"neither present → checkout reported first (more fundamental)"
+);
 
 console.log("\nCOMMENT_SENTINEL:");
 eq(typeof COMMENT_SENTINEL === "string" && COMMENT_SENTINEL.length > 0, true, "sentinel is non-empty");

@@ -16,6 +16,18 @@ import { api } from "../../../github/api/_api/core.mjs";
 // (where an empty passthrough would otherwise override an action.yml default).
 // Matches: `release: vX.Y.Z` with an optional ` - <subject>` suffix and `(#N)`,
 // `chore:` maintenance commits, and standard GitHub merge commits.
+//
+// DELIBERATELY NOT allow-listed: Dependabot's `build(deps…)` / `Build(deps…)`
+// subjects. In the v4 staging flow nothing lands on the default branch except
+// the release/hotfix lanes, so a raw Dependabot commit on master is precisely
+// the "unexpected bot commit / branch-protection bypass" this audit exists to
+// flag. redirect-hotfix-pr (base-mismatch detection) reroutes Dependabot
+// SECURITY updates to the hotfix lane, and dependabot-auto-merge refuses to
+// merge onto the default branch — so a Dependabot subject reaching master means
+// BOTH guards were bypassed. The loud audit issue is the intended signal; adding
+// a Dependabot pattern here would silence exactly that failure mode. Don't. (A
+// repo with a genuinely different convention can still override via the
+// workflow's `allowed_patterns` input.)
 const DEFAULT_ALLOWED_PATTERNS = [
 	String.raw`^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$`,
 	String.raw`^chore(\([^)]+\))?: .+`,

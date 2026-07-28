@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import { execSync } from "node:child_process";
 import { setOutputs } from "../../../common/common/core.mjs";
+import { isVersionAlreadyPublishedError } from "./_impl.mjs";
 
 const packageName = process.env.PACKAGE_NAME || "";
 const packageVersion = process.env.PACKAGE_VERSION || "";
@@ -97,7 +98,7 @@ if (success) {
 console.log("❌ Publish failed");
 console.log(`Error output: ${output}`);
 
-if (output.includes("Cannot publish over previously published version")) {
+if (isVersionAlreadyPublishedError(output)) {
 	console.log("");
 	console.log(`📊 Version conflict detected: ${packageVersion} was previously published`);
 

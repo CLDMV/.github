@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/.github",
-	"version": "4.16.10",
+	"version": "4.16.11",
 	"description": "Shared GitHub Actions, reusable workflows, and org-wide tooling for the CLDMV organization.",
 	"author": {
 		"name": "Shinrai",
