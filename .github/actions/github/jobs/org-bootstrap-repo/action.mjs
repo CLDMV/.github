@@ -392,9 +392,21 @@ async function main() {
 		// security phase. Operators who actually prefer default setup
 		// should delete their custom codeql.yml; the next bootstrap
 		// re-runs and leaves default setup alone if the conflict is gone.
+		// Default setup only CONFLICTS with the advanced workflow when the repo
+		// actually ships `codeql.yml`. If it doesn't, default setup is the repo's
+		// only code scanning — disabling it would leave the repo unscannable (and,
+		// with the code_scanning ruleset rule active, un-mergeable). So only disable
+		// default setup when the custom workflow is present.
+		let hasCodeqlWorkflow = false;
+		try {
+			await api("GET", "/contents/.github/workflows/codeql.yml", null, ctx);
+			hasCodeqlWorkflow = true;
+		} catch {
+			// 404 → no custom codeql.yml in the repo; leave existing scanning alone.
+		}
 		try {
 			const ds = await api("GET", "/code-scanning/default-setup", null, ctx);
-			if (ds?.state === "configured") {
+			if (ds?.state === "configured" && hasCodeqlWorkflow) {
 				warn(`CodeQL default setup was \`configured\`, overwriting to \`not-configured\` (conflicts with the custom codeql.yml workflow)`);
 				try {
 					await mutate("PATCH", "/code-scanning/default-setup", { state: "not-configured" }, "disable CodeQL default setup");
@@ -435,7 +447,24 @@ async function main() {
 
 	// ── RULESETS ──────────────────────────────────────────────────────────
 	if (steps.has("rulesets")) {
-		const desired = buildAll({ ...DEFAULT_OPTS, botAppId });
+		// The CodeQL code_scanning ruleset rule is a merge gate: a PR can't merge
+		// until code scanning has produced results. Only require it where scanning
+		// can actually run — otherwise it's unsatisfiable and deadlocks every PR
+		// ("code scanning needs to be enabled"). Scanning is available on public
+		// repos (free) and on private repos with GitHub Advanced Security enabled
+		// (either already on, or turned on by this run's `code_security` policy).
+		const rsIsPrivate = !!repoInfo.private; // covers private + internal
+		const rsGhasOn = repoInfo.security_and_analysis?.advanced_security?.status === "enabled";
+		const rsCodeSecPolicyOnHere = codeSecurityPolicy === "all" || (codeSecurityPolicy === "public-only" && !rsIsPrivate);
+		const codeScanningAvailable = !rsIsPrivate || rsGhasOn || rsCodeSecPolicyOnHere;
+		if (!codeScanningAvailable) {
+			note(
+				`code scanning unavailable on \`${owner}/${repo}\` (private repo without GHAS) — omitting the CodeQL ` +
+					`code_scanning rule from the rulesets so it isn't an unsatisfiable merge gate. Enable GHAS ` +
+					`(or set code_security: all) and re-run to enforce it.`
+			);
+		}
+		const desired = buildAll({ ...DEFAULT_OPTS, botAppId, codeScanning: codeScanningAvailable });
 		const existing = await api("GET", "/rulesets", null, ctx);
 		const byName = new Map((existing || []).map((r) => [r.name, r]));
 
