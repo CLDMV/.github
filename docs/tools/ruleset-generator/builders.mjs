@@ -87,7 +87,7 @@ function bypassWithBot(includeBot, botAppId) {
 }
 
 /**
- * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, includeBot, botAppId }
+ * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, codeScanning, includeBot, botAppId }
  */
 export function buildMaster(opts) {
 	// master PRs are release-bundle PRs opened from next/hotfixes by the
@@ -101,7 +101,7 @@ export function buildMaster(opts) {
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["squash"] }),
 		{ type: "required_linear_history" },
-		codeScanningRule(),
+		...(opts.codeScanning !== false ? [codeScanningRule()] : []),
 		requiredStatusChecksRule()
 	];
 	return {
@@ -115,7 +115,7 @@ export function buildMaster(opts) {
 }
 
 /**
- * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, includeBot, botAppId }
+ * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, codeScanning, includeBot, botAppId }
  */
 export function buildNext(opts) {
 	// next is where feature PRs land. This is the primary code-review
@@ -127,7 +127,7 @@ export function buildNext(opts) {
 		{ type: "non_fast_forward" },
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["merge"] }),
-		codeScanningRule(),
+		...(opts.codeScanning !== false ? [codeScanningRule()] : []),
 		requiredStatusChecksRule()
 	];
 	if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
@@ -142,7 +142,7 @@ export function buildNext(opts) {
 }
 
 /**
- * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, includeBot, botAppId }
+ * @param {object} opts - { approvals, hotfixCodeOwner, copilotReview, codeScanning, includeBot, botAppId }
  */
 export function buildHotfix(opts) {
 	// Same merge-commit-only policy as next: preserves the PR's signed
@@ -156,7 +156,7 @@ export function buildHotfix(opts) {
 		{ type: "non_fast_forward" },
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["merge"] }),
-		codeScanningRule(),
+		...(opts.codeScanning !== false ? [codeScanningRule()] : []),
 		requiredStatusChecksRule()
 	];
 	if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
@@ -192,6 +192,12 @@ export const DEFAULT_OPTS = Object.freeze({
 	approvals: 1,
 	hotfixCodeOwner: false,
 	copilotReview: false,
+	// Include the CodeQL code_scanning ruleset rule. The bootstrap overrides this
+	// to `false` on repos where code scanning can't run (private without GHAS),
+	// so the rule isn't an unsatisfiable merge gate (that would deadlock every PR
+	// with "code scanning needs to be enabled"). Public repos keep it on — code
+	// scanning is free there.
+	codeScanning: true,
 	includeBot: true,
 	botAppId: DEFAULT_BOT_APP_ID
 });
