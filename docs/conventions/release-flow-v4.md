@@ -222,7 +222,7 @@ Job:
 
 ### 6.8 `local-feature-pr.yml` (new in v4.3.x)
 
-Trigger: `push` to any branch matching the conventional-prefix patterns from [`docs/conventions/branch-naming.md`](branch-naming.md) (`feat/**`, `feature/**`, `fix/**`, `release/**`, `chore/**`, `refactor/**`, `docs/**`, `ci/**`, `perf/**`, `test/**`, `style/**`, `hotfix/**`).
+Trigger: `push` to any branch matching the conventional-prefix patterns from [`docs/conventions/branch-naming.md`](branch-naming.md) (`feat/**`, `feature/**`, `fix/**`, `release/**`, `chore/**`, `deps/**`, `refactor/**`, `docs/**`, `ci/**`, `perf/**`, `test/**`, `style/**`, `hotfix/**`).
 
 Maps the source branch to its integration target:
 
@@ -251,7 +251,7 @@ The existing `local-branch-retention.yml` workflow (called via [`reusable-branch
 
 - `release/*` keeps last 5
 - `hotfix/*` keeps last 3
-- `feat/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*` (and any other matched-non-exempt branches) are deleted on PR merge
+- `feat/*`, `fix/*`, `chore/*`, `deps/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*` (and any other matched-non-exempt branches) are deleted on PR merge
 - `master`, `main`, `badges`, `gh-pages`, `dev`, `next`, `hotfixes` are exempt
 
 The **v4-relevant addition** is that the workflow's `pull_request:` trigger filter must include `next` and `hotfixes` in its `branches:` list. Under v4, contributor PRs merge into those integration branches (not directly into master), so without that addition the workflow never fires on the bulk of merges and feature branches pile up on origin indefinitely. The local dogfood + consumer template both list `[master, main, next, hotfixes]` as of v4.3.x.

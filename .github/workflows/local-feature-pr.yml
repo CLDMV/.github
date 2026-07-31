@@ -13,7 +13,7 @@
 # stay here (GitHub requires the trigger local, and the list is per-repo config).
 #
 # Mapping (matches docs/conventions/branch-naming.md allowed patterns):
-#   feat/*, feature/*, fix/*, release/*, chore/*, refactor/*,
+#   feat/*, feature/*, fix/*, release/*, chore/*, deps/*, refactor/*,
 #   docs/*, ci/*, perf/*, test/*, style/*           → next
 #   hotfix/*                                         → hotfixes
 #
@@ -31,6 +31,7 @@ on:
             - 'fix/**'
             - 'release/**'
             - 'chore/**'
+            - 'deps/**'
             - 'refactor/**'
             - 'docs/**'
             - 'ci/**'

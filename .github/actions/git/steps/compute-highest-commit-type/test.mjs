@@ -111,11 +111,24 @@ eq(
 	{ highestType: "weirdtype", isBreaking: false, bump: "none" },
 	"unknown type still surfaces when only choice (bump=none)"
 );
+eq(
+	computeHighest([
+		{ subject: "chore(deps): bump x", body: "" },
+		{ subject: "ci: raise the matrix floor", body: "" },
+		{ subject: "style: format docs", body: "" }
+	]).highestType,
+	"ci",
+	"ci beats chore and style in a mixed deps PR"
+);
 
 console.log("\nTYPE_PRIORITY ordering:");
 eq(TYPE_PRIORITY[0], "feat", "feat is first");
 eq(TYPE_PRIORITY[1], "fix", "fix is second");
 eq(TYPE_PRIORITY.indexOf("perf") < TYPE_PRIORITY.indexOf("refactor"), true, "perf ranks above refactor");
+eq(TYPE_PRIORITY[TYPE_PRIORITY.length - 1], "style", "style ranks last — formatting never represents a PR");
+eq(TYPE_PRIORITY.indexOf("chore") < TYPE_PRIORITY.indexOf("style"), true, "chore(deps) outranks formatting");
+eq(TYPE_PRIORITY.indexOf("build") < TYPE_PRIORITY.indexOf("test"), true, "build ships, tests do not");
+eq(TYPE_PRIORITY.indexOf("ci") < TYPE_PRIORITY.indexOf("docs"), true, "ci outranks docs");
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);

@@ -11,7 +11,7 @@
 # integration branch on every push.
 #
 # Mapping (matches docs/conventions/branch-naming.md allowed patterns):
-#   feat/*, feature/*, fix/*, release/*, chore/*, refactor/*,
+#   feat/*, feature/*, fix/*, release/*, chore/*, deps/*, refactor/*,
 #   docs/*, ci/*, perf/*, test/*, style/*           → next
 #   hotfix/*                                         → hotfixes
 #
@@ -76,6 +76,7 @@ jobs:
                       fix/*)                 target="next";     type="fix"       ;;
                       docs/*)                target="next";     type="docs"      ;;
                       chore/*)               target="next";     type="chore"     ;;
+                      deps/*)                target="next";     type="deps"      ;;
                       refactor/*)            target="next";     type="refactor"  ;;
                       ci/*)                  target="next";     type="ci"        ;;
                       perf/*)                target="next";     type="perf"      ;;

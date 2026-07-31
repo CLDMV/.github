@@ -22,12 +22,12 @@ export const TYPE_PRIORITY = [
 	"perf",
 	"revert",
 	"refactor",
-	"style",
-	"docs",
-	"test",
 	"build",
 	"ci",
-	"chore"
+	"chore",
+	"test",
+	"docs",
+	"style"
 ];
 
 /**

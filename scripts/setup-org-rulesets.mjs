@@ -38,6 +38,7 @@ const RULESET = {
 					"feat/*",
 					"fix/*",
 					"chore/*",
+					"deps/*",
 					"docs/*",
 					"ci/*",
 					"refactor/*",
