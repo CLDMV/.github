@@ -12,7 +12,7 @@
 #
 #   release/*  — keep last 5
 #   hotfix/*   — keep last 3
-#   everything else (feat/*, fix/*, chore/*, refactor/*, docs/*, ci/*,
+#   everything else (feat/*, fix/*, chore/*, deps/*, refactor/*, docs/*, ci/*,
 #                    perf/*, test/*, style/*, feature/*) — delete on merge
 #   master, main, badges, gh-pages, dev, next, hotfixes — exempt; never
 #       touched. (next/hotfixes are PR HEADS of the persistent release

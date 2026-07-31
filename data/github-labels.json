@@ -42,6 +42,12 @@
 		"aliases": ["flow: chore", "chore → next"]
 	},
 	{
+		"name": "! deps → next",
+		"color": "33691e",
+		"description": "v4 flow: deps contributor PR targeting the next integration branch",
+		"aliases": ["flow: deps", "deps → next"]
+	},
+	{
 		"name": "! refactor → next",
 		"color": "33691e",
 		"description": "v4 flow: refactor contributor PR targeting the next integration branch",
