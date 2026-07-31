@@ -13,7 +13,8 @@ The **Auto-PR target** column shows where the v4 [`feature-pr.yml`](../../exampl
 | `feat/<slug>` | New features | normal CI | `next` |
 | `feature/<slug>` | Same as `feat/<slug>` (alias) | normal CI | `next` |
 | `fix/<slug>` | Bug fixes | normal CI | `next` |
-| `chore/<slug>` | Maintenance, deps, scripts | normal CI | `next` |
+| `chore/<slug>` | Maintenance, scripts | normal CI | `next` |
+| `deps/<slug>` | Dependency updates / version bumps | normal CI | `next` |
 | `docs/<slug>` | Documentation only | CI fires but the inline `paths-gate` job green-lights Required PR Check when every changed file matches `paths_ignore` (docs/md/LICENSE/.gitignore by default) | `next` |
 | `ci/<slug>` | CI/workflow changes | normal CI | `next` |
 | `refactor/<slug>` | Internal restructuring | normal CI | `next` |
@@ -46,7 +47,7 @@ Branch retention is enforced by [`examples/individual-repo-workflows/automation/
 |---|---|
 | `release/*` | Keep last **5** (oldest beyond the cap deleted on PR merge) |
 | `hotfix/*` | Keep last **3** |
-| Anything else matched (`feat/*`, `feature/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*`) | Deleted on merge — no retention |
+| Anything else matched (`feat/*`, `feature/*`, `fix/*`, `chore/*`, `deps/*`, `refactor/*`, `docs/*`, `ci/*`, `perf/*`, `test/*`, `style/*`) | Deleted on merge — no retention |
 | `master`, `main`, `badges`, `gh-pages`, `dev`, `next`, `hotfixes` | **Exempt — never touched** |
 
 `next` and `hotfixes` are exempt because they're the persistent HEAD branches of the v4 release PRs — without exemption, a release merge would delete its own integration branch.
