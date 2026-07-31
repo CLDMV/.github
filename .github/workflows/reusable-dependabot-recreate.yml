@@ -1,0 +1,111 @@
+#
+# @Project: workflows
+# @Filename: /reusable-dependabot-recreate.yml
+# @Date: 2026-07-31 00:00:00 -07:00 (1785481200)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Dependabot Auto-Recreate (org-level, reusable).
+#
+# Fires `@dependabot recreate` on a Dependabot PR that has been *edited by
+# someone other than Dependabot* — the state that (a) makes `@dependabot rebase`
+# refuse, and (b) plants an unsigned commit that a `required_signatures` ruleset
+# then blocks. `recreate` rebuilds the PR from scratch as a fresh, GitHub-signed
+# Dependabot commit, which the auto-merge flow then merges normally.
+#
+# Two entry signals (the caller wires the triggers; this reusable acts on them):
+#   A. issue_comment — Dependabot itself replies "this PR has been edited by
+#      someone other than Dependabot … request `@dependabot recreate`".
+#      Dependabot never comments when a rebase SUCCEEDS (it just 👍-reacts and
+#      force-pushes), so that reply is an unambiguous "it's stuck" signal.
+#   B. pull_request_target — a Dependabot PR opened/updated whose HEAD commit is
+#      unverified (edited / unsigned). Proactive net so you don't have to ask
+#      for a rebase first. The reusable checks verification and no-ops on a
+#      normal (signed) Dependabot sync.
+#
+# COMMAND ACTOR CAVEAT: Dependabot ignores `@dependabot` commands from
+# `github-actions[bot]`. This workflow posts as the org bot App (cldmv-bot). If
+# Dependabot does not act on the App's comment in your org, swap the token used
+# by the `gh pr comment` step for a bot-user PAT with write access (stored as a
+# secret) — nothing else changes.
+#
+# Loop-safe: `recreate` yields a signed/verified commit, so signal B won't
+# re-fire, and signal A only occurs in reply to a rebase request. A PR carrying
+# the opt-out label (default `no-recreate`) is left untouched.
+name: 🔁 Dependabot Auto-Recreate (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            skip_label:
+                description: "PRs carrying this label are never auto-recreated (for intentionally hand-edited Dependabot PRs)."
+                required: false
+                type: string
+                default: "no-recreate"
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+
+permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+
+jobs:
+    recreate:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Decide and request recreate
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  REPO: ${{ github.repository }}
+                  EVENT_NAME: ${{ github.event_name }}
+                  SKIP_LABEL: ${{ inputs.skip_label }}
+                  COMMENT_PR: ${{ github.event.issue.number }}
+                  TARGET_PR: ${{ github.event.pull_request.number }}
+                  TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+              run: |
+                  set -euo pipefail
+
+                  if [ "${EVENT_NAME}" = "issue_comment" ]; then
+                      pr="${COMMENT_PR}"
+                      reason="Dependabot reported it can't rebase (PR edited by a non-Dependabot actor)"
+                  else
+                      pr="${TARGET_PR}"
+                      reason="head commit ${TARGET_HEAD_SHA} is unverified (edited / unsigned)"
+                  fi
+
+                  # Opt-out label: leave intentionally hand-edited PRs alone.
+                  if gh pr view "${pr}" --repo "${REPO}" --json labels \
+                        --jq '.labels[].name' | grep -Fxq "${SKIP_LABEL}"; then
+                      echo "⏭️  #${pr} carries the '${SKIP_LABEL}' label — leaving it alone."
+                      exit 0
+                  fi
+
+                  # Proactive path (B): only act on an actually-unverified head, so a
+                  # normal signed Dependabot sync is a no-op.
+                  if [ "${EVENT_NAME}" = "pull_request_target" ]; then
+                      verified="$(gh api "repos/${REPO}/commits/${TARGET_HEAD_SHA}" \
+                                    --jq '.commit.verification.verified')"
+                      if [ "${verified}" = "true" ]; then
+                          echo "✅ #${pr} head is verified — nothing to recreate."
+                          exit 0
+                      fi
+                  fi
+
+                  echo "🔁 #${pr} — ${reason} → requesting @dependabot recreate"
+                  gh pr comment "${pr}" --repo "${REPO}" --body "@dependabot recreate"
