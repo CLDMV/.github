@@ -464,7 +464,33 @@ async function main() {
 					`(or set code_security: all) and re-run to enforce it.`
 			);
 		}
-		const desired = buildAll({ ...DEFAULT_OPTS, botAppId, codeScanning: codeScanningAvailable });
+
+		// Even where scanning is available, the code_scanning rule is only satisfiable
+		// if the repo actually has code CodeQL can analyze. A declarative / config-only
+		// repo — e.g. a VS Code grammar extension (package.json + a tmLanguage JSON +
+		// icons, no JS/TS) — makes CodeQL fail with a fatal "no source code seen"
+		// configuration error, so requiring the rule deadlocks every PR just like the
+		// visibility case. Coarse "has analyzable code at all" gate via GitHub's
+		// linguist language set (GET /languages).
+		const CODEQL_LANGUAGES = new Set(["C", "C++", "C#", "Go", "Java", "Kotlin", "JavaScript", "TypeScript", "Python", "Ruby", "Swift"]);
+		let hasCodeqlLanguage = true; // fail-safe: on API error keep the rule rather than silently drop scanning
+		try {
+			const langs = await api("GET", "/languages", null, ctx);
+			const present = Object.keys(langs || {});
+			hasCodeqlLanguage = present.some((l) => CODEQL_LANGUAGES.has(l));
+			if (!hasCodeqlLanguage) {
+				note(
+					`no CodeQL-supported language detected on \`${owner}/${repo}\` (linguist: ${present.join(", ") || "none"}) — ` +
+						`omitting the CodeQL code_scanning rule so it isn't an unsatisfiable merge gate on a code-less repo. ` +
+						`Delete the repo's codeql.yml too (nothing to scan); re-run bootstrap if real code is added later.`
+				);
+			}
+		} catch (err) {
+			warn(`could not read languages on \`${owner}/${repo}\`: ${err.message} — keeping the code_scanning rule (fail-safe)`);
+		}
+
+		const codeScanning = codeScanningAvailable && hasCodeqlLanguage;
+		const desired = buildAll({ ...DEFAULT_OPTS, botAppId, codeScanning });
 		const existing = await api("GET", "/rulesets", null, ctx);
 		const byName = new Map((existing || []).map((r) => [r.name, r]));
 
