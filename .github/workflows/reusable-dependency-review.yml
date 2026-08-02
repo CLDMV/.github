@@ -94,13 +94,12 @@ jobs:
               with:
                   repo-token: ${{ steps.app-token.outputs.token }}
                   fail-on-severity: ${{ inputs.fail_on_severity }}
-                  # We post the report ourselves (next step) from this action's
-                  # `comment-content` output — the FULL rendered report that names
-                  # the packages under every category (vulns / licenses / denied /
-                  # OpenSSF scorecard). The action's own PR comment collapses to a
-                  # counts-only `minSummary` (with a "View full job summary" link)
-                  # when it's oversized, which is the uninformative comment we're
-                  # replacing — so suppress it here and post the detailed one.
+                  # We post the comment ourselves (next step) from this action's
+                  # structured outputs (vulnerable-changes / invalid-license-changes
+                  # / denied-changes / dependency-changes) so each count lists its
+                  # actual packages. The action's own PR comment only shows counts
+                  # (collapsing to a "View full job summary" link when oversized) —
+                  # the uninformative comment we're replacing — so suppress it here.
                   comment-summary-in-pr: never
                   base-ref: ${{ inputs.base_ref }}
                   head-ref: ${{ inputs.head_ref }}
@@ -108,76 +107,116 @@ jobs:
                   deny-licenses: ${{ inputs.deny_licenses }}
                   warn-on-openssf-scorecard-level: ${{ inputs.warn_on_openssf_scorecard_level }}
 
-            # Upsert the FULL dependency report as a PR comment — the actual
-            # packages listed under each category, not just counts. Runs on
-            # `always()` so a PR blocked by the review still gets the detailed
-            # comment (`comment-content` is set before fail-on-severity throws).
-            # `comment_summary: false` opts a repo out of the comment entirely.
-            - name: Post detailed dependency-review comment
+            # Upsert a compact PR comment that lists the actual packages under
+            # each count (not just "N packages with …"). Runs on `always()` so a
+            # PR blocked by the review still gets the comment (the outputs are set
+            # before fail-on-severity throws). `comment_summary: false` opts a
+            # repo out of the comment entirely.
+            - name: Post dependency-review summary comment
               if: ${{ always() && inputs.comment_summary && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
               uses: actions/github-script@v7
               env:
-                  REPORT: ${{ steps.depreview.outputs['comment-content'] }}
+                  # Structured outputs from the review step — we compose the comment
+                  # ourselves so each "N packages with …" count lists its packages
+                  # (the action's own comment only shows counts).
+                  VULN: ${{ steps.depreview.outputs['vulnerable-changes'] }}
+                  LICENSES: ${{ steps.depreview.outputs['invalid-license-changes'] }}
+                  DENIED: ${{ steps.depreview.outputs['denied-changes'] }}
+                  ALL_CHANGES: ${{ steps.depreview.outputs['dependency-changes'] }}
+                  SCORECARD_LEVEL: ${{ inputs.warn_on_openssf_scorecard_level }}
               with:
                   github-token: ${{ steps.app-token.outputs.token }}
                   script: |
                       const marker = "<!-- cldmv:dependency-review -->";
-                      const report = (process.env.REPORT || "").trim();
-                      if (!report) {
-                          core.info("No dependency-review report content — nothing to comment.");
-                          return;
-                      }
                       const { owner, repo } = context.repo;
                       const issue_number = context.issue.number;
                       const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+                      const parse = (s) => { try { return JSON.parse(s || "null"); } catch { return null; } };
 
-                      // A single issue comment caps at 65536 chars. If the full report is
-                      // over, PARSE it into its `## ` sections and drop the lowest-value
-                      // ones first (Scanned Files — the bulky manifest list — then Snapshot
-                      // Warnings, and only if still needed the warning tiers), rather than a
-                      // blind tail-cut that would silently lose the OpenSSF Scorecard block.
-                      const LIMIT = 65000;
-                      const fit = (md) => {
-                          if (md.length <= LIMIT) return md;
-                          const pre = [];
-                          const secs = [];
-                          let cur = null;
-                          for (const line of md.split("\n")) {
-                              if (/^##\s/.test(line)) {
-                                  cur = { head: line.replace(/^##\s+/, "").trim(), lines: [line], drop: false };
-                                  secs.push(cur);
-                              } else if (cur) {
-                                  cur.lines.push(line);
-                              } else {
-                                  pre.push(line);
-                              }
-                          }
-                          const dropped = [];
-                          const build = () => {
-                              let out = pre.join("\n");
-                              for (const s of secs) if (!s.drop) out += "\n" + s.lines.join("\n");
-                              if (dropped.length) {
-                                  out += `\n\n> _Omitted to fit the comment: ${dropped.join(", ")} — see the [full job summary](${runUrl})._`;
-                              }
-                              return out;
-                          };
-                          // lowest value first; scorecard / licenses only go if truly necessary
-                          const order = ["scanned files", "snapshot warnings", "openssf scorecard", "license issues", "denied dependencies"];
-                          let out = build();
-                          for (const name of order) {
-                              if (out.length <= LIMIT) break;
-                              const s = secs.find((x) => x.head.toLowerCase().startsWith(name) && !x.drop);
-                              if (!s) continue;
-                              s.drop = true;
-                              dropped.push(s.head);
-                              out = build();
-                          }
-                          if (out.length > LIMIT) {
-                              out = `${out.slice(0, LIMIT - 120)}\n\n> _…truncated — see the [full job summary](${runUrl})._`;
-                          }
-                          return out;
+                      const vuln = parse(process.env.VULN) || [];
+                      const lic = parse(process.env.LICENSES) || {};
+                      const denied = parse(process.env.DENIED) || [];
+                      const all = parse(process.env.ALL_CHANGES) || [];
+                      const scLevel = Number(process.env.SCORECARD_LEVEL || "0");
+                      // invalid-license-changes = { forbidden(incompatible), unresolved(invalid SPDX), unlicensed(unknown) }
+                      const forbidden = lic.forbidden || [];
+                      const unresolved = lic.unresolved || [];
+                      const unlicensed = lic.unlicensed || [];
+
+                      const pkg = (c) => `\`${c.name}@${c.version}\``;
+                      const worstSeverity = (c) => {
+                          const rank = ["critical", "high", "moderate", "low"];
+                          const sevs = (c.vulnerabilities || []).map((v) => v.severity);
+                          return rank.find((s) => sevs.includes(s)) || "unknown";
                       };
-                      const body = `${marker}\n${fit(report)}`;
+
+                      // OpenSSF Scorecard is NOT a dependency-review output — the action fetches
+                      // it internally and flags score < level. Do the same via the Scorecard API
+                      // for the added deps that have a GitHub source repo, so we can name them.
+                      let scorecard = [];
+                      let scorecardCapped = false;
+                      if (scLevel > 0) {
+                          const seen = new Set();
+                          const targets = [];
+                          for (const c of all) {
+                              if (c.change_type !== "added" || !c.source_repository_url) continue;
+                              const m = /github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?\/?$/i.exec(c.source_repository_url);
+                              if (!m) continue;
+                              const key = `${m[1]}/${m[2]}`.toLowerCase();
+                              if (seen.has(key)) continue;
+                              seen.add(key);
+                              targets.push({ change: c, project: `github.com/${m[1]}/${m[2]}` });
+                          }
+                          const CAP = 100;
+                          scorecardCapped = targets.length > CAP;
+                          const list = targets.slice(0, CAP);
+                          for (let i = 0; i < list.length; i += 8) {
+                              const batch = await Promise.all(
+                                  list.slice(i, i + 8).map(async (t) => {
+                                      try {
+                                          const r = await fetch(`https://api.securityscorecards.dev/projects/${t.project}`, { headers: { accept: "application/json" } });
+                                          if (!r.ok) return null;
+                                          const j = await r.json();
+                                          const score = typeof j.score === "number" ? j.score : null;
+                                          return score !== null && score < scLevel ? { change: t.change, score } : null;
+                                      } catch {
+                                          return null;
+                                      }
+                                  })
+                              );
+                              for (const b of batch) if (b) scorecard.push(b);
+                          }
+                      }
+
+                      const CAP_LIST = 50;
+                      const listOf = (items, fmt) => {
+                          if (!items.length) return "";
+                          const shown = items.slice(0, CAP_LIST).map((it) => `  - ${fmt(it)}`);
+                          if (items.length > CAP_LIST) shown.push(`  - …and ${items.length - CAP_LIST} more`);
+                          return "\n" + shown.join("\n");
+                      };
+                      const row = (bad, count, label, block) => {
+                          const icon = count === 0 ? "✅" : bad ? "❌" : "⚠️";
+                          return `- ${icon} **${count}** ${label}${count ? block : ""}`;
+                      };
+
+                      const lines = [
+                          marker,
+                          "## 🔒 Dependency Review",
+                          "",
+                          row(true, vuln.length, "vulnerable package(s)", listOf(vuln, (c) => `${pkg(c)} — **${worstSeverity(c)}** · ${(c.vulnerabilities || [])[0]?.advisory_ghsa_id || "advisory"}`)),
+                          row(true, forbidden.length, "package(s) with incompatible licenses", listOf(forbidden, (c) => `${pkg(c)} — ${c.license || "?"}`)),
+                          row(false, unresolved.length, "package(s) with invalid SPDX license definitions", listOf(unresolved, (c) => `${pkg(c)} — ${c.license || "?"}`)),
+                          row(false, unlicensed.length, "package(s) with unknown licenses", listOf(unlicensed, (c) => pkg(c))),
+                          row(true, denied.length, "denied package(s)", listOf(denied, (c) => `${pkg(c)} — ${c.license || "?"}`))
+                      ];
+                      if (scLevel > 0) {
+                          const label = `package(s) with OpenSSF Scorecard score < ${scLevel}${scorecardCapped ? " (first 100 deps checked)" : ""}`;
+                          lines.push(row(false, scorecard.length, label, listOf(scorecard, (s) => `${pkg(s.change)} — score **${s.score}**`)));
+                      }
+                      lines.push("", `_[Full job summary](${runUrl})_`);
+                      const body = lines.join("\n");
+
                       const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
                       const existing = comments.find((c) => c.body && c.body.includes(marker));
                       if (existing) {
