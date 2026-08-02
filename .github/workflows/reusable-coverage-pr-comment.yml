@@ -116,7 +116,14 @@ jobs:
     coverage-pr-comment:
         name: "PR Coverage Badge"
         runs-on: ubuntu-latest
+        # A job-level `permissions:` block REPLACES the workflow-level one
+        # wholesale (Actions does not merge them), so `contents: read` must be
+        # repeated here. Without it the job token runs with `contents: none`
+        # and `actions/checkout` 404s ("Repository not found") on a PRIVATE
+        # repo — public repos read anonymously, which hid this until the first
+        # private v4 consumer's release PR went red.
         permissions:
+            contents: read
             pull-requests: write
 
         steps:
