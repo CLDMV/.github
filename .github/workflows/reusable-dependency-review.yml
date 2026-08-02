@@ -89,13 +89,101 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Review dependencies
+              id: depreview
               uses: actions/dependency-review-action@v4.9.0
               with:
                   repo-token: ${{ steps.app-token.outputs.token }}
                   fail-on-severity: ${{ inputs.fail_on_severity }}
-                  comment-summary-in-pr: ${{ inputs.comment_summary && 'always' || 'never' }}
+                  # We post the report ourselves (next step) from this action's
+                  # `comment-content` output — the FULL rendered report that names
+                  # the packages under every category (vulns / licenses / denied /
+                  # OpenSSF scorecard). The action's own PR comment collapses to a
+                  # counts-only `minSummary` (with a "View full job summary" link)
+                  # when it's oversized, which is the uninformative comment we're
+                  # replacing — so suppress it here and post the detailed one.
+                  comment-summary-in-pr: never
                   base-ref: ${{ inputs.base_ref }}
                   head-ref: ${{ inputs.head_ref }}
                   allow-licenses: ${{ inputs.allow_licenses }}
                   deny-licenses: ${{ inputs.deny_licenses }}
                   warn-on-openssf-scorecard-level: ${{ inputs.warn_on_openssf_scorecard_level }}
+
+            # Upsert the FULL dependency report as a PR comment — the actual
+            # packages listed under each category, not just counts. Runs on
+            # `always()` so a PR blocked by the review still gets the detailed
+            # comment (`comment-content` is set before fail-on-severity throws).
+            # `comment_summary: false` opts a repo out of the comment entirely.
+            - name: Post detailed dependency-review comment
+              if: ${{ always() && inputs.comment_summary && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+              uses: actions/github-script@v7
+              env:
+                  REPORT: ${{ steps.depreview.outputs['comment-content'] }}
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  script: |
+                      const marker = "<!-- cldmv:dependency-review -->";
+                      const report = (process.env.REPORT || "").trim();
+                      if (!report) {
+                          core.info("No dependency-review report content — nothing to comment.");
+                          return;
+                      }
+                      const { owner, repo } = context.repo;
+                      const issue_number = context.issue.number;
+                      const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+                      // A single issue comment caps at 65536 chars. If the full report is
+                      // over, PARSE it into its `## ` sections and drop the lowest-value
+                      // ones first (Scanned Files — the bulky manifest list — then Snapshot
+                      // Warnings, and only if still needed the warning tiers), rather than a
+                      // blind tail-cut that would silently lose the OpenSSF Scorecard block.
+                      const LIMIT = 65000;
+                      const fit = (md) => {
+                          if (md.length <= LIMIT) return md;
+                          const pre = [];
+                          const secs = [];
+                          let cur = null;
+                          for (const line of md.split("\n")) {
+                              if (/^##\s/.test(line)) {
+                                  cur = { head: line.replace(/^##\s+/, "").trim(), lines: [line], drop: false };
+                                  secs.push(cur);
+                              } else if (cur) {
+                                  cur.lines.push(line);
+                              } else {
+                                  pre.push(line);
+                              }
+                          }
+                          const dropped = [];
+                          const build = () => {
+                              let out = pre.join("\n");
+                              for (const s of secs) if (!s.drop) out += "\n" + s.lines.join("\n");
+                              if (dropped.length) {
+                                  out += `\n\n> _Omitted to fit the comment: ${dropped.join(", ")} — see the [full job summary](${runUrl})._`;
+                              }
+                              return out;
+                          };
+                          // lowest value first; scorecard / licenses only go if truly necessary
+                          const order = ["scanned files", "snapshot warnings", "openssf scorecard", "license issues", "denied dependencies"];
+                          let out = build();
+                          for (const name of order) {
+                              if (out.length <= LIMIT) break;
+                              const s = secs.find((x) => x.head.toLowerCase().startsWith(name) && !x.drop);
+                              if (!s) continue;
+                              s.drop = true;
+                              dropped.push(s.head);
+                              out = build();
+                          }
+                          if (out.length > LIMIT) {
+                              out = `${out.slice(0, LIMIT - 120)}\n\n> _…truncated — see the [full job summary](${runUrl})._`;
+                          }
+                          return out;
+                      };
+                      const body = `${marker}\n${fit(report)}`;
+                      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+                      const existing = comments.find((c) => c.body && c.body.includes(marker));
+                      if (existing) {
+                          await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+                          core.info(`Updated dependency-review comment #${existing.id}`);
+                      } else {
+                          await github.rest.issues.createComment({ owner, repo, issue_number, body });
+                          core.info("Created dependency-review comment");
+                      }
