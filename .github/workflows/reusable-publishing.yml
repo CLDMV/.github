@@ -30,6 +30,11 @@ name: 📦 Publishing Jobs
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             # Package information
             package_name:
                 description: "NPM package name (e.g., @cldmv/slothlet)"
@@ -231,7 +236,7 @@ permissions:
 jobs:
     detect-version:
         name: "🔍 Detect Version"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             version: ${{ steps.extract.outputs.version }}
             # Latest version already on NPM. Downstream publish/release jobs gate
@@ -266,7 +271,7 @@ jobs:
         name: "🔧 Detect Repository Config"
         if: inputs.run_detect_repo_config == true || inputs.run_publish_npm == true ||
             inputs.run_publish_github_packages == true
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             npm-command: ${{ steps.detect.outputs.npm-command }}
             github-packages-command: ${{ steps.detect.outputs.github-packages-command }}
@@ -294,7 +299,7 @@ jobs:
         # only what is actually missing. Downloads the build artifact to expand globs
         # against the staged dist-packages/ directories.
         if: inputs.extra_packages != ''
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version ]
         outputs:
             matrix: ${{ steps.discover.outputs.matrix }}
@@ -332,7 +337,7 @@ jobs:
               inputs.dry_run == true ||
               needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
             )
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version, detect-repo-config ]
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
@@ -373,7 +378,7 @@ jobs:
               inputs.dry_run == true ||
               needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
             )
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version, detect-repo-config ]
         permissions:
             contents: read
@@ -425,7 +430,7 @@ jobs:
               inputs.dry_run == true ||
               needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
             )
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version ]
         outputs:
             release-id: ${{ steps.create.outputs.release-id }}
@@ -508,7 +513,7 @@ jobs:
             inputs.run_create_release == true &&
             inputs.dry_run != true &&
             needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version, create-release ]
         outputs:
             closed: ${{ steps.close.outputs.closed }}
@@ -539,7 +544,7 @@ jobs:
         name: "📌 Update Major Version Tags"
         if: inputs.run_create_release == true
         needs: [ create-release ]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         permissions:
             contents: write
         # Serialize with workflow-update-major-version-tags.yml (which declares
@@ -606,7 +611,7 @@ jobs:
             && needs.publish-npm.result != 'failure'
             && needs.publish-github-packages.result != 'failure'
             && needs.create-release.result != 'failure'
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         permissions:
             id-token: write # NPM trusted publishers (OIDC) — provenance parity with core
             contents: write # Create the satellite's tag + GitHub Release

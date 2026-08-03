@@ -29,6 +29,12 @@ name: 🏷️ PR Title Normalizer (v4 reusable)
 
 on:
     workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App client id for the bot that edits PR titles."
@@ -44,7 +50,7 @@ permissions:
 jobs:
     normalize:
         name: "✏️ Normalize title"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token

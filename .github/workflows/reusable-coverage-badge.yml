@@ -11,6 +11,11 @@ name: "\U0001F4CA Coverage Badge (Reusable)"
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             # ── Node / package manager ──────────────────────────────────────────
             node_version:
                 description: "Node.js version to use (default: lts/*)"
@@ -144,7 +149,7 @@ permissions:
 jobs:
     coverage-badge:
         name: "📊 Coverage & Badge Push"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
 
         steps:
             # ── 1. Source ────────────────────────────────────────────────────────

@@ -27,6 +27,11 @@ name: 🚑 Hotfixes Release (v4 reusable)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             package_name:
                 description: "NPM package name (e.g. @cldmv/slothlet). Used by create/update-release-pr for changelog + version resolution."
                 required: true
@@ -84,7 +89,7 @@ jobs:
             github.event_name != 'push' ||
             !startsWith(github.event.head_commit.message, 'chore: bump version')
         name: "🔍 Plan (detect changes + resolve PR)"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             has-changes: ${{ steps.detect.outputs.has-changes }}
             pr-number: ${{ steps.resolve.outputs.pr-number }}
@@ -154,7 +159,7 @@ jobs:
         name: "🆕 Create hotfix release PR"
         needs: plan
         if: needs.plan.outputs.has-changes == 'true' && needs.plan.outputs.pr-number == ''
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token
@@ -180,7 +185,7 @@ jobs:
         name: "🔁 Refresh hotfix release PR #${{ needs.plan.outputs.pr-number }}"
         needs: plan
         if: needs.plan.outputs.has-changes == 'true' && needs.plan.outputs.pr-number != ''
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token

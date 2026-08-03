@@ -4,6 +4,11 @@ name: "🐳 Docker Publish Workflow (Org-Level)"
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label override. Default stays ubuntu-latest even for CLDMV private repos: this workflow needs a Docker daemon, which the org self-hosted runner pods do not provide."
             debug:
                 required: false
                 type: boolean
@@ -115,7 +120,7 @@ permissions:
 jobs:
     build-and-push:
         name: "🐳 Build and Push GHCR Image"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || 'ubuntu-latest' }}
         permissions:
             contents: read
             packages: write

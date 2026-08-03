@@ -4,6 +4,11 @@ name: 📦 Publish Workflow (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             package_name:
                 required: true
                 type: string
@@ -260,6 +265,7 @@ jobs:
         name: "🏗️ Build and Test"
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
+            runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
             run_build_and_test: true
@@ -284,6 +290,7 @@ jobs:
             packages: write # Required to publish to GitHub Packages
         uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v4
         with:
+            runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
             dry_run: ${{ inputs.dry_run }}
@@ -321,7 +328,7 @@ jobs:
         name: "📋 Publish Summary"
         needs: [ build-and-test, publish ]
         if: always()
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Generate Publish Summary
               uses: CLDMV/.github/.github/actions/workflows/publish-summary@v4

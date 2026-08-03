@@ -14,6 +14,11 @@ name: 📖 Docs Publish (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             build_command:
                 required: true
                 type: string
@@ -63,7 +68,7 @@ concurrency:
 
 jobs:
     publish:
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Checkout
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4

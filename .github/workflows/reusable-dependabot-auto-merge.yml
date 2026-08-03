@@ -22,6 +22,11 @@ name: 🤖 Dependabot Auto-Merge (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             bump_types:
                 description: "Comma-sep allowed bump types: patch, minor, major"
                 required: false
@@ -56,7 +61,7 @@ permissions:
 
 jobs:
     automerge:
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token

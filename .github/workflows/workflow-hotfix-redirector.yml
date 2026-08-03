@@ -38,6 +38,11 @@ name: 🔀 Hotfix PR Redirector (v4 reusable)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             target_base:
                 description: "Branch to redirect hotfix/security PRs to (the hotfix integration branch)."
                 required: false
@@ -68,7 +73,7 @@ permissions:
 jobs:
     redirect:
         name: "🔀 Redirect to hotfixes"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token

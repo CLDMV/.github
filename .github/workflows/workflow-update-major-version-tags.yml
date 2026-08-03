@@ -4,6 +4,11 @@ name: 📌 Update Major Version Tags (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             debug:
                 description: "Enable debug logging for troubleshooting"
                 required: false
@@ -83,6 +88,7 @@ jobs:
         permissions:
             contents: write
         with:
+            runs_on: ${{ inputs.runs_on }}
             debug: ${{ inputs.debug }}
             run_unified_tag_health: true
             create_documentation: ${{ inputs.create_documentation }}

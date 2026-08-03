@@ -23,13 +23,19 @@ name: 📣 Release Notifier (Org-Level)
 
 on:
     workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
 
 permissions:
     contents: read
 
 jobs:
     notify:
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Dispatch release notification
               uses: CLDMV/.github/.github/actions/community/jobs/release-notifier@v4
