@@ -82,6 +82,19 @@ jobs:
         name: "🔍 Analyze ${{ matrix.language }}"
         needs: setup
         runs-on: ubuntu-latest
+        # Repo-variable escape hatch for repos with NO CodeQL-analyzable source
+        # (e.g. a declarative VS Code grammar extension: only a TextMate grammar,
+        # `main: null`, no JS/TS). There, real CodeQL fails "no source code seen"
+        # (exit 32), but simply dropping the workflow leaves the `code_scanning`
+        # ruleset rule waiting on results that never arrive — "Merging is blocked
+        # — Waiting for Code Scanning results" forever. Setting the repo variable
+        # `CLDMV_SKIP_CODE_SCANNING` (any non-empty value) skips analysis and
+        # uploads an empty, 0-alert CodeQL SARIF instead, producing a PASSING
+        # result that satisfies the rule. A plain `if:`-skip is NOT enough — a
+        # skipped job produces no result, so the gate still waits. The decision
+        # lives in the repo (survives `org-bootstrap-repo` re-applying the rule).
+        env:
+            SKIP_CODE_SCANNING: ${{ vars.CLDMV_SKIP_CODE_SCANNING }}
         strategy:
             fail-fast: false
             matrix:
@@ -98,7 +111,7 @@ jobs:
             # CodeQL requires the config file to live INSIDE the workspace; writing
             # to /tmp fails with "configuration file ... is outside of the workspace".
             - name: Write CodeQL config
-              if: inputs.config_file == ''
+              if: ${{ inputs.config_file == '' && env.SKIP_CODE_SCANNING == '' }}
               id: codeql_cfg
               shell: bash
               env:
@@ -125,6 +138,7 @@ jobs:
                   fi
 
             - name: Initialize CodeQL
+              if: ${{ env.SKIP_CODE_SCANNING == '' }}
               uses: github/codeql-action/init@v4
               with:
                   languages: ${{ matrix.language }}
@@ -133,15 +147,56 @@ jobs:
                   config-file: ${{ inputs.config_file != '' && inputs.config_file || steps.codeql_cfg.outputs.path }}
 
             - name: Autobuild
-              if: inputs.build_mode == 'autobuild'
+              if: ${{ inputs.build_mode == 'autobuild' && env.SKIP_CODE_SCANNING == '' }}
               uses: github/codeql-action/autobuild@v4
 
             - name: Manual build
-              if: inputs.build_mode == 'manual' && inputs.manual_build_command != ''
+              if: ${{ inputs.build_mode == 'manual' && inputs.manual_build_command != '' && env.SKIP_CODE_SCANNING == '' }}
               shell: bash
               run: ${{ inputs.manual_build_command }}
 
             - name: Analyze
+              if: ${{ env.SKIP_CODE_SCANNING == '' }}
               uses: github/codeql-action/analyze@v4
               with:
+                  category: "/language:${{ matrix.language }}"
+
+            # ── Skip path (vars.CLDMV_SKIP_CODE_SCANNING set) ────────────────────
+            # No analyzable source: upload an empty, 0-alert CodeQL SARIF under the
+            # SAME category the real Analyze uses, so a PASSING code-scanning result
+            # exists for this language on both the PR and the base branch (this
+            # workflow runs on push-to-default AND PRs), clearing the `code_scanning`
+            # ruleset gate. The unconditional Checkout above gives upload-sarif the
+            # git ref/commit context it needs.
+            #
+            # Two hard requirements for the upload to be ACCEPTED (else it 4xxs):
+            #   1. The SARIF must have one run with `results: []` — NOT `runs: []`,
+            #      which GitHub rejects ("1 item required; only 0 were supplied",
+            #      github/codeql-action#390). Below is one run, zero results.
+            #   2. CodeQL "default setup" must be DISABLED on the repo — GitHub
+            #      rejects advanced-setup SARIF uploads when default setup is on.
+            #      This repo uses advanced setup (this workflow), so keep default
+            #      setup off wherever CLDMV_SKIP_CODE_SCANNING is used.
+            - name: Write empty CodeQL SARIF
+              if: ${{ env.SKIP_CODE_SCANNING != '' }}
+              shell: bash
+              run: |
+                  cat > "${GITHUB_WORKSPACE}/empty.sarif" <<'JSON'
+                  {
+                    "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+                    "version": "2.1.0",
+                    "runs": [
+                      {
+                        "tool": { "driver": { "name": "CodeQL", "informationUri": "https://codeql.github.com/", "version": "0.0.0", "rules": [] } },
+                        "results": []
+                      }
+                    ]
+                  }
+                  JSON
+
+            - name: Upload empty CodeQL SARIF
+              if: ${{ env.SKIP_CODE_SCANNING != '' }}
+              uses: github/codeql-action/upload-sarif@v4
+              with:
+                  sarif_file: empty.sarif
                   category: "/language:${{ matrix.language }}"
