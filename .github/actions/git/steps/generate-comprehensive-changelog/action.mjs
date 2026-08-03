@@ -376,10 +376,15 @@ async function findAssociatedPullNumber(sha, owner, repo, token) {
 		// almost always merged by the time we render), then prefer the
 		// lowest number (the oldest PR — the one that actually introduced
 		// the commit, in the stacked-PR case).
+		// Recognize the long-running release PR by base + head. Accept master/main
+		// plus the resolved release base (DEFAULT_BRANCH) when set, so repos whose
+		// default branch isn't master still exclude their own release PR here.
+		const releaseBase = (process.env.DEFAULT_BRANCH || "").trim();
 		const isReleasePR = (pr) => {
 			const base = pr?.base?.ref;
 			const head = pr?.head?.ref;
-			return base === "master" && (head === "next" || head === "hotfixes");
+			const baseIsDefault = base === "master" || base === "main" || (releaseBase && base === releaseBase);
+			return baseIsDefault && (head === "next" || head === "hotfixes");
 		};
 		const candidates = prs.filter((p) => !isReleasePR(p) && typeof p?.number === "number");
 		if (candidates.length === 0) return null;
