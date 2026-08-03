@@ -36,6 +36,11 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
+            default_branch:
+                description: "Caller YAML override for the release base branch (the `hotfixes → <base>` target). Empty (default) = resolve via the CLDMV_RELEASE_BASE var, then the repo's API default_branch, then `master`."
+                required: false
+                type: string
+                default: ""
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App client id for the bot that opens/refreshes the release PR."
@@ -83,6 +88,7 @@ jobs:
         outputs:
             has-changes: ${{ steps.detect.outputs.has-changes }}
             pr-number: ${{ steps.resolve.outputs.pr-number }}
+            default-branch: ${{ steps.base.outputs.default-branch }}
         steps:
             - name: Create App token
               id: app-token
@@ -100,28 +106,42 @@ jobs:
                   ref: hotfixes
                   fetch-depth: 0
 
-            - name: Detect master..hotfixes changes
+            # Resolve the release base branch (override var → caller input → API
+            # default_branch → master). `vars` in a reusable resolves against the
+            # CALLER repo — intended, so a per-repo CLDMV_RELEASE_BASE var works.
+            - name: Resolve release base
+              id: base
+              uses: CLDMV/.github/.github/actions/git/utilities/resolve-release-base@v4
+              with:
+                  override: ${{ vars.CLDMV_RELEASE_BASE }}
+                  configured: ${{ inputs.default_branch }}
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+            - name: Detect base..hotfixes changes
               id: detect
               shell: bash
+              env:
+                  BASE: ${{ steps.base.outputs.default-branch }}
               run: |
-                  git fetch origin master --quiet
-                  count=$(git rev-list --count origin/master..HEAD)
-                  echo "📊 commits on hotfixes not yet on master: $count"
+                  git fetch origin "$BASE" --quiet
+                  count=$(git rev-list --count "origin/$BASE..HEAD")
+                  echo "📊 commits on hotfixes not yet on $BASE: $count"
                   if [ "$count" -gt 0 ]; then
                       echo "has-changes=true" >> "$GITHUB_OUTPUT"
                   else
                       echo "has-changes=false" >> "$GITHUB_OUTPUT"
-                      echo "ℹ️ hotfixes is in sync with master — nothing to release."
+                      echo "ℹ️ hotfixes is in sync with $BASE — nothing to release."
                   fi
 
-            - name: Resolve persistent hotfixes→master PR
+            - name: Resolve persistent hotfixes→base PR
               id: resolve
               if: steps.detect.outputs.has-changes == 'true'
               shell: bash
               env:
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  BASE: ${{ steps.base.outputs.default-branch }}
               run: |
-                  pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head hotfixes --base master \
+                  pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head hotfixes --base "$BASE" \
                        --state open --json number --jq '.[0].number // ""')
                   echo "pr-number=$pr" >> "$GITHUB_OUTPUT"
                   if [ -n "$pr" ]; then
@@ -153,6 +173,7 @@ jobs:
               with:
                   package-name: ${{ inputs.package_name }}
                   build-command: ${{ inputs.build_command }}
+                  default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
 
     refresh:
@@ -179,6 +200,7 @@ jobs:
                   pr-number: ${{ needs.plan.outputs.pr-number }}
                   package-name: ${{ inputs.package_name }}
                   build-command: ${{ inputs.build_command }}
+                  default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
 
             # Release-PR notifier — see workflow-next-release.yml for the rationale.

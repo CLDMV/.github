@@ -75,6 +75,9 @@ jobs:
               uses: CLDMV/.github/.github/actions/github/steps/pending-release-reminder@v4
               with:
                   github-token: ${{ steps.app-token.outputs.token }}
+                  # Per-repo release base override; empty falls through to the
+                  # action's API default_branch → master resolution.
+                  default-branch: ${{ vars.CLDMV_RELEASE_BASE }}
                   next-threshold-days: ${{ github.event.inputs.next_threshold_days || '14' }}
                   hotfixes-threshold-days: ${{ github.event.inputs.hotfixes_threshold_days || '3' }}
                   dedup-window: ${{ github.event.inputs.dedup_window || 'week' }}

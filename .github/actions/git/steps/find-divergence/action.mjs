@@ -18,15 +18,25 @@ function tryGit(cmd) {
 }
 
 try {
-	// Find where this branch diverged from master/main. The merge-base SHA is
-	// still used downstream as the commit-range base for changelog generation.
-	let mergeBase = tryGit("git merge-base HEAD origin/master");
+	// Find where this branch diverged from the base branch. The merge-base SHA
+	// is still used downstream as the commit-range base for changelog generation.
+	// When DEFAULT_BRANCH is set (the resolved release base), use it directly;
+	// otherwise fall back to the master-then-main heuristic (backward compatible
+	// for existing master-default repos).
+	const resolvedBase = (process.env.DEFAULT_BRANCH || "").trim();
+	let mergeBase = "";
 	let defaultBranch = "";
-	if (mergeBase) {
-		defaultBranch = "master";
+	if (resolvedBase) {
+		mergeBase = tryGit(`git merge-base HEAD "origin/${resolvedBase}"`);
+		if (mergeBase) defaultBranch = resolvedBase;
 	} else {
-		mergeBase = tryGit("git merge-base HEAD origin/main");
-		if (mergeBase) defaultBranch = "main";
+		mergeBase = tryGit("git merge-base HEAD origin/master");
+		if (mergeBase) {
+			defaultBranch = "master";
+		} else {
+			mergeBase = tryGit("git merge-base HEAD origin/main");
+			if (mergeBase) defaultBranch = "main";
+		}
 	}
 
 	// Base version comes from the CURRENT default-branch HEAD, NOT the version

@@ -1,0 +1,28 @@
+name: "Resolve Release Base Branch"
+description: "Resolve the base branch for the release PR: override var → configured input → API-detected default_branch → fallback (master)."
+
+inputs:
+  override:
+    description: "Highest-priority override (typically vars.CLDMV_RELEASE_BASE). Empty = ignored."
+    required: false
+    default: ""
+  configured:
+    description: "Caller-configured release base (the reusable workflow's default_branch input). Empty = ignored."
+    required: false
+    default: ""
+  fallback:
+    description: "Hard fallback when nothing else resolves."
+    required: false
+    default: "master"
+  github-token:
+    description: "Token used to read repository.default_branch when neither override nor configured is set."
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  default-branch:
+    description: "The resolved release base branch name"
+
+runs:
+  using: "node24"
+  main: "action.mjs"
