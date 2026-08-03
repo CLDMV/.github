@@ -124,6 +124,8 @@ jobs:
                   DENIED: ${{ steps.depreview.outputs['denied-changes'] }}
                   ALL_CHANGES: ${{ steps.depreview.outputs['dependency-changes'] }}
                   SCORECARD_LEVEL: ${{ inputs.warn_on_openssf_scorecard_level }}
+                  ALLOW_LICENSES: ${{ inputs.allow_licenses }}
+                  DENY_LICENSES: ${{ inputs.deny_licenses }}
               with:
                   github-token: ${{ steps.app-token.outputs.token }}
                   script: |
@@ -189,13 +191,15 @@ jobs:
                       }
 
                       // GitHub's dependency graph does NOT surface a license for the
-                      // `actions` ecosystem, so first-party reusable workflows / actions
-                      // (e.g. our own `CLDMV/.github/.github/workflows/*.yml@v4`) come back
-                      // license: null and land in `unlicensed` even though the action's repo
-                      // has a LICENSE. Resolve those ourselves from the repo's LICENSE at the
-                      // pinned ref (GET /repos/{o}/{r}/license) and drop any that resolve to a
-                      // real SPDX out of the unknown bucket — a genuinely unlicensed dep stays
-                      // flagged. Deduped by owner/repo; concurrency 8, same as the scorecard leg.
+                      // `actions` ecosystem, so ANY action / reusable-workflow reference
+                      // (first-party `CLDMV/.github/.github/workflows/*.yml@v4` or a third-party
+                      // `owner/action@vX`) comes back license: null and lands in `unlicensed`
+                      // even though the repo has a LICENSE. Resolve those ourselves from the
+                      // repo's LICENSE at the pinned ref (GET /repos/{o}/{r}/license), then apply
+                      // the SAME allow/deny policy the action uses: a resolved license that
+                      // violates it moves to the incompatible-licenses bucket, an allowed one
+                      // clears, and one we can't resolve stays flagged. Deduped by owner/repo;
+                      // concurrency 8, like the scorecard leg.
                       if (unlicensed.length) {
                           const isActions = (c) => /^(actions|githubactions)$/i.test(c.ecosystem || "");
                           const ownerRepoRef = (c) => {
@@ -235,11 +239,22 @@ jobs:
                                   resolved.set(t.key, spdx);
                               }));
                           }
-                          unlicensed = unlicensed.filter((c) => {
-                              if (!isActions(c)) return true;
+                          const norm = (s) => String(s).trim().toLowerCase();
+                          const allowSet = new Set((process.env.ALLOW_LICENSES || "").split(",").map(norm).filter(Boolean));
+                          const denySet = new Set((process.env.DENY_LICENSES || "").split(",").map(norm).filter(Boolean));
+                          // allowlist → only listed SPDX pass; denylist → listed SPDX fail;
+                          // neither set (CLDMV default) → everything passes. Mirrors the action.
+                          const violates = (spdx) => (allowSet.size ? !allowSet.has(norm(spdx)) : denySet.size ? denySet.has(norm(spdx)) : false);
+                          const stillUnknown = [];
+                          for (const c of unlicensed) {
+                              if (!isActions(c)) { stillUnknown.push(c); continue; }
                               const t = ownerRepoRef(c);
-                              return !(t && resolved.get(t.key));
-                          });
+                              const spdx = t ? resolved.get(t.key) : null;
+                              if (!spdx) { stillUnknown.push(c); continue; } // couldn't resolve → still unknown
+                              if (violates(spdx)) { forbidden.push({ ...c, license: spdx }); continue; } // resolved to a disallowed license
+                              // resolved to an allowed license → cleared
+                          }
+                          unlicensed = stillUnknown;
                       }
 
                       const CAP_LIST = 50;
