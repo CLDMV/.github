@@ -124,6 +124,8 @@ jobs:
                   DENIED: ${{ steps.depreview.outputs['denied-changes'] }}
                   ALL_CHANGES: ${{ steps.depreview.outputs['dependency-changes'] }}
                   SCORECARD_LEVEL: ${{ inputs.warn_on_openssf_scorecard_level }}
+                  ALLOW_LICENSES: ${{ inputs.allow_licenses }}
+                  DENY_LICENSES: ${{ inputs.deny_licenses }}
               with:
                   github-token: ${{ steps.app-token.outputs.token }}
                   script: |
@@ -141,7 +143,7 @@ jobs:
                       // invalid-license-changes = { forbidden(incompatible), unresolved(invalid SPDX), unlicensed(unknown) }
                       const forbidden = lic.forbidden || [];
                       const unresolved = lic.unresolved || [];
-                      const unlicensed = lic.unlicensed || [];
+                      let unlicensed = lic.unlicensed || [];
 
                       const pkg = (c) => `\`${c.name}@${c.version}\``;
                       const worstSeverity = (c) => {
@@ -186,6 +188,73 @@ jobs:
                               );
                               for (const b of batch) if (b) scorecard.push(b);
                           }
+                      }
+
+                      // GitHub's dependency graph does NOT surface a license for the
+                      // `actions` ecosystem, so ANY action / reusable-workflow reference
+                      // (first-party `CLDMV/.github/.github/workflows/*.yml@v4` or a third-party
+                      // `owner/action@vX`) comes back license: null and lands in `unlicensed`
+                      // even though the repo has a LICENSE. Resolve those ourselves from the
+                      // repo's LICENSE at the pinned ref (GET /repos/{o}/{r}/license), then apply
+                      // the SAME allow/deny policy the action uses: a resolved license that
+                      // violates it moves to the incompatible-licenses bucket, an allowed one
+                      // clears, and one we can't resolve stays flagged. Deduped by owner/repo;
+                      // concurrency 8, like the scorecard leg.
+                      if (unlicensed.length) {
+                          const isActions = (c) => /^(actions|githubactions)$/i.test(c.ecosystem || "");
+                          const ownerRepoRef = (c) => {
+                              let o, r;
+                              const m = /github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?]|$)/i.exec(c.source_repository_url || "");
+                              if (m) { o = m[1]; r = m[2]; }
+                              else {
+                                  const parts = String(c.name || "").split("/");
+                                  if (parts.length >= 2) { o = parts[0]; r = parts[1]; }
+                              }
+                              if (!o || !r) return null;
+                              const vm = /^v?(\d+)/.exec(String(c.version || ""));
+                              return { owner: o, repo: r, ref: vm ? `v${vm[1]}` : null, key: `${o}/${r}`.toLowerCase() };
+                          };
+                          const toResolve = new Map();
+                          for (const c of unlicensed) {
+                              if (!isActions(c)) continue;
+                              const t = ownerRepoRef(c);
+                              if (t && !toResolve.has(t.key)) toResolve.set(t.key, t);
+                          }
+                          const resolved = new Map();
+                          const tasks = [...toResolve.values()];
+                          for (let i = 0; i < tasks.length; i += 8) {
+                              await Promise.all(tasks.slice(i, i + 8).map(async (t) => {
+                                  const read = async (ref) => {
+                                      try {
+                                          const args = ref ? { owner: t.owner, repo: t.repo, ref } : { owner: t.owner, repo: t.repo };
+                                          const res = await github.request("GET /repos/{owner}/{repo}/license", args);
+                                          const spdx = res.data && res.data.license && res.data.license.spdx_id;
+                                          return spdx && spdx !== "NOASSERTION" ? spdx : null;
+                                      } catch {
+                                          return null;
+                                      }
+                                  };
+                                  let spdx = t.ref ? await read(t.ref) : null;
+                                  if (!spdx) spdx = await read(null);
+                                  resolved.set(t.key, spdx);
+                              }));
+                          }
+                          const norm = (s) => String(s).trim().toLowerCase();
+                          const allowSet = new Set((process.env.ALLOW_LICENSES || "").split(",").map(norm).filter(Boolean));
+                          const denySet = new Set((process.env.DENY_LICENSES || "").split(",").map(norm).filter(Boolean));
+                          // allowlist → only listed SPDX pass; denylist → listed SPDX fail;
+                          // neither set (CLDMV default) → everything passes. Mirrors the action.
+                          const violates = (spdx) => (allowSet.size ? !allowSet.has(norm(spdx)) : denySet.size ? denySet.has(norm(spdx)) : false);
+                          const stillUnknown = [];
+                          for (const c of unlicensed) {
+                              if (!isActions(c)) { stillUnknown.push(c); continue; }
+                              const t = ownerRepoRef(c);
+                              const spdx = t ? resolved.get(t.key) : null;
+                              if (!spdx) { stillUnknown.push(c); continue; } // couldn't resolve → still unknown
+                              if (violates(spdx)) { forbidden.push({ ...c, license: spdx }); continue; } // resolved to a disallowed license
+                              // resolved to an allowed license → cleared
+                          }
+                          unlicensed = stillUnknown;
                       }
 
                       const CAP_LIST = 50;
