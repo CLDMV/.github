@@ -9,13 +9,27 @@
  * @module @cldmv/.github.github.jobs.create-release-pr.divergence
  */
 
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { appendSummary, setOutput } from "../../../common/common/core.mjs";
 
-/** Run a git command, returning "" instead of throwing on failure. */
+/** Run a git command (via a shell), returning "" instead of throwing on failure. */
 function tryGit(cmd) {
 	try {
 		return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * Like tryGit but argv-based (execFileSync — NO shell), so the resolved base
+ * branch name can be interpolated safely. The base comes from repo config (a
+ * variable / workflow input / the API default_branch), never PR content, but it
+ * still must not reach a shell (js/indirect-command-line-injection).
+ */
+function tryGitArgs(args) {
+	try {
+		return execFileSync("git", args, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
 	} catch {
 		return "";
 	}
@@ -43,7 +57,7 @@ try {
 	let mergeBase = "";
 	let defaultBranch = "";
 	if (resolvedBase) {
-		mergeBase = tryGit(`git merge-base HEAD "origin/${resolvedBase}"`);
+		mergeBase = tryGitArgs(["merge-base", "HEAD", `origin/${resolvedBase}`]);
 		if (mergeBase) defaultBranch = resolvedBase;
 	} else {
 		mergeBase = tryGit("git merge-base HEAD origin/master");
@@ -64,7 +78,7 @@ try {
 	let baseVersion = "";
 	if (defaultBranch) {
 		console.log(`🔍 Branch divergence point: ${mergeBase.slice(0, 7)} (default branch: ${defaultBranch})`);
-		const basePackageJson = tryGit(`git show "origin/${defaultBranch}:package.json"`);
+		const basePackageJson = tryGitArgs(["show", `origin/${defaultBranch}:package.json`]);
 		if (basePackageJson) {
 			try {
 				baseVersion = JSON.parse(basePackageJson).version || "";
