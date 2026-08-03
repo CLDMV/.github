@@ -28,6 +28,11 @@ name: 🔬 OpenSSF Scorecard (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             publish_results:
                 # NOTE: publishing uses OIDC (id-token). When a job runs inside
                 # a reusable workflow, the OIDC token's `job_workflow_ref` claim
@@ -77,7 +82,7 @@ on:
 jobs:
     analyze:
         name: "🔬 Scorecard Analysis"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             id-token: write # publish to OpenSSF transparency log; job-scoped per OSSF's own example
             contents: read

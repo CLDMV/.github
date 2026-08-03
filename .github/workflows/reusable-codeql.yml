@@ -20,6 +20,11 @@ name: 🔍 CodeQL Analysis (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             languages:
                 description: "Comma-sep CodeQL languages. Matrix-expanded inside. Examples: javascript-typescript, python, java, go, ruby, csharp, swift, kotlin, cpp."
                 required: false
@@ -68,7 +73,7 @@ jobs:
     # to drive its matrix.
     setup:
         name: "🧮 Build language matrix"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         outputs:
             languages: ${{ steps.parse.outputs.json }}
         steps:
@@ -81,7 +86,7 @@ jobs:
     analyze:
         name: "🔍 Analyze ${{ matrix.language }}"
         needs: setup
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         # Repo-variable escape hatch for repos with NO CodeQL-analyzable source
         # (e.g. a declarative VS Code grammar extension: only a TextMate grammar,
         # `main: null`, no JS/TS). There, real CodeQL fails "no source code seen"

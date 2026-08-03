@@ -19,6 +19,11 @@ name: 🛡️ Container Scan (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label override. Default stays ubuntu-latest even for CLDMV private repos: this workflow needs a Docker daemon, which the org self-hosted runner pods do not provide."
             image:
                 description: "Full image ref (registry/repo:tag)"
                 required: true
@@ -57,7 +62,7 @@ permissions:
 jobs:
     scan:
         name: "🛡️ Trivy Scan"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || 'ubuntu-latest' }}
         steps:
             - name: Trivy scan
               # Pinned by SHA to v0.36.0 (published 2026-04-22). The March

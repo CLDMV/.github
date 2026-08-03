@@ -25,6 +25,11 @@ name: 🧾 Master Commit Audit (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             allowed_patterns:
                 description: "Optional multi-line regex override. Leave empty to inherit audit-commit-subject's canonical release-flow default (release + chore + merge). Set only if this repo's conventions differ."
                 required: false
@@ -56,7 +61,7 @@ permissions:
 jobs:
     audit:
         name: "🧾 Audit commit subject"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token

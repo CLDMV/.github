@@ -14,6 +14,11 @@ name: 👋 Welcome Contributor (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             pr_message_path:
                 required: false
                 type: string
@@ -41,7 +46,7 @@ permissions:
 
 jobs:
     welcome:
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token

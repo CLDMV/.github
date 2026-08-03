@@ -24,6 +24,11 @@ on:
                 description: "true if `next` / `hotfixes` was just force-synced to master (head SHA matches the default branch). Callers should green-light their Required PR Check when this is true — there's no diff to test, no PR to gate."
                 value: ${{ jobs.sync-gate.outputs.is_master_sync }}
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             package_name:
                 required: true
                 type: string
@@ -230,7 +235,7 @@ jobs:
     # green-light. See `.github/actions/common/steps/master-sync-gate`.
     sync-gate:
         name: "🪞 Master sync gate"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         if: |
             github.event_name == 'push' &&
             (github.ref_name == 'next' || github.ref_name == 'hotfixes')
@@ -250,7 +255,7 @@ jobs:
     # they don't run for docs-only changes.
     paths-gate:
         name: "🧭 Paths Gate"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         outputs:
             docs_only: ${{ steps.gate.outputs.docs_only }}
         steps:
@@ -263,7 +268,7 @@ jobs:
     # Check if we should skip CI based on commit message
     commit-gate:
         name: "🚪 Commit Gate"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         outputs:
             should_skip: ${{ steps.gate.outputs.should_skip }}
             matched_prefix: ${{ steps.gate.outputs.matched_prefix }}
@@ -288,6 +293,7 @@ jobs:
             needs.sync-gate.outputs.is_master_sync != 'true'
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
+            runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
             debug: ${{ inputs.debug }}
             run_build_and_test: true
@@ -333,6 +339,7 @@ jobs:
             format('refs/heads/{0}', inputs.default_branch)
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v4
         with:
+            runs_on: ${{ inputs.runs_on }}
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
             # Coverage runs on a fresh runner — pass the src-PRESERVING build
@@ -376,6 +383,7 @@ jobs:
             github.event_name == 'pull_request'
         uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v4
         with:
+            runs_on: ${{ inputs.runs_on }}
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
             # Coverage runs on a fresh runner — pass the src-PRESERVING build
@@ -403,7 +411,7 @@ jobs:
         # summary; the sync-gate / paths-gate / commit-gate output checks
         # then decide whether the summary is meaningful enough to produce.
         if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Generate CI Summary
               uses: CLDMV/.github/.github/actions/workflows/ci-summary@v4
