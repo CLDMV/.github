@@ -39,6 +39,11 @@ name: 🔁 Dependabot Auto-Recreate (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             skip_label:
                 description: "PRs carrying this label are never auto-recreated (for intentionally hand-edited Dependabot PRs)."
                 required: false
@@ -57,7 +62,7 @@ permissions:
 
 jobs:
     recreate:
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token

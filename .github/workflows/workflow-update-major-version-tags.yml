@@ -4,6 +4,11 @@ name: 📌 Update Major Version Tags (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             debug:
                 description: "Enable debug logging for troubleshooting"
                 required: false
@@ -83,6 +88,7 @@ jobs:
         permissions:
             contents: write
         with:
+            runs_on: ${{ inputs.runs_on }}
             debug: ${{ inputs.debug }}
             run_unified_tag_health: true
             create_documentation: ${{ inputs.create_documentation }}

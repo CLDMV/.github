@@ -16,6 +16,11 @@ name: 📊 Bundle Size Diff (Org-Level)
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             build_command:
                 required: false
                 type: string
@@ -60,7 +65,7 @@ permissions:
 jobs:
     build-head:
         name: "📊 Measure HEAD"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Checkout PR head
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
@@ -91,7 +96,7 @@ jobs:
 
     build-base:
         name: "📊 Measure BASE"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Checkout PR base
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
@@ -122,7 +127,7 @@ jobs:
 
     compare:
         name: "📊 Compare"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         needs: [build-head, build-base]
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)

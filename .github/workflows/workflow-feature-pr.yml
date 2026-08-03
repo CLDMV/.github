@@ -31,6 +31,12 @@ name: 🔀 Feature PR (v4 reusable)
 
 on:
     workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App client id for the bot that opens/refreshes the PR."
@@ -49,7 +55,7 @@ jobs:
             github.actor != 'cldmv-bot[bot]' &&
             github.actor != 'github-actions[bot]' &&
             !startsWith(github.event.head_commit.message, 'chore: bump version')
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         steps:
             - name: Determine target branch
               id: target

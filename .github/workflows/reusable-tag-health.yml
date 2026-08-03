@@ -22,6 +22,11 @@ concurrency:
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             # Debug control
             debug:
                 description: "Enable debug logging for troubleshooting"
@@ -162,7 +167,7 @@ jobs:
     # Validate that tag commits are reachable from main/master
     validate-tag-source:
         name: "🔍 Validate Tag Source"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         outputs:
             should-proceed: ${{ steps.validate.outputs.should-proceed }}
             validation-message: ${{ steps.validate.outputs.message }}
@@ -180,7 +185,7 @@ jobs:
     # Auto-detect GPG capability once at the beginning
     detect-gpg:
         name: "🔐 Detect GPG Capability"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         needs: [validate-tag-source]
         if: needs.validate-tag-source.outputs.should-proceed == 'true'
         outputs:
@@ -198,7 +203,7 @@ jobs:
         name: "🔧 Setup Environment"
         if: inputs.run_unified_tag_health == true
         needs: [detect-gpg]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         # permissions:
         #   contents: write
         outputs:
@@ -248,7 +253,7 @@ jobs:
         name: "📦 Fix Orphaned Releases"
         if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
         needs: [detect-gpg, setup-shared]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -291,7 +296,7 @@ jobs:
         name: "🏷️ Update Major/Minor Tags"
         if: inputs.run_unified_tag_health == true
         needs: [detect-gpg, setup-shared, unified-fix-orphaned-releases]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -365,7 +370,7 @@ jobs:
         name: "🤖 Fix Bot Signatures"
         if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
         needs: [detect-gpg, setup-shared, unified-fix-orphaned-releases]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -419,7 +424,7 @@ jobs:
         name: "🔏 Fix Unsigned Tags"
         if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
         needs: [detect-gpg, setup-shared, unified-fix-bot-signatures]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -476,7 +481,7 @@ jobs:
         name: "🎯 Fix Misaligned Major/Minor Tags"
         if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
         needs: [detect-gpg, setup-shared, unified-fix-unsigned-tags]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -533,7 +538,7 @@ jobs:
         name: "🔗 Fix Orphaned Tags"
         if: inputs.run_unified_tag_health == true && always() && needs.setup-shared.result == 'success'
         needs: [detect-gpg, setup-shared, unified-fix-misaligned-major-tags]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: write
         outputs:
@@ -600,7 +605,7 @@ jobs:
                 unified-fix-misaligned-major-tags,
                 unified-fix-orphaned-tags,
             ]
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         permissions:
             contents: read
         outputs:

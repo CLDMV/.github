@@ -18,6 +18,11 @@ name: 🏗️ Build and Test Jobs
 on:
     workflow_call:
         inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
             # Package information
             package_name:
                 description: "NPM package name (e.g., @cldmv/slothlet)"
@@ -127,7 +132,7 @@ permissions:
 jobs:
     set-matrix:
         name: "Set Node.js Matrix"
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         if: inputs.run_build_and_test == true
         outputs:
             node-matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -144,7 +149,7 @@ jobs:
     build-and-test:
         name: "🏗️ Build & Test"
         if: inputs.run_build_and_test == true
-        runs-on: ubuntu-latest
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
         needs: set-matrix
         strategy:
             matrix:
