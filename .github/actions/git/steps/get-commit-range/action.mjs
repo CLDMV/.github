@@ -137,8 +137,11 @@ export function categorizeCommits(commitRange, allCommits = null) {
 					category = "maintenance";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → maintenance (release commit)`);
 				}
-				// Then check for breaking changes (but not release commits)
-				else if ((isBreaking || lower.includes("breaking change") || lower.includes("break")) && type !== "release") {
+				// Breaking change per Conventional Commits: the `!` mark (isBreaking)
+				// or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer in the BODY — NOT a
+				// loose "break" substring, which mis-flagged e.g. "… to break the
+				// deadlock" and forced a spurious MAJOR bump (a .github v5.0.0 fork).
+				else if ((isBreaking || /^BREAKING[\s-]CHANGE:/m.test(body || "")) && type !== "release") {
 					category = "breaking";
 					if (DEBUG) console.log(`🔍 CATEGORY DEBUG: "${subject}" → breaking`);
 				}
