@@ -22,6 +22,10 @@ inputs:
     description: "GitHub token with issues:write + pull-requests:write."
     required: false
     default: ${{ github.token }}
+  default-branch:
+    description: "Release base branch the pending release PRs target. Empty (default) = resolve via the repo's API default_branch, then `master`."
+    required: false
+    default: ""
 
 outputs:
   reminders-filed:

@@ -30,6 +30,10 @@ inputs:
     description: "Command to build package"
     required: false
     default: "npm run build:ci"
+  default-branch:
+    description: "Resolved release base branch. Empty (default) = auto-detect (master/main). When set, it takes precedence and is used as the PR base + divergence/version base."
+    required: false
+    default: ""
   version-bump:
     description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
     required: false
@@ -74,10 +78,17 @@ runs:
     - name: Get branch divergence point
       id: divergence
       shell: bash
-      run: node "${{ github.action_path }}/divergence.mjs"
+      run: |
+        # When a resolved base is passed, make sure its ref is present locally
+        # before divergence.mjs runs merge-base / reads its package.json.
+        if [ -n "${DEFAULT_BRANCH:-}" ]; then
+          git fetch origin "$DEFAULT_BRANCH" --quiet || true
+        fi
+        node "${{ github.action_path }}/divergence.mjs"
       env:
         DRY_RUN: ${{ inputs.dry-run }}
         PACKAGE_NAME: ${{ inputs.package-name }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
 
     - name: Check release commit for auto-detection
       id: commit-check
@@ -133,6 +144,9 @@ runs:
         # own PR; grouping by PR carries more signal than a flat list and
         # collapses stacked-PR duplicates visually.
         group-by-pr: "true"
+        # Resolved release base so the changelog's release-PR filter recognizes
+        # the head=next/hotfixes → base=<resolved> release PR (not just master).
+        default-branch: ${{ inputs.default-branch }}
 
     - name: Detect default branch
       id: default-branch
@@ -189,10 +203,15 @@ runs:
     - name: Append flow label
       id: final-labels
       shell: bash
+      env:
+        HEAD_REF: ${{ github.ref_name }}
+        # Resolved release base (matches the PR's actual base). Empty inputs
+        # (legacy direct callers) keep the historical `master` label.
+        BASE: ${{ inputs.default-branch != '' && inputs.default-branch || 'master' }}
       run: |
-        case "${{ github.ref_name }}" in
-            next)      flow_label="! release → master" ;;
-            hotfixes)  flow_label="! hotfix release → master" ;;
+        case "$HEAD_REF" in
+            next)      flow_label="! release → ${BASE}" ;;
+            hotfixes)  flow_label="! hotfix release → ${BASE}" ;;
             *)         flow_label="" ;;
         esac
         labels='${{ steps.pr-labels.outputs.labels }}'
@@ -204,6 +223,15 @@ runs:
             fi
         fi
         echo "labels=$labels" >> "$GITHUB_OUTPUT"
+        # managed-labels allowlist: base set + the flow-label variants for
+        # master/main (so a stale lane label prunes across a default-branch
+        # rename) plus the resolved base's own variant when it's neither.
+        managed="release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! release → main,! hotfix release → master,! hotfix release → main"
+        case "$BASE" in
+            master|main) ;;
+            *) managed="${managed},! release → ${BASE},! hotfix release → ${BASE}" ;;
+        esac
+        echo "managed-labels=$managed" >> "$GITHUB_OUTPUT"
 
     # managed-labels scopes the update path's label diff: only labels in this
     # allowlist may be removed. Path-based labels owned by the PR labeler
@@ -220,11 +248,12 @@ runs:
         # two open patch PRs both bumping to vX.Y.Z). Empty suffix falls back
         # to the plain "release: vX.Y.Z" form.
         title: "release: v${{ steps.version.outputs.new-version }}${{ steps.commit-check.outputs.title-suffix && format(' - {0}', steps.commit-check.outputs.title-suffix) || '' }}"
-        base-branch: ${{ steps.default-branch.outputs.default-branch }}
+        # Passed base wins when non-empty; else fall back to auto-detected default.
+        base-branch: ${{ inputs.default-branch != '' && inputs.default-branch || steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
         labels: ${{ steps.final-labels.outputs.labels }}
-        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! hotfix release → master"
+        managed-labels: ${{ steps.final-labels.outputs.managed-labels }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
@@ -240,7 +269,7 @@ runs:
       env:
         DRY_RUN: ${{ inputs.dry-run }}
         NEW_VERSION: ${{ steps.version.outputs.new-version }}
-        DEFAULT_BRANCH: ${{ steps.default-branch.outputs.default-branch }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch != '' && inputs.default-branch || steps.default-branch.outputs.default-branch }}
         HEAD_BRANCH: ${{ github.ref_name }}
         PR_LABELS: ${{ steps.pr-labels.outputs.labels }}
         PR_CREATED: ${{ steps.create-pr.outputs.pr-created }}

@@ -97,8 +97,26 @@ function lastReleaseISO() {
 	}
 }
 
-async function findReleasePR(owner, repo, head, token) {
-	const prs = await api("GET", `/pulls?state=open&base=master&head=${owner}:${head}&per_page=5`, null, {
+/**
+ * Resolve the release base branch: the `default-branch` input (or a
+ * DEFAULT_BRANCH/CLDMV_RELEASE_BASE env override) wins; otherwise the repo's
+ * API `default_branch`; otherwise `master`. Keeps the reminder's PR query
+ * targeting the real base branch on repos whose default isn't `master`.
+ */
+async function resolveReleaseBase(owner, repo, token) {
+	const override = getInput("default-branch") || process.env.DEFAULT_BRANCH || process.env.CLDMV_RELEASE_BASE || "";
+	if (override && override.trim()) return override.trim();
+	try {
+		const info = await api("GET", "", null, { token, owner, repo });
+		return (info && info.default_branch) || "master";
+	} catch (error) {
+		console.log(`⚠️ Could not detect default branch via API (${error.message}) — assuming master.`);
+		return "master";
+	}
+}
+
+async function findReleasePR(owner, repo, head, token, base) {
+	const prs = await api("GET", `/pulls?state=open&base=${base}&head=${owner}:${head}&per_page=5`, null, {
 		token,
 		owner,
 		repo
@@ -138,6 +156,8 @@ async function main() {
 		hotfixes: parseInt(getInput("hotfixes-threshold-days") || "3", 10)
 	};
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
+	const releaseBase = await resolveReleaseBase(owner, repo, token);
+	console.log(`🎯 Release base branch: ${releaseBase}`);
 
 	const lastRelease = lastReleaseISO();
 	if (!lastRelease) {
@@ -156,7 +176,7 @@ async function main() {
 			console.log(`✅ ${branch}: ${age}d ≤ ${threshold}d threshold — no reminder.`);
 			continue;
 		}
-		const pr = await findReleasePR(owner, repo, branch, token);
+		const pr = await findReleasePR(owner, repo, branch, token, releaseBase);
 		if (!pr) {
 			console.log(`✅ ${branch}: no open release PR — nothing pending.`);
 			continue;

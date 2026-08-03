@@ -63,6 +63,11 @@ jobs:
                   TARGET_SHA: ${{ github.sha }}
                   REPO: ${{ github.repository }}
                   COMMIT_MSG: ${{ github.event.head_commit.message }}
+                  # Authenticates the tag lookup below (the job runs with
+                  # contents: write). Without it a bare `git ls-remote` exit-128s
+                  # on PRIVATE repos and — under `set -eo pipefail` — kills this
+                  # gate job, so next/hotfixes never get reset after a release.
+                  GH_TOKEN: ${{ github.token }}
               run: |
                   echo "🔍 Release commit: $TARGET_SHA"
                   # Parse the released MAJOR from the `release: vX.Y.Z` subject and
@@ -77,9 +82,17 @@ jobs:
                   tag="v${major}"
                   echo "⏳ Gating on @${tag}…"
                   max_attempts=24   # 24 * 5s = 120s
+                  # Authenticated so PRIVATE repos work (anon ls-remote 128s there).
+                  # Non-fatal: a lookup failure logs and degrades to "proceed anyway"
+                  # (the gate is only a safety delay) rather than aborting the reset,
+                  # and errors reach the log — no `2>/dev/null` hiding the cause.
+                  remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
                   for attempt in $(seq 1 $max_attempts); do
-                      sha=$(git ls-remote "https://github.com/${REPO}.git" "refs/tags/${tag}^{}" 2>/dev/null | awk '{print $1}')
-                      [ -z "$sha" ] && sha=$(git ls-remote "https://github.com/${REPO}.git" "refs/tags/${tag}" 2>/dev/null | awk '{print $1}')
+                      if ! sha=$(git ls-remote "$remote" "refs/tags/${tag}^{}" | awk '{print $1}'); then
+                          echo "⚠️ ls-remote for @${tag} failed — will retry / degrade to proceed"
+                          sha=""
+                      fi
+                      [ -z "$sha" ] && { sha=$(git ls-remote "$remote" "refs/tags/${tag}" | awk '{print $1}') || sha=""; }
                       echo "Attempt $attempt/$max_attempts: @${tag} → ${sha:-<not found>}"
                       if [ "$sha" = "$TARGET_SHA" ]; then
                           echo "✅ @${tag} matches the release commit — safe to proceed"
