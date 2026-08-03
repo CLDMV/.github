@@ -261,10 +261,15 @@ runs:
       id: final-labels
       if: steps.release-check.outputs.should-create-pr == 'true'
       shell: bash
+      env:
+        HEAD_REF: ${{ inputs.head-ref }}
+        # Resolved release base (matches the PR's actual base). Empty inputs
+        # (legacy direct callers) keep the historical `master` label.
+        BASE: ${{ inputs.default-branch != '' && inputs.default-branch || 'master' }}
       run: |
-        case "${{ inputs.head-ref }}" in
-            next)      flow_label="! release → master" ;;
-            hotfixes)  flow_label="! hotfix release → master" ;;
+        case "$HEAD_REF" in
+            next)      flow_label="! release → ${BASE}" ;;
+            hotfixes)  flow_label="! hotfix release → ${BASE}" ;;
             *)         flow_label="" ;;
         esac
         labels='${{ steps.resolved-labels.outputs.labels }}'
@@ -276,6 +281,15 @@ runs:
             fi
         fi
         echo "labels=$labels" >> "$GITHUB_OUTPUT"
+        # managed-labels allowlist: base set + master/main flow-label variants
+        # (so a stale lane label prunes across a default-branch rename) plus the
+        # resolved base's own variant when it's neither.
+        managed="release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! release → main,! hotfix release → master,! hotfix release → main"
+        case "$BASE" in
+            master|main) ;;
+            *) managed="${managed},! release → ${BASE},! hotfix release → ${BASE}" ;;
+        esac
+        echo "managed-labels=$managed" >> "$GITHUB_OUTPUT"
 
     # managed-labels scopes the replace: only labels in this allowlist are
     # removed when not in `labels`. Path-based labels owned by the PR labeler
@@ -291,4 +305,4 @@ runs:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ inputs.pr-number }}
         labels: ${{ steps.final-labels.outputs.labels }}
-        managed-labels: "release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! hotfix release → master"
+        managed-labels: ${{ steps.final-labels.outputs.managed-labels }}

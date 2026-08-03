@@ -12,6 +12,18 @@
 		"aliases": ["flow: hotfix release", "hotfix release → master"]
 	},
 	{
+		"name": "! release → main",
+		"color": "0d47a1",
+		"description": "v4 flow: persistent next → main release PR (carries the next feature release)",
+		"aliases": ["release → main"]
+	},
+	{
+		"name": "! hotfix release → main",
+		"color": "b71c1c",
+		"description": "v4 flow: persistent hotfixes → main release PR (carries an urgent patch release)",
+		"aliases": ["hotfix release → main"]
+	},
+	{
 		"name": "! feature → next",
 		"color": "33691e",
 		"description": "v4 flow: contributor PR targeting the next integration branch",
