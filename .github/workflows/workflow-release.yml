@@ -21,7 +21,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             package_name:
                 required: true
                 type: string
@@ -191,7 +191,7 @@ permissions:
 jobs:
     check-existing-pr:
         name: "🔍 Check for Existing PR"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             pr-exists: ${{ steps.check.outputs.pr-exists }}
             pr-number: ${{ steps.check.outputs.pr-number }}
@@ -209,7 +209,7 @@ jobs:
         name: "🔍 Detect Release"
         if: needs.check-existing-pr.outputs.should-skip == 'false'
         needs: check-existing-pr
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             should-release: ${{ steps.check.outputs.should-create-pr }}
             version-bump: ${{ steps.check.outputs.version-bump }}
@@ -230,7 +230,7 @@ jobs:
         name: "📝 Update Existing PR"
         if: needs.check-existing-pr.outputs.should-skip == 'true'
         needs: check-existing-pr
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Create App token
               id: app-token
@@ -333,7 +333,7 @@ jobs:
                 release,
             ]
         if: always()
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         steps:
             - name: Generate Release Summary
               uses: CLDMV/.github/.github/actions/workflows/release-summary@v4

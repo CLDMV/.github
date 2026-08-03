@@ -8,7 +8,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             # Package information
             package_name:
                 description: "NPM package name (e.g., @cldmv/slothlet)"
@@ -108,7 +108,7 @@ jobs:
     detect-release:
         name: "🔍 Detect Release"
         if: inputs.run_detect_release == true
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             should-release: ${{ steps.detect.outputs.should-release }}
             version: ${{ steps.detect.outputs.version }}
@@ -121,7 +121,7 @@ jobs:
     create-release-pr:
         name: "📋 Create Release PR"
         if: inputs.run_create_release_pr == true
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         outputs:
             pr-created: ${{ steps.create.outputs.pr-created }}
             pr-number: ${{ steps.create.outputs.pr-number }}

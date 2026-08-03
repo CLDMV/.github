@@ -31,7 +31,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto-route: CLDMV-owned private callers use cldmv-runners (org self-hosted scale set); everything else uses ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
             # ── Node / package manager ──────────────────────────────────────────
             node_version:
                 description: "Node.js version to use"
@@ -120,7 +120,7 @@ permissions:
 jobs:
     coverage-pr-comment:
         name: "PR Coverage Badge"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         # A job-level `permissions:` block REPLACES the workflow-level one
         # wholesale (Actions does not merge them), so `contents: read` must be
         # repeated here. Without it the job token runs with `contents: none`
