@@ -109,16 +109,9 @@ jobs:
             # Resolve the release base branch (override var → caller input → API
             # default_branch → master). `vars` in a reusable resolves against the
             # CALLER repo — intended, so a per-repo CLDMV_RELEASE_BASE var works.
-            #
-            # TEMPORARY SHA pin (not @v4): resolve-release-base is a NEW action not
-            # yet on the @v4 tag. .github runs its OWN release from next's copy of
-            # this reusable, so an @v4 ref can't resolve the action until it ships —
-            # a bootstrap deadlock. Pin to a next commit that HAS it (resolves for
-            # both .github self-runs and consumers, which fetch CLDMV/.github@<sha>).
-            # FLIP BACK to @v4 once v4.19.0 ships and rolls @v4 forward to include it.
             - name: Resolve release base
               id: base
-              uses: CLDMV/.github/.github/actions/git/utilities/resolve-release-base@92cac4f55a27f4c30d1bc94d19065b9c3c46244f
+              uses: CLDMV/.github/.github/actions/git/utilities/resolve-release-base@v4
               with:
                   override: ${{ vars.CLDMV_RELEASE_BASE }}
                   configured: ${{ inputs.default_branch }}
