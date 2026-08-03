@@ -24,6 +24,10 @@ inputs:
     description: "Request issues write permission (needed for creating/updating/deleting labels)"
     required: false
     default: "false"
+  permission_pull_requests:
+    description: "Request pull-requests write permission (needed to read/retarget/comment on PRs)"
+    required: false
+    default: "false"
 
 outputs:
   token:
@@ -65,7 +69,8 @@ runs:
         # Otherwise the token inherits ALL permissions the App has.
         if [[ "${{ inputs.permission_contents }}" == "true" ]] || \
            [[ "${{ inputs.permission_workflows }}" == "true" ]] || \
-           [[ "${{ inputs.permission_issues }}" == "true" ]]; then
+           [[ "${{ inputs.permission_issues }}" == "true" ]] || \
+           [[ "${{ inputs.permission_pull_requests }}" == "true" ]]; then
           echo "fine_grained=true" >> "$GITHUB_OUTPUT"
           echo "🔒 Fine-grained permissions mode"
         else
@@ -95,6 +100,7 @@ runs:
         permission-contents: ${{ inputs.permission_contents == 'true' && 'write' || '' }}
         permission-workflows: ${{ inputs.permission_workflows == 'true' && 'write' || '' }}
         permission-issues: ${{ inputs.permission_issues == 'true' && 'write' || '' }}
+        permission-pull-requests: ${{ inputs.permission_pull_requests == 'true' && 'write' || '' }}
 
     - name: Log token resolution
       shell: bash
