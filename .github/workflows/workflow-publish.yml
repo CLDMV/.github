@@ -8,7 +8,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
             package_name:
                 required: true
                 type: string
@@ -263,7 +263,7 @@ permissions:
 jobs:
     build-and-test:
         name: "🏗️ Build and Test"
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
+        uses: ./.github/workflows/reusable-build-and-test.yml
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
@@ -288,7 +288,7 @@ jobs:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: write
             packages: write # Required to publish to GitHub Packages
-        uses: CLDMV/.github/.github/workflows/reusable-publishing.yml@v4
+        uses: ./.github/workflows/reusable-publishing.yml
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
@@ -328,7 +328,7 @@ jobs:
         name: "📋 Publish Summary"
         needs: [ build-and-test, publish ]
         if: always()
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Generate Publish Summary
               uses: CLDMV/.github/.github/actions/workflows/publish-summary@v4

@@ -43,7 +43,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
         secrets:
             BOT_APP_CLIENT_ID:
                 description: "GitHub App client id for the bot that resets/merges the integration branches."
@@ -60,7 +60,7 @@ jobs:
         # Only fire on a release commit (the squash-merge of a release PR).
         if: startsWith(github.event.head_commit.message, 'release:')
         name: "⏳ Wait for the released major tag to roll forward"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         timeout-minutes: 5
         steps:
             - name: Poll the released major tag until it matches the release commit
@@ -112,7 +112,7 @@ jobs:
         name: "♻️ Sync next + hotfixes to master"
         needs: wait-for-tags
         if: startsWith(github.event.head_commit.message, 'release:')
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Create App token
               id: app-token
