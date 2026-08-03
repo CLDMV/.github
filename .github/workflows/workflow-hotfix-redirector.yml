@@ -78,6 +78,13 @@ jobs:
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
                   # The dependabot-security path pushes a cherry-picked branch.
                   permission_contents: "true"
+                  # The action reads the PR (GET /pulls), retargets/reopens it
+                  # (PATCH/POST /pulls) and comments — pull-requests: write. Without
+                  # this the fine-grained token has no PR access and the first
+                  # `GET /pulls/{n}` 403s ("Resource not accessible by integration").
+                  permission_pull_requests: "true"
+                  # Redirect labels the PR via the issues API (POST /issues/{n}/labels).
+                  permission_issues: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
