@@ -282,7 +282,7 @@ jobs:
         name: "🏗️ Build and Test"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release]
-        uses: ./.github/workflows/reusable-build-and-test.yml
+        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
@@ -303,7 +303,7 @@ jobs:
         name: "🚀 Release Management"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release, build-and-test]
-        uses: ./.github/workflows/reusable-release-management.yml
+        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
