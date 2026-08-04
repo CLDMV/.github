@@ -24,7 +24,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
             languages:
                 description: "Comma-sep CodeQL languages. Matrix-expanded inside. Examples: javascript-typescript, python, java, go, ruby, csharp, swift, kotlin, cpp."
                 required: false
@@ -73,7 +73,7 @@ jobs:
     # to drive its matrix.
     setup:
         name: "🧮 Build language matrix"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         outputs:
             languages: ${{ steps.parse.outputs.json }}
         steps:
@@ -86,7 +86,7 @@ jobs:
     analyze:
         name: "🔍 Analyze ${{ matrix.language }}"
         needs: setup
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         # Repo-variable escape hatch for repos with NO CodeQL-analyzable source
         # (e.g. a declarative VS Code grammar extension: only a TextMate grammar,
         # `main: null`, no JS/TS). There, real CodeQL fails "no source code seen"

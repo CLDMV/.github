@@ -21,7 +21,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto: resolves the caller's RUNS_ON_DEFAULT Actions variable (org- or repo-level, all trigger types including schedule) when set; otherwise ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
             package_name:
                 required: true
                 type: string
@@ -191,7 +191,7 @@ permissions:
 jobs:
     check-existing-pr:
         name: "🔍 Check for Existing PR"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         outputs:
             pr-exists: ${{ steps.check.outputs.pr-exists }}
             pr-number: ${{ steps.check.outputs.pr-number }}
@@ -209,7 +209,7 @@ jobs:
         name: "🔍 Detect Release"
         if: needs.check-existing-pr.outputs.should-skip == 'false'
         needs: check-existing-pr
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         outputs:
             should-release: ${{ steps.check.outputs.should-create-pr }}
             version-bump: ${{ steps.check.outputs.version-bump }}
@@ -230,7 +230,7 @@ jobs:
         name: "📝 Update Existing PR"
         if: needs.check-existing-pr.outputs.should-skip == 'true'
         needs: check-existing-pr
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Create App token
               id: app-token
@@ -282,7 +282,7 @@ jobs:
         name: "🏗️ Build and Test"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release]
-        uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
+        uses: ./.github/workflows/reusable-build-and-test.yml
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
@@ -303,7 +303,7 @@ jobs:
         name: "🚀 Release Management"
         if: needs.check-existing-pr.outputs.should-skip == 'false' && needs.detect-release.outputs.should-release == 'true'
         needs: [check-existing-pr, detect-release, build-and-test]
-        uses: CLDMV/.github/.github/workflows/reusable-release-management.yml@v4
+        uses: ./.github/workflows/reusable-release-management.yml
         with:
             runs_on: ${{ inputs.runs_on }}
             package_name: ${{ inputs.package_name }}
@@ -333,7 +333,7 @@ jobs:
                 release,
             ]
         if: always()
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Generate Release Summary
               uses: CLDMV/.github/.github/actions/workflows/release-summary@v4
