@@ -1,0 +1,57 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /.github/workflows/build-runner-image.yml
+# @Date: 2026-08-08 00:00:00 -07:00
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Build the CLDMV self-hosted runner image (ARC actions-runner + gh) and push it
+# to ghcr.io/cldmv/actions-runner. Runs on a GitHub-hosted runner (NOT the
+# self-hosted cldmv-runners) so it never depends on the very tooling it installs.
+# Fixes the exit-127 gap from #210 durably: the image the scale set pulls is now
+# reproducible from source instead of a manual local containerd import.
+name: 🏃 Build runner image
+
+on:
+    # Publish when the image sources land on the default branch.
+    push:
+        branches: [master, main]
+        paths:
+            - "images/actions-runner/**"
+            - ".github/workflows/build-runner-image.yml"
+    # Weekly rebuild to pick up base-image + gh security updates.
+    schedule:
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+
+concurrency:
+    group: build-runner-image
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+    packages: write
+
+jobs:
+    build:
+        name: Build & push ghcr.io/cldmv/actions-runner
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Build & push
+              env:
+                  IMAGE: ghcr.io/cldmv/actions-runner
+                  GHCR_USER: ${{ github.actor }}
+                  GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+                  docker build \
+                      -t "$IMAGE:latest" \
+                      -t "$IMAGE:${GITHUB_SHA::12}" \
+                      images/actions-runner
+                  docker push "$IMAGE:latest"
+                  docker push "$IMAGE:${GITHUB_SHA::12}"
