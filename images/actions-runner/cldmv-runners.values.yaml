@@ -1,0 +1,20 @@
+# Helm values for the cldmv-runners scale set (gha-runner-scale-set), overriding
+# the runner container to the gh-enabled image published from this repo.
+# `helm upgrade -f` REPLACES user-supplied values, so this carries them all.
+githubConfigUrl: https://github.com/CLDMV
+githubConfigSecret: cldmv-runners-github-app
+runnerScaleSetName: cldmv-runners
+runnerGroup: Default
+minRunners: 0
+maxRunners: 4
+
+template:
+  spec:
+    nodeSelector:
+      workload: github-runners
+    containers:
+      - name: runner
+        image: ghcr.io/cldmv/actions-runner:latest
+        # The chart's default runner container sets this; re-declare it since a
+        # containers[] override replaces the whole container definition.
+        command: ["/home/runner/run.sh"]
