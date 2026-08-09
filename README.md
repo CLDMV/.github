@@ -59,6 +59,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
 │   ├── reusable-dependency-review.yml           # PR-time CVE diff
 │   ├── reusable-container-scan.yml              # Trivy
 │   ├── reusable-scorecard.yml                   # OpenSSF Scorecard (SHA-pinned action)
+│   ├── reusable-scorecard-sarif.yml             # Scorecard SARIF path (no publish)
 │   ├── reusable-stale.yml                       # Roll-our-own stale sweep
 │   ├── reusable-dependabot-auto-merge.yml       # Dependabot auto-merge (rebases into next/hotfixes)
 │   ├── reusable-pr-labeler.yml                  # Path-based PR labels
@@ -168,7 +169,7 @@ Reusable `workflow_call` jobs. Each has a copy-paste template in [`examples/indi
 | `reusable-codeql.yml` | GitHub static analysis (SAST). Push + PR + weekly schedule. |
 | `reusable-dependency-review.yml` | At PR-time, flag new deps with CVEs from GitHub Advisory DB. |
 | `reusable-container-scan.yml` | Trivy vulnerability scan; plugs into docker-publish flow. |
-| `reusable-scorecard.yml` | OpenSSF Scorecard. SHA-pinned `scorecard-action` lives here (one source of truth — there is no v3.x); consumers call it and can't drift the version. `publish_results` input (default `true`) toggles the public transparency-log publish. |
+| `reusable-scorecard.yml` | OpenSSF Scorecard. SHA-pinned `scorecard-action` lives here (one source of truth — there is no v3.x); consumers call it and can't drift the version. `publish_results` input (default `true`) toggles the public transparency-log publish (literal `ubuntu-latest` runner — OpenSSF's verifier requires it); `publish_results: false` delegates to `reusable-scorecard-sarif.yml` for Security-tab SARIF on the normal runner routing. Private repos auto-skip entirely (OpenSSF cannot publish them). |
 | `reusable-stale.yml` | Daily auto-stale/auto-close for inactive issues and PRs. Roll-our-own (no `actions/stale` dep). |
 | `reusable-dependabot-auto-merge.yml` | Approve + auto-merge patch/minor Dependabot PRs after CI passes. |
 | `reusable-pr-labeler.yml` | Path-based PR labels feeding the existing label catalog. |
