@@ -8,9 +8,11 @@
  *     updates, private vulnerability reporting, Dependabot security update
  *     PRs)
  *   - replace the three rulesets from the shared builders module
- *   - apply the central GHAS-workflow skip list (data/code-scanning-skips.json)
+ *   - apply the central GHAS-workflow config (data/code-scanning-skips.json)
  *     to the repo's CLDMV_SKIP_CODE_SCANNING / CLDMV_SKIP_DEPENDENCY_REVIEW
- *     Actions variables (`variables` phase; needs the App's "Variables:
+ *     Actions variables: private repos default to SKIPPED unless opted into
+ *     the `scan` list; public repos never default-skip; explicit `skip`
+ *     entries override (`variables` phase; needs the App's "Variables:
  *     Read and write" repository permission)
  *
  * Opt-in paid-on-private security products (3-way: off | public-only | all,
@@ -36,6 +38,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { getInput, setOutput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
 import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-generator/builders.mjs";
@@ -110,6 +113,11 @@ async function main() {
 	// API field — GitHub kept the legacy field name after unbundling.
 	const codeSecurityPolicy = (getInput("code_security") || "off").toLowerCase();
 	const secretProtectionPolicy = (getInput("secret_protection") || "off").toLowerCase();
+	// Override source for the `variables` phase config. Empty = the
+	// data/code-scanning-skips.json bundled at this action's ref; inline JSON
+	// (starts with `{`) or a workspace-relative path lets a third-party org
+	// supply its own list without forking this repo.
+	const codeScanningConfigInput = (getInput("code_scanning_config") || "").trim();
 	for (const [name, val] of [
 		["code_security", codeSecurityPolicy],
 		["secret_protection", secretProtectionPolicy]
@@ -513,29 +521,70 @@ async function main() {
 		}
 	}
 
-	// ── VARIABLES (central GHAS-workflow skip list) ───────────────────────
+	// ── VARIABLES (central GHAS-workflow config) ──────────────────────────
 	if (steps.has("variables")) {
-		// data/code-scanning-skips.json is the single source of truth for
-		// which repos skip the GHAS-gated workflows (codeql / dependency
-		// review). This phase makes the target repo's Actions variables match
-		// it: listed skips are SET, everything else is CLEARED
-		// (warn-on-clear, same overwrite-with-warn posture as the rest of the
-		// bootstrap) — so a hand-set variable either gets recorded centrally
-		// or gets removed. Resolved relative to this file so the list rides
-		// the same ref as the action (mirrors the builders.mjs import above).
-		let skipConfig = { repos: {} };
+		// data/code-scanning-skips.json is the single source of truth for the
+		// GHAS-gated workflows (codeql / dependency review). This phase makes
+		// the target repo's Actions variables match it. Semantics are
+		// default-skip-private with an opt-IN scan list, NOT a per-repo skip
+		// list (Code Security bills per active committer on private repos, so
+		// scanning a private repo is the exception that gets listed — not the
+		// rule every private repo must be enumerated for):
+		//   1. explicit `skip` entry → set exactly the listed skip variables
+		//      (any visibility; e.g. a public repo with nothing to analyze)
+		//   2. else private repo NOT in the `scan` opt-in list → set BOTH
+		//      skip variables (the default for private repos)
+		//   3. else (public, or private opted in via `scan`) → clear both
+		//      (warn-on-clear, same overwrite-with-warn posture as the rest
+		//      of the bootstrap, so hand-set variables get recorded centrally
+		//      or removed)
+		// Config source, in order: the `code_scanning_config` input as inline
+		// JSON (starts with `{`), else as a workspace-relative file path
+		// (caller must have checked the file out), else the
+		// data/code-scanning-skips.json bundled at this action's ref (mirrors
+		// the builders.mjs import above) — so third-party orgs can supply
+		// their own list without forking this repo. If the config can't be
+		// read, the phase really is skipped — clearing variables on a parse
+		// failure would silently re-enable scanning fleet-wide.
+		let skipConfig = null;
 		try {
-			skipConfig = JSON.parse(readFileSync(new URL("../../../../../data/code-scanning-skips.json", import.meta.url), "utf8"));
+			if (codeScanningConfigInput.startsWith("{")) {
+				skipConfig = JSON.parse(codeScanningConfigInput);
+				note("variables phase config: inline JSON from the code_scanning_config input");
+			} else if (codeScanningConfigInput) {
+				skipConfig = JSON.parse(readFileSync(resolve(codeScanningConfigInput), "utf8"));
+				note(`variables phase config: ${codeScanningConfigInput} (code_scanning_config input)`);
+			} else {
+				skipConfig = JSON.parse(readFileSync(new URL("../../../../../data/code-scanning-skips.json", import.meta.url), "utf8"));
+			}
 		} catch (err) {
-			warn(`could not read data/code-scanning-skips.json: ${err.message} — skipping the variables phase (no variables touched)`);
+			warn(
+				`could not read the variables-phase config (${codeScanningConfigInput || "bundled data/code-scanning-skips.json"}): ` +
+					`${err.message} — skipping the variables phase (no variables touched)`
+			);
 		}
-		const entry =
-			Object.entries(skipConfig.repos || {}).find(([key]) => key.toLowerCase() === `${owner}/${repo}`.toLowerCase())?.[1] || {};
-		const desiredVars = {
-			CLDMV_SKIP_CODE_SCANNING: entry.skip_code_scanning ? "1" : null,
-			CLDMV_SKIP_DEPENDENCY_REVIEW: entry.skip_dependency_review ? "1" : null
-		};
-		for (const [name, want] of Object.entries(desiredVars)) {
+		const fullName = `${owner}/${repo}`.toLowerCase();
+		const scanOptIn = (skipConfig?.scan || []).some((s) => String(s).toLowerCase() === fullName);
+		const skipEntry = skipConfig ? Object.entries(skipConfig.skip || {}).find(([key]) => key.toLowerCase() === fullName)?.[1] : null;
+		let desiredVars = null;
+		if (!skipConfig) {
+			// unreadable config — handled above; touch nothing
+		} else if (skipEntry) {
+			note(`explicit skip entry in data/code-scanning-skips.json: ${skipEntry.reason || "(no reason recorded)"}`);
+			desiredVars = {
+				CLDMV_SKIP_CODE_SCANNING: skipEntry.skip_code_scanning ? "1" : null,
+				CLDMV_SKIP_DEPENDENCY_REVIEW: skipEntry.skip_dependency_review ? "1" : null
+			};
+		} else if (repoInfo.private && !scanOptIn) {
+			note(
+				`private repo not in the \`scan\` opt-in list — defaulting both GHAS-gated workflows to skip ` +
+					`(add \`${owner}/${repo}\` to \`scan\` in data/code-scanning-skips.json once it pays for Code Security)`
+			);
+			desiredVars = { CLDMV_SKIP_CODE_SCANNING: "1", CLDMV_SKIP_DEPENDENCY_REVIEW: "1" };
+		} else {
+			desiredVars = { CLDMV_SKIP_CODE_SCANNING: null, CLDMV_SKIP_DEPENDENCY_REVIEW: null };
+		}
+		for (const [name, want] of Object.entries(desiredVars || {})) {
 			let current = null;
 			try {
 				const v = await api("GET", `/actions/variables/${name}`, null, ctx);
@@ -569,8 +618,9 @@ async function main() {
 				ok(`updated ${name}="${want}"`, `variables.${name}.updated`);
 			} else {
 				warn(
-					`variable ${name} was hand-set to "${current}" but \`${owner}/${repo}\` has no skip entry in ` +
-						`data/code-scanning-skips.json — clearing it. If the skip is intended, add the repo to the list and re-run.`
+					`variable ${name} was hand-set to "${current}" but \`${owner}/${repo}\` doesn't warrant it under ` +
+						`data/code-scanning-skips.json (public, or private and opted into \`scan\`) — clearing it. ` +
+						`If the skip is intended, record it in the \`skip\` section and re-run.`
 				);
 				await mutate("DELETE", `/actions/variables/${name}`, null, `delete variable ${name}`);
 				ok(`cleared ${name}`, `variables.${name}.cleared`);
