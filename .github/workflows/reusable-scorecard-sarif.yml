@@ -1,0 +1,79 @@
+#
+# @Project: workflows
+# @Filename: /reusable-scorecard-sarif.yml
+# @Date: 2026-08-09 00:00:00 -07:00 (1786604400)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# OpenSSF Scorecard — SARIF-to-Security-tab path (org-level, reusable).
+#
+# The no-publish half of reusable-scorecard.yml, split out so that file can
+# satisfy scorecard-action's publish verification. The OpenSSF webapp verifies
+# the workflow file named by the OIDC token's `job_workflow_ref` and requires
+# the ONE job whose steps reference ossf/scorecard-action to have a literal
+# single-Ubuntu `runs-on` (its verifier reads the static YAML — a computed
+# `${{ … }}` expression parses as zero runner labels and 400s with "should
+# have exactly 1 'Ubuntu' virtual environment"). Its job lookup also iterates
+# jobs in nondeterministic (Go map) order, so reusable-scorecard.yml may
+# contain only ONE job that references the action at all — this file exists
+# so the dynamic-runner path lives where the verifier never looks. See
+# https://github.com/ossf/scorecard-webapp (app/server/verify_workflow.go).
+#
+# This path never publishes to OpenSSF (publish_results: false), so none of
+# those restrictions apply here: the runner stays dynamic (cldmv-runners
+# routing for private CLDMV repos) and the SARIF goes to the caller's
+# Security tab instead of the public badge.
+#
+# The caller must grant security-events: write for the SARIF upload. It is
+# deliberately NOT declared here — GitHub Actions hard-fails a reusable
+# workflow's run at startup if this file requests something the caller
+# doesn't grant, so this job simply inherits whatever the caller granted
+# (same contract reusable-scorecard.yml has always had for this path).
+name: 🔬 OpenSSF Scorecard SARIF (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+            sarif_category:
+                description: "SARIF category for Code-Scanning grouping"
+                required: false
+                type: string
+                default: "scorecard"
+
+jobs:
+    analyze:
+        name: "🔬 Scorecard Analysis"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read
+            actions: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - name: Run Scorecard
+              # SHA-pinned to v2.4.3 (published 2025-09-30). There is no v3.x;
+              # the action has never released past v2.4.x — a mistaken `@v3.4.0`
+              # fails to resolve at runtime. Keep this pin in lockstep with the
+              # publish-path copy in reusable-scorecard.yml. Re-verify against
+              # https://github.com/ossf/scorecard-action/releases before bumping.
+              uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+              with:
+                  results_file: results.sarif
+                  results_format: sarif
+                  publish_results: false
+
+            - name: Upload SARIF
+              uses: github/codeql-action/upload-sarif@v4
+              with:
+                  sarif_file: results.sarif
+                  category: ${{ inputs.sarif_category }}
