@@ -434,7 +434,39 @@ jobs:
         needs: [ detect-version ]
         outputs:
             release-id: ${{ steps.create.outputs.release-id }}
+            has-standalone-tag-workflow: ${{ steps.standalone.outputs.present }}
         steps:
+            # Feeds the update-version-tags gate below. The standalone
+            # update-major-version-tags.yml caller (template: core-cicd/)
+            # triggers on release:published — the very release this job is
+            # about to create — and performs the same tag move via
+            # workflow-update-major-version-tags.yml. Detect it here (job-level
+            # `if:` can't read repo contents) so the in-line duplicate can step
+            # aside when the standalone will handle it. Content-grep rather
+            # than existence alone so an unrelated file with the same name
+            # doesn't count. Detection failure = 'false' = the in-line job
+            # runs, which is the safe direction (worst case is today's
+            # behavior).
+            - name: Detect standalone tag workflow
+              id: standalone
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+              run: |
+                  present=false
+                  resp=$(curl -sS \
+                    -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$REPO/contents/.github/workflows/update-major-version-tags.yml?ref=$GITHUB_SHA" || true)
+                  if printf '%s' "$resp" | jq -e '.content' > /dev/null 2>&1; then
+                      if printf '%s' "$resp" | jq -r '.content' | base64 -d 2>/dev/null | grep -q "workflow-update-major-version-tags"; then
+                          present=true
+                      fi
+                  fi
+                  echo "present=$present" >> "$GITHUB_OUTPUT"
+                  echo "📌 Standalone update-major-version-tags workflow present: $present"
+
             - name: Create App token (auto-detect)
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
@@ -542,14 +574,31 @@ jobs:
 
     update-version-tags:
         name: "📌 Update Major Version Tags"
-        if: inputs.run_create_release == true
+        # Skip (green, neutral) when the repo carries the standalone
+        # update-major-version-tags.yml workflow: creating the release above
+        # fires its release:published trigger, which does the identical tag
+        # move. Running the in-line duplicate anyway made both enter the
+        # tags-* concurrency group at nearly the same moment, and a group only
+        # holds one running + one pending entry — the loser was EVICTED
+        # (conclusion `cancelled`, never `failure`), flipping the whole
+        # otherwise-green "Release and Publish" run to cancelled on every
+        # release. `continue-on-error` can't fix that: it converts job
+        # FAILURE, not a concurrency cancellation. Skipping the duplicate
+        # removes the race; repos without the standalone workflow (detection
+        # in create-release) still get their tags moved here, alone in the
+        # group.
+        if: |
+            inputs.run_create_release == true &&
+            needs.create-release.outputs.has-standalone-tag-workflow != 'true'
         needs: [ create-release ]
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         permissions:
             contents: write
         # Serialize with workflow-update-major-version-tags.yml (which declares
         # the same group at workflow-level). Prevents intermediate-state flicker
-        # when both run for the same repo around the same release. P3.4.
+        # when both run for the same repo around the same release. P3.4. With
+        # the standalone-workflow gate above this is belt-and-braces — when
+        # this job runs at all, the standalone doesn't exist to race it.
         concurrency:
             group: tags-${{ github.repository }}
             cancel-in-progress: false

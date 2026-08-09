@@ -55,3 +55,18 @@ jobs:
                       images/actions-runner
                   docker push "$IMAGE:latest"
                   docker push "$IMAGE:${GITHUB_SHA::12}"
+
+            # Every build pushes a fresh SHA tag and re-points :latest, so the
+            # package accumulates one version per merge + one per weekly
+            # rebuild, forever. Keep the newest 10 (the version currently
+            # tagged :latest is always among them) and delete the rest.
+            # continue-on-error: pruning is auxiliary — a cleanup hiccup must
+            # not flag an otherwise-successful image publish as failed.
+            - name: Prune old package versions (keep 10)
+              continue-on-error: true
+              uses: actions/delete-package-versions@v5
+              with:
+                  package-name: actions-runner
+                  package-type: container
+                  min-versions-to-keep: 10
+                  token: ${{ secrets.GITHUB_TOKEN }}

@@ -103,9 +103,9 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 
 | Template | From |
 |---|---|
-| `codeql.yml` | `security/codeql.yml` |
-| `dependency-review.yml` | `security/dependency-review.yml` |
-| `scorecard.yml` | `security/scorecard.yml` (only on public repos — skip for private) |
+| `codeql.yml` | `security/codeql.yml` (safe on private repos: the bootstrap default-sets `CLDMV_SKIP_CODE_SCANNING` there, so it uploads an empty passing SARIF instead of failing — opt a paying repo into real scanning via the `scan` list in `data/code-scanning-skips.json`) |
+| `dependency-review.yml` | `security/dependency-review.yml` (same private-repo default-skip via `CLDMV_SKIP_DEPENDENCY_REVIEW`) |
+| `scorecard.yml` | `security/scorecard.yml` (safe everywhere — every scorecard job auto-skips on private repos, where OpenSSF cannot publish) |
 
 ### Always (automation)
 

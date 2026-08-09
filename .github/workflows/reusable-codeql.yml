@@ -60,6 +60,11 @@ on:
                 required: false
                 type: string
                 default: ""
+            skip_code_scanning:
+                description: "Skip CodeQL analysis and upload an empty, 0-alert SARIF instead (satisfies a `code_scanning` ruleset rule on repos with nothing to analyze, or private repos without Code Security). First-class equivalent of the CLDMV_SKIP_CODE_SCANNING repo variable — either one activates the skip path. CLDMV repos should prefer the central per-repo list in data/code-scanning-skips.json (applied by the bootstrap) over hand-setting either."
+                required: false
+                type: boolean
+                default: false
 
 permissions:
     security-events: write # upload SARIF results
@@ -98,8 +103,14 @@ jobs:
         # result that satisfies the rule. A plain `if:`-skip is NOT enough — a
         # skipped job produces no result, so the gate still waits. The decision
         # lives in the repo (survives `org-bootstrap-repo` re-applying the rule).
+        #
+        # The `skip_code_scanning` workflow_call input triggers the same path —
+        # a first-class knob for consumers outside CLDMV who'd rather not adopt
+        # a CLDMV-named variable. Either signal activates the skip. Compared
+        # with (== true || == 'true') because an expression-passed boolean
+        # input arrives as a string.
         env:
-            SKIP_CODE_SCANNING: ${{ vars.CLDMV_SKIP_CODE_SCANNING }}
+            SKIP_CODE_SCANNING: ${{ (inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
         strategy:
             fail-fast: false
             matrix:
@@ -182,8 +193,48 @@ jobs:
             #      rejects advanced-setup SARIF uploads when default setup is on.
             #      This repo uses advanced setup (this workflow), so keep default
             #      setup off wherever CLDMV_SKIP_CODE_SCANNING is used.
-            - name: Write empty CodeQL SARIF
+            #
+            # On a private repo WITHOUT GitHub Advanced Security the SARIF-upload
+            # endpoint itself is what rejects requests ("Code Security must be
+            # enabled for this repository to use code scanning", HTTP 403) — the
+            # exact failure this skip path exists to escape. Probe the
+            # code-scanning API first and skip the upload when it's impossible:
+            # a repo without code scanning cannot have an enforceable
+            # `code_scanning` ruleset rule, so no SARIF result is needed there
+            # and the upload is pure best-effort. ONLY a 403 counts as
+            # unavailable — any other response attempts the upload so genuine
+            # failures (bad SARIF shape, default-setup-enabled rejection) on
+            # repos where the upload should work stay loud. The real-analysis
+            # upload path above is untouched and still fails loudly.
+            - name: Check code scanning availability
               if: ${{ env.SKIP_CODE_SCANNING != '' }}
+              id: scanning_api
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+              run: |
+                  code=$(curl -s -o /dev/null -w "%{http_code}" \
+                    -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$REPO/code-scanning/analyses?per_page=1")
+                  if [ "$code" = "403" ]; then
+                      echo "available=false" >> "$GITHUB_OUTPUT"
+                      echo "🔒 Code scanning API returned 403 — SARIF uploads are not possible on this repo (no GitHub Advanced Security)."
+                  else
+                      echo "available=true" >> "$GITHUB_OUTPUT"
+                      echo "✅ Code scanning API reachable (HTTP $code) — proceeding with the empty-SARIF upload."
+                  fi
+
+            - name: Skip empty SARIF upload (code scanning unavailable)
+              if: ${{ env.SKIP_CODE_SCANNING != '' && steps.scanning_api.outputs.available != 'true' }}
+              shell: bash
+              run: |
+                  echo "⏭️ CLDMV_SKIP_CODE_SCANNING is set and this repo cannot accept SARIF uploads (Code Security / GHAS not enabled)."
+                  echo "   Without code scanning there is no enforceable code_scanning ruleset rule to satisfy, so no result is needed — passing without an upload."
+
+            - name: Write empty CodeQL SARIF
+              if: ${{ env.SKIP_CODE_SCANNING != '' && steps.scanning_api.outputs.available == 'true' }}
               shell: bash
               run: |
                   cat > "${GITHUB_WORKSPACE}/empty.sarif" <<'JSON'
@@ -200,7 +251,7 @@ jobs:
                   JSON
 
             - name: Upload empty CodeQL SARIF
-              if: ${{ env.SKIP_CODE_SCANNING != '' }}
+              if: ${{ env.SKIP_CODE_SCANNING != '' && steps.scanning_api.outputs.available == 'true' }}
               uses: github/codeql-action/upload-sarif@v4
               with:
                   sarif_file: empty.sarif

@@ -13,6 +13,10 @@ Per-release changelogs for `@cldmv/.github`. **One file per minor version** (`vX
 
 | Version | Date | Headline |
 |---|---|---|
+| [v4.20.0](v4.20.0.md) | 2026-08-09 | Private repos default-skip GHAS workflows; scorecard badge publish fixed + private auto-skip; release runs stop reporting cancelled |
+| [v4.19.0](v4.19.0.md) | 2026-08-03 | `runs_on` input with CLDMV-private auto-routing to self-hosted runners |
+| [v4.18.0](v4.18.0.md) | 2026-08-02 | Dependency-review PR comment lists the actual packages per category |
+| [v4.17.0](v4.17.0.md) | 2026-07-31 | Auto-recreate Dependabot PRs stuck in the edited-by-non-dependabot state |
 | [v4.16.0](v4.16.0.md) | 2026-07-09 | Close resolved issues at release via gh-broker markers |
 | [v4.15.0](v4.15.0.md) | 2026-06-21 | Dependency updates get their own 📦 Dependencies changelog section |
 | [v4.14.0](v4.14.0.md) | 2026-06-14 | Satellite-package publishing — extra packages alongside the core |

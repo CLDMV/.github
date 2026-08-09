@@ -58,6 +58,11 @@ on:
                 required: false
                 type: number
                 default: 3
+            skip_dependency_review:
+                description: "Skip the dependency review entirely (the job still completes green). For private repos without GitHub Advanced Security, where the dependency-review API is unavailable and the action can only fail. First-class equivalent of the CLDMV_SKIP_DEPENDENCY_REVIEW repo variable — either one activates the skip. CLDMV repos should prefer the central per-repo list in data/code-scanning-skips.json (applied by the bootstrap) over hand-setting either."
+                required: false
+                type: boolean
+                default: false
         secrets:
             # Optional. When provided, the PR-comment summary is attributed to
             # the consumer's bot App instead of github-actions[bot]. Falls back
@@ -75,8 +80,27 @@ jobs:
     review:
         name: "🔒 Dependency Review"
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        # Skip escape hatch for private repos without GitHub Advanced Security,
+        # where the dependency-review API is unavailable and the action can
+        # only fail. Unlike codeql's skip path there's no ruleset gate waiting
+        # on a result here, so a step-level skip (job completes green, no
+        # upload needed) is sufficient. Activated by either the
+        # `skip_dependency_review` input or the CLDMV_SKIP_DEPENDENCY_REVIEW
+        # repo variable (any non-empty value). Boolean input compared with
+        # (== true || == 'true') because an expression-passed boolean input
+        # arrives as a string.
+        env:
+            SKIP_DEPENDENCY_REVIEW: ${{ (inputs.skip_dependency_review == true || inputs.skip_dependency_review == 'true') && '1' || vars.CLDMV_SKIP_DEPENDENCY_REVIEW }}
         steps:
+            - name: Skip dependency review
+              if: ${{ env.SKIP_DEPENDENCY_REVIEW != '' }}
+              shell: bash
+              run: |
+                  echo "⏭️ Dependency review skipped (skip_dependency_review input or CLDMV_SKIP_DEPENDENCY_REVIEW variable set)."
+                  echo "   Typical reason: private repo without GitHub Advanced Security, where the dependency-review API is unavailable."
+
             - name: Checkout
+              if: ${{ env.SKIP_DEPENDENCY_REVIEW == '' }}
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
 
             # App token so the dependency-review comment is posted as the
@@ -84,6 +108,7 @@ jobs:
             # to GITHUB_TOKEN when bot secrets are absent, preserving the
             # previous behavior for repos that haven't wired the App yet.
             - name: Create App token (falls back to GITHUB_TOKEN)
+              if: ${{ env.SKIP_DEPENDENCY_REVIEW == '' }}
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
@@ -94,6 +119,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Review dependencies
+              if: ${{ env.SKIP_DEPENDENCY_REVIEW == '' }}
               id: depreview
               uses: actions/dependency-review-action@v4.9.0
               with:
@@ -118,7 +144,7 @@ jobs:
             # before fail-on-severity throws). `comment_summary: false` opts a
             # repo out of the comment entirely.
             - name: Post dependency-review summary comment
-              if: ${{ always() && inputs.comment_summary && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+              if: ${{ always() && env.SKIP_DEPENDENCY_REVIEW == '' && inputs.comment_summary && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
               uses: actions/github-script@v7
               env:
                   # Structured outputs from the review step — we compose the comment
