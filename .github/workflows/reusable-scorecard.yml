@@ -32,7 +32,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+                description: "Runner label for the SARIF path (publish_results: false) only. The publish path always runs on a literal ubuntu-latest — scorecard-action's publish verification reads the static YAML and rejects any computed runs-on (see the job comments below). Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
             publish_results:
                 # NOTE: publishing uses OIDC (id-token). When a job runs inside
                 # a reusable workflow, the OIDC token's `job_workflow_ref` claim
@@ -79,10 +79,36 @@ on:
 # satisfied GitHub's own permission-inheritance rules fine but tripped this
 # specific scorecard-action check regardless. Declaring them on the `analyze`
 # job instead (below) matches the documented pattern and satisfies both.
+# The two publish_results modes are two separate jobs, not one job with
+# conditional steps. scorecard-action's publish step submits results to the
+# OpenSSF webapp, which verifies the STATIC YAML of the workflow named by the
+# OIDC token's `job_workflow_ref` (this file). Two of its rules force the
+# split (see scorecard-webapp app/server/verify_workflow.go):
+#   1. The scorecard job's `runs-on` must parse to exactly one literal
+#      GitHub-hosted Ubuntu label. Our dynamic cldmv-runners routing
+#      expression parses as ZERO labels -> HTTP 400 "scorecard job should
+#      have exactly 1 'Ubuntu' virtual environment", failing every
+#      publish_results: true run even though it resolved to ubuntu-latest.
+#   2. Its job lookup (`findScorecardJob`) iterates jobs in nondeterministic
+#      Go-map order and validates the FIRST job whose steps reference
+#      ossf/scorecard-action — so only ONE job in this file may reference
+#      the action at all, or verification becomes a coin flip.
+# Hence: the publish job below is the only job here that runs the action
+# (on a literal ubuntu-latest), and the no-publish SARIF path delegates to
+# reusable-scorecard-sarif.yml, which keeps the dynamic runner routing where
+# the verifier never looks. Publishing only applies to public repos (OpenSSF
+# doesn't accept private ones), so the publish path losing cldmv-runners
+# routing costs nothing.
+#
+# The boolean input is compared with (== true || == 'true') because a caller
+# passing `publish_results: ${{ … }}` delivers a STRING, and a bare
+# `!inputs.publish_results` on a non-empty string is always false.
 jobs:
     analyze:
         name: "🔬 Scorecard Analysis"
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        if: ${{ inputs.publish_results == true || inputs.publish_results == 'true' }}
+        # Literal on purpose — verifier rule 1 above. Never make this dynamic.
+        runs-on: ubuntu-latest
         permissions:
             id-token: write # publish to OpenSSF transparency log; job-scoped per OSSF's own example
             contents: read
@@ -102,23 +128,28 @@ jobs:
               # the action has never released past v2.4.x — a mistaken `@v3.4.0`
               # fails to resolve at runtime. SHA-pin (not the mutable tag)
               # matches the posture for other third-party security actions here
-              # (trivy). Re-verify against
+              # (trivy). Keep this pin in lockstep with the SARIF-path copy in
+              # reusable-scorecard-sarif.yml. Re-verify against
               # https://github.com/ossf/scorecard-action/releases before bumping.
               uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
               with:
                   results_file: results.sarif
                   results_format: sarif
-                  publish_results: ${{ inputs.publish_results }}
+                  publish_results: true
 
-            # Mutually exclusive with the public-badge publish above (see the
-            # permissions note): only attempt this when the caller opted OUT of
-            # publish_results, since only then might the caller have granted
-            # security-events: write. Callers wanting SARIF-to-Security-tab
-            # upload must set publish_results: false AND grant security-events:
-            # write themselves — this workflow no longer requests it for them.
-            - name: Upload SARIF
-              if: ${{ !inputs.publish_results }}
-              uses: github/codeql-action/upload-sarif@v4
-              with:
-                  sarif_file: results.sarif
-                  category: ${{ inputs.sarif_category }}
+    # Mutually exclusive with the public-badge publish above (see the
+    # permissions note): runs only when the caller opted OUT of
+    # publish_results, since only then might the caller have granted
+    # security-events: write. Callers wanting SARIF-to-Security-tab upload
+    # must set publish_results: false AND grant security-events: write
+    # themselves — neither this workflow nor the nested one requests it.
+    # No permissions block here: a `uses:` job passes the caller's grants
+    # through, and the verifier only checks that non-scorecard jobs don't
+    # declare id-token: write (this one declares nothing).
+    analyze-sarif:
+        name: "🔬 Scorecard Analysis (SARIF)"
+        if: ${{ !(inputs.publish_results == true || inputs.publish_results == 'true') }}
+        uses: CLDMV/.github/.github/workflows/reusable-scorecard-sarif.yml@v4
+        with:
+            runs_on: ${{ inputs.runs_on }}
+            sarif_category: ${{ inputs.sarif_category }}
