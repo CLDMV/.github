@@ -81,7 +81,7 @@ on:
             steps:
                 description: "Subset of phases to run, comma-separated. Default runs everything."
                 required: false
-                default: "branches,settings,security,rulesets"
+                default: "branches,settings,security,rulesets,variables"
             concurrency:
                 description: "Max parallel per-repo jobs. GitHub Actions caps matrix at 256."
                 required: false

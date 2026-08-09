@@ -8,6 +8,10 @@
  *     updates, private vulnerability reporting, Dependabot security update
  *     PRs)
  *   - replace the three rulesets from the shared builders module
+ *   - apply the central GHAS-workflow skip list (data/code-scanning-skips.json)
+ *     to the repo's CLDMV_SKIP_CODE_SCANNING / CLDMV_SKIP_DEPENDENCY_REVIEW
+ *     Actions variables (`variables` phase; needs the App's "Variables:
+ *     Read and write" repository permission)
  *
  * Opt-in paid-on-private security products (3-way: off | public-only | all,
  * default off; both are free on public, paid on private):
@@ -31,6 +35,7 @@
  * @module @cldmv/.github.github.jobs.org-bootstrap-repo
  */
 
+import { readFileSync } from "node:fs";
 import { getInput, setOutput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
 import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-generator/builders.mjs";
@@ -92,7 +97,7 @@ function finish(status, reason = "") {
 async function main() {
 	const token = getInput("github_token", { required: true });
 	const dryRun = getInput("dry_run") !== "false";
-	const stepsCsv = getInput("steps") || "branches,settings,security,rulesets";
+	const stepsCsv = getInput("steps") || "branches,settings,security,rulesets,variables";
 	const steps = new Set(stepsCsv.split(",").map((s) => s.trim()).filter(Boolean));
 	const nextBranch = getInput("next_branch") || "next";
 	const hotfixesBranch = getInput("hotfixes_branch") || "hotfixes";
@@ -504,6 +509,71 @@ async function main() {
 			} else {
 				await mutate("POST", "/rulesets", ruleset, `create ruleset ${ruleset.name}`);
 				ok(`created ruleset "${ruleset.name}"`, `rulesets.${branchKey}.created`);
+			}
+		}
+	}
+
+	// ── VARIABLES (central GHAS-workflow skip list) ───────────────────────
+	if (steps.has("variables")) {
+		// data/code-scanning-skips.json is the single source of truth for
+		// which repos skip the GHAS-gated workflows (codeql / dependency
+		// review). This phase makes the target repo's Actions variables match
+		// it: listed skips are SET, everything else is CLEARED
+		// (warn-on-clear, same overwrite-with-warn posture as the rest of the
+		// bootstrap) — so a hand-set variable either gets recorded centrally
+		// or gets removed. Resolved relative to this file so the list rides
+		// the same ref as the action (mirrors the builders.mjs import above).
+		let skipConfig = { repos: {} };
+		try {
+			skipConfig = JSON.parse(readFileSync(new URL("../../../../../data/code-scanning-skips.json", import.meta.url), "utf8"));
+		} catch (err) {
+			warn(`could not read data/code-scanning-skips.json: ${err.message} — skipping the variables phase (no variables touched)`);
+		}
+		const entry =
+			Object.entries(skipConfig.repos || {}).find(([key]) => key.toLowerCase() === `${owner}/${repo}`.toLowerCase())?.[1] || {};
+		const desiredVars = {
+			CLDMV_SKIP_CODE_SCANNING: entry.skip_code_scanning ? "1" : null,
+			CLDMV_SKIP_DEPENDENCY_REVIEW: entry.skip_dependency_review ? "1" : null
+		};
+		for (const [name, want] of Object.entries(desiredVars)) {
+			let current = null;
+			try {
+				const v = await api("GET", `/actions/variables/${name}`, null, ctx);
+				current = v?.value ?? null;
+			} catch (err) {
+				if (err.message.includes("404")) {
+					// not set — nothing to read
+				} else if (err.message.includes("403")) {
+					// The App token can't reach the Variables API. Reading and
+					// writing repo Actions variables needs the App's
+					// "Variables" repository permission (Read and write) —
+					// administration:write alone doesn't cover it.
+					warn(
+						`cannot read Actions variable ${name} on \`${owner}/${repo}\` (403). Grant the bot App the ` +
+							`"Variables: Read and write" repository permission and re-run — skipping the variables phase.`
+					);
+					break;
+				} else {
+					throw err;
+				}
+			}
+			if (want === current) {
+				note(`variable ${name} already ${want === null ? "absent" : `= "${want}"`}`);
+				applied.push(`variables.${name}.already-correct`);
+			} else if (want !== null && current === null) {
+				await mutate("POST", "/actions/variables", { name, value: want }, `create variable ${name}`);
+				ok(`set ${name}="${want}" (listed in data/code-scanning-skips.json)`, `variables.${name}.created`);
+			} else if (want !== null) {
+				warn(`variable ${name} was "${current}", overwriting to "${want}" per data/code-scanning-skips.json`);
+				await mutate("PATCH", `/actions/variables/${name}`, { name, value: want }, `update variable ${name}`);
+				ok(`updated ${name}="${want}"`, `variables.${name}.updated`);
+			} else {
+				warn(
+					`variable ${name} was hand-set to "${current}" but \`${owner}/${repo}\` has no skip entry in ` +
+						`data/code-scanning-skips.json — clearing it. If the skip is intended, add the repo to the list and re-run.`
+				);
+				await mutate("DELETE", `/actions/variables/${name}`, null, `delete variable ${name}`);
+				ok(`cleared ${name}`, `variables.${name}.cleared`);
 			}
 		}
 	}

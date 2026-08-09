@@ -8,6 +8,12 @@
 #
 
 # Individual repo: .github/workflows/dependency-review.yml
+#
+# PRIVATE REPOS — the dependency-review API needs GitHub Advanced Security
+# there. Either pay for it (keep as-is), or opt out via
+# data/code-scanning-skips.json in CLDMV/.github (`skip_dependency_review`;
+# the bootstrap sets CLDMV_SKIP_DEPENDENCY_REVIEW). Consumers outside CLDMV
+# can pass `skip_dependency_review: true` below instead.
 name: 🔒 Dependency Review
 
 on:

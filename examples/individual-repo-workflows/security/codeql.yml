@@ -9,6 +9,15 @@
 
 # Individual repo: .github/workflows/codeql.yml
 #
+# PRIVATE REPOS — decide at onboarding time: either pay for GitHub Code
+# Security (keep this workflow as-is), or opt out of code scanning by adding
+# the repo to data/code-scanning-skips.json in CLDMV/.github (the bootstrap's
+# `variables` phase then sets CLDMV_SKIP_CODE_SCANNING and this workflow
+# uploads an empty 0-alert SARIF instead of analyzing). Consumers outside
+# CLDMV can pass `skip_code_scanning: true` below instead. Do NOT just delete
+# this file on a repo whose ruleset requires code_scanning — the gate then
+# waits forever.
+#
 # REQUIRED REPO SETTING — CodeQL must be in "Advanced" mode for this workflow
 # to upload SARIF. If the repo has CodeQL "Default setup" enabled (the
 # GitHub-managed alternative), upload runs fail with:

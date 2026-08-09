@@ -72,7 +72,7 @@ on:
             steps:
                 description: "Subset of phases to run, comma-separated."
                 required: false
-                default: "branches,settings,security,rulesets"
+                default: "branches,settings,security,rulesets,variables"
 
 permissions:
     contents: read

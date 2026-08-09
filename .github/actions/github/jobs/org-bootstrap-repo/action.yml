@@ -23,9 +23,9 @@ inputs:
     required: false
     default: "true"
   steps:
-    description: "Comma-separated subset of phases to run. Default `branches,settings,security,rulesets` runs everything; pass a subset for partial reapply (e.g. `rulesets` to re-import after editing builders.mjs)."
+    description: "Comma-separated subset of phases to run. Default `branches,settings,security,rulesets,variables` runs everything; pass a subset for partial reapply (e.g. `rulesets` to re-import after editing builders.mjs). The `variables` phase applies data/code-scanning-skips.json — setting/clearing the CLDMV_SKIP_CODE_SCANNING / CLDMV_SKIP_DEPENDENCY_REVIEW repo Actions variables to match the central list; it needs the App's \"Variables: Read and write\" repository permission."
     required: false
-    default: "branches,settings,security,rulesets"
+    default: "branches,settings,security,rulesets,variables"
   next_branch:
     description: "Integration branch name for features/fixes."
     required: false
