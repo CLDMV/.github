@@ -51,7 +51,11 @@ on:
             steps:
                 description: "Subset of phases to run, comma-separated."
                 required: false
-                default: "branches,settings,security,rulesets"
+                default: "branches,settings,security,rulesets,variables"
+            code_scanning_config:
+                description: "Override for the variables-phase GHAS config: inline JSON or a workspace path. Empty = the bundled data/code-scanning-skips.json."
+                required: false
+                default: ""
 
 permissions:
     contents: read
@@ -82,3 +86,4 @@ jobs:
                   steps: ${{ github.event.inputs.steps }}
                   code_security: ${{ github.event.inputs.code_security }}
                   secret_protection: ${{ github.event.inputs.secret_protection }}
+                  code_scanning_config: ${{ github.event.inputs.code_scanning_config }}

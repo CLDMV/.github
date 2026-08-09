@@ -60,6 +60,11 @@ on:
                 required: false
                 type: string
                 default: ""
+            skip_code_scanning:
+                description: "Skip CodeQL analysis and upload an empty, 0-alert SARIF instead (satisfies a `code_scanning` ruleset rule on repos with nothing to analyze, or private repos without Code Security). First-class equivalent of the CLDMV_SKIP_CODE_SCANNING repo variable — either one activates the skip path. CLDMV repos should prefer the central per-repo list in data/code-scanning-skips.json (applied by the bootstrap) over hand-setting either."
+                required: false
+                type: boolean
+                default: false
 
 permissions:
     security-events: write # upload SARIF results
@@ -98,8 +103,14 @@ jobs:
         # result that satisfies the rule. A plain `if:`-skip is NOT enough — a
         # skipped job produces no result, so the gate still waits. The decision
         # lives in the repo (survives `org-bootstrap-repo` re-applying the rule).
+        #
+        # The `skip_code_scanning` workflow_call input triggers the same path —
+        # a first-class knob for consumers outside CLDMV who'd rather not adopt
+        # a CLDMV-named variable. Either signal activates the skip. Compared
+        # with (== true || == 'true') because an expression-passed boolean
+        # input arrives as a string.
         env:
-            SKIP_CODE_SCANNING: ${{ vars.CLDMV_SKIP_CODE_SCANNING }}
+            SKIP_CODE_SCANNING: ${{ (inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
         strategy:
             fail-fast: false
             matrix:

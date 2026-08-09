@@ -1,0 +1,10 @@
+{
+	"$comment": "Central config for the GHAS-gated workflows (codeql / dependency review), applied by the org-bootstrap-repo action's `variables` phase: it sets/clears the CLDMV_SKIP_CODE_SCANNING / CLDMV_SKIP_DEPENDENCY_REVIEW repo Actions variables to match. DEFAULT: private repos are SKIPPED (both workflows) — GitHub bills Code Security per active committer on private repos, so scanning there is an explicit opt-in, not something every private repo must be listed for. `scan` is that opt-in: private repos that pay for GitHub Code Security and should NOT be skipped. Public repos are never skipped by default (scanning is free there); `skip` holds explicit per-repo skips regardless of visibility (e.g. a public repo with no CodeQL-analyzable source). A repo matching no rule gets both variables cleared (warn-on-clear). All names are `owner/name`, case-insensitive. Tracked in CLDMV/.github#213.",
+	"scan": [],
+	"skip": {
+		"CLDMV/jsonv-vscode": {
+			"skip_code_scanning": true,
+			"reason": "Declarative VS Code grammar extension (TextMate JSON, no JS/TS) — CodeQL fails 'no source code seen'; empty-SARIF result keeps the code_scanning ruleset gate satisfiable."
+		}
+	}
+}

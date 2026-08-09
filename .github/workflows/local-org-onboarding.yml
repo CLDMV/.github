@@ -81,7 +81,12 @@ on:
             steps:
                 description: "Subset of phases to run, comma-separated. Default runs everything."
                 required: false
-                default: "branches,settings,security,rulesets"
+                # No code_scanning_config override input here: workflow_dispatch
+                # caps at 10 inputs and this workflow already carries 9. The
+                # org fanout always uses the bundled data/code-scanning-skips.json
+                # (this repo IS the source of truth); the per-repo v4-bootstrap
+                # template exposes the override for third-party callers.
+                default: "branches,settings,security,rulesets,variables"
             concurrency:
                 description: "Max parallel per-repo jobs. GitHub Actions caps matrix at 256."
                 required: false

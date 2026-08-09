@@ -23,9 +23,9 @@ inputs:
     required: false
     default: "true"
   steps:
-    description: "Comma-separated subset of phases to run. Default `branches,settings,security,rulesets` runs everything; pass a subset for partial reapply (e.g. `rulesets` to re-import after editing builders.mjs)."
+    description: "Comma-separated subset of phases to run. Default `branches,settings,security,rulesets,variables` runs everything; pass a subset for partial reapply (e.g. `rulesets` to re-import after editing builders.mjs). The `variables` phase applies data/code-scanning-skips.json — private repos are skipped by DEFAULT (both CLDMV_SKIP_CODE_SCANNING and CLDMV_SKIP_DEPENDENCY_REVIEW set) unless opted into its `scan` list; public repos are never default-skipped; its `skip` section holds explicit per-repo skips. Needs the App's \"Variables: Read and write\" repository permission."
     required: false
-    default: "branches,settings,security,rulesets"
+    default: "branches,settings,security,rulesets,variables"
   next_branch:
     description: "Integration branch name for features/fixes."
     required: false
@@ -46,6 +46,10 @@ inputs:
     description: "GitHub Secret Protection policy (the paid product that gates secret scanning + push protection on private repos; free on public). Same `off` | `public-only` | `all` shape as `code_security`. Drives the `secret_scanning` + `secret_scanning_push_protection` API fields together."
     required: false
     default: "off"
+  code_scanning_config:
+    description: "Override for the GHAS-workflow config the `variables` phase applies. Empty (default) = the data/code-scanning-skips.json bundled at this action's ref. Otherwise inline JSON (starts with `{`) or a path to a JSON file in the runner workspace (the caller must check it out) — lets a third-party org supply its own scan/skip lists without forking this repo. Same shape as data/code-scanning-skips.json."
+    required: false
+    default: ""
 
 outputs:
   # Node actions don't use the composite `value: ${{ steps.<id>.outputs.<name> }}`

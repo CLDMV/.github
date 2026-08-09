@@ -325,7 +325,7 @@ CodeQL SAST. Runs on push to master/main, on PRs against master/main, and weekly
 
 **Required secrets** — none.
 
-**Key inputs** — `languages` (default `javascript-typescript` — supply a CSV like `python,go`), `queries` (override to `security-extended,security-and-quality` for deeper analysis), `paths_ignore`, `config_file`.
+**Key inputs** — `languages` (default `javascript-typescript` — supply a CSV like `python,go`), `queries` (override to `security-extended,security-and-quality` for deeper analysis), `paths_ignore`, `config_file`, `skip_code_scanning` (skip analysis and upload an empty 0-alert SARIF that still satisfies a `code_scanning` ruleset rule — for repos with nothing to analyze or private repos without Code Security; the `CLDMV_SKIP_CODE_SCANNING` repo variable triggers the same path, and in CLDMV the bootstrap's `variables` phase sets it automatically on every private repo not opted into the `scan` list in `data/code-scanning-skips.json`).
 
 ---
 
@@ -339,7 +339,7 @@ On every PR against master/main, diffs the dependency manifest and blocks the PR
 
 **Required secrets** — none.
 
-**Key inputs** — `fail_on_severity` (default `moderate`; pick `low`/`moderate`/`high`/`critical`), `deny_licenses` (optional CSV blocking license types like `GPL-3.0`).
+**Key inputs** — `fail_on_severity` (default `moderate`; pick `low`/`moderate`/`high`/`critical`), `deny_licenses` (optional CSV blocking license types like `GPL-3.0`), `skip_dependency_review` (skip entirely with a green job — the dependency-review API needs GitHub Advanced Security on private repos; the `CLDMV_SKIP_DEPENDENCY_REVIEW` repo variable triggers the same skip, and in CLDMV the bootstrap sets it automatically on private repos not opted into `data/code-scanning-skips.json`'s `scan` list).
 
 ---
 
@@ -349,13 +349,17 @@ On every PR against master/main, diffs the dependency manifest and blocks the PR
 
 Runs the OpenSSF Scorecard on `branch_protection_rule` events, weekly Monday 07:32 UTC, on push to default, and manually. Results publish to the public scoreboard at `securityscorecards.dev`. Thin caller — the SHA-pinned `scorecard-action` version lives in the reusable (`@v2.4.3`; there is no v3.x), so it can't drift in your copy.
 
+**Private repos auto-skip.** Every scorecard job neutral-skips on a private repo (green run, nothing executes): scorecard-action force-disables publishing for private repos in its own code — there is no paid tier — so running would only burn paid runner minutes producing neither badge nor SARIF. Safe to carry this workflow on any repo; it costs nothing where it can't work.
+
+**Publish path runs on a literal `ubuntu-latest`.** OpenSSF's server verifies the static YAML of the submitting workflow and requires the scorecard job's `runs-on` to be one literal GitHub-hosted Ubuntu label, so the `runs_on` input only affects the SARIF path (`publish_results: false`), never the publish path.
+
 **Required `package.json` scripts** — none.
 
-**Required secrets** — none for public repos. Private repos need a `SCORECARD_TOKEN` PAT with read access.
+**Required secrets** — none.
 
-**Key inputs** — `publish_results` (default `true`; set `false` to skip the public OpenSSF transparency-log publish — SARIF still uploads to the Security tab), `sarif_category` (default `scorecard`).
+**Key inputs** — `publish_results` (default `true`; set `false` to skip the public OpenSSF transparency-log publish — SARIF then uploads to the Security tab instead), `sarif_category` (default `scorecard`).
 
-**Prereqs** — caller must grant `id-token: write` for publishing (the example does). Public repo, or set `publish_results: false`.
+**Prereqs** — caller must grant `id-token: write` for publishing (the example does).
 
 ---
 
