@@ -1,10 +1,10 @@
 # CLDMV self-hosted runner image
 
-The image the `cldmv-runners` [actions-runner-controller](https://github.com/actions/actions-runner-controller) scale set runs: the official `ghcr.io/actions/actions-runner` plus the `gh` CLI.
+The image the `cldmv-runners` [actions-runner-controller](https://github.com/actions/actions-runner-controller) scale set runs: the official `ghcr.io/actions/actions-runner` plus the `gh` CLI and `jq`.
 
 ## Why
 
-The stock ARC runner image is minimal and ships no `gh`. Once private CLDMV CI moved to these self-hosted runners (v4.19.1), every reusable job that shells out to `gh` failed with exit 127 (`gh: command not found`). This image closes that gap — see issue #210. Nothing sensitive is baked in (public base + the `gh` binary); runner auth stays in the `cldmv-runners-github-app` Kubernetes Secret and per-job `GH_TOKEN` is injected by Actions.
+The stock ARC runner image is minimal and ships no `gh` or `jq`, unlike GitHub's hosted `ubuntu-latest`. Once private CLDMV CI moved to these self-hosted runners (v4.19.1), every reusable job that shells out to `gh` failed with exit 127 (`gh: command not found`); `jq` closes the same hosted-vs-self-hosted gap for run steps that parse JSON. See issue #210. Nothing sensitive is baked in (public base + the `gh` and `jq` binaries); runner auth stays in the `cldmv-runners-github-app` Kubernetes Secret and per-job `GH_TOKEN` is injected by Actions.
 
 ## Build & publish
 
