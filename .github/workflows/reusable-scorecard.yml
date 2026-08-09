@@ -103,10 +103,48 @@ on:
 # The boolean input is compared with (== true || == 'true') because a caller
 # passing `publish_results: ${{ … }}` delivers a STRING, and a bare
 # `!inputs.publish_results` on a non-empty string is always false.
+#
+# PRIVATE REPOS SKIP ENTIRELY (all jobs neutral-skipped, run stays green).
+# scorecard-action itself force-disables publishing on private repos
+# (options.go: `PublishResults = inputVal && !privateRepo` — no paid tier),
+# so a private repo's publish run would burn paid GitHub-hosted minutes
+# producing neither badge nor SARIF. This is a visibility decision, not a
+# per-repo choice, so it is NOT part of the CLDMV_SKIP_* variable / central
+# list mechanism the codeql and dependency-review reusables use. The check
+# is an API probe job rather than `github.event.repository.private` because
+# scorecard's main trigger is `schedule`, whose event payload carries no
+# repository object (the same gap RUNS_ON_DEFAULT exists for).
 jobs:
+    visibility:
+        name: "🔎 Repo visibility"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read
+        outputs:
+            private: ${{ steps.check.outputs.private }}
+        steps:
+            - name: Check repo visibility
+              id: check
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+              run: |
+                  # `gh api` (preinstalled on GitHub-hosted runners AND baked into
+                  # the cldmv-runners image) — auth comes from GH_TOKEN with no
+                  # hand-rolled curl headers, and its embedded --jq parses the
+                  # response. Fail-open: on any probe error `private` stays
+                  # empty, which the gates below treat as not-private — public
+                  # repos keep working even if the API hiccups; a private repo
+                  # then just behaves as before this gate existed.
+                  private=$(gh api "repos/$REPO" --jq '.private' 2>/dev/null || true)
+                  echo "private=$private" >> "$GITHUB_OUTPUT"
+                  echo "🔎 $REPO private: ${private:-unknown}"
+
     analyze:
         name: "🔬 Scorecard Analysis"
-        if: ${{ inputs.publish_results == true || inputs.publish_results == 'true' }}
+        needs: [ visibility ]
+        if: ${{ (inputs.publish_results == true || inputs.publish_results == 'true') && needs.visibility.outputs.private != 'true' }}
         # Literal on purpose — verifier rule 1 above. Never make this dynamic.
         runs-on: ubuntu-latest
         permissions:
@@ -148,7 +186,8 @@ jobs:
     # declare id-token: write (this one declares nothing).
     analyze-sarif:
         name: "🔬 Scorecard Analysis (SARIF)"
-        if: ${{ !(inputs.publish_results == true || inputs.publish_results == 'true') }}
+        needs: [ visibility ]
+        if: ${{ !(inputs.publish_results == true || inputs.publish_results == 'true') && needs.visibility.outputs.private != 'true' }}
         uses: CLDMV/.github/.github/workflows/reusable-scorecard-sarif.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
