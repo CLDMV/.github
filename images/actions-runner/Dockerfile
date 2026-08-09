@@ -1,10 +1,12 @@
-# CLDMV self-hosted runner image = the official ARC runner + the gh CLI.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
-# ships no gh, unlike GitHub's hosted ubuntu-latest. Once v4.19.1 routed private
-# CLDMV CI to these self-hosted cldmv-runners, every reusable job that shells out
-# to gh started failing with exit 127 (gh: command not found). This image adds
-# gh so those jobs run on self-hosted exactly as they did on hosted. See #210.
+# ships no gh or jq, unlike GitHub's hosted ubuntu-latest. Once v4.19.1 routed
+# private CLDMV CI to these self-hosted cldmv-runners, every reusable job that
+# shells out to gh started failing with exit 127 (gh: command not found). This
+# image adds gh (and jq, which hosted runners also preinstall and workflow run
+# steps reasonably assume) so those jobs run on self-hosted exactly as they did
+# on hosted. See #210.
 #
 # Nothing sensitive is baked in: this is the public base image plus the gh binary
 # from GitHub's public apt repo. Runner auth (the GitHub App) lives in the
@@ -29,7 +31,7 @@ RUN apt-get update \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends gh \
+ && apt-get install -y --no-install-recommends gh jq \
  && rm -rf /var/lib/apt/lists/*
 
 # Add further hosted-runner tools here as #210's audit surfaces them.
@@ -37,5 +39,5 @@ RUN apt-get update \
 # Back to the runner user the entrypoint expects.
 USER runner
 
-# Build-time gate: fail the build if gh isn't on PATH.
-RUN gh --version
+# Build-time gate: fail the build if gh or jq isn't on PATH.
+RUN gh --version && jq --version
