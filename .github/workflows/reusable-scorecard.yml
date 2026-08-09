@@ -130,13 +130,13 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
                   REPO: ${{ github.repository }}
               run: |
-                  # `gh` (preinstalled on GitHub-hosted runners AND baked into the
-                  # cldmv-runners image) with its embedded --jq — no external jq,
-                  # which the minimal self-hosted image doesn't carry. Fail-open:
-                  # on any probe error `private` stays empty, which the gates
-                  # below treat as not-private — public repos keep working even
-                  # if the API hiccups; a private repo then just behaves as
-                  # before this gate existed.
+                  # `gh api` (preinstalled on GitHub-hosted runners AND baked into
+                  # the cldmv-runners image) — auth comes from GH_TOKEN with no
+                  # hand-rolled curl headers, and its embedded --jq parses the
+                  # response. Fail-open: on any probe error `private` stays
+                  # empty, which the gates below treat as not-private — public
+                  # repos keep working even if the API hiccups; a private repo
+                  # then just behaves as before this gate existed.
                   private=$(gh api "repos/$REPO" --jq '.private' 2>/dev/null || true)
                   echo "private=$private" >> "$GITHUB_OUTPUT"
                   echo "🔎 $REPO private: ${private:-unknown}"
