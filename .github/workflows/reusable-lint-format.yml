@@ -1,0 +1,182 @@
+# CLDMV/.github/.github/workflows/reusable-lint-format.yml
+name: "🎨 Lint & Format (Reusable)"
+
+# Reusable workflow: lint + format AUTOFIX, run POST-MERGE on an integration
+# branch (next / hotfixes) — never on feature PRs and never on the release to
+# master. When a feature PR squash-merges into next/hotfixes, this applies safe
+# fixes (prettier --write, eslint --fix) and commits them straight back onto that
+# branch, bot-signed. The commit re-triggers CI; the next run finds a clean tree
+# and doesn't commit, so it converges (no loop). A check step then fails the
+# integration-branch build on any lint problem that couldn't be auto-fixed.
+#
+# By the time next → master ships, next is already clean, so the release needs no
+# lint/format step of its own. Every command is `npm run <script> --if-present`,
+# so a repo without the script is a graceful no-op.
+#
+# The caller (workflow-ci.yml) is responsible for gating this to
+# `push` events on next / hotfixes only.
+
+on:
+    workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label. Empty = auto (RUNS_ON_DEFAULT var, else cldmv-runners for private CLDMV, else ubuntu-latest)."
+            node_version:
+                required: false
+                type: string
+                default: "lts/*"
+            package_manager:
+                required: false
+                type: string
+                default: "npm"
+            format_command:
+                required: false
+                type: string
+                default: "npm run format --if-present"
+                description: "Formatter that WRITES fixes (prettier --write)."
+            lint_fix_command:
+                required: false
+                type: string
+                default: "npm run lint:fix --if-present"
+                description: "Linter that WRITES safe fixes (eslint --fix)."
+            lint_command:
+                required: false
+                type: string
+                default: "npm run lint --if-present"
+                description: "Lint CHECK (no writes) — fails the build on unfixable lint."
+            format_check_command:
+                required: false
+                type: string
+                default: "npm run format:check --if-present"
+                description: "Format CHECK (no writes) — sanity check after the write+commit."
+            debug:
+                required: false
+                type: boolean
+                default: false
+
+        secrets:
+            # Bot App credentials — mint a token that can push the fix commit onto
+            # the protected integration branch AND (as an App, unlike GITHUB_TOKEN)
+            # re-triggers CI on the new commit so it re-verifies and converges.
+            BOT_APP_CLIENT_ID:
+                required: false
+            BOT_APP_PRIVATE_KEY:
+                required: false
+            # Bot git identity + GPG for the signed fix commit.
+            BOT_NAME:
+                required: false
+            BOT_EMAIL:
+                required: false
+            BOT_GPG_PRIVATE_KEY:
+                required: false
+            BOT_GPG_PASSPHRASE:
+                required: false
+
+permissions:
+    contents: write
+
+jobs:
+    lint-format:
+        name: "🎨 Lint & Format"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        steps:
+            # Check out the integration branch itself (not a detached SHA) so the
+            # autofix commit can be pushed straight back onto it.
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ github.ref_name }}
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  cache: ${{ inputs.package_manager }}
+
+            - name: Install dependencies
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
+            # ── Autofix ──────────────────────────────────────────────────────────
+            # Best-effort: never fail the job here. `eslint --fix` exits nonzero
+            # when an unfixable problem remains, but we still want to commit the
+            # fixes it DID apply and let the check step report the remainder.
+            - name: Apply formatting
+              if: inputs.format_command != ''
+              shell: bash
+              run: ${{ inputs.format_command }} || true
+
+            - name: Apply lint fixes
+              if: inputs.lint_fix_command != ''
+              shell: bash
+              run: ${{ inputs.lint_fix_command }} || true
+
+            - name: Detect changes
+              id: diff
+              shell: bash
+              run: |
+                  if [ -n "$(git status --porcelain)" ]; then
+                    echo "dirty=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "dirty=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Generate bot token
+              if: steps.diff.outputs.dirty == 'true'
+              id: bot-token
+              uses: actions/create-github-app-token@v3
+              with:
+                  client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Import bot GPG key
+              if: steps.diff.outputs.dirty == 'true'
+              uses: crazy-max/ghaction-import-gpg@v6
+              with:
+                  gpg_private_key: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.BOT_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+
+            - name: Commit & push fixes
+              if: steps.diff.outputs.dirty == 'true'
+              shell: bash
+              env:
+                  BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
+                  BOT_NAME: ${{ secrets.BOT_NAME }}
+                  BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+                  BRANCH: ${{ github.ref_name }}
+              run: |
+                  git config user.name "$BOT_NAME"
+                  git config user.email "$BOT_EMAIL"
+                  git add -A
+                  git commit -S -m "style: apply automated lint/format fixes"
+                  git push "https://x-access-token:${BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${BRANCH}"
+                  echo "::notice::Applied automated lint/format fixes and pushed them onto ${BRANCH}."
+
+            # ── Check (authoritative) ────────────────────────────────────────────
+            # After the write+commit, formatting is clean; this fails the
+            # integration-branch build only on lint problems --fix couldn't
+            # resolve, flagging that unfixable code reached next/hotfixes.
+            - name: Format check
+              if: inputs.format_check_command != ''
+              shell: bash
+              run: |
+                  ${{ inputs.format_check_command }} || {
+                    echo "::error::Formatting issues remain after autofix — inspect the formatter output above.";
+                    exit 1;
+                  }
+
+            - name: Lint check
+              if: inputs.lint_command != ''
+              shell: bash
+              run: |
+                  ${{ inputs.lint_command }} || {
+                    echo "::error::Lint problems reached ${{ github.ref_name }} that could not be auto-fixed. Fix them at source.";
+                    exit 1;
+                  }

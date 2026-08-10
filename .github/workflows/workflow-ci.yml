@@ -80,6 +80,37 @@ on:
                 type: string
                 default: "npm test"
                 description: "Command to run tests"
+            # ── Lint & format (autofix) ──────────────────────────────────────
+            # The lint-format job runs these. On internal branches it applies safe
+            # fixes and commits them back (bot-signed); on fork PRs it runs the
+            # check variants and fails with instructions (can't push to a fork).
+            # Every command uses `--if-present`, so a repo with no such script is a
+            # graceful no-op. Override per repo (monorepo-aware invocation) or set
+            # empty ("") to disable that phase.
+            format_command:
+                required: false
+                type: string
+                default: "npm run format --if-present"
+                description: "Formatter that WRITES fixes (prettier --write). Applied on
+                    internal branches, then committed back."
+            lint_fix_command:
+                required: false
+                type: string
+                default: "npm run lint:fix --if-present"
+                description: "Linter that WRITES safe fixes (eslint --fix). Applied on
+                    internal branches, then committed back."
+            lint_command:
+                required: false
+                type: string
+                default: "npm run lint --if-present"
+                description: "Lint CHECK (no writes). Run after autofix to fail on lint
+                    problems that couldn't be safely auto-fixed; also the fork-PR path."
+            format_check_command:
+                required: false
+                type: string
+                default: "npm run format:check --if-present"
+                description: "Format CHECK (no writes). The fork-PR path (fails with
+                    instructions since CI can't push a fix to a fork)."
             build_command:
                 required: false
                 type: string
@@ -312,6 +343,39 @@ jobs:
             BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
             BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
+    # Lint + format autofix, POST-MERGE only. Runs on a push to next / hotfixes
+    # (i.e. after a feature PR squash-merges in), applies safe fixes, and commits
+    # them straight back onto that integration branch — NOT on feature PRs and
+    # NOT on the release to master. next is therefore already clean by the time it
+    # ships. Skipped on the master-sync push (next just mirrors master) and on
+    # bump commits. Runs once (no matrix).
+    lint-format:
+        name: "🎨 Lint & Format"
+        needs: [sync-gate, commit-gate]
+        if: |
+            !cancelled() &&
+            github.event_name == 'push' &&
+            (github.ref_name == 'next' || github.ref_name == 'hotfixes') &&
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.sync-gate.outputs.is_master_sync != 'true'
+        uses: CLDMV/.github/.github/workflows/reusable-lint-format.yml@v4
+        with:
+            runs_on: ${{ inputs.runs_on }}
+            node_version: ${{ inputs.node_version }}
+            package_manager: ${{ inputs.package_manager }}
+            format_command: ${{ inputs.format_command }}
+            lint_fix_command: ${{ inputs.lint_fix_command }}
+            lint_command: ${{ inputs.lint_command }}
+            format_check_command: ${{ inputs.format_check_command }}
+            debug: ${{ inputs.debug }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+            BOT_NAME: ${{ secrets.BOT_NAME }}
+            BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+            BOT_GPG_PRIVATE_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+            BOT_GPG_PASSPHRASE: ${{ secrets.BOT_GPG_PASSPHRASE }}
+
     coverage-badge:
         name: "📊 Coverage & Badge Push"
         needs: [ paths-gate, commit-gate, ci ]
@@ -406,7 +470,7 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [ sync-gate, paths-gate, commit-gate, ci, coverage-badge, coverage-pr-comment ]
+        needs: [ sync-gate, paths-gate, commit-gate, ci, lint-format, coverage-badge, coverage-pr-comment ]
         # `always()` is already there so skipped gates don't suppress the
         # summary; the sync-gate / paths-gate / commit-gate output checks
         # then decide whether the summary is meaningful enough to produce.
