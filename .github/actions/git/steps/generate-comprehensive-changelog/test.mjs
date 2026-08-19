@@ -65,6 +65,12 @@ ok(escFile === null, "../ file template rejected → null");
 ok(!(escFile || "").includes("TOP-SECRET"), "no secret content leaked via ../ file template");
 eq(readVersionChangelogFile("5.5.5", D, "/etc/hostname"), null, "absolute file template rejected");
 eq(readVersionChangelogFile("5.5.5", "../..", ""), null, "../ dir input rejected");
+// An in-workspace file whose real target is OUTSIDE the workspace (symlink):
+// abs passes the prefix check, but the resolved real path must be re-confined.
+fs.symlinkSync(path.join(scratch, "SECRET.txt"), path.join(ws, "docs/changelog/v4.4.4.md"));
+const linked = readVersionChangelogFile("4.4.4", D, "");
+ok(linked === null, "in-workspace symlink whose target escapes the workspace → null");
+ok(!(linked || "").includes("TOP-SECRET"), "no secret leaked via escaping symlink");
 
 console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflow-command injection):");
 {

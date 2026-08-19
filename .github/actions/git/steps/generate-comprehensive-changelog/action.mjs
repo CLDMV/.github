@@ -1,4 +1,4 @@
-import { appendFileSync, readFileSync, existsSync } from "fs";
+import { appendFileSync, readFileSync, existsSync, realpathSync } from "fs";
 import path from "node:path";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
@@ -87,7 +87,15 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		}
 		try {
 			if (!existsSync(abs)) continue;
-			const content = readFileSync(abs, "utf8").trim();
+			// `abs` is within the workspace, but it may be a symlink whose target
+			// is not: readFileSync would follow it and leak external content into
+			// the PR body. Resolve the real path and re-confine before reading.
+			const real = realpathSync(abs);
+			if (real !== root && !real.startsWith(root + path.sep)) {
+				console.log(`⚠️ Ignoring changelog path that resolves outside the workspace: ${oneLine(rel)}`);
+				continue;
+			}
+			const content = readFileSync(real, "utf8").trim();
 			if (content) {
 				console.log(`📄 Found committed changelog file for the release: ${oneLine(rel)}`);
 				return content;
