@@ -63,7 +63,8 @@ export function isNotFoundError(message) {
 export function allowedMergeMethodsFromRules(rules) {
 	const effective = Array.isArray(rules) ? rules : [];
 	const prRule = effective.find((r) => r && r.type === "pull_request");
-	const methods = prRule && prRule.parameters && Array.isArray(prRule.parameters.allowed_merge_methods) ? prRule.parameters.allowed_merge_methods : [];
+	const methods =
+		prRule && prRule.parameters && Array.isArray(prRule.parameters.allowed_merge_methods) ? prRule.parameters.allowed_merge_methods : [];
 	return methods.map((m) => String(m).toLowerCase()).filter(Boolean);
 }
 

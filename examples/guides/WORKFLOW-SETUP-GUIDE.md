@@ -6,36 +6,36 @@ Per-template setup reference for every example workflow under [`../individual-re
 
 ## Workflows at a Glance
 
-| Category | Workflow | File | Trigger | Purpose |
-|---|---|---|---|---|
-| Core CI/CD | [CI Tests & Build](#-ci-tests--build) | `core-cicd/ci.yml` | push / fork-PR | Test matrix + build; PR gate. Supports [embedded private tests](#-ci-tests--build) via anonymous gitlinks (opt-in) |
-| Core CI/CD | [Create Release PR](#-create-release-pr) | `core-cicd/release.yml` | push to non-default | Opens versioned release PRs |
-| Core CI/CD | [Release and Publish](#-release-and-publish) | `core-cicd/publish.yml` | push to master/main | Publishes to NPM / GitHub Packages |
-| Core CI/CD | [Update Major Version Tags](#-update-major-version-tags) | `core-cicd/update-major-version-tags.yml` | release published | Maintains `vX` / `vX.Y` floating tags |
-| Release flow v4 | [Next Release](#-next-release-v4) | `release-flow-v4/next-release.yml` | push to `next` | Refreshes persistent `next → master` release PR |
-| Release flow v4 | [Hotfixes Release](#-hotfixes-release-v4) | `release-flow-v4/hotfixes-release.yml` | push to `hotfixes` | Refreshes persistent `hotfixes → master` release PR |
-| Release flow v4 | [Next/Hotfixes Reset](#-nexthotfixes-reset-v4) | `release-flow-v4/next-reset.yml` | push to `master` (release commit) | Re-syncs integration branches after a release |
-| Release flow v4 | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4) | `release-flow-v4/hotfix-redirector.yml` | PR opened | Retargets `hotfix/*` / `security/*` PRs **and Dependabot security updates** onto `hotfixes` |
-| Release flow v4 | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer) | `release-flow-v4/pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to conventional-commit shape |
-| Release flow v4 | [v4 Bootstrap](#-v4-bootstrap) | `release-flow-v4/v4-bootstrap.yml` | manual dispatch | Creates `next` + `hotfixes`; configures repo for v4 |
-| Release companions | [Tag Health](#-tag-health) | `release-companions/tag-health.yml` | weekly cron + dispatch | Validates / repairs tags |
-| Release companions | [Release Notifier](#-release-notifier) | `release-companions/release-notify.yml` | release published | Notifies Discord / Slack / webhooks |
-| Release companions | [Master Commit Audit](#-master-commit-audit) | `release-companions/master-commit-audit.yml` | push to default | Files Issues on subject-line drift |
-| Security | [CodeQL](#-codeql) | `security/codeql.yml` | push / PR / weekly cron | SAST via CodeQL |
-| Security | [Dependency Review](#-dependency-review) | `security/dependency-review.yml` | PR | Blocks PRs with high-severity new deps |
-| Security | [OpenSSF Scorecard](#-openssf-scorecard) | `security/scorecard.yml` | weekly + dispatch | Publishes OSSF Scorecard score |
-| Security | [CLA Bot](#-cla-bot) | `security/cla.yml` | PR + issue_comment | Per-CLA-version, org-wide signing via central ledger; org members exempt |
-| Automation | [Dependabot config](#-dependabot-config) | `automation/dependabot.yml` | (config file) | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes` |
-| Automation | [Dependabot Auto-Merge](#-dependabot-auto-merge) | `automation/dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`) |
-| Automation | [Member Auto-Enable Auto-Merge](#-member-auto-enable-auto-merge) | `automation/member-auto-merge.yml` | PR by org member | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes`; does NOT approve |
-| Automation | [Labeler](#-labeler) | `automation/labeler.yml` | pull_request_target | Path-based PR labels |
-| Automation | [Welcome](#-welcome) | `automation/welcome.yml` | first issue / PR | Welcome comments |
-| Automation | [Stale](#-stale) | `automation/stale.yml` | daily cron | Marks/closes inactive issues + PRs |
-| Automation | [Branch Retention](#-branch-retention) | `automation/branch-retention.yml` | PR merged | Prunes head branches with retention |
-| Packaging/docs | [Docker Publish](#-docker-publish) | `packaging-docs/docker-publish.yml` | push to default + dispatch | Builds + pushes image to GHCR |
-| Packaging/docs | [Bundle Size](#-bundle-size) | `packaging-docs/bundle-size.yml` | PR | Comments `dist/` size delta |
-| Packaging/docs | [Docs Publish](#-docs-publish) | `packaging-docs/docs.yml` | push to default (filtered) | Publishes docs to `gh-pages` |
-| Packaging/docs | [Sync Org Labels](#-sync-org-labels) | `packaging-docs/sync-org-labels.yml` | manual / weekly cron | Syncs labels across org repos |
+| Category           | Workflow                                                          | File                                         | Trigger                           | Purpose                                                                                                            |
+| ------------------ | ----------------------------------------------------------------- | -------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Core CI/CD         | [CI Tests & Build](#-ci-tests--build)                             | `core-cicd/ci.yml`                           | push / fork-PR                    | Test matrix + build; PR gate. Supports [embedded private tests](#-ci-tests--build) via anonymous gitlinks (opt-in) |
+| Core CI/CD         | [Create Release PR](#-create-release-pr)                          | `core-cicd/release.yml`                      | push to non-default               | Opens versioned release PRs                                                                                        |
+| Core CI/CD         | [Release and Publish](#-release-and-publish)                      | `core-cicd/publish.yml`                      | push to master/main               | Publishes to NPM / GitHub Packages                                                                                 |
+| Core CI/CD         | [Update Major Version Tags](#%EF%B8%8F-update-major-version-tags) | `core-cicd/update-major-version-tags.yml`    | release published                 | Maintains `vX` / `vX.Y` floating tags                                                                              |
+| Release flow v4    | [Next Release](#-next-release-v4)                                 | `release-flow-v4/next-release.yml`           | push to `next`                    | Refreshes persistent `next → master` release PR                                                                    |
+| Release flow v4    | [Hotfixes Release](#-hotfixes-release-v4)                         | `release-flow-v4/hotfixes-release.yml`       | push to `hotfixes`                | Refreshes persistent `hotfixes → master` release PR                                                                |
+| Release flow v4    | [Next/Hotfixes Reset](#%EF%B8%8F-nexthotfixes-reset-v4)           | `release-flow-v4/next-reset.yml`             | push to `master` (release commit) | Re-syncs integration branches after a release                                                                      |
+| Release flow v4    | [Hotfix PR Redirector](#-hotfix-pr-redirector-v4)                 | `release-flow-v4/hotfix-redirector.yml`      | PR opened                         | Retargets `hotfix/*` / `security/*` PRs **and Dependabot security updates** onto `hotfixes`                        |
+| Release flow v4    | [PR Title Normalizer](#%EF%B8%8F-pr-title-normalizer)             | `release-flow-v4/pr-title-normalizer.yml`    | PR opened / synchronize           | Normalizes PR titles to conventional-commit shape                                                                  |
+| Release flow v4    | [v4 Bootstrap](#-v4-bootstrap)                                    | `release-flow-v4/v4-bootstrap.yml`           | manual dispatch                   | Creates `next` + `hotfixes`; configures repo for v4                                                                |
+| Release companions | [Tag Health](#-tag-health)                                        | `release-companions/tag-health.yml`          | weekly cron + dispatch            | Validates / repairs tags                                                                                           |
+| Release companions | [Release Notifier](#-release-notifier)                            | `release-companions/release-notify.yml`      | release published                 | Notifies Discord / Slack / webhooks                                                                                |
+| Release companions | [Master Commit Audit](#%EF%B8%8F-master-commit-audit)             | `release-companions/master-commit-audit.yml` | push to default                   | Files Issues on subject-line drift                                                                                 |
+| Security           | [CodeQL](#-codeql)                                                | `security/codeql.yml`                        | push / PR / weekly cron           | SAST via CodeQL                                                                                                    |
+| Security           | [Dependency Review](#%EF%B8%8F-dependency-review)                 | `security/dependency-review.yml`             | PR                                | Blocks PRs with high-severity new deps                                                                             |
+| Security           | [OpenSSF Scorecard](#-openssf-scorecard)                          | `security/scorecard.yml`                     | weekly + dispatch                 | Publishes OSSF Scorecard score                                                                                     |
+| Security           | [CLA Bot](#%EF%B8%8F-cla-bot)                                     | `security/cla.yml`                           | PR + issue_comment                | Per-CLA-version, org-wide signing via central ledger; org members exempt                                           |
+| Automation         | [Dependabot config](#-dependabot-config)                          | `automation/dependabot.yml`                  | (config file)                     | Routes Dependabot PRs to `next`; security updates auto-promoted to `hotfixes`                                      |
+| Automation         | [Dependabot Auto-Merge](#-dependabot-auto-merge)                  | `automation/dependabot-auto-merge.yml`       | PR by dependabot[bot]             | Auto-merges patch/minor bumps into the PR's target branch (`next` or `hotfixes`)                                   |
+| Automation         | [Member Auto-Enable Auto-Merge](#-member-auto-enable-auto-merge)  | `automation/member-auto-merge.yml`           | PR by org member                  | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes`; does NOT approve                       |
+| Automation         | [Labeler](#%EF%B8%8F-labeler)                                     | `automation/labeler.yml`                     | pull_request_target               | Path-based PR labels                                                                                               |
+| Automation         | [Welcome](#-welcome)                                              | `automation/welcome.yml`                     | first issue / PR                  | Welcome comments                                                                                                   |
+| Automation         | [Stale](#-stale)                                                  | `automation/stale.yml`                       | daily cron                        | Marks/closes inactive issues + PRs                                                                                 |
+| Automation         | [Branch Retention](#-branch-retention)                            | `automation/branch-retention.yml`            | PR merged                         | Prunes head branches with retention                                                                                |
+| Packaging/docs     | [Docker Publish](#-docker-publish)                                | `packaging-docs/docker-publish.yml`          | push to default + dispatch        | Builds + pushes image to GHCR                                                                                      |
+| Packaging/docs     | [Bundle Size](#-bundle-size)                                      | `packaging-docs/bundle-size.yml`             | PR                                | Comments `dist/` size delta                                                                                        |
+| Packaging/docs     | [Docs Publish](#-docs-publish)                                    | `packaging-docs/docs.yml`                    | push to default (filtered)        | Publishes docs to `gh-pages`                                                                                       |
+| Packaging/docs     | [Sync Org Labels](#%EF%B8%8F-sync-org-labels)                     | `packaging-docs/sync-org-labels.yml`         | manual / weekly cron              | Syncs labels across org repos                                                                                      |
 
 ---
 
@@ -49,12 +49,12 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 
 **Required `package.json` scripts**
 
-| Script | When required | Default command |
-|---|---|---|
-| `test` | Always | `npm test` |
-| `build:ci` | Always | `npm run build:ci` |
+| Script        | When required                                                                               | Default command       |
+| ------------- | ------------------------------------------------------------------------------------------- | --------------------- |
+| `test`        | Always                                                                                      | `npm test`            |
+| `build:ci`    | Always                                                                                      | `npm run build:ci`    |
 | `ci:coverage` | When `enable_coverage_badge` / `enable_coverage_pr_comment` is `true` (both default `true`) | `npm run ci:coverage` |
-| `test:types` | When `skip_type_check` is `false` (default) | `npm run test:types` |
+| `test:types`  | When `skip_type_check` is `false` (default)                                                 | `npm run test:types`  |
 
 `ci:coverage` must produce a `coverage/coverage-summary.json` (Istanbul / c8 / Vitest reporter format). Path is configurable via `coverage_summary_path`.
 
@@ -240,13 +240,13 @@ Fires on `release: published`. Each channel is a single secret — set the secre
 
 **Required secrets** — any of `<TYPE>_RELEASES_<VIS>_WEBHOOK` you want active:
 
-| Secret | Effect |
-|---|---|
-| `DISCORD_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → Discord |
-| `DISCORD_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → Discord |
-| `SLACK_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → Slack |
-| `SLACK_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → Slack |
-| `GENERIC_RELEASES_PUBLIC_WEBHOOK` | Public-repo release → JSON POST |
+| Secret                             | Effect                                    |
+| ---------------------------------- | ----------------------------------------- |
+| `DISCORD_RELEASES_PUBLIC_WEBHOOK`  | Public-repo release → Discord             |
+| `DISCORD_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → Discord   |
+| `SLACK_RELEASES_PUBLIC_WEBHOOK`    | Public-repo release → Slack               |
+| `SLACK_RELEASES_PRIVATE_WEBHOOK`   | Private/internal-repo release → Slack     |
+| `GENERIC_RELEASES_PUBLIC_WEBHOOK`  | Public-repo release → JSON POST           |
 | `GENERIC_RELEASES_PRIVATE_WEBHOOK` | Private/internal-repo release → JSON POST |
 
 Repo secret overrides org secret of the same name (built-in GitHub precedence). Set a repo secret to an empty string to mute that channel for this repo.
@@ -259,19 +259,19 @@ Repo secret overrides org secret of the same name (built-in GitHub precedence). 
 
 **File:** `release-companions/pr-notify.yml` &nbsp;·&nbsp; **Calls:** `reusable-pr-notifier.yml@v4`
 
-Fires once per `pull_request: opened` (for every PR, including release PRs opened by the release-flow workflows). Release-PR *updates* are notified separately by the inline notifier step in `update-release-pr` — so a release PR open hits this notifier exactly once and version-bump shifts are handled by the release-PR notifier.
+Fires once per `pull_request: opened` (for every PR, including release PRs opened by the release-flow workflows). Release-PR _updates_ are notified separately by the inline notifier step in `update-release-pr` — so a release PR open hits this notifier exactly once and version-bump shifts are handled by the release-PR notifier.
 
 **Required `package.json` scripts** — none.
 
 **Required secrets** — any of `<TYPE>_PR_<VIS>_WEBHOOK`:
 
-| Secret | Effect |
-|---|---|
-| `DISCORD_PR_PUBLIC_WEBHOOK` | Public-repo PR open → Discord |
-| `DISCORD_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → Discord |
-| `SLACK_PR_PUBLIC_WEBHOOK` | Public-repo PR open → Slack |
-| `SLACK_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → Slack |
-| `GENERIC_PR_PUBLIC_WEBHOOK` | Public-repo PR open → JSON POST |
+| Secret                       | Effect                                    |
+| ---------------------------- | ----------------------------------------- |
+| `DISCORD_PR_PUBLIC_WEBHOOK`  | Public-repo PR open → Discord             |
+| `DISCORD_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → Discord   |
+| `SLACK_PR_PUBLIC_WEBHOOK`    | Public-repo PR open → Slack               |
+| `SLACK_PR_PRIVATE_WEBHOOK`   | Private/internal-repo PR open → Slack     |
+| `GENERIC_PR_PUBLIC_WEBHOOK`  | Public-repo PR open → JSON POST           |
 | `GENERIC_PR_PRIVATE_WEBHOOK` | Private/internal-repo PR open → JSON POST |
 
 Same precedence + mute mechanics as the release notifier.
@@ -286,14 +286,14 @@ The release-flow workflows (`next-release.yml`, `hotfixes-release.yml`, `workflo
 
 **Required secrets** — any of `<TYPE>_RELEASE_PR_<VIS>_WEBHOOK`:
 
-| Secret | Effect |
-|---|---|
-| `DISCORD_RELEASE_PR_PUBLIC_WEBHOOK` | Public-repo release-PR version bump → Discord |
+| Secret                               | Effect                                                  |
+| ------------------------------------ | ------------------------------------------------------- |
+| `DISCORD_RELEASE_PR_PUBLIC_WEBHOOK`  | Public-repo release-PR version bump → Discord           |
 | `DISCORD_RELEASE_PR_PRIVATE_WEBHOOK` | Private/internal-repo release-PR version bump → Discord |
-| `SLACK_RELEASE_PR_PUBLIC_WEBHOOK` | … → Slack |
-| `SLACK_RELEASE_PR_PRIVATE_WEBHOOK` | … → Slack |
-| `GENERIC_RELEASE_PR_PUBLIC_WEBHOOK` | … → JSON POST |
-| `GENERIC_RELEASE_PR_PRIVATE_WEBHOOK` | … → JSON POST |
+| `SLACK_RELEASE_PR_PUBLIC_WEBHOOK`    | … → Slack                                               |
+| `SLACK_RELEASE_PR_PRIVATE_WEBHOOK`   | … → Slack                                               |
+| `GENERIC_RELEASE_PR_PUBLIC_WEBHOOK`  | … → JSON POST                                           |
+| `GENERIC_RELEASE_PR_PRIVATE_WEBHOOK` | … → JSON POST                                           |
 
 To opt out entirely: delete the `Notify on release-PR version bump` step in your `next-release.yml` / `hotfixes-release.yml`. Otherwise just leave the secrets unset.
 
@@ -372,7 +372,7 @@ On every PR (including from forks), checks whether each commit author has signed
 - **Default scope** — the consumer repo has no `CLA.md` at the root. The bot reads the org-wide CLA from the ledger at `cla-versions/v<X.Y>.md`. One signature covers every consumer repo using the default, until the major.minor version is bumped.
 - **Override scope** — the consumer repo includes its own `CLA.md` with custom terms. The bot reads that text directly and parses the version from the file's header (`# … CLA — v1.0` → `v1.0`). On the **first signature** the bot bootstraps an immutable snapshot at `cla-versions/overrides/<owner>/<repo>/v<X.Y>.md`; on subsequent signatures it verifies the consumer's text still matches that snapshot. Editing the override's text without bumping the header version is detected as **drift** and rejected with a clear remediation message.
 
-Signatures are scoped per-CLA-text-hash. Signing the default v1.0 does *not* cover override-repo v1.0 and vice versa — the override's text is a different agreement. Override signatures live at `signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/<shard>/<id>.json`; default signatures live at `signatures/<platform>/v<X.Y>/<shard>/<id>.json`.
+Signatures are scoped per-CLA-text-hash. Signing the default v1.0 does _not_ cover override-repo v1.0 and vice versa — the override's text is a different agreement. Override signatures live at `signatures/<platform>/overrides/<owner>/<repo>/v<X.Y>/<shard>/<id>.json`; default signatures live at `signatures/<platform>/v<X.Y>/<shard>/<id>.json`.
 
 A contributor replies on the PR with the exact text `I have read and I agree to the CLA v<X.Y>`; the bot writes an immutable JSON signature record to the central ledger (private — `CLDMV/.cla-signatures`). Org members and configured bots are exempt.
 
@@ -416,11 +416,12 @@ Auto-approves and queues auto-merge for patch/minor Dependabot bumps once CI pas
 
 **Key inputs** — `bump_types` (default `patch,minor`), `merge_method` (default `squash`), `also_for_actors` (extend to Renovate or other bots).
 
-**Interaction with hotfix-redirector:** the redirector fires on `opened` *before* this workflow's auto-merge takes effect. For a Dependabot security PR, the sequence is:
-  1. Dependabot opens PR against `next` (per the config in `dependabot.yml`).
-  2. `hotfix-redirector.yml` detects the GHSA reference in the body and retargets the PR `next` → `hotfixes`.
-  3. CI runs against `hotfixes`.
-  4. This auto-merge workflow approves + auto-merges into `hotfixes`.
+**Interaction with hotfix-redirector:** the redirector fires on `opened` _before_ this workflow's auto-merge takes effect. For a Dependabot security PR, the sequence is:
+
+1. Dependabot opens PR against `next` (per the config in `dependabot.yml`).
+2. `hotfix-redirector.yml` detects the GHSA reference in the body and retargets the PR `next` → `hotfixes`.
+3. CI runs against `hotfixes`.
+4. This auto-merge workflow approves + auto-merges into `hotfixes`.
 
 The net effect: security updates ship via the hotfix lane without anyone clicking anything; routine bumps batch into `next` for the next release.
 
@@ -441,6 +442,7 @@ Auto-enables GitHub's "auto-merge" flag on PRs opened by org members (`author_as
 **Required secrets** — bot App credentials.
 
 **Prereqs**
+
 - **Settings → Pull Requests → "Allow auto-merge"** must be ON (enabled by `release-flow-v4/v4-bootstrap.yml`).
 - A ruleset on `next` / `hotfixes` with required status checks AND a required-approving-review count ≥ 1 (the default v4 rulesets do both). The action refuses to enable auto-merge on a branch without required checks; the ruleset's approval requirement is what keeps a human in the loop after auto-merge is enabled.
 
@@ -524,7 +526,7 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 
 **Key inputs** — `image_namespace` (default `cldmv`), `pre_publish_command`, `dockerfile` path.
 
-**Optional pre-push vulnerability gate.** Set `enable_container_scan: true` to run Trivy against the image *before* it's pushed. The workflow builds the image once into an OCI tarball (`outputs: type=oci`), feeds the tarball to Trivy via its native `--input` mode, optionally uploads SARIF to the GitHub Security tab, and only pushes when the scan exits 0. The same OCI artifact is then shipped to the registry by [`crane push`](https://github.com/google/go-containerregistry/tree/main/cmd/crane) (SHA-pinned `imjasonh/setup-crane`) — multi-platform manifest lists are preserved intact, so the gate works for single- and multi-platform builds with one code path. Knobs: `scan_severity` (default `CRITICAL,HIGH`), `scan_fail_on_severity` (default `true` — set `false` for report-only), `scan_ignore_unfixed` (default `true`), `scan_sarif_upload` (default `true`), `scan_sarif_category` (default `trivy`).
+**Optional pre-push vulnerability gate.** Set `enable_container_scan: true` to run Trivy against the image _before_ it's pushed. The workflow builds the image once into an OCI tarball (`outputs: type=oci`), feeds the tarball to Trivy via its native `--input` mode, optionally uploads SARIF to the GitHub Security tab, and only pushes when the scan exits 0. The same OCI artifact is then shipped to the registry by [`crane push`](https://github.com/google/go-containerregistry/tree/main/cmd/crane) (SHA-pinned `imjasonh/setup-crane`) — multi-platform manifest lists are preserved intact, so the gate works for single- and multi-platform builds with one code path. Knobs: `scan_severity` (default `CRITICAL,HIGH`), `scan_fail_on_severity` (default `true` — set `false` for report-only), `scan_ignore_unfixed` (default `true`), `scan_sarif_upload` (default `true`), `scan_sarif_category` (default `trivy`).
 
 ---
 
@@ -582,17 +584,17 @@ Reads `data/github-labels.json` from the public org repo and applies the catalog
 
 The table below maps each template to the org/repo secrets it actually references. The bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) are mapped to `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` inside the reusable via `secrets:` inheritance — the consumer always references the `CLDMV_*` name in their workflow's `secrets:` block.
 
-| Org secret name | ci | release | publish | sync-rel-prs | tag-health | docker | cla | docs | dependabot | stale | branch-ret. | sync-labels |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `CLDMV_BOT_APP_CLIENT_ID` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `CLDMV_BOT_APP_PRIVATE_KEY` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `CLDMV_CLA_BOT_APP_CLIENT_ID` | — | — | — | — | — | — | ✓⁴ | — | — | — | — | — |
-| `CLDMV_CLA_BOT_APP_PRIVATE_KEY` | — | — | — | — | — | — | ✓⁴ | — | — | — | — | — |
-| `CLDMV_BOT_NAME` | ✓¹ | ✓² | ✓² | — | ✓ | — | ✓ | ✓ | — | — | — | — |
-| `CLDMV_BOT_EMAIL` | ✓¹ | ✓² | ✓² | — | ✓ | — | ✓ | ✓ | — | — | — | — |
-| `CLDMV_BOT_GPG_PRIVATE_KEY` | ✓¹ | ✓² | ✓² | — | ✓ | — | — | — | — | — | — | — |
-| `CLDMV_BOT_GPG_PASSPHRASE` | ✓¹ | ✓² | ✓² | — | ✓ | — | — | — | — | — | — | — |
-| `NPM_TOKEN` | ✓³ | ✓³ | ✓ | — | — | — | — | — | — | — | — | — |
+| Org secret name                 | ci  | release | publish | sync-rel-prs | tag-health | docker | cla | docs | dependabot | stale | branch-ret. | sync-labels |
+| ------------------------------- | :-: | :-----: | :-----: | :----------: | :--------: | :----: | :-: | :--: | :--------: | :---: | :---------: | :---------: |
+| `CLDMV_BOT_APP_CLIENT_ID`       |  ✓  |    ✓    |    ✓    |      ✓       |     ✓      |   ✓    |  ✓  |  ✓   |     ✓      |   ✓   |      ✓      |      ✓      |
+| `CLDMV_BOT_APP_PRIVATE_KEY`     |  ✓  |    ✓    |    ✓    |      ✓       |     ✓      |   ✓    |  ✓  |  ✓   |     ✓      |   ✓   |      ✓      |      ✓      |
+| `CLDMV_CLA_BOT_APP_CLIENT_ID`   |  —  |    —    |    —    |      —       |     —      |   —    | ✓⁴  |  —   |     —      |   —   |      —      |      —      |
+| `CLDMV_CLA_BOT_APP_PRIVATE_KEY` |  —  |    —    |    —    |      —       |     —      |   —    | ✓⁴  |  —   |     —      |   —   |      —      |      —      |
+| `CLDMV_BOT_NAME`                | ✓¹  |   ✓²    |   ✓²    |      —       |     ✓      |   —    |  ✓  |  ✓   |     —      |   —   |      —      |      —      |
+| `CLDMV_BOT_EMAIL`               | ✓¹  |   ✓²    |   ✓²    |      —       |     ✓      |   —    |  ✓  |  ✓   |     —      |   —   |      —      |      —      |
+| `CLDMV_BOT_GPG_PRIVATE_KEY`     | ✓¹  |   ✓²    |   ✓²    |      —       |     ✓      |   —    |  —  |  —   |     —      |   —   |      —      |      —      |
+| `CLDMV_BOT_GPG_PASSPHRASE`      | ✓¹  |   ✓²    |   ✓²    |      —       |     ✓      |   —    |  —  |  —   |     —      |   —   |      —      |      —      |
+| `NPM_TOKEN`                     | ✓³  |   ✓³    |    ✓    |      —       |     —      |   —    |  —  |  —   |     —      |   —   |      —      |      —      |
 
 ¹ Required when `enable_coverage_badge: true` (the default — uncheck to skip)
 ² Required when `use_gpg: true`
@@ -617,7 +619,7 @@ These come up across multiple workflows — set them once per repo:
 - **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
 - **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
-- **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
+- **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#%EF%B8%8F-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
 - **`Dockerfile`** at repo root — required by `docker-publish.yml`.
 - **Bot App permissions** — Contents: write, Pull-requests: write, Issues: write, Packages: write (for Docker), Org → Members: read (for CLA), plus Contents: write on `CLDMV/.cla-signatures` specifically (for CLA signature recording).

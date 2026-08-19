@@ -6,7 +6,7 @@
  */
 
 import fs from "node:fs";
-import { getInput } from "../../../common/common/core.mjs";
+import { getInput, floorToFixed } from "../../../common/common/core.mjs";
 
 try {
 	const summaryPath = getInput("coverage-summary-path", { required: true });
@@ -14,7 +14,7 @@ try {
 
 	// A metric with zero total counts as fully covered.
 	const safePct = (metric) => (metric.total === 0 ? 100 : metric.pct);
-	const avg = ((safePct(total.statements) + safePct(total.branches) + safePct(total.functions) + safePct(total.lines)) / 4).toFixed(1);
+	const avg = floorToFixed((safePct(total.statements) + safePct(total.branches) + safePct(total.functions) + safePct(total.lines)) / 4);
 
 	const color = avg >= 90 ? "brightgreen" : avg >= 75 ? "green" : avg >= 60 ? "yellow" : "red";
 

@@ -127,7 +127,7 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
 
 		if (info.isAnnotated) {
 			const tagContent = gitCommand(`git cat-file -p ${tagName}`, true);
-			const taggerMatch = tagContent.match(/^tagger (.+) (\d{10,}) ([\+\-]\d{4})$/m);
+			const taggerMatch = tagContent.match(/^tagger (.+) (\d{10,}) ([+-]\d{4})$/m);
 
 			if (taggerMatch) {
 				const taggerStr = taggerMatch[1];

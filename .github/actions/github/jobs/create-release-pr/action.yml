@@ -45,6 +45,14 @@ inputs:
   github-token:
     description: "GitHub token for API operations"
     required: true
+  changelog-dir:
+    description: "Base directory searched for a committed per-version changelog file. When one matching the resolved version exists on the head branch, its contents become the release-PR body. Empty (default) searches both `docs/changelog` and `docs/changelogs`."
+    required: false
+    default: ""
+  changelog-file:
+    description: "Optional explicit path-template override for the changelog file (supports `{version}`/`{major}`). Takes precedence over the default lookup."
+    required: false
+    default: ""
 
 outputs:
   pr-created:
@@ -147,6 +155,12 @@ runs:
         # Resolved release base so the changelog's release-PR filter recognizes
         # the head=next/hotfixes → base=<resolved> release PR (not just master).
         default-branch: ${{ inputs.default-branch }}
+        # When a committed changelog file for this version exists on the head
+        # branch, the generator uses it as the PR body (contributors still
+        # appended). Absent → the generated changelog above.
+        new-version: ${{ steps.version.outputs.new-version }}
+        changelog-dir: ${{ inputs.changelog-dir }}
+        changelog-file: ${{ inputs.changelog-file }}
 
     - name: Detect default branch
       id: default-branch

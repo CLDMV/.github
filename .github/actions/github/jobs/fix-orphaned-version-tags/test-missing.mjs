@@ -27,7 +27,11 @@ const cmp = (a, b) => {
 // refresh tags
 try {
 	sh("git fetch --prune --tags --force");
-} catch {}
+} catch {
+	// Best-effort refresh — a stale/unreachable remote shouldn't block the
+	// tag comparison below, which still works against whatever tags are
+	// already present locally.
+}
 
 const allTags = sh('git tag -l "v*.*.*"').split("\n").filter(Boolean).sort(cmp);
 const allRefTags = sh("git tag -l").split("\n").filter(Boolean);

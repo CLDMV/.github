@@ -6,12 +6,12 @@ CLDMV CI applies lint and format fixes **post-merge, on the integration branch**
 
 The `lint-format` job (`workflow-ci.yml` → `reusable-lint-format.yml`) runs once (no matrix), gated to **`push` events on `next` / `hotfixes`** only. Four commands, each `npm run <script> --if-present` so a missing script is a no-op:
 
-| Phase | Default command | Input | Writes? |
-|---|---|---|---|
-| Format | `npm run format --if-present` | `format_command` | yes (prettier --write) |
-| Lint fix | `npm run lint:fix --if-present` | `lint_fix_command` | yes (eslint --fix) |
-| Format check | `npm run format:check --if-present` | `format_check_command` | no |
-| Lint check | `npm run lint --if-present` | `lint_command` | no |
+| Phase        | Default command                     | Input                  | Writes?                |
+| ------------ | ----------------------------------- | ---------------------- | ---------------------- |
+| Format       | `npm run format --if-present`       | `format_command`       | yes (prettier --write) |
+| Lint fix     | `npm run lint:fix --if-present`     | `lint_fix_command`     | yes (eslint --fix)     |
+| Format check | `npm run format:check --if-present` | `format_check_command` | no                     |
+| Lint check   | `npm run lint --if-present`         | `lint_command`         | no                     |
 
 Flow on a merge into `next`/`hotfixes`: run the two writers; if the tree is now dirty, **commit the fixes back bot-signed** and push onto the branch. That commit re-triggers CI; the next run finds a clean tree, doesn't commit, and converges (no loop). The check phase then fails the integration-branch build only on lint problems `--fix` couldn't resolve — a signal that unfixable code reached `next`.
 

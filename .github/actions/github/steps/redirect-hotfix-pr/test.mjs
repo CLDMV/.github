@@ -118,19 +118,43 @@ const pat = compilePattern("");
 
 // Routine non-bot hotfix flow
 eq(
-	shouldSkip({ userType: "User", userLogin: "octocat", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "User",
+		userLogin: "octocat",
+		headRef: "hotfix/x",
+		baseRef: "next",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: false, reason: "", redirectKind: "hotfix" },
 	"hotfix head, not yet redirected → proceed (kind=hotfix)"
 );
 eq(
-	shouldSkip({ userType: "User", userLogin: "octocat", headRef: "security/cve-1234", baseRef: "next", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "User",
+		userLogin: "octocat",
+		headRef: "security/cve-1234",
+		baseRef: "next",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: false, reason: "", redirectKind: "hotfix" },
 	"security/ head → proceed (kind=hotfix)"
 );
 
 // Bot skipping (no GHSA reference)
 eq(
-	shouldSkip({ userType: "Bot", userLogin: "github-actions[bot]", headRef: "hotfix/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "Bot",
+		userLogin: "github-actions[bot]",
+		headRef: "hotfix/x",
+		baseRef: "next",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: true, reason: "PR author is a Bot", redirectKind: null },
 	"non-dependabot bot → skip even on hotfix head"
 );
@@ -196,17 +220,41 @@ eq(
 
 // Existing skip paths still apply for non-bot non-matching
 eq(
-	shouldSkip({ userType: "User", userLogin: "octocat", headRef: "feat/x", baseRef: "next", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "User",
+		userLogin: "octocat",
+		headRef: "feat/x",
+		baseRef: "next",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: true, reason: `Head 'feat/x' does not match hotfix pattern ${pat}`, redirectKind: null },
 	"non-hotfix head → skip"
 );
 eq(
-	shouldSkip({ userType: "User", userLogin: "octocat", headRef: "hotfix/x", baseRef: "hotfixes", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "User",
+		userLogin: "octocat",
+		headRef: "hotfix/x",
+		baseRef: "hotfixes",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: true, reason: "PR already targets 'hotfixes'", redirectKind: null },
 	"hotfix head already on target → skip"
 );
 eq(
-	shouldSkip({ userType: "User", userLogin: "octocat", headRef: "", baseRef: "next", targetBase: "hotfixes", headPattern: pat, prBody: "" }),
+	shouldSkip({
+		userType: "User",
+		userLogin: "octocat",
+		headRef: "",
+		baseRef: "next",
+		targetBase: "hotfixes",
+		headPattern: pat,
+		prBody: ""
+	}),
 	{ skip: true, reason: `Head '' does not match hotfix pattern ${pat}`, redirectKind: null },
 	"empty head → skip"
 );

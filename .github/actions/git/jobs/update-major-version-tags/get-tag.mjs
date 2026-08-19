@@ -36,7 +36,10 @@ try {
 			}
 		}
 
-		const allTags = execSync("git tag -l").toString().split("\n").map((tag) => tag.trim());
+		const allTags = execSync("git tag -l")
+			.toString()
+			.split("\n")
+			.map((tag) => tag.trim());
 
 		if (pkgTag) {
 			tagName = pkgTag;

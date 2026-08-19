@@ -426,4 +426,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 } // End main execution block
 
 // Export functions for testing
-export { findReleaseCommits, analyzeVersionBump, extractExplicitVersion, hasConventionalCommits, stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix };
+export {
+	findReleaseCommits,
+	analyzeVersionBump,
+	extractExplicitVersion,
+	hasConventionalCommits,
+	stripConventionalPrefix,
+	stripLeadingVersion,
+	computeTitleSuffix
+};

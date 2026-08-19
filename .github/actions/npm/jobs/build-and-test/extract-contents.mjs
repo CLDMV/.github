@@ -32,10 +32,11 @@ try {
 	console.log("📦 Extracting npm package contents for easier access...");
 
 	// npm pack writes the .tgz to the repo root; fall back to a recursive search.
-	const tgzFile = fs
-		.readdirSync(".")
-		.filter((name) => name.endsWith(".tgz"))
-		.sort()[0] || findTgz(".");
+	const tgzFile =
+		fs
+			.readdirSync(".")
+			.filter((name) => name.endsWith(".tgz"))
+			.sort()[0] || findTgz(".");
 
 	if (!tgzFile) {
 		console.error("::error::No .tgz file found");

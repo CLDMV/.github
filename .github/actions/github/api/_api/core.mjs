@@ -62,9 +62,10 @@ export async function paginate(path, ctx) {
 
 	for (let page = 1; page <= maxPages; page++) {
 		const sep = path.includes("?") ? "&" : "?";
-		const url = owner && repo
-			? `https://api.github.com/repos/${owner}/${repo}${path}${sep}per_page=${perPage}&page=${page}`
-			: `https://api.github.com${path}${sep}per_page=${perPage}&page=${page}`;
+		const url =
+			owner && repo
+				? `https://api.github.com/repos/${owner}/${repo}${path}${sep}per_page=${perPage}&page=${page}`
+				: `https://api.github.com${path}${sep}per_page=${perPage}&page=${page}`;
 		debugLog(`paginate GET ${url}`);
 		const res = await fetch(url, {
 			headers: {
@@ -86,7 +87,9 @@ export async function paginate(path, ctx) {
 		items.push(...batch);
 		if (batch.length < perPage) break;
 		if (remaining < rateLimitFloor) {
-			console.log(`::warning::Rate limit remaining=${remaining} below floor=${rateLimitFloor}; aborting pagination at page ${page} with ${items.length} items collected.`);
+			console.log(
+				`::warning::Rate limit remaining=${remaining} below floor=${rateLimitFloor}; aborting pagination at page ${page} with ${items.length} items collected.`
+			);
 			rateLimitedOut = true;
 			break;
 		}

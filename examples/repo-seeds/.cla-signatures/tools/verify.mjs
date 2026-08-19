@@ -79,7 +79,7 @@ function canonicalize(value) {
 }
 
 function computeSignatureId(record) {
-	const { signature_id, ...rest } = record;
+	const { signature_id: _, ...rest } = record;
 	const canonical = JSON.stringify(canonicalize(rest));
 	return "sha256:" + createHash("sha256").update(canonical).digest("hex");
 }

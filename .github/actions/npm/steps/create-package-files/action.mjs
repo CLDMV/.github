@@ -66,9 +66,10 @@ try {
 				}
 			} else {
 				const globRe = new RegExp("^" + packagePathInput.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
-				tgzFile = walkFiles(".")
-					.map((f) => path.relative(".", f))
-					.find((f) => globRe.test(f) || globRe.test("./" + f)) || "";
+				tgzFile =
+					walkFiles(".")
+						.map((f) => path.relative(".", f))
+						.find((f) => globRe.test(f) || globRe.test("./" + f)) || "";
 				if (tgzFile) console.log(`📦 Found .tgz file with relative path pattern: ${tgzFile}`);
 			}
 		}

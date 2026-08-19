@@ -1,43 +1,14 @@
-# VS Code settings
-.vscode/
-.backup/
+node_modules/
+*.log
+.DS_Store
+.env
+.env.local
+dist/
+build/
+coverage/
 reference/
-
-# Development/Testing Directories
 tmp/
-.github/actions/core/
-.github/actions/core2/
-
-# AI Agent Files
-.cursorrules
-.windsurfrules
-.clinerules
-.cursor/
-.windsurf/
-
-# Project Management
-TODO.md
-
-# Archive Files
-*.zip
-*.tar.gz
-*.rar
-*.7z
-.cline/
-.aider*
-.aide*
-.claude*
-.copilot*
-.github-copilot*
-copilot-instructions.md
-ai-instructions.*
-AGENT.md
-AGENTS.md
-CLAUDE.md
-AI.md
-*.ai.md
-*-agent.*
-agent-*
-.ai/
-ai/
-agents/
+trash/
+.idea/
+.vscode/
+*.tsbuildinfo

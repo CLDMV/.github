@@ -13,12 +13,7 @@ export async function markStale({ owner, repo, token, item, label, message, dryR
 	console.log(`  → ${dryRun ? "[dry-run] " : ""}MARK STALE: #${number} "${item.title}"`);
 	if (dryRun) return;
 
-	await api(
-		"POST",
-		`/issues/${number}/labels`,
-		{ labels: [label] },
-		{ token, owner, repo }
-	);
+	await api("POST", `/issues/${number}/labels`, { labels: [label] }, { token, owner, repo });
 
 	if (message) {
 		// Idempotency: skip the comment if the most-recent bot comment already says this

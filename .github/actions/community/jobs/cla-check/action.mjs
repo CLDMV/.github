@@ -229,9 +229,7 @@ try {
 		const defaultClaPath = `cla-versions/${claVersion}.md`;
 		const ledgerCla = await fetchFileContents({ token, owner: ledgerOwner, repo: ledgerName, path: defaultClaPath });
 		if (!ledgerCla.exists) {
-			console.error(
-				`::error::Default CLA not found at ${ledgerRepo}/${defaultClaPath} and consumer repo has no override at ${claPath}.`
-			);
+			console.error(`::error::Default CLA not found at ${ledgerRepo}/${defaultClaPath} and consumer repo has no override at ${claPath}.`);
 			process.exit(1);
 		}
 		activeCla = ledgerCla;
@@ -297,9 +295,7 @@ try {
 			description: `All ${authors.size} author(s) covered (${scope})`,
 			targetUrl: pr.html_url
 		});
-		appendSummary(
-			`## ✅ CLA signature-check passed\n\nAll ${authors.size} commit author(s) are covered for ${claVersion} (${scope} CLA).`
-		);
+		appendSummary(`## ✅ CLA signature-check passed\n\nAll ${authors.size} commit author(s) are covered for ${claVersion} (${scope} CLA).`);
 		process.exit(0);
 	}
 

@@ -12,7 +12,10 @@ import { getInput, setOutput } from "../../../common/common/core.mjs";
 const BIG_BUFFER = 1024 * 1024 * 256;
 
 /** Run a git command and return trimmed stdout. */
-const gitStr = (cmd) => execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], maxBuffer: BIG_BUFFER }).toString().trim();
+const gitStr = (cmd) =>
+	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"], maxBuffer: BIG_BUFFER })
+		.toString()
+		.trim();
 
 try {
 	const commitMessage = getInput("commit-message", { required: true });

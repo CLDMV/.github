@@ -17,14 +17,14 @@ CLDMV builds software — open-source libraries and developer tooling, smart-hom
 
 ## ⭐ Featured
 
-| Project | What it does |
-|---|---|
-| [**slothlet**](https://github.com/CLDMV/slothlet) | Modular API loader for Node.js — lazy-loads modules and submodules only when accessed, with live-binding, context isolation, and ESM/CJS dual support. Zero dependencies. |
-| [**jsonv**](https://github.com/CLDMV/jsonv) | Modern JSON parser extending JSON5 with ES2015–2025 features and a year-based API. |
-| [**uuid**](https://github.com/CLDMV/uuid) | Extended RFC 4122 / RFC 9562 UUID implementation with custom variant structures, issuer-based identification, and timestamp variants. |
-| [**stubborn-tcp**](https://github.com/CLDMV/stubborn-tcp) | A stubbornly persistent TCP/TLS client that auto-reconnects with exponential backoff, keep-alive, and application heartbeats. |
-| [**git-embedded**](https://github.com/CLDMV/git-embedded) | Manage embedded git repositories (anonymous gitlinks) without `.gitmodules` — keeps a child's origin URL out of the public parent while restoring normal git ergonomics. |
-| [**vitest-runner**](https://github.com/CLDMV/vitest-runner) | Sequential Vitest runner that sidesteps the OOM crashes large test suites hit when running in parallel. |
+| Project                                                     | What it does                                                                                                                                                              |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**slothlet**](https://github.com/CLDMV/slothlet)           | Modular API loader for Node.js — lazy-loads modules and submodules only when accessed, with live-binding, context isolation, and ESM/CJS dual support. Zero dependencies. |
+| [**jsonv**](https://github.com/CLDMV/jsonv)                 | Modern JSON parser extending JSON5 with ES2015–2025 features and a year-based API.                                                                                        |
+| [**uuid**](https://github.com/CLDMV/uuid)                   | Extended RFC 4122 / RFC 9562 UUID implementation with custom variant structures, issuer-based identification, and timestamp variants.                                     |
+| [**stubborn-tcp**](https://github.com/CLDMV/stubborn-tcp)   | A stubbornly persistent TCP/TLS client that auto-reconnects with exponential backoff, keep-alive, and application heartbeats.                                             |
+| [**git-embedded**](https://github.com/CLDMV/git-embedded)   | Manage embedded git repositories (anonymous gitlinks) without `.gitmodules` — keeps a child's origin URL out of the public parent while restoring normal git ergonomics.  |
+| [**vitest-runner**](https://github.com/CLDMV/vitest-runner) | Sequential Vitest runner that sidesteps the OOM crashes large test suites hit when running in parallel.                                                                   |
 
 ## 🧰 Libraries & utilities
 

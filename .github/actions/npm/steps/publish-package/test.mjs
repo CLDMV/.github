@@ -33,11 +33,7 @@ eq(
 	true,
 	"real npm 403 'You cannot publish over the previously published versions: X' → true"
 );
-eq(
-	isVersionAlreadyPublishedError("You cannot publish over the previously published version"),
-	true,
-	"singular 'version' variant → true"
-);
+eq(isVersionAlreadyPublishedError("You cannot publish over the previously published version"), true, "singular 'version' variant → true");
 eq(
 	isVersionAlreadyPublishedError("Cannot publish over previously published version"),
 	true,

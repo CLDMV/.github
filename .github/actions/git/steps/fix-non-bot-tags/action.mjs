@@ -8,11 +8,10 @@
 import { writeFileSync } from "fs";
 import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
-import { importGpgIfNeeded, configureGitIdentity, shouldSign } from "../../../github/api/_api/gpg.mjs";
+import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 console.log("🔍 DEBUG: Bot signature action starting...");
 
-const DEBUG = process.env.INPUT_DEBUG === "true";
 const DRY_RUN = process.env.INPUT_DRY_RUN === "true";
 const TAGS_DETAILED = JSON.parse(process.env.INPUT_TAGS_DETAILED || "[]");
 const BOT_PATTERNS = JSON.parse(process.env.INPUT_BOT_PATTERNS || '["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]');

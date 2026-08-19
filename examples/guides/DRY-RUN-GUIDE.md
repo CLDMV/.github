@@ -103,7 +103,7 @@ on:
 
 ### Successful Dry Run Output
 
-```
+```text
 🧪 Dry Run - Release Workflow Validation
 
 Package: @cldmv/your-package

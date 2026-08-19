@@ -8,7 +8,7 @@
 
 import fs from "node:fs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
-import { getInput, getEventPayload } from "../../../common/common/core.mjs";
+import { getInput, getEventPayload, floorToFixed } from "../../../common/common/core.mjs";
 
 const START = "<!-- coverage-start -->";
 const END = "<!-- coverage-end -->";
@@ -35,12 +35,12 @@ try {
 
 	// Compute per-metric percentages and the average.
 	const total = JSON.parse(fs.readFileSync(summaryPath, "utf8")).total;
-	const fmt = (metric) => (metric.total === 0 ? "100.0" : metric.pct.toFixed(1));
+	const fmt = (metric) => (metric.total === 0 ? "100.0" : floorToFixed(metric.pct));
 	const st = fmt(total.statements);
 	const br = fmt(total.branches);
 	const fn = fmt(total.functions);
 	const ln = fmt(total.lines);
-	const avg = ((Number.parseFloat(st) + Number.parseFloat(br) + Number.parseFloat(fn) + Number.parseFloat(ln)) / 4).toFixed(1);
+	const avg = floorToFixed((Number.parseFloat(st) + Number.parseFloat(br) + Number.parseFloat(fn) + Number.parseFloat(ln)) / 4);
 
 	const color = avg >= 90 ? "brightgreen" : avg >= 75 ? "green" : avg >= 60 ? "yellow" : "red";
 	const badgeUrl =

@@ -55,7 +55,10 @@ function formatDelta(d) {
 }
 
 async function measure() {
-	const distPatterns = (getInput("dist_paths") || "dist/**").split(",").map((s) => s.trim()).filter(Boolean);
+	const distPatterns = (getInput("dist_paths") || "dist/**")
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 	const outputFile = getInput("output_file") || "sizes.json";
 
 	const regexes = distPatterns.map(globRegex);
@@ -83,10 +86,11 @@ async function measure() {
 	}
 
 	files.sort((a, b) => a.path.localeCompare(b.path));
-	const total = files.reduce(
-		(acc, f) => ({ raw: acc.raw + f.raw, gzip: acc.gzip + f.gzip, brotli: acc.brotli + f.brotli }),
-		{ raw: 0, gzip: 0, brotli: 0 }
-	);
+	const total = files.reduce((acc, f) => ({ raw: acc.raw + f.raw, gzip: acc.gzip + f.gzip, brotli: acc.brotli + f.brotli }), {
+		raw: 0,
+		gzip: 0,
+		brotli: 0
+	});
 	const result = { files, total };
 
 	fs.writeFileSync(outputFile, JSON.stringify(result, null, 2));
@@ -134,9 +138,15 @@ async function compare() {
 
 	const totalRawDelta = head.total.raw - base.total.raw;
 	const totalGzipDelta = head.total.gzip - base.total.gzip;
-	rows.push(`| **Total** | ${formatBytes(head.total.raw)} | **${formatDelta(totalRawDelta)}** | ${formatBytes(head.total.gzip)} | **${formatDelta(totalGzipDelta)}** |`);
+	rows.push(
+		`| **Total** | ${formatBytes(head.total.raw)} | **${formatDelta(totalRawDelta)}** | ${formatBytes(head.total.gzip)} | **${formatDelta(totalGzipDelta)}** |`
+	);
 
-	const heading = anyWarning ? "## ⚠️ Bundle size increased" : totalRawDelta < 0 ? "## ✅ Bundle size decreased" : "## 📦 Bundle size unchanged";
+	const heading = anyWarning
+		? "## ⚠️ Bundle size increased"
+		: totalRawDelta < 0
+			? "## ✅ Bundle size decreased"
+			: "## 📦 Bundle size unchanged";
 	const body = [
 		heading,
 		"",

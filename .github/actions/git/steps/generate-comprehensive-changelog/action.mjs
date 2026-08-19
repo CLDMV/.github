@@ -1,4 +1,5 @@
-import { appendFileSync, readFileSync } from "fs";
+import { appendFileSync, readFileSync, existsSync, realpathSync } from "fs";
+import path from "node:path";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
@@ -24,6 +25,111 @@ const USE_SINGLE_COMMIT_MESSAGE = process.env.USE_SINGLE_COMMIT_MESSAGE === "tru
 const GROUP_BY_PR = process.env.GROUP_BY_PR === "true";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY;
+// Release version being resolved for this PR (e.g. "4.21.1"). Drives the
+// committed-changelog-file lookup below; empty on non-release callers, which
+// keeps the file lookup a no-op so the generated changelog is used as before.
+const NEW_VERSION = process.env.NEW_VERSION || "";
+// Base directory for committed per-version changelog files. Empty (default) =
+// search the built-in defaults (`docs/changelog` AND `docs/changelogs`), so
+// either the singular or plural convention works out of the box; set it to
+// search one specific directory instead.
+const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "";
+// Optional explicit path template overriding the default lookup order. Supports
+// `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
+const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
+
+// Collapse CR/LF in caller-influenced values before logging: a newline in
+// CHANGELOG_DIR/CHANGELOG_FILE could otherwise emit extra log lines or a GitHub
+// Actions workflow command (a line starting with `::`). Formatting only — the
+// path-resolution logic still uses the raw value.
+const oneLine = (s) => String(s).replace(/[\r\n]+/g, " ");
+
+/**
+ * Locate a committed, hand-authored changelog file for the release version and
+ * return its contents. Once a maintainer commits the version's changelog to
+ * `next`/`hotfixes`, that file — not the auto-generated commit summary — becomes
+ * the release-PR body (and, via the repo's `squash_merge_commit_message: PR_BODY`
+ * setting, the squash-merge commit message on the release branch). The caller
+ * still appends the same contributor block either way, so contributors are never
+ * lost when the file omits them. Returns null when no matching, non-empty file
+ * exists, so the generator falls back to the commit-derived changelog.
+ *
+ * Matched by EXACT resolved version — a release NEVER falls back to a different
+ * version's file (e.g. 5.7.8 will not use v5.7.0.md); when no file matches the
+ * resolved version, the generated changelog is used instead. Lookup (first hit
+ * wins), rooted at GITHUB_WORKSPACE, over each base directory (an explicit `dir`
+ * searches only it; unset searches both the singular `docs/changelog` and the
+ * plural `docs/changelogs`):
+ *   0. `fileTemplate` (when set) with `{version}`/`{major}` substituted.
+ *   1. `<dir>/v<major>/v<version>.md`  (nested-by-major layout, e.g. slothlet)
+ *   2. `<dir>/v<version>.md`           (flat layout, e.g. this repo's docs/changelogs)
+ *   3. `<dir>/<version>.md`
+ *
+ * @param {string} rawVersion - Resolved release version, with or without a leading `v`.
+ * @param {string} dir - Changelog base directory; empty searches both `docs/changelog` and `docs/changelogs`.
+ * @param {string} fileTemplate - Optional explicit path-template override.
+ * @returns {string|null} Trimmed file contents, or null when absent/empty.
+ */
+function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
+	const version = String(rawVersion || "")
+		.trim()
+		.replace(/^v/i, "");
+	if (!version) return null;
+	const root = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd());
+	// True when `p` is `root` itself or lies within it. Uses path.relative rather
+	// than a `startsWith(root + sep)` prefix test, which mishandles a root that
+	// already ends in a separator (e.g. GITHUB_WORKSPACE = "/", where root + sep
+	// is "//") and cross-drive paths on Windows (path.relative returns an
+	// absolute path there).
+	const isInsideRoot = (p) => {
+		const rel = path.relative(root, p);
+		return rel === "" || (rel !== ".." && !rel.startsWith(".." + path.sep) && !path.isAbsolute(rel));
+	};
+	const major = version.split(".")[0];
+	// An explicit dir searches only that dir; unset searches both the singular
+	// and plural spellings of the default so either convention works out of the box.
+	const bases = String(dir || "").trim() ? [String(dir).trim().replace(/\/+$/, "")] : ["docs/changelog", "docs/changelogs"];
+	const subst = (t) => t.replace(/\{version\}/g, version).replace(/\{major\}/g, major);
+	const candidates = [];
+	if (fileTemplate && fileTemplate.trim()) candidates.push(subst(fileTemplate.trim()));
+	// Exact-version match only. A release must never fall back to a different
+	// version's changelog (e.g. 5.7.8 must not use v5.7.0.md — misleading); when
+	// nothing matches the resolved version, the generated changelog is used.
+	for (const base of bases) {
+		candidates.push(`${base}/v${major}/v${version}.md`, `${base}/v${version}.md`, `${base}/${version}.md`);
+	}
+	for (const rel of candidates) {
+		// Resolve and confine to the workspace root. CHANGELOG_DIR/CHANGELOG_FILE
+		// are caller-controlled, so a `../` or absolute value could otherwise read
+		// files outside GITHUB_WORKSPACE and leak them into the release-PR body
+		// (and the squash-merge message). Reject anything that escapes.
+		const abs = path.resolve(root, rel);
+		if (!isInsideRoot(abs)) {
+			console.log(`⚠️ Ignoring changelog path outside the workspace: ${oneLine(rel)}`);
+			continue;
+		}
+		try {
+			if (!existsSync(abs)) continue;
+			// `abs` is within the workspace, but it may be a symlink whose target
+			// is not: readFileSync would follow it and leak external content into
+			// the PR body. Resolve the real path and re-confine before reading.
+			const real = realpathSync(abs);
+			if (!isInsideRoot(real)) {
+				console.log(`⚠️ Ignoring changelog path that resolves outside the workspace: ${oneLine(rel)}`);
+				continue;
+			}
+			const content = readFileSync(real, "utf8").trim();
+			if (content) {
+				console.log(`📄 Found committed changelog file for the release: ${oneLine(rel)}`);
+				return content;
+			}
+			console.log(`⚠️ Changelog file '${oneLine(rel)}' exists but is empty — ignoring.`);
+		} catch (err) {
+			console.log(`⚠️ Could not read changelog file '${oneLine(rel)}': ${oneLine(err.message)}`);
+		}
+	}
+	return null;
+}
 
 /**
  * Remove a duplicated leading subject line from a commit body.
@@ -857,7 +963,13 @@ async function convertAuthorToGitHubLink(author, email, token) {
  * @param {string} token - GitHub API token for user lookups
  * @returns {Promise<string>} Generated changelog content
  */
-async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false, groupByPR = false) {
+async function generateComprehensiveChangelog(
+	commitRange = null,
+	commits = null,
+	token = null,
+	useSingleCommitMessage = false,
+	groupByPR = false
+) {
 	console.log(`🔍 DEBUG: generateComprehensiveChangelog called with:`);
 	console.log(`  - commitRange: ${commitRange}`);
 	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + " commits" : "provided but not array") : "null"}`);
@@ -900,8 +1012,8 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			console.log(`⚠️ Failed to get current commit message: ${error.message}`);
 		}
 	}
-	let lastTag = "";
-	let range = "";
+	let lastTag;
+	let range;
 
 	if (!commitRange && !commits) {
 		// Try to find the last release tag
@@ -909,7 +1021,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			lastTag = gitCommand("git describe --tags --abbrev=0", true);
 			console.log(`Last tag: ${lastTag}`);
 			range = `${lastTag}..HEAD`;
-		} catch (error) {
+		} catch (_) {
 			console.log("No previous tags found, using initial commit");
 			const initialCommit = gitCommand("git rev-list --max-parents=0 HEAD", true);
 			range = `${initialCommit}..HEAD`;
@@ -949,8 +1061,6 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	// Note: When there are multiple commits, we should ALWAYS generate a comprehensive
 	// categorized changelog regardless of the useSingleCommitMessage flag, because users
 	// need to see all the changes (fixes, features, etc.) in the PR/release notes.
-
-	let changelog = "## 🚀 What's Changed\n\n";
 
 	// Strip the release flow's own bot-trail (version bumps, `release:` commits,
 	// merge commits) and other bot noise — but KEEP dependency updates.
@@ -1008,73 +1118,90 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 		return out;
 	}
 
-	// Breaking Changes - use proper categorization (merge commits are already categorized separately)
-	changelog += "### 💥 Breaking Changes\n";
-	const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && !isDependencyUpdate(c.subject));
-	if (breakingCommits.length > 0) {
-		changelog += await renderSection(breakingCommits);
+	// Once a maintainer commits the release's changelog file to `next`/`hotfixes`,
+	// that hand-authored file becomes the PR body (and thus the squash-merge
+	// message on the release branch) in place of the commit-derived summary. When
+	// no such file exists yet, fall back to the generated sections (unchanged
+	// behaviour). Either way, the contributor block below is still appended, so
+	// contributors are never dropped when the file omits them.
+	const fileBody = readVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
+	let changelog;
+	if (fileBody) {
+		// Strip any leading "v" so an explicit NEW_VERSION of "v4.21.2" doesn't log "vv4.21.2".
+		const displayVersion = String(NEW_VERSION).trim().replace(/^v/i, "");
+		console.log(`📄 Using committed changelog file as the release-PR body (v${displayVersion}).`);
+		changelog = `${fileBody}\n\n`;
 	} else {
-		changelog += "_No breaking changes_\n";
-	}
-	changelog += "\n";
+		changelog = "## 🚀 What's Changed\n\n";
 
-	// Features - use proper categorization (exclude merge commits)
-	changelog += "### ✨ Features\n";
-	const featureCommits = commits.filter((c) => c.category === "feature" && !isDependencyUpdate(c.subject));
-	if (featureCommits.length > 0) {
-		changelog += await renderSection(featureCommits);
-	} else {
-		changelog += "_No new features_\n";
-	}
-	changelog += "\n";
-
-	// Bug Fixes - use proper categorization (exclude merge commits)
-	changelog += "### 🐛 Bug Fixes\n";
-	const fixCommits = commits.filter((c) => c.category === "fix" && !isDependencyUpdate(c.subject));
-	if (fixCommits.length > 0) {
-		changelog += await renderSection(fixCommits);
-	} else {
-		changelog += "_No bug fixes_\n";
-	}
-	changelog += "\n";
-
-	// Dependencies - Dependabot/Renovate dependency bumps get their own section
-	// rather than being folded into Other Changes. Merge commits are already
-	// filtered out above, so this only picks up the real bump commits.
-	changelog += "### 📦 Dependencies\n";
-	const dependencyCommits = commits.filter((c) => c.category !== "merge" && isDependencyUpdate(c.subject));
-	if (dependencyCommits.length > 0) {
-		changelog += await renderSection(dependencyCommits);
-	} else {
-		changelog += "_No dependency updates_\n";
-	}
-	changelog += "\n";
-
-	// Other Changes - maintenance and other categories (but NOT release, merge,
-	// or dependency-update commits — those have their own section above)
-	changelog += "### 🔧 Other Changes\n";
-	const otherCommits = commits.filter(
-		(c) =>
-			(c.category === "maintenance" || c.category === "other") &&
-			c.type !== "release" &&
-			c.category !== "merge" &&
-			!isDependencyUpdate(c.subject)
-	);
-	if (otherCommits.length > 0) {
-		changelog += await renderSection(otherCommits);
-	} else {
-		changelog += "_No other changes_\n";
-	}
-	changelog += "\n";
-
-	// Release Information - show release commits that triggered this PR
-	const releaseCommits = commits.filter(
-		(c) => c.type === "release" || (c.category === "maintenance" && c.subject.toLowerCase().startsWith("release"))
-	);
-	if (releaseCommits.length > 0) {
-		changelog += "### 🏷️ Release Information\n";
-		changelog += await renderSection(releaseCommits);
+		// Breaking Changes - use proper categorization (merge commits are already categorized separately)
+		changelog += "### 💥 Breaking Changes\n";
+		const breakingCommits = commits.filter((c) => (c.category === "breaking" || c.isBreaking) && !isDependencyUpdate(c.subject));
+		if (breakingCommits.length > 0) {
+			changelog += await renderSection(breakingCommits);
+		} else {
+			changelog += "_No breaking changes_\n";
+		}
 		changelog += "\n";
+
+		// Features - use proper categorization (exclude merge commits)
+		changelog += "### ✨ Features\n";
+		const featureCommits = commits.filter((c) => c.category === "feature" && !isDependencyUpdate(c.subject));
+		if (featureCommits.length > 0) {
+			changelog += await renderSection(featureCommits);
+		} else {
+			changelog += "_No new features_\n";
+		}
+		changelog += "\n";
+
+		// Bug Fixes - use proper categorization (exclude merge commits)
+		changelog += "### 🐛 Bug Fixes\n";
+		const fixCommits = commits.filter((c) => c.category === "fix" && !isDependencyUpdate(c.subject));
+		if (fixCommits.length > 0) {
+			changelog += await renderSection(fixCommits);
+		} else {
+			changelog += "_No bug fixes_\n";
+		}
+		changelog += "\n";
+
+		// Dependencies - Dependabot/Renovate dependency bumps get their own section
+		// rather than being folded into Other Changes. Merge commits are already
+		// filtered out above, so this only picks up the real bump commits.
+		changelog += "### 📦 Dependencies\n";
+		const dependencyCommits = commits.filter((c) => c.category !== "merge" && isDependencyUpdate(c.subject));
+		if (dependencyCommits.length > 0) {
+			changelog += await renderSection(dependencyCommits);
+		} else {
+			changelog += "_No dependency updates_\n";
+		}
+		changelog += "\n";
+
+		// Other Changes - maintenance and other categories (but NOT release, merge,
+		// or dependency-update commits — those have their own section above)
+		changelog += "### 🔧 Other Changes\n";
+		const otherCommits = commits.filter(
+			(c) =>
+				(c.category === "maintenance" || c.category === "other") &&
+				c.type !== "release" &&
+				c.category !== "merge" &&
+				!isDependencyUpdate(c.subject)
+		);
+		if (otherCommits.length > 0) {
+			changelog += await renderSection(otherCommits);
+		} else {
+			changelog += "_No other changes_\n";
+		}
+		changelog += "\n";
+
+		// Release Information - show release commits that triggered this PR
+		const releaseCommits = commits.filter(
+			(c) => c.type === "release" || (c.category === "maintenance" && c.subject.toLowerCase().startsWith("release"))
+		);
+		if (releaseCommits.length > 0) {
+			changelog += "### 🏷️ Release Information\n";
+			changelog += await renderSection(releaseCommits);
+			changelog += "\n";
+		}
 	}
 
 	const contributorDetails = await buildContributorMentionsDetails(commits, token, false);
@@ -1096,7 +1223,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			try {
 				commits = JSON.parse(COMMITS_INPUT);
 				console.log(`📋 Using provided commits: ${commits.length} commits`);
-			} catch (error) {
+			} catch (_) {
 				console.log("⚠️ Failed to parse commits input, falling back to git commands");
 				console.log(`Debug: COMMITS_INPUT = ${COMMITS_INPUT}`);
 			}
@@ -1126,4 +1253,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog };
+export { generateComprehensiveChangelog, readVersionChangelogFile };
