@@ -35,6 +35,28 @@ export function exec(cmd, env = {}) {
 }
 
 /**
+ * Format a number to a fixed number of decimals, rounding DOWN (floor) so the
+ * value is never displayed higher than it actually is. Coverage percentages
+ * use this: an average of 99.975% must read as "99.9%", never round up to
+ * "100.0%" and claim full coverage the suite doesn't have.
+ * @public
+ * @param {number} value - The value to format.
+ * @param {number} [digits=1] - Number of decimal places.
+ * @returns {string} The floored value as a fixed-decimal string.
+ *
+ * @example
+ * floorToFixed(99.975); // "99.9"
+ * floorToFixed(100);    // "100.0"
+ */
+export function floorToFixed(value, digits = 1) {
+	const factor = 10 ** digits;
+	// The tiny epsilon absorbs binary-float representation error (e.g. an exact
+	// 88.0 arriving as 87.9999999999) without bridging a real sub-unit gap — it
+	// is far too small to nudge 99.975 up to 100.
+	return (Math.floor(Number(value) * factor + 1e-9) / factor).toFixed(digits);
+}
+
+/**
  * Read a GitHub Actions input (the `INPUT_<NAME>` environment variable).
  * @public
  * @param {string} name - Input name as declared in action.yml.
