@@ -26,6 +26,18 @@ inputs:
   github-token:
     description: "GitHub token used by the PR-ref augmentation (lookup of each commit's source PR via `/commits/{sha}/pulls`) and per-PR merge-SHA fetch when `group-by-pr` is on. Without a token, augmentation silently no-ops and the grouped output falls back to whatever PR refs were already in commit subjects — meaning commits brought in by a merge-commit PR (rather than a squash that appends `(#N)` automatically) end up at the bottom of the section as ungrouped bullets. Pass the bot App token (with at minimum `pull-requests: read`) for the PR-bodies that this action generates."
     required: false
+  new-version:
+    description: "Resolved release version (e.g. `4.21.1`). When a committed changelog file for this version exists in the checked-out tree, that file's contents replace the generated `What's Changed` sections as the PR body (the contributor block is still appended). Empty = no file lookup, generated changelog is used."
+    required: false
+    default: ""
+  changelog-dir:
+    description: "Base directory searched for a per-version changelog file. Lookup order (first hit wins): `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md`. Default matches the fleet convention."
+    required: false
+    default: "docs/changelog"
+  changelog-file:
+    description: "Optional explicit path-template override that takes precedence over the default lookup. Supports `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`)."
+    required: false
+    default: ""
 
 outputs:
   changelog-content:
@@ -46,6 +58,9 @@ runs:
         USE_SINGLE_COMMIT_MESSAGE: ${{ inputs.use-single-commit-message }}
         GROUP_BY_PR: ${{ inputs.group-by-pr }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        NEW_VERSION: ${{ inputs.new-version }}
+        CHANGELOG_DIR: ${{ inputs.changelog-dir }}
+        CHANGELOG_FILE: ${{ inputs.changelog-file }}
         # Fall back to ${{ github.token }} so the augmentation can still
         # find squashed-PR refs even when the caller doesn't pass an
         # explicit token. Default github.token carries `pull-requests:
