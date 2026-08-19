@@ -46,9 +46,9 @@ inputs:
     description: "GitHub token for API operations"
     required: true
   changelog-dir:
-    description: "Base directory searched for a committed per-version changelog file. When one matching the resolved version exists on the head branch, its contents become the release-PR body. Default matches the fleet convention."
+    description: "Base directory searched for a committed per-version changelog file. When one matching the resolved version exists on the head branch, its contents become the release-PR body. Empty (default) searches both `docs/changelog` and `docs/changelogs`."
     required: false
-    default: "docs/changelog"
+    default: ""
   changelog-file:
     description: "Optional explicit path-template override for the changelog file (supports `{version}`/`{major}`). Takes precedence over the default lookup."
     required: false

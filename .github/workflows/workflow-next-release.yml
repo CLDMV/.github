@@ -47,7 +47,7 @@ on:
                 type: string
                 default: ""
             changelog_dir:
-                description: "Base directory for a committed per-version changelog file. When a file matching the resolved version exists on `next`, its contents become the release-PR body (and thus the squash-merge message on the base branch); the contributor block is still appended. Empty (default) = the caller's CLDMV_CHANGELOG_DIR var, else `docs/changelog`."
+                description: "Base directory for a committed per-version changelog file. When a file matching the resolved version exists on `next`, its contents become the release-PR body (and thus the squash-merge message on the base branch); the contributor block is still appended. Empty (default) = the caller's CLDMV_CHANGELOG_DIR var, else `docs/changelog` or `docs/changelogs`."
                 required: false
                 type: string
                 default: ""
@@ -194,7 +194,7 @@ jobs:
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR
                   # var, else the fleet default. `vars` resolves against the caller.
-                  changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || 'docs/changelog') }}
+                  changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || '') }}
                   changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
 
     refresh:
@@ -225,7 +225,7 @@ jobs:
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR
                   # var, else the fleet default. `vars` resolves against the caller.
-                  changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || 'docs/changelog') }}
+                  changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || '') }}
                   changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
 
             # Release-PR notifier — fires only when the target version actually
