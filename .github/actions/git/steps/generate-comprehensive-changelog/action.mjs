@@ -36,6 +36,12 @@ const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "docs/changelog";
 // `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
 const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
 
+// Collapse CR/LF in caller-influenced values before logging: a newline in
+// CHANGELOG_DIR/CHANGELOG_FILE could otherwise emit extra log lines or a GitHub
+// Actions workflow command (a line starting with `::`). Formatting only — the
+// path-resolution logic still uses the raw value.
+const oneLine = (s) => String(s).replace(/[\r\n]+/g, " ");
+
 /**
  * Locate a committed, hand-authored changelog file for the release version and
  * return its contents. Once a maintainer commits the version's changelog to
@@ -76,19 +82,19 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		// (and the squash-merge message). Reject anything that escapes.
 		const abs = path.resolve(root, rel);
 		if (abs !== root && !abs.startsWith(root + path.sep)) {
-			console.log(`⚠️ Ignoring changelog path outside the workspace: ${rel}`);
+			console.log(`⚠️ Ignoring changelog path outside the workspace: ${oneLine(rel)}`);
 			continue;
 		}
 		try {
 			if (!existsSync(abs)) continue;
 			const content = readFileSync(abs, "utf8").trim();
 			if (content) {
-				console.log(`📄 Found committed changelog file for the release: ${rel}`);
+				console.log(`📄 Found committed changelog file for the release: ${oneLine(rel)}`);
 				return content;
 			}
-			console.log(`⚠️ Changelog file '${rel}' exists but is empty — ignoring.`);
+			console.log(`⚠️ Changelog file '${oneLine(rel)}' exists but is empty — ignoring.`);
 		} catch (err) {
-			console.log(`⚠️ Could not read changelog file '${rel}': ${err.message}`);
+			console.log(`⚠️ Could not read changelog file '${oneLine(rel)}': ${oneLine(err.message)}`);
 		}
 	}
 	return null;

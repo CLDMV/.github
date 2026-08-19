@@ -66,6 +66,25 @@ ok(!(escFile || "").includes("TOP-SECRET"), "no secret content leaked via ../ fi
 eq(readVersionChangelogFile("5.5.5", D, "/etc/hostname"), null, "absolute file template rejected");
 eq(readVersionChangelogFile("5.5.5", "../..", ""), null, "../ dir input rejected");
 
+console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflow-command injection):");
+{
+	const captured = [];
+	const origLog = console.log;
+	console.log = (...args) => captured.push(args.join(" "));
+	// A caller-influenced value carrying a newline + a GitHub Actions workflow
+	// command; the rejection path logs it, so it must be collapsed to one line.
+	readVersionChangelogFile("5.5.5", D, "../evil\n::set-output name=x::y");
+	console.log = origLog;
+	ok(
+		!captured.some((line) => /[\r\n]/.test(line)),
+		"no raw CR/LF survives into a logged value"
+	);
+	ok(
+		!captured.join("\n").split("\n").some((line) => line.startsWith("::")),
+		"no logged line starts with :: (workflow-command injection blocked)"
+	);
+}
+
 fs.rmSync(scratch, { recursive: true, force: true });
 
 if (failures > 0) {
