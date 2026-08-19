@@ -1098,7 +1098,9 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 	const fileBody = readVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
 	let changelog;
 	if (fileBody) {
-		console.log(`📄 Using committed changelog file as the release-PR body (v${NEW_VERSION}).`);
+		// Strip any leading "v" so an explicit NEW_VERSION of "v4.21.2" doesn't log "vv4.21.2".
+		const displayVersion = String(NEW_VERSION).trim().replace(/^v/i, "");
+		console.log(`📄 Using committed changelog file as the release-PR body (v${displayVersion}).`);
 		changelog = `${fileBody}\n\n`;
 	} else {
 		changelog = "## 🚀 What's Changed\n\n";
