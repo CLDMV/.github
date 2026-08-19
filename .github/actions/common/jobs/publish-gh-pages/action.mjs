@@ -19,11 +19,18 @@ function redact(str) {
 	return String(str).replace(/(x-access-token:)[^@]+@/g, "$1***@");
 }
 
-// Render an argv for logging: redact the token and single-quote any arg
-// containing whitespace so multi-word values (e.g. the default bot name
-// "CLDMV Bot") aren't ambiguous.
+// Render an argv for logging: redact the token, then JSON-encode any arg that
+// isn't a simple bare token so whitespace, embedded quotes, and control chars
+// (e.g. a commit message like `docs: it's ready`) render unambiguously instead
+// of producing broken shell-style quoting. Bare tokens (flags, refs, paths,
+// the redacted URL) print as-is for readability.
 function showArgs(args) {
-	return args.map((a) => (/\s/.test(a) ? `'${redact(a)}'` : redact(a))).join(" ");
+	return args
+		.map((a) => {
+			const r = redact(a);
+			return /^[\w@.:/=+*~-]+$/.test(r) ? r : JSON.stringify(r);
+		})
+		.join(" ");
 }
 
 // Run git with its argv as an array through execFileSync — NO shell — so values
