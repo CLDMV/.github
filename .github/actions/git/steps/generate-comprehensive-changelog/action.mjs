@@ -29,9 +29,11 @@ const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY;
 // committed-changelog-file lookup below; empty on non-release callers, which
 // keeps the file lookup a no-op so the generated changelog is used as before.
 const NEW_VERSION = process.env.NEW_VERSION || "";
-// Base directory for committed per-version changelog files. Default matches the
-// fleet convention (`docs/changelog/`); overridable per repo via the caller.
-const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "docs/changelog";
+// Base directory for committed per-version changelog files. Empty (default) =
+// search the built-in defaults (`docs/changelog` AND `docs/changelogs`), so
+// either the singular or plural convention works out of the box; set it to
+// search one specific directory instead.
+const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "";
 // Optional explicit path template overriding the default lookup order. Supports
 // `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
 const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
@@ -52,14 +54,19 @@ const oneLine = (s) => String(s).replace(/[\r\n]+/g, " ");
  * lost when the file omits them. Returns null when no matching, non-empty file
  * exists, so the generator falls back to the commit-derived changelog.
  *
- * Lookup (first hit wins), rooted at GITHUB_WORKSPACE:
+ * Matched by EXACT resolved version — a release NEVER falls back to a different
+ * version's file (e.g. 5.7.8 will not use v5.7.0.md); when no file matches the
+ * resolved version, the generated changelog is used instead. Lookup (first hit
+ * wins), rooted at GITHUB_WORKSPACE, over each base directory (an explicit `dir`
+ * searches only it; unset searches both the singular `docs/changelog` and the
+ * plural `docs/changelogs`):
  *   0. `fileTemplate` (when set) with `{version}`/`{major}` substituted.
- *   1. `<dir>/v<major>/v<version>.md`  (nested layout, e.g. slothlet)
- *   2. `<dir>/v<version>.md`           (flat layout, e.g. this repo)
+ *   1. `<dir>/v<major>/v<version>.md`  (nested-by-major layout, e.g. slothlet)
+ *   2. `<dir>/v<version>.md`           (flat layout, e.g. this repo's docs/changelogs)
  *   3. `<dir>/<version>.md`
  *
  * @param {string} rawVersion - Resolved release version, with or without a leading `v`.
- * @param {string} dir - Changelog base directory.
+ * @param {string} dir - Changelog base directory; empty searches both `docs/changelog` and `docs/changelogs`.
  * @param {string} fileTemplate - Optional explicit path-template override.
  * @returns {string|null} Trimmed file contents, or null when absent/empty.
  */
@@ -79,11 +86,18 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		return rel === "" || (rel !== ".." && !rel.startsWith(".." + path.sep) && !path.isAbsolute(rel));
 	};
 	const major = version.split(".")[0];
-	const base = String(dir || "docs/changelog").replace(/\/+$/, "");
+	// An explicit dir searches only that dir; unset searches both the singular
+	// and plural spellings of the default so either convention works out of the box.
+	const bases = String(dir || "").trim() ? [String(dir).trim().replace(/\/+$/, "")] : ["docs/changelog", "docs/changelogs"];
 	const subst = (t) => t.replace(/\{version\}/g, version).replace(/\{major\}/g, major);
 	const candidates = [];
 	if (fileTemplate && fileTemplate.trim()) candidates.push(subst(fileTemplate.trim()));
-	candidates.push(`${base}/v${major}/v${version}.md`, `${base}/v${version}.md`, `${base}/${version}.md`);
+	// Exact-version match only. A release must never fall back to a different
+	// version's changelog (e.g. 5.7.8 must not use v5.7.0.md — misleading); when
+	// nothing matches the resolved version, the generated changelog is used.
+	for (const base of bases) {
+		candidates.push(`${base}/v${major}/v${version}.md`, `${base}/v${version}.md`, `${base}/${version}.md`);
+	}
 	for (const rel of candidates) {
 		// Resolve and confine to the workspace root. CHANGELOG_DIR/CHANGELOG_FILE
 		// are caller-controlled, so a `../` or absolute value could otherwise read

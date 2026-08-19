@@ -31,9 +31,9 @@ inputs:
     required: false
     default: ""
   changelog-dir:
-    description: "Base directory searched for a per-version changelog file. Lookup order (first hit wins): `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md`. Default matches the fleet convention."
+    description: "Base directory searched for a per-version changelog file. Lookup order (first hit wins): `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md`. Matched by exact resolved version (never a different version's file). Empty (default) searches both `docs/changelog` and `docs/changelogs`."
     required: false
-    default: "docs/changelog"
+    default: ""
   changelog-file:
     description: "Optional explicit path-template override that takes precedence over the default lookup. Supports `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`)."
     required: false

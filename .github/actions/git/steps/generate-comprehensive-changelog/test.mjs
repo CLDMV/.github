@@ -2,8 +2,10 @@
 /**
  * @fileoverview Unit tests for readVersionChangelogFile — the committed-changelog
  * lookup that sources the release-PR body. Covers in-workspace discovery (nested
- * + flat layouts), the empty-file fallback to the generated changelog, and the
- * path confinement that keeps caller-controlled CHANGELOG_DIR/CHANGELOG_FILE
+ * + flat layouts), the default search of both `docs/changelog` and the plural
+ * `docs/changelogs`, exact-version matching (a patch never falls back to a
+ * different version's file), the empty-file fallback to the generated changelog,
+ * and the path confinement that keeps caller-controlled CHANGELOG_DIR/CHANGELOG_FILE
  * inputs from escaping GITHUB_WORKSPACE. Run: `node test.mjs`.
  */
 
@@ -41,6 +43,11 @@ fs.mkdirSync(path.join(ws, "docs/changelog/v9"), { recursive: true });
 fs.writeFileSync(path.join(ws, "docs/changelog/v9/v9.9.9.md"), "# Notes 9.9.9\n\nnested layout\n");
 fs.writeFileSync(path.join(ws, "docs/changelog/v8.0.0.md"), "# Notes 8.0.0\n\nflat layout\n");
 fs.writeFileSync(path.join(ws, "docs/changelog/v7.0.0.md"), "   \n\n"); // whitespace-only → treated as empty
+// Plural spelling (docs/changelogs) — this repo's convention; must be found by
+// default. v5.7.0 also seeds the exact-version test (5.7.8 must NOT use it).
+fs.mkdirSync(path.join(ws, "docs/changelogs"), { recursive: true });
+fs.writeFileSync(path.join(ws, "docs/changelogs/v4.20.0.md"), "# Notes 4.20.0\n\nplural dir\n");
+fs.writeFileSync(path.join(ws, "docs/changelogs/v5.7.0.md"), "# Notes 5.7.0\n\nminor rollup\n");
 fs.writeFileSync(path.join(scratch, "SECRET.txt"), "TOP-SECRET\n"); // one level above the workspace root
 
 process.env.GITHUB_WORKSPACE = ws;
@@ -51,6 +58,22 @@ eq(readVersionChangelogFile("9.9.9", D, ""), "# Notes 9.9.9\n\nnested layout", "
 eq(readVersionChangelogFile("v8.0.0", D, ""), "# Notes 8.0.0\n\nflat layout", "flat v<version>.md (leading v stripped)");
 eq(readVersionChangelogFile("6.6.6", D, ""), null, "no matching file → null (falls back to generated changelog)");
 eq(readVersionChangelogFile("7.0.0", D, ""), null, "empty/whitespace-only file → null (falls back)");
+
+console.log("\nreadVersionChangelogFile — default dirs (singular + plural) when dir is unset:");
+eq(readVersionChangelogFile("9.9.9", "", ""), "# Notes 9.9.9\n\nnested layout", "unset dir finds singular docs/changelog (nested)");
+eq(readVersionChangelogFile("8.0.0", "", ""), "# Notes 8.0.0\n\nflat layout", "unset dir finds singular docs/changelog (flat)");
+eq(readVersionChangelogFile("4.20.0", "", ""), "# Notes 4.20.0\n\nplural dir", "unset dir finds plural docs/changelogs");
+// Explicit dir searches ONLY that dir — the plural-only file is not found when
+// the caller pins the singular dir.
+eq(
+	readVersionChangelogFile("4.20.0", "docs/changelog", ""),
+	null,
+	"explicit dir searches only that dir (plural file not found under singular)"
+);
+
+console.log("\nreadVersionChangelogFile — EXACT version only (never a different version's file):");
+eq(readVersionChangelogFile("5.7.0", "", ""), "# Notes 5.7.0\n\nminor rollup", "exact v5.7.0 resolves to its own file");
+eq(readVersionChangelogFile("5.7.8", "", ""), null, "patch 5.7.8 does NOT fall back to v5.7.0.md → null (generated changelog used)");
 
 console.log("\nreadVersionChangelogFile — explicit file template:");
 eq(
