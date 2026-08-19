@@ -4,11 +4,11 @@ CLA versions follow a `major.minor.patch` scheme, where each level signals a dif
 
 ## What each level means
 
-| Level | Triggers re-signing? | Examples |
-|---|---|---|
-| **Major** (`v1.0` → `v2.0`) | Yes | Fundamental terms change: scope of the license grant, jurisdiction, addition or removal of a patent clause. |
-| **Minor** (`v1.0` → `v1.1`) | Yes | Wording changes that affect meaning, clarification of a clause that shifts interpretation, added or removed exemption. |
-| **Patch** (`v1.0` → `v1.0.1`) | **No** | Spelling fixes, typo corrections, pure formatting (whitespace, list markers, line breaks). No change in meaning. |
+| Level                         | Triggers re-signing? | Examples                                                                                                               |
+| ----------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Major** (`v1.0` → `v2.0`)   | Yes                  | Fundamental terms change: scope of the license grant, jurisdiction, addition or removal of a patent clause.            |
+| **Minor** (`v1.0` → `v1.1`)   | Yes                  | Wording changes that affect meaning, clarification of a clause that shifts interpretation, added or removed exemption. |
+| **Patch** (`v1.0` → `v1.0.1`) | **No**               | Spelling fixes, typo corrections, pure formatting (whitespace, list markers, line breaks). No change in meaning.       |
 
 ## Why the bot only sees major.minor
 
@@ -63,7 +63,7 @@ When a consumer repo includes its own `CLA.md` at the root, the bot uses **overr
 
 The bot reads the version from the consumer `CLA.md`'s **first-line H1 header**:
 
-```
+```text
 # CLDMV Contributor License Agreement (CLA) — v1.0
                                               ^^^^
 ```

@@ -35,11 +35,9 @@ const SELF_REPO = "CLDMV/.github"; // self-references resolve to local paths
 
 /** List every workflow + action.yml file in the repo. */
 function listYamlFiles() {
-	const out = execFileSync(
-		"find",
-		[`${REPO_ROOT}/.github/workflows`, `${REPO_ROOT}/.github/actions`, "-name", "*.yml", "-type", "f"],
-		{ encoding: "utf8" }
-	);
+	const out = execFileSync("find", [`${REPO_ROOT}/.github/workflows`, `${REPO_ROOT}/.github/actions`, "-name", "*.yml", "-type", "f"], {
+		encoding: "utf8"
+	});
 	return out.trim().split("\n").filter(Boolean);
 }
 
@@ -90,7 +88,7 @@ function extractUsesBlocks(file) {
 }
 
 /** Resolve a `uses:` ref to either a local action.yml path (if self-ref or relative) or { remote: { owner, repo, version } }. */
-function resolveRef(uses, fromFile) {
+function resolveRef(uses, _) {
 	// Self-repo absolute: CLDMV/.github/.github/actions/foo@v3
 	const selfMatch = uses.match(/^([\w-]+\/[\w.-]+)\/\.github\/actions\/([\w./-]+)@(.+)$/);
 	if (selfMatch && selfMatch[1] === SELF_REPO) {

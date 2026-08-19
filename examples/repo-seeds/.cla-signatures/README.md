@@ -17,7 +17,7 @@ The ledger has two parallel trees, one per scope.
 
 **Default scope** (consumer repo has no `CLA.md`):
 
-```
+```text
 cla-versions/v<major.minor>.md                                  # binding text
 cla-versions/v<major.minor>.sha256
 signatures/<platform>/v<major.minor>/<shard>/<id>.json
@@ -25,7 +25,7 @@ signatures/<platform>/v<major.minor>/<shard>/<id>.json
 
 **Override scope** (consumer repo has its own `CLA.md`):
 
-```
+```text
 cla-versions/overrides/<owner>/<repo>/v<major.minor>.md         # immutable snapshot
 cla-versions/overrides/<owner>/<repo>/v<major.minor>.sha256
 signatures/<platform>/overrides/<owner>/<repo>/v<major.minor>/<shard>/<id>.json
@@ -40,17 +40,17 @@ Common path components:
 
 A contributor who signed the org-wide default CLA v1.0 with GitHub user ID `583231` has their record at:
 
-```
+```text
 signatures/github/v1.0/a4c/583231.json
 ```
 
-If they *also* contribute to `CLDMV/widgets` (which uses an override CLA), they have a **separate** record at:
+If they _also_ contribute to `CLDMV/widgets` (which uses an override CLA), they have a **separate** record at:
 
-```
+```text
 signatures/github/overrides/CLDMV/widgets/v1.0/a4c/583231.json
 ```
 
-(`a4c` is `sha256("583231")` truncated to three characters. Signatures are scoped per-CLA-text-hash — signing the default v1.0 does *not* cover override v1.0 and vice versa, even though both call themselves `v1.0`.)
+(`a4c` is `sha256("583231")` truncated to three characters. Signatures are scoped per-CLA-text-hash — signing the default v1.0 does _not_ cover override v1.0 and vice versa, even though both call themselves `v1.0`.)
 
 ## Auditing a signature
 

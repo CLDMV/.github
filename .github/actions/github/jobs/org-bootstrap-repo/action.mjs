@@ -101,7 +101,12 @@ async function main() {
 	const token = getInput("github_token", { required: true });
 	const dryRun = getInput("dry_run") !== "false";
 	const stepsCsv = getInput("steps") || "branches,settings,security,rulesets,variables";
-	const steps = new Set(stepsCsv.split(",").map((s) => s.trim()).filter(Boolean));
+	const steps = new Set(
+		stepsCsv
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean)
+	);
 	const nextBranch = getInput("next_branch") || "next";
 	const hotfixesBranch = getInput("hotfixes_branch") || "hotfixes";
 	const botAppId = parseInt(getInput("bot_app_id") || "1910694", 10);
@@ -135,7 +140,7 @@ async function main() {
 	console.log(`🚀 Bootstrap ${owner}/${repo}  (dry_run=${dryRun}, steps=${[...steps].join("+")})`);
 
 	/** Wrap a mutating call so dry_run suppresses the fire-the-API part. */
-	async function mutate(method, path, body, label) {
+	async function mutate(method, path, body, _) {
 		if (dryRun) {
 			console.log(`🔸 [dry-run] would ${method} ${path}`);
 			return null;
@@ -148,7 +153,7 @@ async function main() {
 	try {
 		repoInfo = await api("GET", "", null, ctx);
 	} catch (err) {
-		throw new Error(`Could not GET repo ${owner}/${repo}: ${err.message}`);
+		throw new Error(`Could not GET repo ${owner}/${repo}: ${err.message}`, { cause: err });
 	}
 	if (repoInfo.archived) return finish("skipped", "archived");
 	const defaultBranch = repoInfo.default_branch || "master";
@@ -160,7 +165,7 @@ async function main() {
 	try {
 		const ref = await api("GET", `/git/ref/heads/${defaultBranch}`, null, ctx);
 		defaultBranchSha = ref.object?.sha || "";
-	} catch (err) {
+	} catch (_) {
 		return finish("skipped", `no commits on default branch ${defaultBranch}`);
 	}
 	if (!defaultBranchSha) return finish("skipped", `default branch ${defaultBranch} has no HEAD`);
@@ -179,7 +184,9 @@ async function main() {
 			}
 			if (exists) {
 				if (existingSha !== defaultBranchSha) {
-					note(`${branch} exists at ${existingSha.slice(0, 7)} (diverged from ${defaultBranch}@${defaultBranchSha.slice(0, 7)}) — leaving alone`);
+					note(
+						`${branch} exists at ${existingSha.slice(0, 7)} (diverged from ${defaultBranch}@${defaultBranchSha.slice(0, 7)}) — leaving alone`
+					);
 				} else {
 					note(`${branch} already at ${defaultBranch} HEAD — no-op`);
 				}
@@ -235,7 +242,7 @@ async function main() {
 		// suppress the reminder once it's been flipped — that's the price
 		// of GitHub's API gap. Worded as a check, not an alarm.
 		manual(
-			"Settings → General → Pull Requests → \"Auto-close issues with merged linked pull requests\" — confirm ON (UI-only; not in REST/GraphQL/gh CLI)."
+			'Settings → General → Pull Requests → "Auto-close issues with merged linked pull requests" — confirm ON (UI-only; not in REST/GraphQL/gh CLI).'
 		);
 	}
 

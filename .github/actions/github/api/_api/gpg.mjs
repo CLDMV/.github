@@ -29,10 +29,14 @@ export function setupNonInteractiveGpg({ gpg_passphrase }) {
 	fs.writeFileSync(`${home}/.gnupg/gpg.conf`, `pinentry-mode loopback\n`);
 	try {
 		sh(`gpgconf --reload gpg-agent`);
-	} catch {}
+	} catch {
+		// best-effort; no agent running yet is fine, config below still gets written
+	}
 	try {
 		sh(`gpgconf --launch gpg-agent`);
-	} catch {}
+	} catch {
+		// best-effort; a subsequent gpg invocation will launch the agent itself if needed
+	}
 
 	// wrapper that always enforces loopback and passes the env-based passphrase
 	fs.writeFileSync(

@@ -103,7 +103,7 @@ function getTagMetadata(tag) {
 			const tagContent = gitCommand(`git cat-file -p ${tag}`, true);
 
 			// Parse tagger info
-			const taggerMatch = tagContent.match(/^tagger (.+) (\d{10,}) ([\+\-]\d{4})$/m);
+			const taggerMatch = tagContent.match(/^tagger (.+) (\d{10,}) ([+-]\d{4})$/m);
 			if (taggerMatch) {
 				metadata.tagger = taggerMatch[1];
 				metadata.taggerDate = taggerMatch[2];

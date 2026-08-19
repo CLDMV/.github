@@ -4,15 +4,7 @@
  * Run: `node test.mjs`. No network.
  */
 
-import {
-	ageInDays,
-	isoWeek,
-	bucketLabel,
-	dedupKey,
-	shouldRemind,
-	buildIssueTitle,
-	buildIssueBody
-} from "./action.mjs";
+import { ageInDays, isoWeek, bucketLabel, dedupKey, shouldRemind, buildIssueTitle, buildIssueBody } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {

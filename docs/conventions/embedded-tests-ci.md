@@ -28,12 +28,12 @@ Two conventions are supported. The workflow picks between them automatically bas
 
 Each gitlink path maps to its own private repo, named with the path embedded:
 
-| Gitlink path | Private repo (where `<repo>` = parent's repo name) |
-|---|---|
-| `tests/` | `<org>/<repo>-tests` |
-| `vendor/` | `<org>/<repo>-vendor` |
-| `internal/` | `<org>/<repo>-internal` |
-| `some/folder/deep/` | `<org>/<repo>-some-folder-deep` |
+| Gitlink path        | Private repo (where `<repo>` = parent's repo name) |
+| ------------------- | -------------------------------------------------- |
+| `tests/`            | `<org>/<repo>-tests`                               |
+| `vendor/`           | `<org>/<repo>-vendor`                              |
+| `internal/`         | `<org>/<repo>-internal`                            |
+| `some/folder/deep/` | `<org>/<repo>-some-folder-deep`                    |
 
 **Algorithm:**
 
@@ -47,7 +47,7 @@ This convention is the default. Each gitlink gets its own private repo, named de
 
 For consumers who'd rather have ONE private repo holding everything (instead of a `-tests` repo plus a `-vendor` repo plus a `-internal` repo plus…), the workflow recognizes a single private repo named `<org>/<repo>-embedded`. Its internal layout mirrors the parent's gitlink paths:
 
-```
+```text
 <repo>-embedded/
 ├── tests/                  # contents land at parent's tests/
 ├── vendor/                 # contents land at parent's vendor/
@@ -56,7 +56,7 @@ For consumers who'd rather have ONE private repo holding everything (instead of 
         └── deep/           # contents land at parent's some/folder/deep/
 ```
 
-The workflow clones the single `-embedded` repo once and checks out each gitlink's pinned SHA in turn, copying or moving the relevant subdirectory into the parent's gitlink path. *(SHA-pinning semantics: each gitlink in the parent's tree pins to a specific commit of the `-embedded` repo. If the parent has multiple gitlinks pinned to different SHAs of the same `-embedded` repo, the workflow checks out each SHA in turn — the underlying repo is one, but the checkouts are independent.)*
+The workflow clones the single `-embedded` repo once and checks out each gitlink's pinned SHA in turn, copying or moving the relevant subdirectory into the parent's gitlink path. _(SHA-pinning semantics: each gitlink in the parent's tree pins to a specific commit of the `-embedded` repo. If the parent has multiple gitlinks pinned to different SHAs of the same `-embedded` repo, the workflow checks out each SHA in turn — the underlying repo is one, but the checkouts are independent.)_
 
 ### Convention selection
 
@@ -75,7 +75,7 @@ The conventions are deterministic and rely only on information that's already pu
 - The parent's repo name (public)
 - The paths of any gitlinks (visible in the parent's tree)
 
-A reader of the public parent repo can predict the private repo names by applying the convention. That's the same information they already have from the parent's tree — the convention doesn't *add* information, it just reduces guessing. Whether someone *knows* a private repo exists by that name is not the same as having access to it.
+A reader of the public parent repo can predict the private repo names by applying the convention. That's the same information they already have from the parent's tree — the convention doesn't _add_ information, it just reduces guessing. Whether someone _knows_ a private repo exists by that name is not the same as having access to it.
 
 If a consumer specifically wants the private repo names to be unguessable (a stronger threat model than this design targets), the right answer is to use unrelated names and skip the auto-fetch entirely — clone the private repos manually in the workflow with hardcoded URLs and the bot token. The convention-based auto-fetch is a convenience layered on top of the anonymous-gitlink primitive; the primitive still works without it.
 
@@ -97,16 +97,16 @@ This is the explicit threat-model decision: outside contributors can't run the p
 
 ## Failure modes
 
-| Condition | Result | What to do |
-|---|---|---|
-| Consumer hasn't set `enable_embedded_tests: true` | Workflow runs as if the feature didn't exist | This is the default; no action needed |
-| Feature enabled, no gitlinks present in the parent's tree | Step logs "no embedded gitlinks found"; workflow continues | Expected behavior — public-only repos won't have gitlinks |
-| Feature enabled, gitlinks present, secrets available | Each private repo is fetched at its pinned SHA, full suite runs | Happy path |
-| Feature enabled, gitlinks present, secrets unavailable (fork PR) | Fetch step is skipped silently; public surface runs | Expected — fork PRs run public surface only |
-| Feature enabled, gitlinks present, App lacks access to a private repo | Workflow fails with: "App does not have access to <repo>; install the App on that repo" | Install the App on the missing private repo |
-| Feature enabled, pinned SHA doesn't exist on the private repo | Workflow fails with: "SHA <sha> not found on <repo>; push the missing commit" | Push the missing commit to the private repo |
-| Feature enabled, neither per-path nor `-embedded` repo exists for a gitlink | Workflow fails with: "Expected `<repo>-<path>` or `<repo>-embedded` not found; create one or remove the gitlink" | Create a private repo following one of the two conventions |
-| Feature enabled, both per-path AND `-embedded` repos exist | Workflow uses `-embedded` and emits a warning advising the consumer to pick one | Decide on a single convention and remove the duplicate private repo |
+| Condition                                                                   | Result                                                                                                           | What to do                                                          |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Consumer hasn't set `enable_embedded_tests: true`                           | Workflow runs as if the feature didn't exist                                                                     | This is the default; no action needed                               |
+| Feature enabled, no gitlinks present in the parent's tree                   | Step logs "no embedded gitlinks found"; workflow continues                                                       | Expected behavior — public-only repos won't have gitlinks           |
+| Feature enabled, gitlinks present, secrets available                        | Each private repo is fetched at its pinned SHA, full suite runs                                                  | Happy path                                                          |
+| Feature enabled, gitlinks present, secrets unavailable (fork PR)            | Fetch step is skipped silently; public surface runs                                                              | Expected — fork PRs run public surface only                         |
+| Feature enabled, gitlinks present, App lacks access to a private repo       | Workflow fails with: "App does not have access to <repo>; install the App on that repo"                          | Install the App on the missing private repo                         |
+| Feature enabled, pinned SHA doesn't exist on the private repo               | Workflow fails with: "SHA <sha> not found on <repo>; push the missing commit"                                    | Push the missing commit to the private repo                         |
+| Feature enabled, neither per-path nor `-embedded` repo exists for a gitlink | Workflow fails with: "Expected `<repo>-<path>` or `<repo>-embedded` not found; create one or remove the gitlink" | Create a private repo following one of the two conventions          |
+| Feature enabled, both per-path AND `-embedded` repos exist                  | Workflow uses `-embedded` and emits a warning advising the consumer to pick one                                  | Decide on a single convention and remove the duplicate private repo |
 
 ## Workflow integration sketch
 

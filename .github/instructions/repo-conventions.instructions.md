@@ -13,11 +13,11 @@ tooling for the CLDMV organization.
 
 Files in `.github/workflows/` are grouped by what they DO:
 
-| Prefix | Trigger | Purpose |
-|---|---|---|
-| `local-*.yml` | `push` / `pull_request` / `schedule` / `release` / `workflow_dispatch` | Runs on THIS repo's events. Dogfoods the reusables against this repo's own changes. Use **relative** `uses: ./.github/workflows/reusable-X.yml` so PRs test against the PR's version of the reusable. |
-| `workflow-*.yml` | `workflow_call` only | Org-level entry point that consumer repos invoke via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v4`. Maps inputs/secrets and delegates to `reusable-*.yml`. Thin layer. |
-| `reusable-*.yml` | `workflow_call` only | Lower-level building block called by other workflows (entry points OR other reusables). Bundles a set of jobs gated by `run_*` boolean inputs. |
+| Prefix           | Trigger                                                                | Purpose                                                                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local-*.yml`    | `push` / `pull_request` / `schedule` / `release` / `workflow_dispatch` | Runs on THIS repo's events. Dogfoods the reusables against this repo's own changes. Use **relative** `uses: ./.github/workflows/reusable-X.yml` so PRs test against the PR's version of the reusable. |
+| `workflow-*.yml` | `workflow_call` only                                                   | Org-level entry point that consumer repos invoke via `uses: CLDMV/.github/.github/workflows/workflow-X.yml@v4`. Maps inputs/secrets and delegates to `reusable-*.yml`. Thin layer.                    |
+| `reusable-*.yml` | `workflow_call` only                                                   | Lower-level building block called by other workflows (entry points OR other reusables). Bundles a set of jobs gated by `run_*` boolean inputs.                                                        |
 
 The naming prefix is convention, not enforced by GitHub Actions. What matters technically is the `on:` block: anything with non-`workflow_call` triggers runs on this repo's own events; pure `workflow_call` files are library code.
 
@@ -47,14 +47,14 @@ entrypoint). Action logic belongs in `.mjs` files — not inline shell in `actio
 When deciding whether a new action should be a thin wrapper or a from-scratch
 implementation:
 
-- **Roll our own** when the third-party action is *a thin wrapper over generic
-  mechanics* — operations any competent GitHub Actions user could implement (label
+- **Roll our own** when the third-party action is _a thin wrapper over generic
+  mechanics_ — operations any competent GitHub Actions user could implement (label
   management, PR approvals, REST orchestration). Examples in this repo: stale,
   Dependabot auto-merge, PR labeler, welcomer, bundle-size diff, gh-pages
   publisher, release notifier, CLA bot. Rolling our own keeps bot attribution
   consistent, removes third-party dependencies, and fits the existing Node-action
   conventions.
-- **Wrap the marketplace action** when it wraps a *substantive external system* —
+- **Wrap the marketplace action** when it wraps a _substantive external system_ —
   a vuln database (Trivy), per-ecosystem dep tree resolution (Anchore syft),
   GitHub's own Sigstore signing (`actions/attest-sbom`), a research project's
   check suite (OpenSSF Scorecard, CodeQL). Rolling our own here means
@@ -126,7 +126,7 @@ git push --force origin vX vX.Y
 
 All GitHub REST API calls in this repo use:
 
-```
+```text
 Accept: application/vnd.github+json
 Authorization: Bearer <token>
 X-GitHub-Api-Version: 2026-03-10

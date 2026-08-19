@@ -30,9 +30,7 @@ import { getInput, setOutputs, getBooleanInput } from "../../../common/common/co
  * @returns {{ base: string, head: string, commit_message: string }}
  */
 export function buildMergePayload({ targetBranch, sourceRef, commitMessage }) {
-	const message = commitMessage && commitMessage.trim()
-		? commitMessage.trim()
-		: `Merge ${sourceRef} into ${targetBranch}`;
+	const message = commitMessage && commitMessage.trim() ? commitMessage.trim() : `Merge ${sourceRef} into ${targetBranch}`;
 	return { base: targetBranch, head: sourceRef, commit_message: message };
 }
 

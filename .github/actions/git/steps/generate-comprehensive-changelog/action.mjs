@@ -949,7 +949,13 @@ async function convertAuthorToGitHubLink(author, email, token) {
  * @param {string} token - GitHub API token for user lookups
  * @returns {Promise<string>} Generated changelog content
  */
-async function generateComprehensiveChangelog(commitRange = null, commits = null, token = null, useSingleCommitMessage = false, groupByPR = false) {
+async function generateComprehensiveChangelog(
+	commitRange = null,
+	commits = null,
+	token = null,
+	useSingleCommitMessage = false,
+	groupByPR = false
+) {
 	console.log(`🔍 DEBUG: generateComprehensiveChangelog called with:`);
 	console.log(`  - commitRange: ${commitRange}`);
 	console.log(`  - commits: ${commits ? (Array.isArray(commits) ? commits.length + " commits" : "provided but not array") : "null"}`);
@@ -992,8 +998,8 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			console.log(`⚠️ Failed to get current commit message: ${error.message}`);
 		}
 	}
-	let lastTag = "";
-	let range = "";
+	let lastTag;
+	let range;
 
 	if (!commitRange && !commits) {
 		// Try to find the last release tag
@@ -1001,7 +1007,7 @@ async function generateComprehensiveChangelog(commitRange = null, commits = null
 			lastTag = gitCommand("git describe --tags --abbrev=0", true);
 			console.log(`Last tag: ${lastTag}`);
 			range = `${lastTag}..HEAD`;
-		} catch (error) {
+		} catch (_) {
 			console.log("No previous tags found, using initial commit");
 			const initialCommit = gitCommand("git rev-list --max-parents=0 HEAD", true);
 			range = `${initialCommit}..HEAD`;
@@ -1203,7 +1209,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			try {
 				commits = JSON.parse(COMMITS_INPUT);
 				console.log(`📋 Using provided commits: ${commits.length} commits`);
-			} catch (error) {
+			} catch (_) {
 				console.log("⚠️ Failed to parse commits input, falling back to git commands");
 				console.log(`Debug: COMMITS_INPUT = ${COMMITS_INPUT}`);
 			}

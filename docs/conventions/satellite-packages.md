@@ -10,12 +10,12 @@ A satellite is **not** a separately-versioned project. It is a complete, publish
 
 Per core release `vX.Y.Z`, the pipeline produces, for the core and for each satellite:
 
-| Target | Core | Each satellite |
-|---|---|---|
-| npm | yes | yes |
-| GitHub Packages | yes | yes |
-| GitHub Release + git tag | `vX.Y.Z` | own prefixed tag at the same commit |
-| Rolling `vN` / `vN.Y` tags | yes | no — core only |
+| Target                     | Core     | Each satellite                      |
+| -------------------------- | -------- | ----------------------------------- |
+| npm                        | yes      | yes                                 |
+| GitHub Packages            | yes      | yes                                 |
+| GitHub Release + git tag   | `vX.Y.Z` | own prefixed tag at the same commit |
+| Rolling `vN` / `vN.Y` tags | yes      | no — core only                      |
 
 Rolling major tags exist so workflow consumers can pin `uses: …@v4`. Nobody pins a git tag to install an npm package, so satellites get only their immutable release tag.
 
@@ -23,7 +23,7 @@ Rolling major tags exist so workflow consumers can pin `uses: …@v4`. Nobody pi
 
 The repository has a single git-tag namespace, and `vX.Y.Z` belongs to the core. Satellites therefore use the multi-package convention `@scope/name@version`:
 
-```
+```text
 @cldmv/slothlet@1.2.3        ← core uses the plain vX.Y.Z scheme (tag: v1.2.3)
 @cldmv/slothlet-i18n@1.2.3   ← satellite tag
 @cldmv/slothlet-types@1.2.3  ← satellite tag
@@ -90,7 +90,7 @@ Idempotency is inherited from the publish step: a re-run of a version already on
 
 ## Bootstrapping a new satellite (first publish)
 
-npm's OIDC trusted publishing **cannot create a package name it has never seen** — there is no initial-publish-over-OIDC yet (tracked in [npm/cli#8544](https://github.com/npm/cli/issues/8544), still open as of 2026-06). And both the npmjs.com UI and the `npm trust` CLI **require the package to already exist** before a trusted publisher can be configured for it — there is no way to pre-register one against a name npm has never seen. So each brand-new satellite *name* needs a **one-time, manual first publish** to create the package; every release after that is automated and token-less via OIDC, in lockstep with the core.
+npm's OIDC trusted publishing **cannot create a package name it has never seen** — there is no initial-publish-over-OIDC yet (tracked in [npm/cli#8544](https://github.com/npm/cli/issues/8544), still open as of 2026-06). And both the npmjs.com UI and the `npm trust` CLI **require the package to already exist** before a trusted publisher can be configured for it — there is no way to pre-register one against a name npm has never seen. So each brand-new satellite _name_ needs a **one-time, manual first publish** to create the package; every release after that is automated and token-less via OIDC, in lockstep with the core.
 
 Do this **before** the satellite's first release — not after a release half-fails on a name npm can't create. It is per brand-new name only: existing satellites need nothing, and a satellite leg that fails mid-release is recoverable by simply re-running, since the satellite jobs are not gated on the core version and every publish step is idempotent (see [Failure semantics](#failure-semantics)).
 
@@ -151,11 +151,11 @@ The satellite matrix runs **after** the core publish and release, with `fail-fas
 - does not cancel sibling satellites;
 - marks the overall run failed (red) so it is visible and retryable.
 
-Because publish is idempotent, re-running the release republishes only the satellite that failed. For this to hold, satellite discovery and publishing are deliberately **not** gated on the core version. The core publish/release jobs skip cleanly when `version == npm-latest` (nothing new to ship), but the satellite jobs must not borrow that gate: once the core is published, a re-run to recover a failed satellite *also* has `version == npm-latest`, and a core-keyed gate would skip the satellites and strand the failure. Instead the satellite matrix always re-enters, and each leg's own idempotency (already-published version ⇒ pseudo-success skip; tag/release creation upsert) makes the re-run a no-op for the satellites already out and a real publish for the one(s) missing — on either "re-run all jobs" or a fresh trigger. The trade-off is that satellite discovery runs on every publish trigger (not only on version bumps); on an unchanged version this is a green no-op, not a failure.
+Because publish is idempotent, re-running the release republishes only the satellite that failed. For this to hold, satellite discovery and publishing are deliberately **not** gated on the core version. The core publish/release jobs skip cleanly when `version == npm-latest` (nothing new to ship), but the satellite jobs must not borrow that gate: once the core is published, a re-run to recover a failed satellite _also_ has `version == npm-latest`, and a core-keyed gate would skip the satellites and strand the failure. Instead the satellite matrix always re-enters, and each leg's own idempotency (already-published version ⇒ pseudo-success skip; tag/release creation upsert) makes the re-run a no-op for the satellites already out and a real publish for the one(s) missing — on either "re-run all jobs" or a fresh trigger. The trade-off is that satellite discovery runs on every publish trigger (not only on version bumps); on an unchanged version this is a green no-op, not a failure.
 
 ## Rollout
 
-Adding an input that flows entry → reusable is two-phase, because this repo publishes itself and `@v4` only rolls forward *after* a publish run completes:
+Adding an input that flows entry → reusable is two-phase, because this repo publishes itself and `@v4` only rolls forward _after_ a publish run completes:
 
 - **Release 1** ships everything except the `workflow-publish.yml` surface: the `reusable-publishing.yml` inputs and jobs, the `package-dir` action support, the create-release tag override, and `dist-packages/` in the artifact.
 - **Release 2** (after `@v4` includes Release 1) adds `extra_packages` and `build_subpackages_command` to `workflow-publish.yml` and forwards them. Consumers adopt after Release 2.

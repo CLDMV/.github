@@ -149,10 +149,7 @@ async function findOverrideSignaturesForId(platform, id) {
 }
 
 async function findAllSignaturesForId(platform, id) {
-	const [defaults, overrides] = await Promise.all([
-		findDefaultSignaturesForId(platform, id),
-		findOverrideSignaturesForId(platform, id)
-	]);
+	const [defaults, overrides] = await Promise.all([findDefaultSignaturesForId(platform, id), findOverrideSignaturesForId(platform, id)]);
 	return [...defaults, ...overrides];
 }
 

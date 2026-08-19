@@ -9,7 +9,10 @@ import { execSync } from "node:child_process";
 import { setOutput } from "../../../common/common/core.mjs";
 
 /** Run a git command and return trimmed stdout. */
-const sh = (cmd) => execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] }).toString().trim();
+const sh = (cmd) =>
+	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] })
+		.toString()
+		.trim();
 
 try {
 	// Ensure tags are up to date (checkout already used fetch-depth: 0).
@@ -21,7 +24,11 @@ try {
 
 	console.log("🔍 Checking for orphaned major and minor version tags...");
 
-	const verKey = (tag) => tag.replace(/^v/, "").split(".").map((n) => Number.parseInt(n, 10));
+	const verKey = (tag) =>
+		tag
+			.replace(/^v/, "")
+			.split(".")
+			.map((n) => Number.parseInt(n, 10));
 	const cmp = (a, b) => {
 		const [A, B, C] = verKey(a);
 		const [D, E, F] = verKey(b);

@@ -4,7 +4,15 @@
  * Run directly: `node test.mjs` in this directory. Exits non-zero on failure.
  */
 
-import { parseSemverBump, requiredCheckContextsFromRules, isNotFoundError, allowedMergeMethodsFromRules, chooseMergeMethod, isAlreadyMergeableError, isProtectedBase } from "./_impl.mjs";
+import {
+	parseSemverBump,
+	requiredCheckContextsFromRules,
+	isNotFoundError,
+	allowedMergeMethodsFromRules,
+	chooseMergeMethod,
+	isAlreadyMergeableError,
+	isProtectedBase
+} from "./_impl.mjs";
 
 let failures = 0;
 
@@ -36,7 +44,11 @@ eq(
 	["test", "lint"],
 	"extracts contexts from a ruleset array"
 );
-eq(requiredCheckContextsFromRules([{ type: "pull_request", parameters: { required_approving_review_count: 1 } }]), [], "pull_request-only → no checks");
+eq(
+	requiredCheckContextsFromRules([{ type: "pull_request", parameters: { required_approving_review_count: 1 } }]),
+	[],
+	"pull_request-only → no checks"
+);
 eq(requiredCheckContextsFromRules([]), [], "empty array → no checks");
 eq(requiredCheckContextsFromRules(null), [], "non-array (null) → no checks");
 eq(requiredCheckContextsFromRules({ message: "Not Found" }), [], "object payload → no checks");
@@ -46,7 +58,9 @@ eq(
 	"blank/missing contexts filtered out"
 );
 eq(
-	requiredCheckContextsFromRules([{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "  " }, { context: " ci " }] } }]),
+	requiredCheckContextsFromRules([
+		{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "  " }, { context: " ci " }] } }
+	]),
 	["ci"],
 	"whitespace-only dropped, surrounding whitespace trimmed"
 );
@@ -83,7 +97,11 @@ eq(chooseMergeMethod("", ["merge", "squash"]), "merge", "empty config → merge 
 console.log("isAlreadyMergeableError:");
 eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in unstable status"}]'), true, "unstable status → fall back");
 eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Pull request is in clean status"}]'), true, "clean status → fall back");
-eq(isAlreadyMergeableError('GraphQL errors: [{"message":"Auto merge is not allowed for this repository"}]'), false, "auto-merge disabled → rethrow");
+eq(
+	isAlreadyMergeableError('GraphQL errors: [{"message":"Auto merge is not allowed for this repository"}]'),
+	false,
+	"auto-merge disabled → rethrow"
+);
 eq(isAlreadyMergeableError("GraphQL 403: Resource not accessible by integration"), false, "permission error → rethrow");
 eq(isAlreadyMergeableError(undefined), false, "non-string → rethrow");
 

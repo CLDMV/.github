@@ -1,190 +1,270 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLDMV/.github v4 — Ruleset Generator</title>
-<style>
-  :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-bg: #1f6feb;
-    --warn: #d29922;
-    --warn-bg: rgba(210, 153, 34, 0.1);
-    --info: #58a6ff;
-    --info-bg: rgba(56, 139, 253, 0.1);
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    max-width: 960px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-    line-height: 1.5;
-  }
-  h1 { font-size: 1.5rem; margin-top: 0; }
-  h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
-  a { color: var(--accent); }
-  code { background: var(--panel); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
-  fieldset {
-    border: 1px solid var(--border);
-    background: var(--panel);
-    padding: 1rem 1.25rem;
-    margin: 1rem 0;
-    border-radius: 6px;
-  }
-  legend { padding: 0 0.5rem; font-weight: 600; }
-  label { display: block; margin: 0.75rem 0; }
-  label small { display: block; color: var(--muted); margin-top: 0.25rem; }
-  input[type="number"], select {
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 0.4rem 0.6rem;
-    border-radius: 4px;
-    font-size: 0.95rem;
-    width: 6rem;
-  }
-  input[type="checkbox"] { transform: scale(1.1); margin-right: 0.5rem; }
-  .branch-block {
-    border: 1px solid var(--border);
-    background: var(--panel);
-    padding: 1rem;
-    margin: 1rem 0;
-    border-radius: 6px;
-  }
-  button {
-    background: var(--accent-bg);
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 500;
-  }
-  button:hover { filter: brightness(1.15); }
-  pre {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 0.75rem;
-    overflow: auto;
-    max-height: 240px;
-    font-size: 0.8rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-  }
-  .note {
-    background: var(--warn-bg);
-    border-left: 3px solid var(--warn);
-    padding: 0.75rem 1rem;
-    margin: 1rem 0;
-    border-radius: 0 4px 4px 0;
-  }
-  .step {
-    background: var(--info-bg);
-    border-left: 3px solid var(--info);
-    padding: 0.75rem 1rem;
-    margin: 1rem 0;
-    border-radius: 0 4px 4px 0;
-  }
-  ul { padding-left: 1.5rem; }
-  li { margin: 0.25rem 0; }
-</style>
-</head>
-<body>
-<h1>CLDMV/.github v4 — Ruleset Generator</h1>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>CLDMV/.github v4 — Ruleset Generator</title>
+		<style>
+			:root {
+				--bg: #0d1117;
+				--panel: #161b22;
+				--border: #30363d;
+				--text: #c9d1d9;
+				--muted: #8b949e;
+				--accent: #58a6ff;
+				--accent-bg: #1f6feb;
+				--warn: #d29922;
+				--warn-bg: rgba(210, 153, 34, 0.1);
+				--info: #58a6ff;
+				--info-bg: rgba(56, 139, 253, 0.1);
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+				background: var(--bg);
+				color: var(--text);
+				max-width: 960px;
+				margin: 2rem auto;
+				padding: 0 1rem;
+				line-height: 1.5;
+			}
+			h1 {
+				font-size: 1.5rem;
+				margin-top: 0;
+			}
+			h2 {
+				font-size: 1.1rem;
+				margin: 0 0 0.5rem;
+			}
+			a {
+				color: var(--accent);
+			}
+			code {
+				background: var(--panel);
+				padding: 0.1em 0.3em;
+				border-radius: 3px;
+				font-size: 0.9em;
+			}
+			fieldset {
+				border: 1px solid var(--border);
+				background: var(--panel);
+				padding: 1rem 1.25rem;
+				margin: 1rem 0;
+				border-radius: 6px;
+			}
+			legend {
+				padding: 0 0.5rem;
+				font-weight: 600;
+			}
+			label {
+				display: block;
+				margin: 0.75rem 0;
+			}
+			label small {
+				display: block;
+				color: var(--muted);
+				margin-top: 0.25rem;
+			}
+			input[type="number"],
+			select {
+				background: var(--bg);
+				color: var(--text);
+				border: 1px solid var(--border);
+				padding: 0.4rem 0.6rem;
+				border-radius: 4px;
+				font-size: 0.95rem;
+				width: 6rem;
+			}
+			input[type="checkbox"] {
+				transform: scale(1.1);
+				margin-right: 0.5rem;
+			}
+			.branch-block {
+				border: 1px solid var(--border);
+				background: var(--panel);
+				padding: 1rem;
+				margin: 1rem 0;
+				border-radius: 6px;
+			}
+			button {
+				background: var(--accent-bg);
+				color: white;
+				border: none;
+				padding: 0.5rem 1rem;
+				border-radius: 4px;
+				cursor: pointer;
+				font-size: 0.95rem;
+				font-weight: 500;
+			}
+			button:hover {
+				filter: brightness(1.15);
+			}
+			pre {
+				background: var(--bg);
+				border: 1px solid var(--border);
+				padding: 0.75rem;
+				overflow: auto;
+				max-height: 240px;
+				font-size: 0.8rem;
+				border-radius: 4px;
+				margin-top: 0.5rem;
+			}
+			.note {
+				background: var(--warn-bg);
+				border-left: 3px solid var(--warn);
+				padding: 0.75rem 1rem;
+				margin: 1rem 0;
+				border-radius: 0 4px 4px 0;
+			}
+			.step {
+				background: var(--info-bg);
+				border-left: 3px solid var(--info);
+				padding: 0.75rem 1rem;
+				margin: 1rem 0;
+				border-radius: 0 4px 4px 0;
+			}
+			ul {
+				padding-left: 1.5rem;
+			}
+			li {
+				margin: 0.25rem 0;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>CLDMV/.github v4 — Ruleset Generator</h1>
 
-<p>Generates GitHub Ruleset JSON for the three v4 branches. After downloading, import each in your consumer repo: <strong>Settings → Rules → Rulesets → New ruleset → "Import a ruleset"</strong>.</p>
+		<p>
+			Generates GitHub Ruleset JSON for the three v4 branches. After downloading, import each in your consumer repo:
+			<strong>Settings → Rules → Rulesets → New ruleset → "Import a ruleset"</strong>.
+		</p>
 
-<p>See <a href="https://github.com/CLDMV/.github/blob/master/docs/conventions/release-flow-v4.md#9-branch-protection-rules">§9 of the v4 design doc</a> for what each setting does.</p>
+		<p>
+			See
+			<a href="https://github.com/CLDMV/.github/blob/master/docs/conventions/release-flow-v4.md#9-branch-protection-rules"
+				>§9 of the v4 design doc</a
+			>
+			for what each setting does.
+		</p>
 
-<fieldset>
-<legend>Repo settings</legend>
+		<fieldset>
+			<legend>Repo settings</legend>
 
-<label>
-  <strong>Team size (optional)</strong>
-  <select id="team-size">
-    <option value="">— skip (use manual count below) —</option>
-    <option value="1">1 (solo maintainer)</option>
-    <option value="2">2-4 (small team) → 1 approval</option>
-    <option value="5">5-9 (mid team) → 2 approvals</option>
-    <option value="10">10+ (large team) → 2 approvals</option>
-  </select>
-  <small>Selecting a team size pre-fills the approvals count below. You can override.</small>
-</label>
+			<label>
+				<strong>Team size (optional)</strong>
+				<select id="team-size">
+					<option value="">— skip (use manual count below) —</option>
+					<option value="1">1 (solo maintainer)</option>
+					<option value="2">2-4 (small team) → 1 approval</option>
+					<option value="5">5-9 (mid team) → 2 approvals</option>
+					<option value="10">10+ (large team) → 2 approvals</option>
+				</select>
+				<small>Selecting a team size pre-fills the approvals count below. You can override.</small>
+			</label>
 
-<label>
-  <strong>Required approvals</strong>
-  <input type="number" id="approvals" min="0" max="6" value="1">
-  <small>Number of approving reviews required before a PR can be merged. Default 1.</small>
-</label>
+			<label>
+				<strong>Required approvals</strong>
+				<input type="number" id="approvals" min="0" max="6" value="1" />
+				<small>Number of approving reviews required before a PR can be merged. Default 1.</small>
+			</label>
 
-<label>
-  <input type="checkbox" id="hotfix-codeowner">
-  <strong>Require Code Owner reviews on hotfixes</strong>
-  <small>Off by default. Requires a <code>CODEOWNERS</code> file at <code>.github/</code>, the repo root, or <code>docs/</code> — without that file the rule is a silent no-op. Affects the hotfixes ruleset only.</small>
-</label>
+			<label>
+				<input type="checkbox" id="hotfix-codeowner" />
+				<strong>Require Code Owner reviews on hotfixes</strong>
+				<small
+					>Off by default. Requires a <code>CODEOWNERS</code> file at <code>.github/</code>, the repo root, or <code>docs/</code> — without
+					that file the rule is a silent no-op. Affects the hotfixes ruleset only.</small
+				>
+			</label>
 
-<label>
-  <input type="checkbox" id="copilot-review">
-  <strong>Require Copilot Code Review (next + hotfixes)</strong>
-  <small><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to next and hotfixes — the branches where feature / hotfix PRs actually land and need review. Master PRs are release bundles assembled from already-reviewed commits, so Copilot review there adds no signal. Every PR to next / hotfixes triggers a Copilot review against your org's Copilot subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small>
-</label>
+			<label>
+				<input type="checkbox" id="copilot-review" />
+				<strong>Require Copilot Code Review (next + hotfixes)</strong>
+				<small
+					><strong>Off by default — enabling costs money.</strong> Adds the <code>copilot_code_review</code> rule to next and hotfixes — the
+					branches where feature / hotfix PRs actually land and need review. Master PRs are release bundles assembled from already-reviewed
+					commits, so Copilot review there adds no signal. Every PR to next / hotfixes triggers a Copilot review against your org's Copilot
+					subscription quota. Only enable if you have a paid Copilot tier and want AI review gating every change.</small
+				>
+			</label>
 
-<label>
-  <input type="checkbox" id="include-bot-bypass" checked>
-  <strong>Add the bot App to <code>next</code> + <code>hotfixes</code> bypass (recommended)</strong>
-  <small>The v4 reset/merge workflows (§6.3, §7.2) push to <code>next</code>/<code>hotfixes</code> as your bot's GitHub App; without bypass GitHub blocks them (<code>GH013</code> / <code>non_fast_forward</code>). Checked = the bot is pre-added to those two rulesets so you skip the manual UI step. <strong>Uncheck to opt out</strong> — e.g. you'll add the bot by hand, or your flow doesn't reset those branches as the App. <code>master</code> is never given bot bypass.</small>
-</label>
+			<label>
+				<input type="checkbox" id="include-bot-bypass" checked />
+				<strong>Add the bot App to <code>next</code> + <code>hotfixes</code> bypass (recommended)</strong>
+				<small
+					>The v4 reset/merge workflows (§6.3, §7.2) push to <code>next</code>/<code>hotfixes</code> as your bot's GitHub App; without
+					bypass GitHub blocks them (<code>GH013</code> / <code>non_fast_forward</code>). Checked = the bot is pre-added to those two
+					rulesets so you skip the manual UI step. <strong>Uncheck to opt out</strong> — e.g. you'll add the bot by hand, or your flow
+					doesn't reset those branches as the App. <code>master</code> is never given bot bypass.</small
+				>
+			</label>
 
-<label>
-  <strong>Bot GitHub App ID</strong>
-  <input type="number" id="bot-app-id" min="0" value="1910694">
-  <small>The bot App's numeric <strong>App ID</strong> (Org → Settings → Developer settings → GitHub Apps → your bot → "App ID"). Defaults to CLDMV's bot. If this is blank or non-numeric, the bot is <strong>not</strong> added even when the box above is checked.</small>
-</label>
-</fieldset>
+			<label>
+				<strong>Bot GitHub App ID</strong>
+				<input type="number" id="bot-app-id" min="0" value="1910694" />
+				<small
+					>The bot App's numeric <strong>App ID</strong> (Org → Settings → Developer settings → GitHub Apps → your bot → "App ID"). Defaults
+					to CLDMV's bot. If this is blank or non-numeric, the bot is <strong>not</strong> added even when the box above is checked.</small
+				>
+			</label>
+		</fieldset>
 
-<div class="step">
-<strong>Bot bypass is pre-added by default.</strong> With the checkbox above left on, the generated <code>next.json</code> / <code>hotfixes.json</code> already list your bot App in <code>bypass_actors</code> — no manual step needed. The v4 reset/merge workflows (§6.3, §7.2) push as the bot and would otherwise be blocked by <code>non_fast_forward</code> / require-PR.
-<br><br>
-<strong>If you opted out</strong> (or left the App ID blank), add it after import: open the imported ruleset → <strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> never needs bot bypass.
-</div>
+		<div class="step">
+			<strong>Bot bypass is pre-added by default.</strong> With the checkbox above left on, the generated <code>next.json</code> /
+			<code>hotfixes.json</code> already list your bot App in <code>bypass_actors</code> — no manual step needed. The v4 reset/merge
+			workflows (§6.3, §7.2) push as the bot and would otherwise be blocked by <code>non_fast_forward</code> / require-PR. <br /><br />
+			<strong>If you opted out</strong> (or left the App ID blank), add it after import: open the imported ruleset →
+			<strong>Bypass list</strong> → <strong>Add bypass</strong> → select your bot's GitHub App. <code>master</code> never needs bot bypass.
+		</div>
 
-<div class="branch-block">
-<h2><code>master.json</code> — production branch</h2>
-<button data-branch="master">Download master.json</button>
-<pre id="preview-master"></pre>
-</div>
+		<div class="branch-block">
+			<h2><code>master.json</code> — production branch</h2>
+			<button data-branch="master">Download master.json</button>
+			<pre id="preview-master"></pre>
+		</div>
 
-<div class="branch-block">
-<h2><code>next.json</code> — integration branch</h2>
-<button data-branch="next">Download next.json</button>
-<pre id="preview-next"></pre>
-</div>
+		<div class="branch-block">
+			<h2><code>next.json</code> — integration branch</h2>
+			<button data-branch="next">Download next.json</button>
+			<pre id="preview-next"></pre>
+		</div>
 
-<div class="branch-block">
-<h2><code>hotfixes.json</code> — hotfixes lane</h2>
-<button data-branch="hotfixes">Download hotfixes.json</button>
-<pre id="preview-hotfixes"></pre>
-</div>
+		<div class="branch-block">
+			<h2><code>hotfixes.json</code> — hotfixes lane</h2>
+			<button data-branch="hotfixes">Download hotfixes.json</button>
+			<pre id="preview-hotfixes"></pre>
+		</div>
 
-<div class="note">
-<strong>Notes:</strong>
-<ul>
-<li>The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the imported ruleset after import.</li>
-<li>Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit; <code>next</code> and <code>hotfixes</code> use <code>["merge"]</code> only — "Create a merge commit" preserves the PR's original signed commits intact. GitHub's "Rebase and merge" web-UI button re-creates commits server-side and <em>strips GPG signatures</em>, so it's deliberately disallowed on the staging branches. The slightly noisier git log on <code>next</code>/<code>hotfixes</code> is invisible at the master level: the master squash collapses the entire range (merge commits included) into one clean signed commit per release.</li>
-<li><code>next.json</code> and <code>hotfixes.json</code> both intentionally omit <code>required_linear_history</code> — they are merge-commit-only (<code>["merge"]</code>), and that rule forbids merge commits (it would deadlock every merge, including bot auto-merge of redirected security PRs). On <code>next</code> this also lets §7.2's master-into-next API merge produce a merge commit when needed.</li>
-<li>The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or blank the App ID, to opt out). It is never added to <code>master</code>.</li>
-</ul>
-</div>
+		<div class="note">
+			<strong>Notes:</strong>
+			<ul>
+				<li>
+					The required-check name is hardcoded as <code>✅ Required PR Check</code>. If your repo's check uses a different name, edit the
+					imported ruleset after import.
+				</li>
+				<li>
+					Merge methods are per-branch: <code>master</code> uses <code>["squash"]</code> so each release lands as one clean commit;
+					<code>next</code> and <code>hotfixes</code> use <code>["merge"]</code> only — "Create a merge commit" preserves the PR's original
+					signed commits intact. GitHub's "Rebase and merge" web-UI button re-creates commits server-side and
+					<em>strips GPG signatures</em>, so it's deliberately disallowed on the staging branches. The slightly noisier git log on
+					<code>next</code>/<code>hotfixes</code> is invisible at the master level: the master squash collapses the entire range (merge
+					commits included) into one clean signed commit per release.
+				</li>
+				<li>
+					<code>next.json</code> and <code>hotfixes.json</code> both intentionally omit <code>required_linear_history</code> — they are
+					merge-commit-only (<code>["merge"]</code>), and that rule forbids merge commits (it would deadlock every merge, including bot
+					auto-merge of redirected security PRs). On <code>next</code> this also lets §7.2's master-into-next API merge produce a merge
+					commit when needed.
+				</li>
+				<li>
+					The bot App is pre-added to <code>next</code>/<code>hotfixes</code> <code>bypass_actors</code> by default (uncheck the box, or
+					blank the App ID, to opt out). It is never added to <code>master</code>.
+				</li>
+			</ul>
+		</div>
 
-<script type="module" src="generator.js"></script>
-</body>
+		<script type="module" src="generator.js"></script>
+	</body>
 </html>

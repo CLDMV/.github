@@ -20,22 +20,22 @@ v3 is mostly additive — the existing `workflow-ci.yml` / `workflow-release.yml
 
 ### New reusable workflows
 
-| Workflow | Consumer template |
-|---|---|
-| `reusable-codeql.yml` | `examples/.../security/codeql.yml` |
-| `reusable-dependency-review.yml` | `examples/.../security/dependency-review.yml` |
-| `reusable-container-scan.yml` | (invoked from `reusable-docker-publish.yml`) |
-| `reusable-stale.yml` | `examples/.../automation/stale.yml` |
-| `reusable-dependabot-auto-merge.yml` | `examples/.../automation/dependabot-auto-merge.yml` |
-| `reusable-pr-labeler.yml` | `examples/.../automation/labeler.yml` |
-| `reusable-welcome.yml` | `examples/.../automation/welcome.yml` |
-| `reusable-bundle-size.yml` | `examples/.../packaging-docs/bundle-size.yml` |
-| `reusable-docs-publish.yml` | `examples/.../packaging-docs/docs.yml` |
-| `reusable-release-notifier.yml` | `examples/.../release-companions/release-notify.yml` |
-| `reusable-branch-retention.yml` | `examples/.../automation/branch-retention.yml` |
-| `reusable-cla.yml` | `examples/.../security/cla.yml` |
-| `workflow-sync-open-release-prs.yml` | `examples/.../release-companions/sync-release-prs.yml` |
-| `examples/.../release-companions/master-commit-audit.yml` | (uses an action directly) |
+| Workflow                                                  | Consumer template                                      |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| `reusable-codeql.yml`                                     | `examples/.../security/codeql.yml`                     |
+| `reusable-dependency-review.yml`                          | `examples/.../security/dependency-review.yml`          |
+| `reusable-container-scan.yml`                             | (invoked from `reusable-docker-publish.yml`)           |
+| `reusable-stale.yml`                                      | `examples/.../automation/stale.yml`                    |
+| `reusable-dependabot-auto-merge.yml`                      | `examples/.../automation/dependabot-auto-merge.yml`    |
+| `reusable-pr-labeler.yml`                                 | `examples/.../automation/labeler.yml`                  |
+| `reusable-welcome.yml`                                    | `examples/.../automation/welcome.yml`                  |
+| `reusable-bundle-size.yml`                                | `examples/.../packaging-docs/bundle-size.yml`          |
+| `reusable-docs-publish.yml`                               | `examples/.../packaging-docs/docs.yml`                 |
+| `reusable-release-notifier.yml`                           | `examples/.../release-companions/release-notify.yml`   |
+| `reusable-branch-retention.yml`                           | `examples/.../automation/branch-retention.yml`         |
+| `reusable-cla.yml`                                        | `examples/.../security/cla.yml`                        |
+| `workflow-sync-open-release-prs.yml`                      | `examples/.../release-companions/sync-release-prs.yml` |
+| `examples/.../release-companions/master-commit-audit.yml` | (uses an action directly)                              |
 
 See [examples/guides/WORKFLOW-SETUP-GUIDE.md](../../examples/guides/WORKFLOW-SETUP-GUIDE.md) for required `package.json` scripts, secrets, and per-workflow prerequisites.
 
@@ -99,22 +99,22 @@ Idempotent — re-running updates the existing ruleset.
 
 4. **Optionally adopt new workflows** by copying their templates from the appropriate subfolder under `examples/individual-repo-workflows/`:
 
-   | Want… | Template |
-   |---|---|
-   | Path-based PR labels | `automation/labeler.yml` |
-   | First-PR / first-issue welcome | `automation/welcome.yml` |
-   | Stale issue / PR sweep | `automation/stale.yml` |
-   | Auto-merge Dependabot patch/minor | `automation/dependabot-auto-merge.yml` |
-   | Branch retention on merge | `automation/branch-retention.yml` |
-   | CLA bot | `security/cla.yml` |
-   | CodeQL SAST | `security/codeql.yml` |
-   | PR-time CVE diff | `security/dependency-review.yml` |
-   | OpenSSF Scorecard | `security/scorecard.yml` |
-   | Master-commit audit | `release-companions/master-commit-audit.yml` |
-   | Tag-health weekly sweep | `release-companions/tag-health.yml` |
-   | Discord / Slack release notify | `release-companions/release-notify.yml` |
-   | Bundle-size diff on PRs | `packaging-docs/bundle-size.yml` |
-   | gh-pages docs publish | `packaging-docs/docs.yml` |
+   | Want…                             | Template                                     |
+   | --------------------------------- | -------------------------------------------- |
+   | Path-based PR labels              | `automation/labeler.yml`                     |
+   | First-PR / first-issue welcome    | `automation/welcome.yml`                     |
+   | Stale issue / PR sweep            | `automation/stale.yml`                       |
+   | Auto-merge Dependabot patch/minor | `automation/dependabot-auto-merge.yml`       |
+   | Branch retention on merge         | `automation/branch-retention.yml`            |
+   | CLA bot                           | `security/cla.yml`                           |
+   | CodeQL SAST                       | `security/codeql.yml`                        |
+   | PR-time CVE diff                  | `security/dependency-review.yml`             |
+   | OpenSSF Scorecard                 | `security/scorecard.yml`                     |
+   | Master-commit audit               | `release-companions/master-commit-audit.yml` |
+   | Tag-health weekly sweep           | `release-companions/tag-health.yml`          |
+   | Discord / Slack release notify    | `release-companions/release-notify.yml`      |
+   | Bundle-size diff on PRs           | `packaging-docs/bundle-size.yml`             |
+   | gh-pages docs publish             | `packaging-docs/docs.yml`                    |
 
 5. **First-run guidance for `stale.yml`**: dispatch with `dry_run: true` first to preview the marking/closing set; flip to live once you're comfortable.
 

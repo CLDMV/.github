@@ -105,7 +105,9 @@ entries = entries.filter((e) => (seen.has(e.dir) ? false : (seen.add(e.dir), tru
 const names = entries.map((e) => e.name);
 const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
 if (dupes.length) {
-	console.error(`::error::Duplicate satellite package name(s): ${dupes.join(", ")}. Each satellite directory must resolve to a unique package name.`);
+	console.error(
+		`::error::Duplicate satellite package name(s): ${dupes.join(", ")}. Each satellite directory must resolve to a unique package name.`
+	);
 	process.exit(1);
 }
 

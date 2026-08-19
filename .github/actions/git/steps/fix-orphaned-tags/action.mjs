@@ -33,7 +33,6 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 		// Get the commit message and author from orphaned commit
 		const orphanedMessage = gitCommand(`git log -1 --format="%s" ${orphanedCommit}`, true);
 		const orphanedAuthor = gitCommand(`git log -1 --format="%an <%ae>" ${orphanedCommit}`, true);
-		const orphanedDate = gitCommand(`git log -1 --format="%ct" ${orphanedCommit}`, true);
 
 		if (!orphanedMessage) {
 			console.warn(`⚠️ Could not get message for orphaned commit ${orphanedCommit}`);
@@ -67,7 +66,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 				// 1st Priority: Look for "release: <extracted version>" at start of commit
 				console.log(`🔍 Priority 1: Searching for "release: ${fullVersionFromTag}" at start of commit...`);
 				for (const line of lines) {
-					const [sha, message, author, timestamp] = line.split("|");
+					const [sha, message] = line.split("|");
 					if (sha === orphanedCommit) continue;
 
 					if (message.startsWith(`release: ${fullVersionFromTag}`)) {
@@ -79,7 +78,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 				// 2nd Priority: Look for full version (with v) anywhere in commit title
 				console.log(`🔍 Priority 2: Searching for "${fullVersionFromTag}" anywhere in commit title...`);
 				for (const line of lines) {
-					const [sha, message, author, timestamp] = line.split("|");
+					const [sha, message] = line.split("|");
 					if (sha === orphanedCommit) continue;
 
 					if (message.includes(fullVersionFromTag)) {
@@ -91,7 +90,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 				// 3rd Priority: Look for numeric version (without v) anywhere in commit title
 				console.log(`🔍 Priority 3: Searching for "${versionFromTag}" anywhere in commit title...`);
 				for (const line of lines) {
-					const [sha, message, author, timestamp] = line.split("|");
+					const [sha, message] = line.split("|");
 					if (sha === orphanedCommit) continue;
 
 					if (message.includes(versionFromTag)) {
@@ -112,7 +111,7 @@ function findEquivalentCommit(orphanedCommit, tagName = "") {
 			if (allCommits) {
 				const lines = allCommits.split("\n").filter((line) => line.trim());
 				for (const line of lines) {
-					const [sha, message, author] = line.split("|");
+					const [sha, message] = line.split("|");
 
 					// Skip if it's the same commit
 					if (sha === orphanedCommit) continue;

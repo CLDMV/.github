@@ -8,9 +8,9 @@ This action is typically used at the end of workflows to properly clean up GitHu
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `auth-token` | GitHub App installation token to revoke | Yes | - |
+| Input        | Description                             | Required | Default |
+| ------------ | --------------------------------------- | -------- | ------- |
+| `auth-token` | GitHub App installation token to revoke | Yes      | -       |
 
 ## Usage
 
@@ -37,9 +37,9 @@ jobs:
         with:
           client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-      
+
       # ... do work with the token ...
-      
+
       - name: Revoke App token
         if: always() # Always run to ensure cleanup
         uses: CLDMV/.github/.github/actions/github/api/revoke-app-token@v4

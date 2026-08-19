@@ -123,18 +123,18 @@ export function extractCloseKeywords(text) {
  * @public
  */
 export function sourcePRTexts({ body, comments, commits } = {}) {
-	return [
-		body || "",
-		...(comments || []).map((c) => c?.body || ""),
-		...(commits || []).map((c) => c?.commit?.message || "")
-	];
+	return [body || "", ...(comments || []).map((c) => c?.body || ""), ...(commits || []).map((c) => c?.commit?.message || "")];
 }
 
 async function listRangeCommits(owner, repo, base, head, token) {
 	const all = [];
 	let page = 1;
 	while (true) {
-		const data = await api("GET", `/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=250&page=${page}`, null, { token, owner, repo });
+		const data = await api("GET", `/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=250&page=${page}`, null, {
+			token,
+			owner,
+			repo
+		});
 		const commits = data?.commits || [];
 		all.push(...commits);
 		const total = data?.total_commits ?? all.length;
@@ -198,7 +198,16 @@ async function main() {
 		if (attributedPR == null) continue;
 		collectInto(issueSources, extractCloseKeywords, fullMessage, attributedPR);
 	}
-	console.log(`🔗 Source PR(s) bundled in this release: ${sourcePRs.size ? [...sourcePRs].sort((a, b) => a - b).map((n) => `#${n}`).join(", ") : "<none>"}`);
+	console.log(
+		`🔗 Source PR(s) bundled in this release: ${
+			sourcePRs.size
+				? [...sourcePRs]
+						.sort((a, b) => a - b)
+						.map((n) => `#${n}`)
+						.join(", ")
+				: "<none>"
+		}`
+	);
 
 	// Pass 2: for each source PR, sweep its description, its comments, AND its
 	// own constituent commit messages for the gh-broker:resolves: marker AND the
@@ -244,7 +253,12 @@ async function main() {
 				console.log(`⏭️ #${issueNumber} already ${issue?.state || "missing"} — skipping.`);
 				continue;
 			}
-			await api("POST", `/issues/${issueNumber}/comments`, { body: `Closed in ${releaseVersion} — resolved by #${sourcePR}.` }, { token, owner, repo });
+			await api(
+				"POST",
+				`/issues/${issueNumber}/comments`,
+				{ body: `Closed in ${releaseVersion} — resolved by #${sourcePR}.` },
+				{ token, owner, repo }
+			);
 			await api("PATCH", `/issues/${issueNumber}`, { state: "closed", state_reason: "completed" }, { token, owner, repo });
 			closed.push(issueNumber);
 			console.log(`✅ Closed #${issueNumber} (resolved by #${sourcePR}).`);

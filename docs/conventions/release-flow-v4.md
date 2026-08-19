@@ -41,7 +41,7 @@ The common thread: **per-PR release PRs encode too much state on each contributo
 
 ## 4. Branch model
 
-```
+```text
 master         release: v3.2.0 ─── release: v3.2.4 ─── release: v3.2.5 ─── release: v3.3.0 ─── ...
                        ▲                  ▲                  ▲                  ▲
                        │ squash from next │ squash from hotfix│ squash from hotfix│ squash from next
@@ -58,13 +58,13 @@ hotfixes ───────────────────────�
                                   (hotfix PRs squash-merge to hotfix)              (more hotfixes)
 ```
 
-| Branch | Purpose | History | Reset behaviour | Auto-merge allowed? |
-|---|---|---|---|---|
-| `master` | Production. Tagged releases live here. | Release commits only | Never. Protected. | **No** — manual review + green checks |
-| `next` | Integration for unreleased features/fixes. | Free-form (squashed contributor commits) | Force-reset to master HEAD after each `next → master` release | **Yes** — contributor PRs with required reviews + green checks |
-| `hotfixes` | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits) | Force-reset to master HEAD after each `hotfixes → master` release | **No, by convention** — maintainer doesn't enable auto-merge on hotfix PRs; rulesets enforce required checks + approvals as prerequisites but don't hard-block auto-merge unless Code Owner review is enabled in the generator |
-| `feature/*`, `fix/*` | Contributor work. | Whatever they want. | Deleted on merge to `next`. | N/A |
-| `hotfix/*`, `security/*` | Hotfix work. | Whatever they want. | Deleted on merge to `hotfixes`. | N/A |
+| Branch                   | Purpose                                          | History                                  | Reset behaviour                                                   | Auto-merge allowed?                                                                                                                                                                                                            |
+| ------------------------ | ------------------------------------------------ | ---------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `master`                 | Production. Tagged releases live here.           | Release commits only                     | Never. Protected.                                                 | **No** — manual review + green checks                                                                                                                                                                                          |
+| `next`                   | Integration for unreleased features/fixes.       | Free-form (squashed contributor commits) | Force-reset to master HEAD after each `next → master` release     | **Yes** — contributor PRs with required reviews + green checks                                                                                                                                                                 |
+| `hotfixes`               | Integration for urgent fixes to current release. | Free-form (squashed hotfix commits)      | Force-reset to master HEAD after each `hotfixes → master` release | **No, by convention** — maintainer doesn't enable auto-merge on hotfix PRs; rulesets enforce required checks + approvals as prerequisites but don't hard-block auto-merge unless Code Owner review is enabled in the generator |
+| `feature/*`, `fix/*`     | Contributor work.                                | Whatever they want.                      | Deleted on merge to `next`.                                       | N/A                                                                                                                                                                                                                            |
+| `hotfix/*`, `security/*` | Hotfix work.                                     | Whatever they want.                      | Deleted on merge to `hotfixes`.                                   | N/A                                                                                                                                                                                                                            |
 
 ## 5. PR flows
 
@@ -120,6 +120,7 @@ hotfixes ───────────────────────�
 Trigger: `push` to `next`.
 
 Job graph:
+
 1. **wait-for-tags** — gate from v3.2.4; ensures the released major tag (`@vN`, parsed from the `release:` commit) matches master HEAD before downstream resolves
 2. **detect-changes** — `git log master..next`; if empty, exit (next has been reset, nothing to do)
 3. **resolve-or-create-pr** — looks up the persistent `next → master` PR; creates if missing
@@ -139,7 +140,8 @@ Mirror of §6.1 but for the `hotfixes` branch.
 Trigger: `push` to `master` (only when the head commit is a `release:` commit).
 
 Job graph:
-1. **wait-for-tags** — polls the released **major** tag (`@vN`, parsed from the `release: vX.Y.Z` commit — not a hardcoded `@v3`, which never rolls on a major bump) until it matches the release commit. A release also fires `update-major-version-tags` (which rolls `@vN`); since jobs resolve `uses: …@vN` at job start, this gate prevents the sync job from running the *previous* release's action code. (This race is exactly what made the first v3.5.0 reset fail against the old `force-reset-branch`.)
+
+1. **wait-for-tags** — polls the released **major** tag (`@vN`, parsed from the `release: vX.Y.Z` commit — not a hardcoded `@v3`, which never rolls on a major bump) until it matches the release commit. A release also fires `update-major-version-tags` (which rolls `@vN`); since jobs resolve `uses: …@vN` at job start, this gate prevents the sync job from running the _previous_ release's action code. (This race is exactly what made the first v3.5.0 reset fail against the old `force-reset-branch`.)
 2. **sync-branches** (needs wait-for-tags) — re-syncs the integration branches by lane:
    - **`hotfixes` is always force-reset** to master HEAD after any release.
    - **`next` depends on the released lane** (detected from the PR head ref behind the squash commit's trailing `(#N)`):
@@ -154,6 +156,7 @@ Job graph:
 Trigger: `pull_request` (`opened`, `synchronize`). **Not** `edited` — contributors editing their own title should not trigger a re-normalize loop.
 
 **Skip conditions** (early-exit before any rewrite logic):
+
 - `pull_request.user.type == "Bot"` — any bot-created PR (cldmv-bot, github-actions, dependabot, renovate, etc.) is exempt. This catches every automated PR-creation path without needing markers, since GitHub stamps the property itself.
 - PR base ref is `master` AND head ref is `next` or `hotfixes` — the long-running release PRs own their own title format via the release flow.
 - PR title starts with `release:` — escape-hatch override (matches v3's emergency-release commit semantics, see §10.2); contributor or maintainer is asserting explicit control of the title, pass through unchanged.
@@ -164,6 +167,7 @@ Trigger: `pull_request` (`opened`, `synchronize`). **Not** `edited` — contribu
 2. **Comment dedup via comment query.** Before commenting, query `GET /issues/{n}/comments` and check if a comment from the bot starting with a known sentinel phrase (e.g., `"_Auto-normalized PR title:_"`) already exists. If yes, skip.
 
 Job:
+
 1. Skip if `user.type == "Bot"` or base/head ref matches the release-PR pattern.
 2. Fetch the PR's commits.
 3. Determine highest conventional type from those commits.
@@ -180,6 +184,7 @@ Trigger: `pull_request opened`.
 This single workflow handles both the "default PRs to `next`" and "redirect `hotfix/*` to `hotfixes`" cases, so the repo default branch can stay `master` (no need to change it from the universal convention).
 
 Job:
+
 1. Determine intended base from head branch name:
    - `^(hotfix|security)/` → intended base = `hotfixes`
    - anything else → intended base = `next`
@@ -188,7 +193,7 @@ Job:
 4. **Respect manual override.** If the contributor explicitly set the target via the GitHub UI (we can't perfectly detect this), they can change it back — the workflow won't re-fire on `edited` events.
 5. **Skip bot-created PRs** via `user.type == "Bot"` (consistent with §6.4), **except** a Dependabot PR that lands on a base other than `dependabot.yml`'s routine `target-branch` (security update) — see the note below.
 
-**Dependabot security exception — not a plain base PATCH.** Dependabot forks its update branch from whatever `dependabot.yml` sets as `target-branch` (`next`, so routine bumps pool with everyone else's work) — there's no per-update "security only" target, so this redirect-after-the-fact is the only way to route security bumps to the hotfix lane at all. **Detection is base-branch mismatch, not body text:** GitHub always overrides `target-branch` for Dependabot security updates regardless of what the PR body says, so a Dependabot PR whose base isn't the configured routine target-branch (the `dependabot-base` input, default `next`) is *by construction* a security override — that's the primary signal `redirect-hotfix-pr` checks. A literal `GHSA-…` id in the body is only a secondary/fallback signal: verified against real Dependabot security-update PRs (CLDMV/slothlet #225, #230, #233) that the current PR body template does **not** reliably embed the GHSA id, so body-text sniffing alone silently never fires and these PRs fall through to the bot-skip path and auto-merge straight onto the default branch — this happened in production before the base-mismatch check was added. But by the time a security PR gets redirected, `next` may have already diverged from `hotfixes` (picked up other pooled work), and Dependabot's branch carries that as ancestry. A plain `PATCH /pulls/{n}` (base only) doesn't rebase the branch — merging it as-is would drag that unrelated `next` history into `hotfixes`, which is supposed to stay rooted at master, with no human in the loop to notice (these PRs are zero-touch auto-merged, §6.9). So for this case only, `redirect-hotfix-pr` instead:
+**Dependabot security exception — not a plain base PATCH.** Dependabot forks its update branch from whatever `dependabot.yml` sets as `target-branch` (`next`, so routine bumps pool with everyone else's work) — there's no per-update "security only" target, so this redirect-after-the-fact is the only way to route security bumps to the hotfix lane at all. **Detection is base-branch mismatch, not body text:** GitHub always overrides `target-branch` for Dependabot security updates regardless of what the PR body says, so a Dependabot PR whose base isn't the configured routine target-branch (the `dependabot-base` input, default `next`) is _by construction_ a security override — that's the primary signal `redirect-hotfix-pr` checks. A literal `GHSA-…` id in the body is only a secondary/fallback signal: verified against real Dependabot security-update PRs (CLDMV/slothlet #225, #230, #233) that the current PR body template does **not** reliably embed the GHSA id, so body-text sniffing alone silently never fires and these PRs fall through to the bot-skip path and auto-merge straight onto the default branch — this happened in production before the base-mismatch check was added. But by the time a security PR gets redirected, `next` may have already diverged from `hotfixes` (picked up other pooled work), and Dependabot's branch carries that as ancestry. A plain `PATCH /pulls/{n}` (base only) doesn't rebase the branch — merging it as-is would drag that unrelated `next` history into `hotfixes`, which is supposed to stay rooted at master, with no human in the loop to notice (these PRs are zero-touch auto-merged, §6.9). So for this case only, `redirect-hotfix-pr` instead:
 
 1. Fetches the PR's own commits (`GET /pulls/{n}/commits`).
 2. Cherry-picks them (`git cherry-pick -x`) onto a fresh branch cut from `hotfixes`' current tip.
@@ -205,14 +210,15 @@ Trigger: scheduled (daily, e.g., 09:00 UTC). Schedule cron is a workflow input s
 
 Inputs (with defaults, configurable per consumer repo):
 
-| Input | Default | Meaning |
-|---|---|---|
-| `next_threshold_days` | `14` | Days since last release before `next → master` PR triggers a reminder |
-| `hotfix_threshold_days` | `3` | Days since last release before `hotfixes → master` PR triggers a reminder |
-| `issue_labels` | `"priority: high,type: release"` | Labels applied to the filed reminder issue |
-| `dedup_window` | `"week"` | Bucket for dedup: `week` (default) / `day` / `month` |
+| Input                   | Default                          | Meaning                                                                   |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------------- |
+| `next_threshold_days`   | `14`                             | Days since last release before `next → master` PR triggers a reminder     |
+| `hotfix_threshold_days` | `3`                              | Days since last release before `hotfixes → master` PR triggers a reminder |
+| `issue_labels`          | `"priority: high,type: release"` | Labels applied to the filed reminder issue                                |
+| `dedup_window`          | `"week"`                         | Bucket for dedup: `week` (default) / `day` / `month`                      |
 
 Job:
+
 1. Find the persistent `next → master` and `hotfixes → master` PRs.
 2. For each: compute `last_release_to_master_age_days` from master's last release commit timestamp.
 3. If age > threshold AND the PR has commits to ship:
@@ -271,11 +277,13 @@ The existing per-PR release-PR flow stays available on `@v3` for repos that need
 ### 7.1 `next` reset
 
 After `next → master` merges:
+
 - master moves to e.g. `c1c1c1c release: v3.3.0 - <subject>`
 - `next` still has the pre-squash commits (`feat: A`, `fix: B`, `feat: C`)
 - Without intervention: the persistent release PR shows "0 changes" but `next`'s branch still has stale commits
 
 Solution: `local-next-reset.yml` force-pushes `next` → `master`. After reset:
+
 - `next` HEAD == master HEAD
 - Persistent release PR auto-closes (GitHub closes PRs whose head and base have converged)
 - Next push to `next` (next contributor PR merge) re-fires §6.1, whose `resolve-or-create-pr` step finds no open `next → master` PR and creates a fresh one
@@ -283,6 +291,7 @@ Solution: `local-next-reset.yml` force-pushes `next` → `master`. After reset:
 ### 7.2 `hotfixes` reset
 
 Same mechanic, plus: after a hotfix lands on master, **`next` is also reset**. Rationale:
+
 - master has new patch commit (e.g., 3.2.4 → 3.2.5)
 - `next` has accumulated features targeting v3.3.0 from base 3.2.4
 - After reset of `next` → master (3.2.5), `next`'s feature work is **lost from the branch but preserved in the contributor PRs that landed there** — those PRs are closed (merged to next), and their commits are gone.
@@ -290,6 +299,7 @@ Same mechanic, plus: after a hotfix lands on master, **`next` is also reset**. R
 This is a problem. **The reset of `next` after a hotfix would lose accumulated feature work.**
 
 Options:
+
 - **A. Re-apply via cherry-pick after reset.** Workflow cherry-picks the squash commits from old-next onto new-next. Risk: conflicts.
 - **B. Merge master into next (no force).** Master moves into next as a merge commit; the accumulated features stay. The release PR diff against new master shows only the feature work.
 - **C. Block hotfix releases while next has accumulated work.** Force-close-and-restart-from-scratch model.
@@ -306,12 +316,12 @@ All resets use `--force-with-lease` (or equivalent API headers when going throug
 
 ### 8.1 Modified
 
-| Action | Change | PR 3 outcome |
-|---|---|---|
-| `check-release-commit` | Planned: add `range-override` for `master..next`. | **Not needed.** Reused as-is — when `update-release-pr` runs on `next`, the merge-base it already computes against `origin/master` *is* the `master..next` base. |
-| `update-release-pr` | Planned: add `mode: persistent` input. | **Not needed.** Reused as-is with `head-ref: next`. It already computes `master..next` semantics (merge-base vs `origin/master`, base-version from master HEAD) and pushes the `chore: bump version` commit to `next` — which is **required** (see note below). |
-| `find-divergence` | Planned: add `head-branch` / `base-branch` overrides. | **Not needed for PR 3.** Defaults (HEAD vs `origin/master`) are correct when the workflow runs on `next`. May still be added for the hotfix lane (PR 4) if useful. |
-| `force-reset-branch` | **Done in PR 3** (the one real action change): added optional `github-token` so the reset can push as the bot via an `x-access-token` URL — required to bypass `next`'s `non_fast_forward` rule. | ✅ shipped on the PR 3 branch |
+| Action                 | Change                                                                                                                                                                                           | PR 3 outcome                                                                                                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-release-commit` | Planned: add `range-override` for `master..next`.                                                                                                                                                | **Not needed.** Reused as-is — when `update-release-pr` runs on `next`, the merge-base it already computes against `origin/master` _is_ the `master..next` base.                                                                                                |
+| `update-release-pr`    | Planned: add `mode: persistent` input.                                                                                                                                                           | **Not needed.** Reused as-is with `head-ref: next`. It already computes `master..next` semantics (merge-base vs `origin/master`, base-version from master HEAD) and pushes the `chore: bump version` commit to `next` — which is **required** (see note below). |
+| `find-divergence`      | Planned: add `head-branch` / `base-branch` overrides.                                                                                                                                            | **Not needed for PR 3.** Defaults (HEAD vs `origin/master`) are correct when the workflow runs on `next`. May still be added for the hotfix lane (PR 4) if useful.                                                                                              |
+| `force-reset-branch`   | **Done in PR 3** (the one real action change): added optional `github-token` so the reset can push as the bot via an `x-access-token` URL — required to bypass `next`'s `non_fast_forward` rule. | ✅ shipped on the PR 3 branch                                                                                                                                                                                                                                   |
 
 **Why the `chore: bump version` commit must stay on `next` (correction to an earlier draft).** An earlier version of this doc claimed persistent mode could skip the bump commit and let "master's package.json update via the squash." That is impossible under this design:
 
@@ -323,14 +333,14 @@ Therefore the version bump must be present on `next` before the squash, exactly 
 
 ### 8.2 New
 
-| Action | Purpose |
-|---|---|
-| `force-reset-branch` | Wraps the `--force-with-lease` reset with retry-on-lease-failure. Used by `local-next-reset.yml`. |
-| `merge-master-into-branch` | API-driven merge for §7.2's option B. |
-| `normalize-pr-title` | Implements §6.4's PR title rewrite. |
-| `redirect-hotfix-pr` | Implements §6.5's PR target change. |
-| `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`). |
-| `pending-release-reminder` | Implements §6.6 — ages master's last release, finds open `next`/`hotfixes` release PRs, files a deduped tracking issue + comment when stale. |
+| Action                        | Purpose                                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `force-reset-branch`          | Wraps the `--force-with-lease` reset with retry-on-lease-failure. Used by `local-next-reset.yml`.                                            |
+| `merge-master-into-branch`    | API-driven merge for §7.2's option B.                                                                                                        |
+| `normalize-pr-title`          | Implements §6.4's PR title rewrite.                                                                                                          |
+| `redirect-hotfix-pr`          | Implements §6.5's PR target change.                                                                                                          |
+| `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`).                                                        |
+| `pending-release-reminder`    | Implements §6.6 — ages master's last release, finds open `next`/`hotfixes` release PRs, files a deduped tracking issue + comment when stale. |
 
 ### 8.3 Unchanged (reused as-is)
 
@@ -362,19 +372,19 @@ A static generator at [`docs/tools/ruleset-generator/`](https://cldmv.github.io/
 
 Everything else is hardcoded into the templates from v4's intended flow:
 
-| Setting | master | next | hotfixes |
-|---|---|---|---|
-| `non_fast_forward` (block force-push) | yes | yes (bot bypass added manually) | yes (bot bypass added manually) |
-| `required_signatures` (GPG) | yes | yes | yes |
-| `required_linear_history` | yes | **no** (allows §7.2 API merge commits) | **no** (same merge-commit policy as next) |
-| `required_status_checks: ["✅ Required PR Check"]` | yes | yes | yes |
-| `code_scanning` (CodeQL `high_or_higher`) | yes | yes | yes |
-| `copilot_code_review` (asked) | optional | no | optional |
-| `allowed_merge_methods` | `["squash"]` | `["merge"]` | `["merge"]` |
-| `required_review_thread_resolution` | yes | yes | yes |
-| `dismiss_stale_reviews_on_push` | yes | yes | yes |
-| `require_last_push_approval` | no | no | no |
-| `deletion` (block branch deletion) | yes | yes | yes |
+| Setting                                            | master       | next                                   | hotfixes                                  |
+| -------------------------------------------------- | ------------ | -------------------------------------- | ----------------------------------------- |
+| `non_fast_forward` (block force-push)              | yes          | yes (bot bypass added manually)        | yes (bot bypass added manually)           |
+| `required_signatures` (GPG)                        | yes          | yes                                    | yes                                       |
+| `required_linear_history`                          | yes          | **no** (allows §7.2 API merge commits) | **no** (same merge-commit policy as next) |
+| `required_status_checks: ["✅ Required PR Check"]` | yes          | yes                                    | yes                                       |
+| `code_scanning` (CodeQL `high_or_higher`)          | yes          | yes                                    | yes                                       |
+| `copilot_code_review` (asked)                      | optional     | no                                     | optional                                  |
+| `allowed_merge_methods`                            | `["squash"]` | `["merge"]`                            | `["merge"]`                               |
+| `required_review_thread_resolution`                | yes          | yes                                    | yes                                       |
+| `dismiss_stale_reviews_on_push`                    | yes          | yes                                    | yes                                       |
+| `require_last_push_approval`                       | no           | no                                     | no                                        |
+| `deletion` (block branch deletion)                 | yes          | yes                                    | yes                                       |
 
 Consumers whose actual check names differ from `"✅ Required PR Check"` edit the imported ruleset post-import.
 
@@ -398,25 +408,25 @@ Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflo
 
 ### 10.1 Resolved
 
-| Question | Decision | Notes |
-|---|---|---|
-| PR title normalizer scope | Runs on all contributor PRs to `next` AND `hotfixes`. Skips bot-authored PRs. Skips PRs already targeting `master` (release PRs own their own title). | §6.4 |
-| Title normalizer re-fire prevention | Fires on `opened` + `synchronize` only. Idempotent via hidden HTML markers. No re-fire if title already conforms. Silent on `synchronize` rewrites (no comment spam). | §6.4 |
-| Default branch | **Stays as `master`.** PR target redirection handled invisibly by `local-pr-target-redirector.yml` (§6.5). Alternative (change default to `next`) is supported but not required. | §6.5 |
-| Solo-maintainer opt-out for "review from non-author" | **No workflow change needed** — GitHub's branch protection has a "Require approval from someone other than the last pusher" toggle. Solo maintainers leave it off and set required reviewers to 0. Per-repo setting. | §9 |
-| Pending-release reminder thresholds | **Configurable via workflow inputs** in `local-pending-release-reminder.yml`. Defaults: 14 days (next), 3 days (hotfix). | §6.6 |
-| Co-author trailer in squash commits | **Accept it.** No automatic way to strip co-authors for GitHub-UI-clicked merges. Manual edit of the squash dialog is the only suppression path. Bot co-author is redundant but not wrong. Documented in CONTRIBUTING. | This section |
-| Auto-merge enabled? | Repo-level "Allow auto-merge" = ON. Per-branch effective gating via branch protection (§9). PRs to `next` can auto-merge; PRs to `master` / `hotfixes` effectively can't (require manual maintainer review). | §9 |
+| Question                                             | Decision                                                                                                                                                                                                               | Notes        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| PR title normalizer scope                            | Runs on all contributor PRs to `next` AND `hotfixes`. Skips bot-authored PRs. Skips PRs already targeting `master` (release PRs own their own title).                                                                  | §6.4         |
+| Title normalizer re-fire prevention                  | Fires on `opened` + `synchronize` only. Idempotent via hidden HTML markers. No re-fire if title already conforms. Silent on `synchronize` rewrites (no comment spam).                                                  | §6.4         |
+| Default branch                                       | **Stays as `master`.** PR target redirection handled invisibly by `local-pr-target-redirector.yml` (§6.5). Alternative (change default to `next`) is supported but not required.                                       | §6.5         |
+| Solo-maintainer opt-out for "review from non-author" | **No workflow change needed** — GitHub's branch protection has a "Require approval from someone other than the last pusher" toggle. Solo maintainers leave it off and set required reviewers to 0. Per-repo setting.   | §9           |
+| Pending-release reminder thresholds                  | **Configurable via workflow inputs** in `local-pending-release-reminder.yml`. Defaults: 14 days (next), 3 days (hotfix).                                                                                               | §6.6         |
+| Co-author trailer in squash commits                  | **Accept it.** No automatic way to strip co-authors for GitHub-UI-clicked merges. Manual edit of the squash dialog is the only suppression path. Bot co-author is redundant but not wrong. Documented in CONTRIBUTING. | This section |
+| Auto-merge enabled?                                  | Repo-level "Allow auto-merge" = ON. Per-branch effective gating via branch protection (§9). PRs to `next` can auto-merge; PRs to `master` / `hotfixes` effectively can't (require manual maintainer review).           | §9           |
 
 ### 10.2 Resolved in this revision
 
-| Question | Decision |
-|---|---|
-| Bot-detection mechanism (no markers) | Use `pull_request.user.type == "Bot"` from the event payload. GitHub already stamps every bot account with this property. No PR-body marker needed. |
-| Title-rewrite idempotency (no markers) | Check current title against the conventional-commit regex. If it already matches with the correct-or-higher type, exit. Re-fires on `synchronize` become no-ops once the title conforms. |
-| Comment dedup (no markers) | Query the PR's comments via `GET /issues/{n}/comments`, scan for a sentinel phrase from a prior bot comment. If present, skip. |
-| `release[!]?:` escape hatch | Keep existing v3 semantics: if a `release: vX.Y.Z` commit is present and a version parses out, use that explicit version; if it doesn't parse, fall back to the automatic bump algorithm. Document in CONTRIBUTING for v4. |
-| Conflict with sibling during auto-merge | GitHub's auto-merge holds the PR open when there's a merge conflict — it can't fire. Contributor must resolve (rebase or merge) before auto-merge can complete. No special handling needed in our workflows. |
+| Question                                | Decision                                                                                                                                                                                                                   |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bot-detection mechanism (no markers)    | Use `pull_request.user.type == "Bot"` from the event payload. GitHub already stamps every bot account with this property. No PR-body marker needed.                                                                        |
+| Title-rewrite idempotency (no markers)  | Check current title against the conventional-commit regex. If it already matches with the correct-or-higher type, exit. Re-fires on `synchronize` become no-ops once the title conforms.                                   |
+| Comment dedup (no markers)              | Query the PR's comments via `GET /issues/{n}/comments`, scan for a sentinel phrase from a prior bot comment. If present, skip.                                                                                             |
+| `release[!]?:` escape hatch             | Keep existing v3 semantics: if a `release: vX.Y.Z` commit is present and a version parses out, use that explicit version; if it doesn't parse, fall back to the automatic bump algorithm. Document in CONTRIBUTING for v4. |
+| Conflict with sibling during auto-merge | GitHub's auto-merge holds the PR open when there's a merge conflict — it can't fire. Contributor must resolve (rebase or merge) before auto-merge can complete. No special handling needed in our workflows.               |
 
 ### 10.3 Still open
 
@@ -439,20 +449,20 @@ Repo-level "Allow auto-merge" toggle is **ON** (enabled by the bootstrap workflo
 
 Six PRs in sequence, each independently shippable:
 
-| # | PR | Scope | Releasable on its own? | Status |
-|---|---|---|---|---|
-| 1 | **Foundation actions** | Add `compute-highest-commit-type`, `normalize-pr-title`, `redirect-hotfix-pr`, `force-reset-branch`, `merge-master-into-branch`. Wire none of them yet. | Yes — additive | ✅ shipped v3.3.0 |
-| 2 | **`@v3` parallel: PR title normalizer** | Add `local-pr-title-normalizer.yml` for v3 repos. Backportable feature. | Yes — useful even pre-v4 | ✅ shipped v3.4.0 |
-| 3 | **v4 core workflows** | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling. | Yes — new major opt-in | ✅ shipped (v4 preview → v4.0.0 cut) |
-| 4 | **v4 hotfix lane** | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next. | Yes — additive | ✅ shipped (v4 preview → v4.0.0 cut) |
-| 5 | **v4 pending-release reminder** | `local-pending-release-reminder.yml` + the `pending-release-reminder` action. | Yes — additive | ✅ shipped (v4 preview → v4.0.0 cut) |
-| 6 | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site. `docs/migration/v3-to-v4.md`. Top-level `README.md` + root dev/test cleanup. **Done at the deliberate cut:** decommissioned `workflow-sync-open-release-prs.yml` + `local-sync-release-prs.yml`; swapped this repo's `@v3`→`@v4` refs (v4.0.2). | Final v4 cut | ✅ shipped — v4.0.0 cut |
+| #   | PR                                                     | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                      | Releasable on its own?   | Status                               |
+| --- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ------------------------------------ |
+| 1   | **Foundation actions**                                 | Add `compute-highest-commit-type`, `normalize-pr-title`, `redirect-hotfix-pr`, `force-reset-branch`, `merge-master-into-branch`. Wire none of them yet.                                                                                                                                                                                                                                                                                    | Yes — additive           | ✅ shipped v3.3.0                    |
+| 2   | **`@v3` parallel: PR title normalizer**                | Add `local-pr-title-normalizer.yml` for v3 repos. Backportable feature.                                                                                                                                                                                                                                                                                                                                                                    | Yes — useful even pre-v4 | ✅ shipped v3.4.0                    |
+| 3   | **v4 core workflows**                                  | `local-next-release.yml`, `local-next-reset.yml`, refactored `update-release-pr` with `mode: persistent`. Tag as `@v4` rolling.                                                                                                                                                                                                                                                                                                            | Yes — new major opt-in   | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 4   | **v4 hotfix lane**                                     | `local-hotfixes-release.yml`, `local-hotfix-redirector.yml`; extend `local-next-reset.yml` with the wait-for-tags gate + hotfixes reset + §7.2 merge-into-next.                                                                                                                                                                                                                                                                            | Yes — additive           | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 5   | **v4 pending-release reminder**                        | `local-pending-release-reminder.yml` + the `pending-release-reminder` action.                                                                                                                                                                                                                                                                                                                                                              | Yes — additive           | ✅ shipped (v4 preview → v4.0.0 cut) |
+| 6   | **v4 bootstrap + ruleset generator + migration guide** | `local-v4-bootstrap.yml` (slim — branch creation + repo toggle, no branch protection). `data/rulesets/{master,next,hotfixes}.json` templates. `docs/tools/ruleset-generator/` static site. `docs/migration/v3-to-v4.md`. Top-level `README.md` + root dev/test cleanup. **Done at the deliberate cut:** decommissioned `workflow-sync-open-release-prs.yml` + `local-sync-release-prs.yml`; swapped this repo's `@v3`→`@v4` refs (v4.0.2). | Final v4 cut             | ✅ shipped — v4.0.0 cut              |
 
 Each step ships against `@v4` (rolling major tag). CLDMV repos cut over individually by swapping their workflow files from `@v3` to `@v4` references — older example files remain in git history for reference. `@v3` stays as an immutable tag indefinitely; not actively maintained after v4.0.0.
 
 **`@v4` stability:** PRs 3–5 were an additive preview on `@v4`; the line became **stable when PR 6 landed and v4.0.0 was formally cut**. `@v4` now tracks the latest release (the v4.1.x line) and is the recommended pin.
 
-**How the major was cut (learned the hard way):** v4.0.0 was opened with a **`feat!:` breaking commit**, *not* an explicit `release: v4.0.0` escape-hatch commit. A content-bearing `release:` commit double-prefixes the PR title (`release: v4.0.0 - v4.0.0 - …`) and yields an empty changelog — release commits are filtered out of the changelog range. A breaking `feat!:` is the correct way to open a new major: it computes the major bump *and* populates the changelog from the commit itself.
+**How the major was cut (learned the hard way):** v4.0.0 was opened with a **`feat!:` breaking commit**, _not_ an explicit `release: v4.0.0` escape-hatch commit. A content-bearing `release:` commit double-prefixes the PR title (`release: v4.0.0 - v4.0.0 - …`) and yields an empty changelog — release commits are filtered out of the changelog range. A breaking `feat!:` is the correct way to open a new major: it computes the major bump _and_ populates the changelog from the commit itself.
 
 Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the final step of PR 6 — written for internal institutional memory, not external consumer hand-holding.
 

@@ -38,8 +38,8 @@ if (DEBUG) {
 				process.env.INPUT_GITHUB_TOKEN.startsWith("ghs_")
 					? "App token"
 					: process.env.INPUT_GITHUB_TOKEN.startsWith("ghp_")
-					? "Personal token"
-					: "Unknown type"
+						? "Personal token"
+						: "Unknown type"
 			}`
 		);
 	}
@@ -51,8 +51,8 @@ if (DEBUG) {
 				process.env.GITHUB_TOKEN.startsWith("ghs_")
 					? "App token"
 					: process.env.GITHUB_TOKEN.startsWith("ghp_")
-					? "Personal token"
-					: "Default workflow token"
+						? "Personal token"
+						: "Default workflow token"
 			}`
 		);
 	}
@@ -248,7 +248,9 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			gitCommand(`git tag -s -f -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);
-			} catch {}
+			} catch {
+				// best-effort cleanup of the temp message file; failure here is non-fatal
+			}
 		} else if (willAnnotate) {
 			console.log(`🏷️ Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
 			// Use temp file for message to handle multiline content properly
@@ -257,7 +259,9 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			gitCommand(`git tag -a -f -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);
-			} catch {}
+			} catch {
+				// best-effort cleanup of the temp message file; failure here is non-fatal
+			}
 		} else {
 			console.log(`🏷️ Creating lightweight tag: git tag -f ${tagName} ${targetCommit}`);
 			gitCommand(`git tag -f ${tagName} ${targetCommit}`);
@@ -304,7 +308,9 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		// this same git-push -> REST Git Data API fallback for this exact reason.
 		// Mirror it here rather than giving up on the git push error.
 		if (/refusing to allow .* without .*workflow.* permission/i.test(pushErrorText)) {
-			console.warn(`⚠️ Git push rejected by GitHub's workflow-permission check (known platform bug for tags off the branch tip): ${pushErrorText}`);
+			console.warn(
+				`⚠️ Git push rejected by GitHub's workflow-permission check (known platform bug for tags off the branch tip): ${pushErrorText}`
+			);
 			console.log(`🔁 Falling back to the REST Git Data API to create the tag (bypasses the git-protocol check)...`);
 
 			try {
@@ -315,14 +321,23 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 
 			try {
 				const tagger = { name: TAGGER_NAME, email: TAGGER_EMAIL };
-				const tagObj = await createAnnotatedTag({ token: GITHUB_TOKEN, repo, tag: tagName, message: tagMessage, objectSha: targetCommit, tagger });
+				const tagObj = await createAnnotatedTag({
+					token: GITHUB_TOKEN,
+					repo,
+					tag: tagName,
+					message: tagMessage,
+					objectSha: targetCommit,
+					tagger
+				});
 				try {
 					await createRefForTagObject({ token: GITHUB_TOKEN, repo, tag: tagName, tagObjectSha: tagObj.sha });
 				} catch {
 					await forceMoveRefToTagObject({ token: GITHUB_TOKEN, repo, tag: tagName, tagObjectSha: tagObj.sha });
 				}
 				if (willSign) {
-					console.warn(`⚠️ Tag ${tagName} was created via the REST API, so it is annotated but NOT GPG-signed (the API has no signing path).`);
+					console.warn(
+						`⚠️ Tag ${tagName} was created via the REST API, so it is annotated but NOT GPG-signed (the API has no signing path).`
+					);
 				}
 				console.log(`✅ Successfully created tag ${tagName} via REST API fallback`);
 				return true;
@@ -340,7 +355,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		try {
 			gitCommand(`git tag -d ${tagName}`, true);
 			console.log(`🧹 Cleaned up local tag ${tagName}`);
-		} catch (cleanupError) {
+		} catch (_) {
 			// Ignore cleanup errors
 		}
 
@@ -465,7 +480,9 @@ async function main() {
 	if (failedReleases.length > 0) {
 		console.log(`\n❌ Failed to create tags:`);
 		failedReleases.forEach((tag) => console.log(`   ${tag}`));
-		console.log(`\n💡 See the per-tag logs above for the specific failure reason (missing target commit, git push rejection, or REST API fallback error).`);
+		console.log(
+			`\n💡 See the per-tag logs above for the specific failure reason (missing target commit, git push rejection, or REST API fallback error).`
+		);
 	}
 
 	// Generate summary

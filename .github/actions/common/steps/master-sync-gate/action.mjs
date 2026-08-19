@@ -44,7 +44,9 @@ try {
 	}
 
 	if (!masterSha) {
-		console.log(`⚠️ Could not resolve default branch tip (tried ${defaultBranch}${defaultBranch !== "main" ? " and main" : ""}). Emitting is_master_sync=false (fail open).`);
+		console.log(
+			`⚠️ Could not resolve default branch tip (tried ${defaultBranch}${defaultBranch !== "main" ? " and main" : ""}). Emitting is_master_sync=false (fail open).`
+		);
 		setOutputs({ is_master_sync: "false" });
 		process.exit(0);
 	}

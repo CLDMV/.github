@@ -1,7 +1,7 @@
 /**
  * @fileoverview GitHub Action to revoke a GitHub App installation token
  * @module revoke-app-token
- * 
+ *
  * @description
  * This action revokes a GitHub App installation token using the GitHub API.
  * It's typically called at the end of workflows to properly clean up tokens
@@ -15,11 +15,11 @@ import { debugLog } from "../../../common/common/core.mjs";
  * Main function to revoke GitHub App token
  * @async
  * @function main
- * 
+ *
  * @description
  * Retrieves the auth token from environment variables and calls the
  * revokeAppToken function from the core API module.
- * 
+ *
  * @throws {Error} If AUTH_TOKEN environment variable is not provided
  * @returns {Promise<void>} Resolves when token revocation is complete
  */

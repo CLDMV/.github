@@ -319,7 +319,10 @@ async function main() {
 	const dependabotBase = getInput("dependabot-base") || "next";
 	const headPattern = compilePattern(getInput("hotfix-branch-pattern"));
 	const dryRun = getBooleanInput("dry-run", false);
-	const bumpTypes = (getInput("bump-types") || "patch,minor").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+	const bumpTypes = (getInput("bump-types") || "patch,minor")
+		.split(",")
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
 	const mergeMethod = (getInput("merge-method") || "merge").toLowerCase();
 	const requireBranchProtection = getBooleanInput("require-branch-protection", true);
 	let headRef = getInput("head-ref");
@@ -387,7 +390,13 @@ async function main() {
 		} catch (commentErr) {
 			console.error(`::warning::Could not post the stale-caller explanatory comment on PR #${prNumber}: ${commentErr.message}`);
 		}
-		setOutputs({ redirected: "false", "new-base": baseRef, skipped: "false", "skip-reason": `missing-prereq: ${prereqReason}`, "replacement-pr": "" });
+		setOutputs({
+			redirected: "false",
+			"new-base": baseRef,
+			skipped: "false",
+			"skip-reason": `missing-prereq: ${prereqReason}`,
+			"replacement-pr": ""
+		});
 		throw new Error(
 			`redirect-hotfix-pr needs a git checkout of the repo AND a configured git identity to cherry-pick a Dependabot security update onto '${targetBase}', but ${prereqReason}. The calling workflow must run checkout-code (ref: ${targetBase}, fetch-depth: 0) and setup-git-identity (with permission_contents: true on the token) before this step — see local-hotfix-redirector.yml / examples/individual-repo-workflows/release-flow-v4/hotfix-redirector.yml for the current shape.`
 		);
@@ -406,7 +415,9 @@ async function main() {
 
 	if (!pickResult.ok) {
 		console.log(`⚠️  ${pickResult.reason}`);
-		console.log("⚠️  Leaving PR on its current base — a merge would have carried unrelated history into the hotfix lane. Manual handling required.");
+		console.log(
+			"⚠️  Leaving PR on its current base — a merge would have carried unrelated history into the hotfix lane. Manual handling required."
+		);
 		if (!(await hasSentinelComment(owner, repo, prNumber, token))) {
 			await postComment(
 				owner,
@@ -416,7 +427,13 @@ async function main() {
 				token
 			);
 		}
-		setOutputs({ redirected: "false", "new-base": baseRef, skipped: "false", "skip-reason": `cherry-pick-conflict: ${pickResult.reason}`, "replacement-pr": "" });
+		setOutputs({
+			redirected: "false",
+			"new-base": baseRef,
+			skipped: "false",
+			"skip-reason": `cherry-pick-conflict: ${pickResult.reason}`,
+			"replacement-pr": ""
+		});
 		return;
 	}
 

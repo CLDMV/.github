@@ -1,13 +1,7 @@
 import fs from "node:fs";
 import { sh } from "../../../../common/common/core.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
-import {
-	getRefTag,
-	createRefToCommit,
-	forceMoveRefToCommit,
-	createAnnotatedTag,
-	createRefForTagObject
-} from "../../_api/tag.mjs";
+import { getRefTag, createRefToCommit, forceMoveRefToCommit, createAnnotatedTag, createRefForTagObject } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
 
 function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push }) {

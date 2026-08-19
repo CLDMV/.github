@@ -77,7 +77,7 @@ function canonicalize(value) {
 }
 
 function computeSignatureId(record) {
-	const { signature_id: _ignored, ...rest } = record;
+	const { signature_id: _, ...rest } = record;
 	const canonical = JSON.stringify(canonicalize(rest));
 	return "sha256:" + createHash("sha256").update(canonical).digest("hex");
 }
@@ -265,9 +265,7 @@ try {
 		const defaultClaPath = `cla-versions/${claVersion}.md`;
 		const ledgerCla = await fetchFileContents({ token, owner: ledgerOwner, repo: ledgerName, path: defaultClaPath });
 		if (!ledgerCla.exists) {
-			console.error(
-				`::error::Default CLA not found at ${ledgerRepo}/${defaultClaPath} and consumer repo has no override at ${claPath}.`
-			);
+			console.error(`::error::Default CLA not found at ${ledgerRepo}/${defaultClaPath} and consumer repo has no override at ${claPath}.`);
 			process.exit(1);
 		}
 		activeCla = ledgerCla;
@@ -353,8 +351,7 @@ try {
 
 	// --- Compute cla_url_at_signing (commit-pinned into the ledger) ---
 	const ledgerCommitSha =
-		bootstrapCommitSha ||
-		(await getLastCommitForPath({ token, owner: ledgerOwner, repo: ledgerName, path: activeClaPathInLedger }));
+		bootstrapCommitSha || (await getLastCommitForPath({ token, owner: ledgerOwner, repo: ledgerName, path: activeClaPathInLedger }));
 	const claUrlAtSigning = ledgerCommitSha
 		? `${serverUrl}/${ledgerOwner}/${ledgerName}/blob/${ledgerCommitSha}/${activeClaPathInLedger}`
 		: `${serverUrl}/${ledgerOwner}/${ledgerName}/blob/HEAD/${activeClaPathInLedger}`;

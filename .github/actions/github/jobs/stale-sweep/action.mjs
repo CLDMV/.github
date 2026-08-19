@@ -35,7 +35,11 @@ async function findLatestCommentAfter(owner, repo, token, issueNumber, sinceMs) 
 	if (!sinceMs) return null;
 	const sinceIso = new Date(sinceMs).toISOString();
 	try {
-		const comments = await api("GET", `/issues/${issueNumber}/comments?since=${encodeURIComponent(sinceIso)}&per_page=100`, null, { token, owner, repo });
+		const comments = await api("GET", `/issues/${issueNumber}/comments?since=${encodeURIComponent(sinceIso)}&per_page=100`, null, {
+			token,
+			owner,
+			repo
+		});
 		if (!Array.isArray(comments) || comments.length === 0) return null;
 		// Sorted ascending by default; last is most recent.
 		const last = comments[comments.length - 1];
@@ -54,13 +58,16 @@ try {
 
 	const nowMs = Date.now();
 	console.log(`🍂 Stale-sweep starting on ${owner}/${repo} (dry_run=${config.dryRun})`);
-	console.log(`📋 Config: issues ${config.daysBeforeIssueStale}d+${config.daysBeforeIssueClose}d; PRs ${config.daysBeforePrStale}d+${config.daysBeforePrClose}d; ops cap ${config.operationsPerRun}`);
+	console.log(
+		`📋 Config: issues ${config.daysBeforeIssueStale}d+${config.daysBeforeIssueClose}d; PRs ${config.daysBeforePrStale}d+${config.daysBeforePrClose}d; ops cap ${config.operationsPerRun}`
+	);
 
 	// Enumerate open issues AND PRs (REST returns PRs as issues with pull_request key).
-	const { items: openIssues, rateLimitedOut, lastRemaining } = await paginate(
-		"/issues?state=open&filter=all",
-		{ token, owner, repo, maxPages: 20, perPage: 100, rateLimitFloor: 200 }
-	);
+	const {
+		items: openIssues,
+		rateLimitedOut,
+		lastRemaining
+	} = await paginate("/issues?state=open&filter=all", { token, owner, repo, maxPages: 20, perPage: 100, rateLimitFloor: 200 });
 	console.log(`📊 Found ${openIssues.length} open issues/PRs (rate-limit remaining=${lastRemaining})`);
 	if (rateLimitedOut) {
 		appendSummary(`⚠️ Stale-sweep aborted enumeration early due to rate limit. ${openIssues.length} items scanned.`);
@@ -102,7 +109,10 @@ try {
 				break;
 			case Action.MARK_STALE:
 				await markStale({
-					owner, repo, token, item,
+					owner,
+					repo,
+					token,
+					item,
 					label: labelName,
 					message: isPR ? config.stalePrMessage : config.staleIssueMessage,
 					dryRun: config.dryRun
@@ -112,7 +122,10 @@ try {
 				break;
 			case Action.CLOSE:
 				await closeItem({
-					owner, repo, token, item,
+					owner,
+					repo,
+					token,
+					item,
 					message: isPR ? config.closePrMessage : config.closeIssueMessage,
 					dryRun: config.dryRun
 				});
@@ -121,7 +134,10 @@ try {
 				break;
 			case Action.UNSTALE:
 				await unstale({
-					owner, repo, token, item,
+					owner,
+					repo,
+					token,
+					item,
 					label: labelName,
 					dryRun: config.dryRun
 				});
