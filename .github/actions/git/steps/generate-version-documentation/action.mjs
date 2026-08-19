@@ -13,7 +13,10 @@ import { getInput, getEventPayload } from "../../../common/common/core.mjs";
 const versionCompare = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 /** Run a git command and return trimmed stdout. */
-const git = (cmd) => execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] }).toString().trim();
+const git = (cmd) =>
+	execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] })
+		.toString()
+		.trim();
 
 try {
 	if (getInput("create-documentation", { default: "true" }) !== "true") {

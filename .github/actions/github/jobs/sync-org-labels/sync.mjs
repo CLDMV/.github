@@ -142,7 +142,7 @@ async function api(path, options = {}) {
 		}
 	});
 
-	let body = null;
+	let body;
 	const text = await res.text();
 	try {
 		body = JSON.parse(text);

@@ -105,7 +105,8 @@ try {
 		.filter(Boolean);
 	const expectedList = patterns.map((p) => `- \`${p.source}\``).join("\n");
 	const commitUrl = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${owner}/${repo}/commit/${sha}`;
-	const body = `🤖 **Automated audit**: a commit landed on the default branch whose subject does not match any expected pattern.\n\n` +
+	const body =
+		`🤖 **Automated audit**: a commit landed on the default branch whose subject does not match any expected pattern.\n\n` +
 		`**Commit:** [\`${shortSha}\`](${commitUrl})\n` +
 		`**Subject:** \`${subject}\`\n` +
 		`**Author:** ${commit?.commit?.author?.name || "(unknown)"} <${commit?.commit?.author?.email || ""}>\n\n` +

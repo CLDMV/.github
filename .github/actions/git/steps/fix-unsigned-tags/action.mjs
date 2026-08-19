@@ -189,7 +189,7 @@ async function fixUnsignedTag(tagObj) {
 
 // Initialize variables for summary generation
 let updatedTagsDetailed;
-let fixedTagsArray = [];
+let fixedTagsArray;
 
 console.log("🔐 Checking and fixing unsigned/unannotated tags...");
 

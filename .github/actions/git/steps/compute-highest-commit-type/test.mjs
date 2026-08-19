@@ -25,16 +25,8 @@ eq(parseCommit("feat: add foo"), { type: "feat", isBreaking: false }, "plain fea
 eq(parseCommit("fix(parser): handle empty input"), { type: "fix", isBreaking: false }, "fix with scope");
 eq(parseCommit("feat!: drop legacy API"), { type: "feat", isBreaking: true }, "feat with breaking mark");
 eq(parseCommit("chore(deps)!: bump major dep"), { type: "chore", isBreaking: true }, "scoped + breaking mark");
-eq(
-	parseCommit("feat: add foo", "BREAKING CHANGE: removes /v1"),
-	{ type: "feat", isBreaking: true },
-	"breaking via body footer"
-);
-eq(
-	parseCommit("feat: add foo", "BREAKING-CHANGE: removes /v1"),
-	{ type: "feat", isBreaking: true },
-	"breaking via hyphenated body footer"
-);
+eq(parseCommit("feat: add foo", "BREAKING CHANGE: removes /v1"), { type: "feat", isBreaking: true }, "breaking via body footer");
+eq(parseCommit("feat: add foo", "BREAKING-CHANGE: removes /v1"), { type: "feat", isBreaking: true }, "breaking via hyphenated body footer");
 eq(parseCommit("Merge pull request #10 from foo"), null, "non-conventional → null");
 eq(parseCommit("FEAT: caps"), null, "uppercase type rejected");
 eq(parseCommit(""), null, "empty subject");
@@ -70,44 +62,28 @@ eq(
 	"fix wins over chore"
 );
 eq(
-	computeHighest([
-		{ subject: "chore!: rip out v1", body: "" }
-	]),
+	computeHighest([{ subject: "chore!: rip out v1", body: "" }]),
 	{ highestType: "chore", isBreaking: true, bump: "major" },
 	"breaking outranks bump category — chore! → major"
 );
 eq(
-	computeHighest([
-		{ subject: "feat: add foo", body: "BREAKING CHANGE: removes /v1" }
-	]),
+	computeHighest([{ subject: "feat: add foo", body: "BREAKING CHANGE: removes /v1" }]),
 	{ highestType: "feat", isBreaking: true, bump: "major" },
 	"footer-declared breaking → major"
 );
+eq(computeHighest([]), { highestType: "", isBreaking: false, bump: "none" }, "empty list → all defaults");
 eq(
-	computeHighest([]),
-	{ highestType: "", isBreaking: false, bump: "none" },
-	"empty list → all defaults"
-);
-eq(
-	computeHighest([
-		{ subject: "Merge pull request #10 from foo" },
-		{ subject: "non-conventional message" }
-	]),
+	computeHighest([{ subject: "Merge pull request #10 from foo" }, { subject: "non-conventional message" }]),
 	{ highestType: "", isBreaking: false, bump: "none" },
 	"all non-conventional → all defaults"
 );
 eq(
-	computeHighest([
-		{ subject: "weirdtype: a new category" },
-		{ subject: "fix: bar" }
-	]),
+	computeHighest([{ subject: "weirdtype: a new category" }, { subject: "fix: bar" }]),
 	{ highestType: "fix", isBreaking: false, bump: "patch" },
 	"unknown type ranks below known types"
 );
 eq(
-	computeHighest([
-		{ subject: "weirdtype: foo" }
-	]),
+	computeHighest([{ subject: "weirdtype: foo" }]),
 	{ highestType: "weirdtype", isBreaking: false, bump: "none" },
 	"unknown type still surfaces when only choice (bump=none)"
 );

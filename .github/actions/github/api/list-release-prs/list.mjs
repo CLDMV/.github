@@ -18,7 +18,7 @@ try {
 	try {
 		pattern = new RegExp(patternStr);
 	} catch (err) {
-		throw new Error(`Invalid title-pattern regex "${patternStr}": ${err.message}`);
+		throw new Error(`Invalid title-pattern regex "${patternStr}": ${err.message}`, { cause: err });
 	}
 
 	const results = [];

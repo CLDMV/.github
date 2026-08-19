@@ -40,7 +40,9 @@ function showArgs(args) {
 function git(args) {
 	console.log(`$ git ${showArgs(args)}`);
 	try {
-		return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+		return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] })
+			.toString()
+			.trim();
 	} catch (err) {
 		// execFileSync's Error embeds the full argv (including the tokenized
 		// remote URL) in .message, and git's own failure output in .stderr/.stdout.

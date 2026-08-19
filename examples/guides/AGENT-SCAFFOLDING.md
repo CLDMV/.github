@@ -2,7 +2,7 @@
 
 This file tells an AI agent (Claude Code, etc.) how to scaffold the CLDMV org-level GitHub Actions workflows into a new or existing consumer repo. The scaffold targets **v4** (the staging-branch release flow); `@v3` is legacy/frozen — see the [v3 fallback](#v3-fallback-legacy) at the bottom if you specifically need that. Drop this file into the repo you're scaffolding, point your agent at it, and follow it top-to-bottom.
 
-> **For the user:** open your repo in an agent and say: *"Read `AGENT-SCAFFOLDING.md` and scaffold the CLDMV workflows for this repo."*
+> **For the user:** open your repo in an agent and say: _"Read `AGENT-SCAFFOLDING.md` and scaffold the CLDMV workflows for this repo."_
 >
 > **For the agent:** read this file fully before doing anything. Then execute Phases 1 → 5 in order. Ask the user every Discovery question explicitly before acting on it — don't infer.
 
@@ -33,20 +33,20 @@ Constraints:
 
 Ask the user these questions before touching any files. Use a single batched question prompt if your tooling allows.
 
-| # | Question | Type | Why it matters |
-|---|---|---|---|
-| 1 | What's the npm package name (e.g. `@your-org/your-package`)? | string | Required by `ci.yml`, `publish.yml`, `next-release.yml`, `hotfixes-release.yml`, `docker-publish.yml` |
-| 2 | Is this an npm-published package, or a meta-package (workflows/actions only, no npm publish)? | enum (`npm` / `meta`) | Determines whether `publish.yml` is needed and what `release_source_only` should be |
-| 3 | Does this repo ship a runtime bundle (`dist/`)? | bool | If yes, adopt `bundle-size.yml` |
-| 4 | Does this repo publish docs to a `gh-pages` branch? | bool | If yes, adopt `docs.yml` |
-| 5 | Is there a `Dockerfile` at the repo root that should publish to GHCR? | bool | If yes, adopt `docker-publish.yml` |
-| 6 | Should non-org contributors be required to sign a CLA before their PRs can merge? | bool | If yes, adopt `cla.yml`. The bot uses the org-wide default CLA from the `CLDMV/.cla-signatures` ledger — no per-repo `CLA.md` is needed in the default case. Only add a local `CLA.md` if this repo needs an **override** with custom terms; ask about that separately as Q6b. |
-| 6b | (Only if Q6 is yes) Does this repo need a CLA with **different terms** than the org-wide default? | bool | If yes, ask the user for the override CLA text; place at root as `CLA.md` with a `# … CLA — v1.0` header. The bot will detect override scope automatically and bootstrap a snapshot in the ledger on the first signature. |
-| 7 | Want Dependabot enabled for this repo? | bool | If yes, adopt `dependabot.yml` (routes PRs to `next`; security updates auto-promote to `hotfixes` via `hotfix-redirector.yml`). The companion `dependabot-auto-merge.yml` is **ON by default** — drop it from the adoption set only if the user explicitly wants to review each Dependabot PR by hand. |
-| 8 | Want Discord/Slack/webhook release notifications? | bool | If yes, adopt `release-notify.yml` (and `pr-notify.yml` for PR-opened notifications). Each channel is a single secret named `<TYPE>_<KIND>_<VIS>_WEBHOOK` — set the secret to enable, unset = no-op. No config file required. |
-| 9 | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads. |
-| 10 | Should the standard org-default labels be synced into this repo? | bool | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only) |
-| 11 | Does this repo have (or need) a private test suite pulled from a separate private repo via an anonymous gitlink (typically `tests/`)? | bool | If yes, set `enable_embedded_tests: true` on the `ci.yml` workflow call. Confirm the matching private repo exists per the URL-mapping convention (`<org>/<repo>-tests` for a `tests/` gitlink). See [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md). Independent of workflow adoption — it's a single input on the existing CI workflow. |
+| #   | Question                                                                                                                                    | Type                  | Why it matters                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | What's the npm package name (e.g. `@your-org/your-package`)?                                                                                | string                | Required by `ci.yml`, `publish.yml`, `next-release.yml`, `hotfixes-release.yml`, `docker-publish.yml`                                                                                                                                                                                                                                                                                                              |
+| 2   | Is this an npm-published package, or a meta-package (workflows/actions only, no npm publish)?                                               | enum (`npm` / `meta`) | Determines whether `publish.yml` is needed and what `release_source_only` should be                                                                                                                                                                                                                                                                                                                                |
+| 3   | Does this repo ship a runtime bundle (`dist/`)?                                                                                             | bool                  | If yes, adopt `bundle-size.yml`                                                                                                                                                                                                                                                                                                                                                                                    |
+| 4   | Does this repo publish docs to a `gh-pages` branch?                                                                                         | bool                  | If yes, adopt `docs.yml`                                                                                                                                                                                                                                                                                                                                                                                           |
+| 5   | Is there a `Dockerfile` at the repo root that should publish to GHCR?                                                                       | bool                  | If yes, adopt `docker-publish.yml`                                                                                                                                                                                                                                                                                                                                                                                 |
+| 6   | Should non-org contributors be required to sign a CLA before their PRs can merge?                                                           | bool                  | If yes, adopt `cla.yml`. The bot uses the org-wide default CLA from the `CLDMV/.cla-signatures` ledger — no per-repo `CLA.md` is needed in the default case. Only add a local `CLA.md` if this repo needs an **override** with custom terms; ask about that separately as Q6b.                                                                                                                                     |
+| 6b  | (Only if Q6 is yes) Does this repo need a CLA with **different terms** than the org-wide default?                                           | bool                  | If yes, ask the user for the override CLA text; place at root as `CLA.md` with a `# … CLA — v1.0` header. The bot will detect override scope automatically and bootstrap a snapshot in the ledger on the first signature.                                                                                                                                                                                          |
+| 7   | Want Dependabot enabled for this repo?                                                                                                      | bool                  | If yes, adopt `dependabot.yml` (routes PRs to `next`; security updates auto-promote to `hotfixes` via `hotfix-redirector.yml`). The companion `dependabot-auto-merge.yml` is **ON by default** — drop it from the adoption set only if the user explicitly wants to review each Dependabot PR by hand.                                                                                                             |
+| 8   | Want Discord/Slack/webhook release notifications?                                                                                           | bool                  | If yes, adopt `release-notify.yml` (and `pr-notify.yml` for PR-opened notifications). Each channel is a single secret named `<TYPE>_<KIND>_<VIS>_WEBHOOK` — set the secret to enable, unset = no-op. No config file required.                                                                                                                                                                                      |
+| 9   | What extra branch patterns should be exempt from auto-deletion on PR merge (besides `master`/`main`/`badges`/`gh-pages`/`next`/`hotfixes`)? | list                  | Feeds `branch-retention.yml`'s `exempt_patterns`. `next` + `hotfixes` are exempt by default — they're the persistent release-PR heads.                                                                                                                                                                                                                                                                             |
+| 10  | Should the standard org-default labels be synced into this repo?                                                                            | bool                  | Determines whether to recommend `sync-org-labels.yml` (rare — org-admin only)                                                                                                                                                                                                                                                                                                                                      |
+| 11  | Does this repo have (or need) a private test suite pulled from a separate private repo via an anonymous gitlink (typically `tests/`)?       | bool                  | If yes, set `enable_embedded_tests: true` on the `ci.yml` workflow call. Confirm the matching private repo exists per the URL-mapping convention (`<org>/<repo>-tests` for a `tests/` gitlink). See [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md). Independent of workflow adoption — it's a single input on the existing CI workflow. |
 
 Save all answers before proceeding. If the user says "all defaults", set: name=`@your-org/your-package` (and remind them to fix later), all bools → true except #5 (Docker), #6 (CLA), #6b (CLA override), #10 (org labels), #11 (embedded private tests) which default to false.
 
@@ -58,62 +58,62 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 
 ### Always (v4 release flow — adopt as a set)
 
-| Template | From | Note |
-|---|---|---|
-| `next-release.yml` | `release-flow-v4/next-release.yml` | Customize `package-name` + `build-command` |
-| `hotfixes-release.yml` | `release-flow-v4/hotfixes-release.yml` | Customize `package-name` + `build-command` |
-| `next-reset.yml` | `release-flow-v4/next-reset.yml` | No customization |
-| `hotfix-redirector.yml` | `release-flow-v4/hotfix-redirector.yml` | No customization |
-| `pr-title-normalizer.yml` | `release-flow-v4/pr-title-normalizer.yml` | No customization |
-| `v4-bootstrap.yml` | `release-flow-v4/v4-bootstrap.yml` | No customization (manual-dispatch, run once after install) |
+| Template                  | From                                      | Note                                                       |
+| ------------------------- | ----------------------------------------- | ---------------------------------------------------------- |
+| `next-release.yml`        | `release-flow-v4/next-release.yml`        | Customize `package-name` + `build-command`                 |
+| `hotfixes-release.yml`    | `release-flow-v4/hotfixes-release.yml`    | Customize `package-name` + `build-command`                 |
+| `next-reset.yml`          | `release-flow-v4/next-reset.yml`          | No customization                                           |
+| `hotfix-redirector.yml`   | `release-flow-v4/hotfix-redirector.yml`   | No customization                                           |
+| `pr-title-normalizer.yml` | `release-flow-v4/pr-title-normalizer.yml` | No customization                                           |
+| `v4-bootstrap.yml`        | `release-flow-v4/v4-bootstrap.yml`        | No customization (manual-dispatch, run once after install) |
 
 ### Always (core CI/CD)
 
-| Template | From | Note |
-|---|---|---|
-| `ci.yml` | `core-cicd/ci.yml` | Customize `package_name` |
-| `update-major-version-tags.yml` | `core-cicd/update-major-version-tags.yml` | No customization needed |
+| Template                        | From                                      | Note                     |
+| ------------------------------- | ----------------------------------------- | ------------------------ |
+| `ci.yml`                        | `core-cicd/ci.yml`                        | Customize `package_name` |
+| `update-major-version-tags.yml` | `core-cicd/update-major-version-tags.yml` | No customization needed  |
 
 (`release.yml` is **NOT** scaffolded — it's the v3 per-PR release flow, replaced by `next-release.yml` + `hotfixes-release.yml` above. A repo running both would double-fire on `release:` commits.)
 
 ### Always (release companions)
 
-| Template | From | Note |
-|---|---|---|
+| Template                  | From                                         | Note                                         |
+| ------------------------- | -------------------------------------------- | -------------------------------------------- |
 | `master-commit-audit.yml` | `release-companions/master-commit-audit.yml` | No customization needed for default patterns |
-| `tag-health.yml` | `release-companions/tag-health.yml` | No customization needed |
+| `tag-health.yml`          | `release-companions/tag-health.yml`          | No customization needed                      |
 
 ### Conditional (based on Phase 1)
 
-| Q | If answer | Add template | From |
-|---|---|---|---|
-| 2 | `npm` | `publish.yml` | `core-cicd/publish.yml` (customize `package_name`) |
-| 2 | `meta` | `publish.yml` (modified) | Same as above but set `publish_to_npm: false`, `publish_to_github_packages: false`, `release_source_only: true`, and stub `test_command`/`build_command` with `echo` lines |
-| 3 | true | `bundle-size.yml` | `packaging-docs/bundle-size.yml` |
-| 4 | true | `docs.yml` | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent) |
-| 5 | true | `docker-publish.yml` | `packaging-docs/docker-publish.yml` |
-| 6 | true | `cla.yml` | `security/cla.yml`. Do **not** add a `CLA.md` to the repo root unless Q6b is also yes — the bot defaults to the org-wide CLA from `CLDMV/.cla-signatures` and a stray local `CLA.md` would silently switch the repo into override scope. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo. |
-| 6b | true | `CLA.md` at repo root | Copy the consumer's override text into `CLA.md` with a `# … CLA — v1.0` header. (Or, if they want to start from the default and customize, copy from `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging.) The bot detects override scope by file presence; no other config needed. |
-| 7 | true | `dependabot.yml` + `dependabot-auto-merge.yml` | Copy `automation/dependabot.yml` to `.github/dependabot.yml` (NOT `.github/workflows/`); copy `automation/dependabot-auto-merge.yml` to `.github/workflows/`. Customize `dependabot.yml` ecosystems for the user's stack (drop the npm block for non-Node repos; add gomod / pip / docker / etc. as needed). |
-| 8 | true | `release-notify.yml` + `pr-notify.yml` | `release-companions/release-notify.yml` and `release-companions/pr-notify.yml`. No config file needed. Tell the user to set whichever `<TYPE>_<KIND>_<VIS>_WEBHOOK` secrets they want active (org-level for the default; repo-level overrides). The release-PR notifier is already wired into `next-release.yml` / `hotfixes-release.yml` from Q7's flow — see the `RELEASE_PR` secret block below. |
-| 10 | true | `sync-org-labels.yml` | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo** |
-| 11 | true | (no new file) | Set `enable_embedded_tests: true` on the existing `ci.yml`'s workflow call. Confirm the matching private repo exists (`<org>/<repo>-tests` for `tests/`; or `<org>/<repo>-embedded` for the consolidated layout — see [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md)). Confirm the bot App has access to the private repo. |
+| Q   | If answer | Add template                                   | From                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --- | --------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2   | `npm`     | `publish.yml`                                  | `core-cicd/publish.yml` (customize `package_name`)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 2   | `meta`    | `publish.yml` (modified)                       | Same as above but set `publish_to_npm: false`, `publish_to_github_packages: false`, `release_source_only: true`, and stub `test_command`/`build_command` with `echo` lines                                                                                                                                                                                                                                                                                                  |
+| 3   | true      | `bundle-size.yml`                              | `packaging-docs/bundle-size.yml`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 4   | true      | `docs.yml`                                     | `packaging-docs/docs.yml` (verify the consumer has `npm run docs:build` or equivalent)                                                                                                                                                                                                                                                                                                                                                                                      |
+| 5   | true      | `docker-publish.yml`                           | `packaging-docs/docker-publish.yml`                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 6   | true      | `cla.yml`                                      | `security/cla.yml`. Do **not** add a `CLA.md` to the repo root unless Q6b is also yes — the bot defaults to the org-wide CLA from `CLDMV/.cla-signatures` and a stray local `CLA.md` would silently switch the repo into override scope. Confirm the org-level ledger repo `CLDMV/.cla-signatures` exists — it's a one-time org setup; if missing, tell the user to create it as a private repo and seed from `examples/repo-seeds/.cla-signatures/` in the `.github` repo. |
+| 6b  | true      | `CLA.md` at repo root                          | Copy the consumer's override text into `CLA.md` with a `# … CLA — v1.0` header. (Or, if they want to start from the default and customize, copy from `https://github.com/CLDMV/.github/blob/v4/examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md` and tell the user to confirm with legal before merging.) The bot detects override scope by file presence; no other config needed.                                                                                  |
+| 7   | true      | `dependabot.yml` + `dependabot-auto-merge.yml` | Copy `automation/dependabot.yml` to `.github/dependabot.yml` (NOT `.github/workflows/`); copy `automation/dependabot-auto-merge.yml` to `.github/workflows/`. Customize `dependabot.yml` ecosystems for the user's stack (drop the npm block for non-Node repos; add gomod / pip / docker / etc. as needed).                                                                                                                                                                |
+| 8   | true      | `release-notify.yml` + `pr-notify.yml`         | `release-companions/release-notify.yml` and `release-companions/pr-notify.yml`. No config file needed. Tell the user to set whichever `<TYPE>_<KIND>_<VIS>_WEBHOOK` secrets they want active (org-level for the default; repo-level overrides). The release-PR notifier is already wired into `next-release.yml` / `hotfixes-release.yml` from Q7's flow — see the `RELEASE_PR` secret block below.                                                                         |
+| 10  | true      | `sync-org-labels.yml`                          | `packaging-docs/sync-org-labels.yml` — **only if this is the org-admin repo**                                                                                                                                                                                                                                                                                                                                                                                               |
+| 11  | true      | (no new file)                                  | Set `enable_embedded_tests: true` on the existing `ci.yml`'s workflow call. Confirm the matching private repo exists (`<org>/<repo>-tests` for `tests/`; or `<org>/<repo>-embedded` for the consolidated layout — see [`docs/conventions/embedded-tests-ci.md`](https://github.com/CLDMV/.github/blob/v4/docs/conventions/embedded-tests-ci.md)). Confirm the bot App has access to the private repo.                                                                       |
 
 ### Always (security baseline — recommended for any OSS repo)
 
-| Template | From |
-|---|---|
-| `codeql.yml` | `security/codeql.yml` (safe on private repos: the bootstrap default-sets `CLDMV_SKIP_CODE_SCANNING` there, so it uploads an empty passing SARIF instead of failing — opt a paying repo into real scanning via the `scan` list in `data/code-scanning-skips.json`) |
-| `dependency-review.yml` | `security/dependency-review.yml` (same private-repo default-skip via `CLDMV_SKIP_DEPENDENCY_REVIEW`) |
-| `scorecard.yml` | `security/scorecard.yml` (safe everywhere — every scorecard job auto-skips on private repos, where OpenSSF cannot publish) |
+| Template                | From                                                                                                                                                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codeql.yml`            | `security/codeql.yml` (safe on private repos: the bootstrap default-sets `CLDMV_SKIP_CODE_SCANNING` there, so it uploads an empty passing SARIF instead of failing — opt a paying repo into real scanning via the `scan` list in `data/code-scanning-skips.json`) |
+| `dependency-review.yml` | `security/dependency-review.yml` (same private-repo default-skip via `CLDMV_SKIP_DEPENDENCY_REVIEW`)                                                                                                                                                              |
+| `scorecard.yml`         | `security/scorecard.yml` (safe everywhere — every scorecard job auto-skips on private repos, where OpenSSF cannot publish)                                                                                                                                        |
 
 ### Always (automation)
 
-| Template | From |
-|---|---|
-| `labeler.yml` | `automation/labeler.yml` |
-| `welcome.yml` | `automation/welcome.yml` |
-| `stale.yml` | `automation/stale.yml` |
+| Template               | From                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `labeler.yml`          | `automation/labeler.yml`                                                                                              |
+| `welcome.yml`          | `automation/welcome.yml`                                                                                              |
+| `stale.yml`            | `automation/stale.yml`                                                                                                |
 | `branch-retention.yml` | `automation/branch-retention.yml` (set `exempt_patterns` from Phase 1 Q9 — `next`/`hotfixes` are added automatically) |
 
 ---
@@ -226,10 +226,10 @@ For release / PR / release-PR notifications (OPTIONAL, set whichever channels yo
 
 The secret name itself encodes the channel — `<TYPE>_<KIND>_<VIS>_WEBHOOK`. Set the secret at the org level for an org-wide default; override or mute per-repo by setting a repo-level secret with the same name (empty string = mute). Visibility is auto-detected (public vs private/internal).
 
-| `<KIND>` | Fires on | Pick whichever of these you want |
-|---|---|---|
-| `RELEASES` | `release: published` | `DISCORD_RELEASES_PUBLIC_WEBHOOK`, `DISCORD_RELEASES_PRIVATE_WEBHOOK`, `SLACK_RELEASES_PUBLIC_WEBHOOK`, `SLACK_RELEASES_PRIVATE_WEBHOOK`, `GENERIC_RELEASES_PUBLIC_WEBHOOK`, `GENERIC_RELEASES_PRIVATE_WEBHOOK` |
-| `PR` | `pull_request: opened` | `DISCORD_PR_PUBLIC_WEBHOOK`, `DISCORD_PR_PRIVATE_WEBHOOK`, `SLACK_PR_PUBLIC_WEBHOOK`, `SLACK_PR_PRIVATE_WEBHOOK`, `GENERIC_PR_PUBLIC_WEBHOOK`, `GENERIC_PR_PRIVATE_WEBHOOK` |
+| `<KIND>`     | Fires on                                                                         | Pick whichever of these you want                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RELEASES`   | `release: published`                                                             | `DISCORD_RELEASES_PUBLIC_WEBHOOK`, `DISCORD_RELEASES_PRIVATE_WEBHOOK`, `SLACK_RELEASES_PUBLIC_WEBHOOK`, `SLACK_RELEASES_PRIVATE_WEBHOOK`, `GENERIC_RELEASES_PUBLIC_WEBHOOK`, `GENERIC_RELEASES_PRIVATE_WEBHOOK`             |
+| `PR`         | `pull_request: opened`                                                           | `DISCORD_PR_PUBLIC_WEBHOOK`, `DISCORD_PR_PRIVATE_WEBHOOK`, `SLACK_PR_PUBLIC_WEBHOOK`, `SLACK_PR_PRIVATE_WEBHOOK`, `GENERIC_PR_PUBLIC_WEBHOOK`, `GENERIC_PR_PRIVATE_WEBHOOK`                                                 |
 | `RELEASE_PR` | release-PR version-bump (inline, in `next-release.yml` / `hotfixes-release.yml`) | `DISCORD_RELEASE_PR_PUBLIC_WEBHOOK`, `DISCORD_RELEASE_PR_PRIVATE_WEBHOOK`, `SLACK_RELEASE_PR_PUBLIC_WEBHOOK`, `SLACK_RELEASE_PR_PRIVATE_WEBHOOK`, `GENERIC_RELEASE_PR_PUBLIC_WEBHOOK`, `GENERIC_RELEASE_PR_PRIVATE_WEBHOOK` |
 
 ### Bot App permissions (Org admin only)
@@ -306,7 +306,7 @@ If steps 5–6 work, the v4 flow is wired correctly.
 1. **`enable_coverage_badge` ON but no `badges` branch** — CI's badge-publish step fails. Solution: create the orphan `badges` branch (Phase 3.4).
 2. **`docs.yml` adopted but no `npm run docs:build` script** — docs-publish fails. Solution: add the script to `package.json` or change the `build_command` input in `docs.yml`.
 3. **`dependabot-auto-merge.yml` adopted but "Allow auto-merge" is OFF** — solution: run `v4-bootstrap.yml`, or enable manually in Settings → Pull Requests.
-3b. **`dependabot.yml` placed in `.github/workflows/` by mistake** — Dependabot won't pick it up there. It must live at `.github/dependabot.yml` (root of `.github/`, not inside `workflows/`).
+   3b. **`dependabot.yml` placed in `.github/workflows/` by mistake** — Dependabot won't pick it up there. It must live at `.github/dependabot.yml` (root of `.github/`, not inside `workflows/`).
 4. **`cla.yml` adopted but the bot App lacks `Organization → Members: Read`** — the org-member exemption fails open (everyone gets prompted to sign). Solution: request the permission from org admin.
 5. **Meta-package `publish.yml` left with `publish_to_npm: true`** — npm publish fails because the package isn't real. Solution: re-check Phase 2 customizations.
 6. **`package-name` placeholder left as `@your-org/your-package`** in `next-release.yml` / `hotfixes-release.yml` — release-PR creation fails ("package not found on npm"). Solution: search/replace the placeholder.
@@ -340,6 +340,7 @@ If you specifically need the v3 per-PR release model (one release PR per feature
 After scaffolding, hand the user this summary (fill in `[brackets]`):
 
 > Scaffolded `[N]` workflows into `.github/workflows/` (v4 staging-branch release flow). Configuration:
+>
 > - npm package name: `[name]`
 > - package mode: `[npm | meta]`
 > - extras adopted: `[docker, bundle-size, docs, cla, etc.]`
@@ -349,6 +350,7 @@ After scaffolding, hand the user this summary (fill in `[brackets]`):
 > ✅ Scaffold PR opened: `[link]`
 >
 > **You must still do these manually** (see Phase 4 of `AGENT-SCAFFOLDING.md`):
+>
 > - Dispatch `v4-bootstrap.yml` (dry-run, then real)
 > - Generate + import the 3 rulesets, add bot App to next/hotfixes bypass
 > - `[N]` repo settings changes (listed)

@@ -11,11 +11,7 @@
 
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { getInput, setOutputs, getBooleanInput } from "../../../common/common/core.mjs";
-import {
-	TYPE_PRIORITY,
-	parseCommit,
-	computeHighest
-} from "../../../git/steps/compute-highest-commit-type/action.mjs";
+import { TYPE_PRIORITY, parseCommit, computeHighest } from "../../../git/steps/compute-highest-commit-type/action.mjs";
 
 /**
  * Sentinel phrase used to dedup the "title was normalized" comment. Must be
@@ -159,10 +155,12 @@ export function findRepresentativeCommit(commits, targetType) {
 	// `commits` comes from the PR commits API, which returns OLDEST-first
 	// (chronological order, matching the GitHub "Commits" tab). So plain
 	// `find` returns the earliest matching commit — the one we want.
-	return commits.find((c) => {
-		const p = parseCommit(c?.subject ?? c?.commit?.message ?? "", c?.body ?? "");
-		return p && p.type === targetType;
-	}) || null;
+	return (
+		commits.find((c) => {
+			const p = parseCommit(c?.subject ?? c?.commit?.message ?? "", c?.body ?? "");
+			return p && p.type === targetType;
+		}) || null
+	);
 }
 
 // ---- side-effecting main flow (gated to script entry only) ----------------

@@ -25,7 +25,13 @@ try {
 		.split(",")
 		.map((s) => s.trim().toLowerCase())
 		.filter(Boolean);
-	const exemptActors = ["dependabot[bot]", ...alsoActorsRaw.split(",").map((s) => s.trim()).filter(Boolean)];
+	const exemptActors = [
+		"dependabot[bot]",
+		...alsoActorsRaw
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean)
+	];
 
 	// Read the triggering event payload
 	const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -49,7 +55,9 @@ try {
 	// Fail safe if the env didn't parse to owner/repo — otherwise api() would fall
 	// back to a repo-less URL and a 404 there would be misread as "no branch rules".
 	if (!owner || !repo) {
-		throw new Error(`GITHUB_REPOSITORY is not in "owner/repo" form (got "${repository}"). Refusing to act — cannot resolve the repository for protection checks.`);
+		throw new Error(
+			`GITHUB_REPOSITORY is not in "owner/repo" form (got "${repository}"). Refusing to act — cannot resolve the repository for protection checks.`
+		);
 	}
 	const prNumber = pr.number;
 
@@ -72,7 +80,9 @@ try {
 	// Fail safe on an unexpected payload rather than calling /rules/branches/undefined
 	// or sending prId: undefined to GraphQL.
 	if (!baseRef || !prNodeId) {
-		throw new Error(`Could not resolve the live base branch or node id for PR #${prNumber} (base=${JSON.stringify(baseRef)}, nodeId present=${Boolean(prNodeId)}). Refusing to act — the GitHub API returned an unexpected PR payload.`);
+		throw new Error(
+			`Could not resolve the live base branch or node id for PR #${prNumber} (base=${JSON.stringify(baseRef)}, nodeId present=${Boolean(prNodeId)}). Refusing to act — the GitHub API returned an unexpected PR payload.`
+		);
 	}
 	if (baseRef !== pr.base?.ref) {
 		console.log(`🔎 PR #${prNumber} base is now "${baseRef}" (event snapshot said "${pr.base?.ref}") — using the live base.`);
@@ -87,11 +97,14 @@ try {
 	// handling instead of auto-landing it. Only next/hotfixes are valid targets.
 	const defaultBranch = livePr.base?.repo?.default_branch ?? pr.base?.repo?.default_branch ?? "";
 	if (isProtectedBase(baseRef, defaultBranch)) {
-		const where = defaultBranch && baseRef === defaultBranch ? `the default branch "${baseRef}"` : `the protected release branch "${baseRef}"`;
+		const where =
+			defaultBranch && baseRef === defaultBranch ? `the default branch "${baseRef}"` : `the protected release branch "${baseRef}"`;
 		const msg = `PR #${prNumber} targets ${where}; refusing to auto-merge. Only 'next'/'hotfixes' are valid auto-merge targets in the staging-branch flow — leaving this PR open for manual handling.`;
 		console.log(`⏭️  ${msg}`);
 		console.log(`::warning::${msg}`);
-		appendSummary(`⚠️ **Auto-merge declined** — PR #${prNumber} targets ${where}. A Dependabot PR must not auto-land on the release branch; retarget it to \`hotfixes\` or merge it deliberately.`);
+		appendSummary(
+			`⚠️ **Auto-merge declined** — PR #${prNumber} targets ${where}. A Dependabot PR must not auto-land on the release branch; retarget it to \`hotfixes\` or merge it deliberately.`
+		);
 		process.exit(0);
 	}
 
@@ -120,7 +133,9 @@ try {
 		appendSummary(`🚀 **Auto-merge enabled** on PR #${prNumber}: ${result.bump.type} bump ${result.bump.from} → ${result.bump.to}`);
 	} else {
 		console.log(`🚀 Merged PR #${prNumber} directly (${result.mergeMethod}) — required gates already satisfied.`);
-		appendSummary(`🚀 **Merged** PR #${prNumber} (${result.mergeMethod}): ${result.bump.type} bump ${result.bump.from} → ${result.bump.to}`);
+		appendSummary(
+			`🚀 **Merged** PR #${prNumber} (${result.mergeMethod}): ${result.bump.type} bump ${result.bump.from} → ${result.bump.to}`
+		);
 	}
 } catch (error) {
 	console.error(`::error::${error.message}`);

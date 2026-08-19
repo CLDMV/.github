@@ -53,11 +53,7 @@ eq(
 	{ performed: true, sha: "", conflict: false, error: "" },
 	"201 without sha → still performed=true, empty sha"
 );
-eq(
-	interpretMergeResponse(204, null),
-	{ performed: false, sha: "", conflict: false, error: "" },
-	"204 (no content) → already up-to-date"
-);
+eq(interpretMergeResponse(204, null), { performed: false, sha: "", conflict: false, error: "" }, "204 (no content) → already up-to-date");
 eq(
 	interpretMergeResponse(409, { message: "Merge conflict" }),
 	{ performed: false, sha: "", conflict: true, error: "Merge conflict (409) — manual resolution required" },

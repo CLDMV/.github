@@ -38,7 +38,10 @@ async function graphql(token, query, variables) {
 }
 
 function csvSet(input, fallback) {
-	const raw = (input || fallback || "").split(",").map((s) => s.trim()).filter(Boolean);
+	const raw = (input || fallback || "")
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 	return new Set(raw);
 }
 
@@ -59,7 +62,10 @@ try {
 	const allowedAssociations = csvSet(getInput("allowed_associations"), "MEMBER,OWNER,COLLABORATOR");
 	const targetBranches = csvSet(getInput("target_branches"), "next,hotfixes");
 	const branchPrefixesRaw = getInput("branch_prefixes") || "feat,feature,fix,hotfix,chore,refactor,docs,ci,perf,test,style";
-	const branchPrefixes = branchPrefixesRaw.split(",").map((s) => s.trim()).filter(Boolean);
+	const branchPrefixes = branchPrefixesRaw
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 	const requireBP = (getInput("require_branch_protection") || "true").toLowerCase() === "true";
 
 	const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -119,7 +125,7 @@ try {
 			console.log(`✅ Base "${baseRef}" requires checks: ${requiredChecks.join(", ")}`);
 		} catch (err) {
 			if (err.message.includes("404")) {
-				throw new Error(`Base branch "${baseRef}" has no branch-protection rule. ${err.message}`);
+				throw new Error(`Base branch "${baseRef}" has no branch-protection rule. ${err.message}`, { cause: err });
 			}
 			throw err;
 		}

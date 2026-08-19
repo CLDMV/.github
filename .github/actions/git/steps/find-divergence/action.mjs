@@ -11,7 +11,9 @@ import { setOutput } from "../../../common/common/core.mjs";
 /** Run a git command (via a shell), returning "" instead of throwing on failure. */
 function tryGit(cmd) {
 	try {
-		return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+		return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] })
+			.toString()
+			.trim();
 	} catch {
 		return "";
 	}
@@ -25,7 +27,9 @@ function tryGit(cmd) {
  */
 function tryGitArgs(args) {
 	try {
-		return execFileSync("git", args, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+		return execFileSync("git", args, { stdio: ["ignore", "pipe", "ignore"] })
+			.toString()
+			.trim();
 	} catch {
 		return "";
 	}

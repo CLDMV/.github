@@ -81,12 +81,12 @@ console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflo
 	// command; the rejection path logs it, so it must be collapsed to one line.
 	readVersionChangelogFile("5.5.5", D, "../evil\n::set-output name=x::y");
 	console.log = origLog;
+	ok(!captured.some((line) => /[\r\n]/.test(line)), "no raw CR/LF survives into a logged value");
 	ok(
-		!captured.some((line) => /[\r\n]/.test(line)),
-		"no raw CR/LF survives into a logged value"
-	);
-	ok(
-		!captured.join("\n").split("\n").some((line) => line.startsWith("::")),
+		!captured
+			.join("\n")
+			.split("\n")
+			.some((line) => line.startsWith("::")),
 		"no logged line starts with :: (workflow-command injection blocked)"
 	);
 }

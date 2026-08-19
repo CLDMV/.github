@@ -67,7 +67,9 @@ try {
 	}
 	console.log(releaseExists ? `  - Release ${tag}: ⚠️ Already exists (will be updated)` : `  - Release ${tag}: ✅ Will be created`);
 
-	console.log(sourceOnly ? "  - Package assets: ⏭️ Source-only release (no assets)" : "  - Package assets: ✅ Will be attached (.tar.gz and .zip)");
+	console.log(
+		sourceOnly ? "  - Package assets: ⏭️ Source-only release (no assets)" : "  - Package assets: ✅ Will be attached (.tar.gz and .zip)"
+	);
 	console.log("");
 	console.log("💡 In real run, would create release at:");
 	console.log(`   ${releaseUrl}`);

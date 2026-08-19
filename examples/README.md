@@ -17,66 +17,66 @@ Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), gr
 
 ### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD (most repos want all four)
 
-| Template | Triggers | Calls | What it does |
-|---|---|---|---|
-| `ci.yml` | push, fork-PR | `workflow-ci.yml` | Build + test matrix; PR gate via status check on SHA |
-| `release.yml` | push to non-default branch | `workflow-release.yml` | Detects `release:`/`release!:` commits → opens/updates a release PR |
-| `publish.yml` | push to default branch | `workflow-publish.yml` | Publishes to NPM + GitHub Packages, creates GitHub release |
-| `update-major-version-tags.yml` | `release: published` | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags |
+| Template                        | Triggers                   | Calls                                    | What it does                                                        |
+| ------------------------------- | -------------------------- | ---------------------------------------- | ------------------------------------------------------------------- |
+| `ci.yml`                        | push, fork-PR              | `workflow-ci.yml`                        | Build + test matrix; PR gate via status check on SHA                |
+| `release.yml`                   | push to non-default branch | `workflow-release.yml`                   | Detects `release:`/`release!:` commits → opens/updates a release PR |
+| `publish.yml`                   | push to default branch     | `workflow-publish.yml`                   | Publishes to NPM + GitHub Packages, creates GitHub release          |
+| `update-major-version-tags.yml` | `release: published`       | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags                                |
 
 ### 🔀 [`release-flow-v4/`](individual-repo-workflows/release-flow-v4/) — v4 staging-branch release flow (recommended)
 
 The v4 release model: contributors merge into `next` (features) or `hotfixes` (urgent); a persistent `next → master` PR (and `hotfixes → master`) batches everything into a single release; `master` stays a clean, release-only history. Adopt the **whole set together** — these workflows depend on each other.
 
-| Template | Triggers | What it does |
-|---|---|---|
-| `next-release.yml` | push to `next` | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range. |
-| `hotfixes-release.yml` | push to `hotfixes` | Same, for the `hotfixes → master` lane (independent patch versioning). |
-| `next-reset.yml` | push to `master` (release commit) | After a release, force-resets `next` / `hotfixes` to master HEAD via REST API (gated on the released major tag); merges master into `next` after a hotfix release. |
-| `feature-pr.yml` | push to `feat/*`, `fix/*`, `hotfix/*`, etc. | Auto-opens (and refreshes on every push) a PR from a code-side branch to `next` (or `hotfixes` for `hotfix/*`). Body is the standard categorized changelog. Branch patterns are `# CUSTOMIZE:` markers in the file — trim to your repo's conventions. See [branch-naming.md](../../docs/conventions/branch-naming.md) for the full mapping. |
-| `hotfix-redirector.yml` | PR opened | Auto-retargets `hotfix/*` / `security/*` PRs **and Dependabot security-advisory PRs** onto the `hotfixes` lane. |
-| `pr-title-normalizer.yml` | PR opened / synchronize | Normalizes PR titles to the conventional-commit shape the release flow expects. |
-| `v4-bootstrap.yml` | manual dispatch (one-time) | Creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. Run once per repo with `dry_run: true` first. |
+| Template                  | Triggers                                    | What it does                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `next-release.yml`        | push to `next`                              | Refreshes the persistent `next → master` release PR (version + changelog) from the `master..next` range.                                                                                                                                                                                                                                    |
+| `hotfixes-release.yml`    | push to `hotfixes`                          | Same, for the `hotfixes → master` lane (independent patch versioning).                                                                                                                                                                                                                                                                      |
+| `next-reset.yml`          | push to `master` (release commit)           | After a release, force-resets `next` / `hotfixes` to master HEAD via REST API (gated on the released major tag); merges master into `next` after a hotfix release.                                                                                                                                                                          |
+| `feature-pr.yml`          | push to `feat/*`, `fix/*`, `hotfix/*`, etc. | Auto-opens (and refreshes on every push) a PR from a code-side branch to `next` (or `hotfixes` for `hotfix/*`). Body is the standard categorized changelog. Branch patterns are `# CUSTOMIZE:` markers in the file — trim to your repo's conventions. See [branch-naming.md](../../docs/conventions/branch-naming.md) for the full mapping. |
+| `hotfix-redirector.yml`   | PR opened                                   | Auto-retargets `hotfix/*` / `security/*` PRs **and Dependabot security-advisory PRs** onto the `hotfixes` lane.                                                                                                                                                                                                                             |
+| `pr-title-normalizer.yml` | PR opened / synchronize                     | Normalizes PR titles to the conventional-commit shape the release flow expects.                                                                                                                                                                                                                                                             |
+| `v4-bootstrap.yml`        | manual dispatch (one-time)                  | Creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches. Run once per repo with `dry_run: true` first.                                                                                                                                                                                                          |
 
 After installing these, complete the cutover via the [v3→v4 migration guide](../docs/migration/v3-to-v4.md) — rulesets, bot bypass, retire any existing v3 per-PR release flow.
 
 ### 📋 [`release-companions/`](individual-repo-workflows/release-companions/) — Release-flow companions
 
-| Template | Triggers | What it does |
-|---|---|---|
-| `tag-health.yml` | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags. |
-| `release-notify.yml` | `release: published` | Posts to configured Discord/Slack/generic webhook channels. |
-| `master-commit-audit.yml` | push to default | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern. |
+| Template                  | Triggers                      | What it does                                                                                     |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `tag-health.yml`          | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags.                              |
+| `release-notify.yml`      | `release: published`          | Posts to configured Discord/Slack/generic webhook channels.                                      |
+| `master-commit-audit.yml` | push to default               | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern. |
 
 ### 🔒 [`security/`](individual-repo-workflows/security/) — Security baseline (recommended for OSS repos)
 
-| Template | Triggers | What it does |
-|---|---|---|
-| `codeql.yml` | push, PR, weekly cron | CodeQL SAST. |
-| `dependency-review.yml` | PR | Flags new deps with known CVEs at PR-time. |
-| `scorecard.yml` | weekly + branch_protection_rule | OpenSSF Scorecard, publishes to public scoreboard. |
-| `cla.yml` | PR + issue_comment | Per-CLA-version signing via central ledger (`CLDMV/.cla-signatures`), with per-repo override support. Default scope (no consumer `CLA.md`) covers every CLDMV repo using the default until the next bump; override scope (consumer has root `CLA.md`) is scoped to that repo only. Org members exempt. |
+| Template                | Triggers                        | What it does                                                                                                                                                                                                                                                                                           |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `codeql.yml`            | push, PR, weekly cron           | CodeQL SAST.                                                                                                                                                                                                                                                                                           |
+| `dependency-review.yml` | PR                              | Flags new deps with known CVEs at PR-time.                                                                                                                                                                                                                                                             |
+| `scorecard.yml`         | weekly + branch_protection_rule | OpenSSF Scorecard, publishes to public scoreboard.                                                                                                                                                                                                                                                     |
+| `cla.yml`               | PR + issue_comment              | Per-CLA-version signing via central ledger (`CLDMV/.cla-signatures`), with per-repo override support. Default scope (no consumer `CLA.md`) covers every CLDMV repo using the default until the next bump; override scope (consumer has root `CLA.md`) is scoped to that repo only. Org members exempt. |
 
 ### 🤖 [`automation/`](individual-repo-workflows/automation/) — Automation
 
-| Template | Triggers | What it does |
-|---|---|---|
-| `dependabot.yml` | (config file at `.github/dependabot.yml`) | Routes Dependabot PRs to `next` (with `hotfix-redirector.yml` auto-promoting security updates to `hotfixes`). |
-| `dependabot-auto-merge.yml` | PR by dependabot[bot] | Auto-approves + queues auto-merge for patch/minor bumps after CI, into the PR's target (`next` or `hotfixes`). |
-| `member-auto-merge.yml` | PR by org member | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes` (does NOT approve — keeps the human-review gate). |
-| `labeler.yml` | pull_request_target | Path-based PR labels (uses [labeler.default.yml](../.github/labeler.default.yml) unless overridden by `.github/labeler.yml`). |
-| `welcome.yml` | first issue / PR | Friendly welcome with conditional links to CONTRIBUTING / CLA / COC. |
-| `stale.yml` | daily cron | Marks/closes inactive issues + PRs. Defaults: 60+14 days issues, 30+7 days PRs. |
-| `branch-retention.yml` | PR merged | Prunes most head branches; keeps last N of `release/*` and `hotfix/*`. |
+| Template                    | Triggers                                  | What it does                                                                                                                  |
+| --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `dependabot.yml`            | (config file at `.github/dependabot.yml`) | Routes Dependabot PRs to `next` (with `hotfix-redirector.yml` auto-promoting security updates to `hotfixes`).                 |
+| `dependabot-auto-merge.yml` | PR by dependabot[bot]                     | Auto-approves + queues auto-merge for patch/minor bumps after CI, into the PR's target (`next` or `hotfixes`).                |
+| `member-auto-merge.yml`     | PR by org member                          | Auto-enables GitHub's auto-merge flag on member PRs to `next` / `hotfixes` (does NOT approve — keeps the human-review gate).  |
+| `labeler.yml`               | pull_request_target                       | Path-based PR labels (uses [labeler.default.yml](../.github/labeler.default.yml) unless overridden by `.github/labeler.yml`). |
+| `welcome.yml`               | first issue / PR                          | Friendly welcome with conditional links to CONTRIBUTING / CLA / COC.                                                          |
+| `stale.yml`                 | daily cron                                | Marks/closes inactive issues + PRs. Defaults: 60+14 days issues, 30+7 days PRs.                                               |
+| `branch-retention.yml`      | PR merged                                 | Prunes most head branches; keeps last N of `release/*` and `hotfix/*`.                                                        |
 
 ### 📦 [`packaging-docs/`](individual-repo-workflows/packaging-docs/) — Packaging / docs (opt-in)
 
-| Template | Triggers | What it does |
-|---|---|---|
-| `docker-publish.yml` | push to default + dispatch | Build + push image to GHCR. |
-| `bundle-size.yml` | PR | Comments size delta of `dist/` (raw, gzip, brotli). For runtime libs. |
-| `docs.yml` | push to default (paths-filtered) | Builds docs and publishes to `gh-pages`. |
-| `sync-org-labels.yml` | manual / cron | Syncs `data/github-labels.json` across all repos in the org. (Org-admin repo only — most repos don't need this.) |
+| Template              | Triggers                         | What it does                                                                                                     |
+| --------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `docker-publish.yml`  | push to default + dispatch       | Build + push image to GHCR.                                                                                      |
+| `bundle-size.yml`     | PR                               | Comments size delta of `dist/` (raw, gzip, brotli). For runtime libs.                                            |
+| `docs.yml`            | push to default (paths-filtered) | Builds docs and publishes to `gh-pages`.                                                                         |
+| `sync-org-labels.yml` | manual / cron                    | Syncs `data/github-labels.json` across all repos in the org. (Org-admin repo only — most repos don't need this.) |
 
 ## How to use
 

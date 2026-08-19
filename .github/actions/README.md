@@ -7,7 +7,7 @@ blocks behind the org-level workflows in [`../workflows/`](../workflows/).
 
 Actions live under `.github/actions/`, grouped by technology layer:
 
-```
+```text
 .github/actions/
 ├── common/      # Cross-cutting steps + the shared lib (common/common/core.mjs)
 ├── git/         # Local git operations and analysis (audit-commit-subject, branch-retention)

@@ -15,7 +15,7 @@ const nonBotTagsFound = process.env.NON_BOT_TAGS_FOUND === "true";
 // package.json is the source of truth even when the vX.Y.Z tag isn't created yet.
 let pkgShouldRun = false;
 if (fs.existsSync("package.json")) {
-	let pkgVersion = "";
+	let pkgVersion;
 	try {
 		pkgVersion = JSON.parse(fs.readFileSync("package.json", "utf8")).version || "";
 	} catch {

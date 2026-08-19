@@ -57,7 +57,11 @@ async function findHistoricalBranches({ token, owner, repo, pattern, maxPages = 
 	const results = [];
 	let page = 1;
 	while (page <= maxPages) {
-		const batch = await api("GET", `/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`, null, { token, owner, repo });
+		const batch = await api("GET", `/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`, null, {
+			token,
+			owner,
+			repo
+		});
 		if (!Array.isArray(batch) || batch.length === 0) break;
 		for (const pr of batch) {
 			if (!pr.merged_at) continue;
@@ -145,7 +149,6 @@ try {
 	console.log(`📦 ${stillExisting.length} are still present as refs`);
 
 	const keepCount = Number(matchingRule.keep_last || 5);
-	const toKeep = stillExisting.slice(0, keepCount);
 	const toDelete = stillExisting.slice(keepCount);
 
 	const summaryLines = [`🔒 Kept \`${branch}\` (retention rule \`${matchingRule.pattern}\`, keep_last=${keepCount})`];

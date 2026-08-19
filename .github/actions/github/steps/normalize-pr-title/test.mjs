@@ -29,11 +29,7 @@ function eq(actual, expected, label) {
 }
 
 console.log("extractTitleParts:");
-eq(
-	extractTitleParts("feat: add foo"),
-	{ type: "feat", scope: "", breakingMark: false, summary: "add foo" },
-	"plain feat title"
-);
+eq(extractTitleParts("feat: add foo"), { type: "feat", scope: "", breakingMark: false, summary: "add foo" }, "plain feat title");
 eq(
 	extractTitleParts("fix(parser): handle empty input"),
 	{ type: "fix", scope: "parser", breakingMark: false, summary: "handle empty input" },
@@ -101,11 +97,7 @@ eq(titleConforms("feat: x", "", false), true, "no required type → conventional
 console.log("\nbuildNewTitle:");
 eq(buildNewTitle({ type: "feat", isBreaking: false, summary: "add foo" }), "feat: add foo", "plain feat");
 eq(buildNewTitle({ type: "feat", isBreaking: true, summary: "rip out v1" }), "feat!: rip out v1", "breaking feat");
-eq(
-	buildNewTitle({ type: "fix", isBreaking: false, summary: "bar", scope: "parser" }),
-	"fix(parser): bar",
-	"with scope"
-);
+eq(buildNewTitle({ type: "fix", isBreaking: false, summary: "bar", scope: "parser" }), "fix(parser): bar", "with scope");
 
 console.log("\nsummaryFromSubject:");
 eq(summaryFromSubject("feat: add foo"), "add foo", "plain feat strips prefix");
@@ -114,26 +106,18 @@ eq(summaryFromSubject("just a regular subject"), "just a regular subject", "non-
 
 console.log("\nfindRepresentativeCommit (PR commits API order = oldest-first):");
 const fixturesChrono = [
-	{ subject: "feat: add foo", body: "" },         // oldest feat — should be picked
+	{ subject: "feat: add foo", body: "" }, // oldest feat — should be picked
 	{ subject: "fix: a small fix", body: "" },
-	{ subject: "feat: add bar", body: "" },         // newer feat — not picked
-	{ subject: "chore: cleanup", body: "" }         // newest
+	{ subject: "feat: add bar", body: "" }, // newer feat — not picked
+	{ subject: "chore: cleanup", body: "" } // newest
 ];
 eq(
 	findRepresentativeCommit(fixturesChrono, "feat")?.subject,
 	"feat: add foo",
 	"oldest matching feat picked (title stays pinned to original intent)"
 );
-eq(
-	findRepresentativeCommit(fixturesChrono, "fix")?.subject,
-	"fix: a small fix",
-	"matches a non-feat type too"
-);
-eq(
-	findRepresentativeCommit(fixturesChrono, "docs"),
-	null,
-	"no docs commit → null"
-);
+eq(findRepresentativeCommit(fixturesChrono, "fix")?.subject, "fix: a small fix", "matches a non-feat type too");
+eq(findRepresentativeCommit(fixturesChrono, "docs"), null, "no docs commit → null");
 eq(findRepresentativeCommit([], "feat"), null, "empty input → null");
 eq(findRepresentativeCommit(null, "feat"), null, "null input → null");
 

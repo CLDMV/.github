@@ -79,7 +79,7 @@ if (dryRun) {
 
 // Execute the publish command, capturing combined stdout/stderr.
 console.log(`🔧 Running command: ${publishCmd}`);
-let output = "";
+let output;
 let success = false;
 try {
 	output = execSync(`${publishCmd} 2>&1`, { encoding: "utf8", env });
@@ -103,7 +103,7 @@ if (isVersionAlreadyPublishedError(output)) {
 	console.log(`📊 Version conflict detected: ${packageVersion} was previously published`);
 
 	// The version may have been published then unpublished — check availability.
-	let registryAvailable = false;
+	let registryAvailable;
 	try {
 		execSync(`npm view "${packageName}@${packageVersion}" version`, { stdio: ["ignore", "pipe", "ignore"] });
 		registryAvailable = true;

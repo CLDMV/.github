@@ -98,11 +98,13 @@ export async function approveAndEnableAutoMerge({
 		} catch (err) {
 			if (isNotFoundError(err.message)) {
 				throw new Error(
-					`Base branch "${baseRef}" has no effective branch rules (classic protection and rulesets both empty). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`
+					`Base branch "${baseRef}" has no effective branch rules (classic protection and rulesets both empty). Refusing to enable auto-merge — this would merge without CI gating. Add a ruleset / branch-protection rule or set require_branch_protection: false to override.`,
+					{ cause: err }
 				);
 			}
 			throw new Error(
-				`Could not read branch rules for "${baseRef}" (${err.message}). Refusing to enable auto-merge — protection state is unknown. Ensure the token has "Administration: read" (repository rules) on the repo, or set require_branch_protection: false to override.`
+				`Could not read branch rules for "${baseRef}" (${err.message}). Refusing to enable auto-merge — protection state is unknown. Ensure the token has "Administration: read" (repository rules) on the repo, or set require_branch_protection: false to override.`,
+				{ cause: err }
 			);
 		}
 
@@ -144,7 +146,10 @@ export async function approveAndEnableAutoMerge({
 		try {
 			await api("PUT", `/pulls/${prNumber}/merge`, { merge_method: mergeMethod, sha: headSha }, { token, owner, repo });
 		} catch (mergeError) {
-			throw new Error(`Could not auto-merge or directly merge PR #${prNumber}. Auto-merge: ${autoMergeError.message} | Direct merge: ${mergeError.message}`);
+			throw new Error(
+				`Could not auto-merge or directly merge PR #${prNumber}. Auto-merge: ${autoMergeError.message} | Direct merge: ${mergeError.message}`,
+				{ cause: mergeError }
+			);
 		}
 		return { outcome: "merged-directly", bump, mergeMethod };
 	}

@@ -207,7 +207,11 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	// send the field" — GitHub applies its own default (true) for the core
 	// release. Satellite releases pass "false" so they never steal the
 	// "Latest release" badge from the core release that created them.
-	const wantsMakeLatest = ["true", "false", "legacy"].includes(String(make_latest || "").trim().toLowerCase())
+	const wantsMakeLatest = ["true", "false", "legacy"].includes(
+		String(make_latest || "")
+			.trim()
+			.toLowerCase()
+	)
 		? String(make_latest).trim().toLowerCase()
 		: undefined;
 	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
@@ -254,11 +258,15 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 				debugLog(`Tag ref ${tag_name} confirmed on GitHub API (attempt ${attempt})`);
 				break;
 			}
-			debugLog(`Tag ref ${tag_name} not yet visible (attempt ${attempt}/${maxAttempts}, status ${tagCheckResponse.status}) — waiting ${delayMs}ms`);
+			debugLog(
+				`Tag ref ${tag_name} not yet visible (attempt ${attempt}/${maxAttempts}, status ${tagCheckResponse.status}) — waiting ${delayMs}ms`
+			);
 			await new Promise((r) => setTimeout(r, delayMs));
 		}
 		if (!tagReady) {
-			throw new Error(`Tag ${tag_name} was not resolvable via GitHub API after ${maxAttempts} attempts. Cannot create release against a missing tag.`);
+			throw new Error(
+				`Tag ${tag_name} was not resolvable via GitHub API after ${maxAttempts} attempts. Cannot create release against a missing tag.`
+			);
 		}
 	}
 
@@ -397,7 +405,9 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 				break;
 			}
 
-			debugLog(`Release ${releaseData.id} still reads draft after PATCH+verify (attempt ${attempt}/${maxAttempts}) — retrying in ${retryDelayMs}ms`);
+			debugLog(
+				`Release ${releaseData.id} still reads draft after PATCH+verify (attempt ${attempt}/${maxAttempts}) — retrying in ${retryDelayMs}ms`
+			);
 			await new Promise((r) => setTimeout(r, retryDelayMs));
 		}
 
@@ -430,7 +440,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	return result;
 }
 
-async function uploadAssets({ token, repo, release_id, upload_url, assets, debug }) {
+async function uploadAssets({ token, repo: ___repo, release_id: ___release_id, upload_url, assets, debug: ___debug }) {
 	const fs = await import("node:fs/promises");
 	const path = await import("node:path");
 

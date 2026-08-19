@@ -6,11 +6,11 @@ The `update-major-version-tags.yml` workflow automatically maintains **floating 
 
 When you publish a release `v1.2.3`, callers who pin to `@v1` or `@v1.2` should automatically get it. This workflow keeps those floating tags in sync:
 
-| Tag | Points to |
-|---|---|
-| `v1` | Latest release across all `v1.*.*` versions |
-| `v1.2` | Latest release within `v1.2.*` |
-| `v1.2.3` | Exact release (never moved) |
+| Tag      | Points to                                   |
+| -------- | ------------------------------------------- |
+| `v1`     | Latest release across all `v1.*.*` versions |
+| `v1.2`   | Latest release within `v1.2.*`              |
+| `v1.2.3` | Exact release (never moved)                 |
 
 ## 🚀 Quick Setup
 
@@ -27,16 +27,16 @@ cp examples/individual-repo-workflows/update-major-version-tags.yml \
 
 The following secrets must be set at the org (or repo) level:
 
-| Secret Name | Description |
-|---|---|
-| `CLDMV_BOT_APP_ID` | GitHub App ID used to mint tokens for tagging |
-| `CLDMV_BOT_APP_PRIVATE_KEY` | Private key for the GitHub App |
-| `CLDMV_BOT_NAME` | Git author name for signed tags (e.g. `CLDMV Bot`) |
-| `CLDMV_BOT_EMAIL` | Git author email for signed tags |
-| `CLDMV_BOT_GPG_PRIVATE_KEY` | GPG private key for signing tags |
-| `CLDMV_BOT_GPG_PASSPHRASE` | Passphrase for the GPG key |
+| Secret Name                 | Description                                        |
+| --------------------------- | -------------------------------------------------- |
+| `CLDMV_BOT_APP_ID`          | GitHub App ID used to mint tokens for tagging      |
+| `CLDMV_BOT_APP_PRIVATE_KEY` | Private key for the GitHub App                     |
+| `CLDMV_BOT_NAME`            | Git author name for signed tags (e.g. `CLDMV Bot`) |
+| `CLDMV_BOT_EMAIL`           | Git author email for signed tags                   |
+| `CLDMV_BOT_GPG_PRIVATE_KEY` | GPG private key for signing tags                   |
+| `CLDMV_BOT_GPG_PASSPHRASE`  | Passphrase for the GPG key                         |
 
-GPG signing is enabled by default. If you don't have GPG secrets, set `use_gpg: false` (see [Skipping GPG Signing](#-skipping-gpg-signing) below).
+GPG signing is enabled by default. If you don't have GPG secrets, set `use_gpg: false` (see [Skipping GPG Signing](#skipping-gpg-signing) below).
 
 ### 3. Commit and Push
 
@@ -52,11 +52,11 @@ The workflow runs automatically on every push to `main`/`master` and on every pu
 
 ## 🔄 When Does It Run?
 
-| Trigger | When |
-|---|---|
+| Trigger                   | When                                          |
+| ------------------------- | --------------------------------------------- |
 | `push` to `main`/`master` | Every time commits land on the default branch |
-| `release` published | Every time a GitHub Release is published |
-| `workflow_dispatch` | Manually, from the Actions tab |
+| `release` published       | Every time a GitHub Release is published      |
+| `workflow_dispatch`       | Manually, from the Actions tab                |
 
 The most common trigger is publishing a release — after `v1.2.3` is created, the workflow moves `v1.2` and `v1` to point at the same commit.
 
@@ -68,29 +68,29 @@ All inputs are optional with sensible defaults.
 
 ### Behavior Inputs
 
-| Input | Default | Description |
-|---|---|---|
-| `debug` | `false` | Enable verbose logging in the Actions tab |
+| Input                  | Default | Description                                                          |
+| ---------------------- | ------- | -------------------------------------------------------------------- |
+| `debug`                | `false` | Enable verbose logging in the Actions tab                            |
 | `create_documentation` | `false` | Create/update a `VERSION_TAGS.md` file documenting all floating tags |
-| `use_gpg` | `true` | Sign tags with the bot GPG key |
+| `use_gpg`              | `true`  | Sign tags with the bot GPG key                                       |
 
 ### Safety Limits
 
 These prevent runaway tag processing on repos with large tag histories:
 
-| Input | Default | Description |
-|---|---|---|
-| `max_tags` | `100` | Maximum total tags to process |
-| `max_major_versions` | `10` | Maximum distinct major versions (e.g. v1, v2, …) |
-| `max_minor_versions` | `10` | Maximum minor versions per major (e.g. v1.0, v1.1, …) |
+| Input                | Default | Description                                           |
+| -------------------- | ------- | ----------------------------------------------------- |
+| `max_tags`           | `100`   | Maximum total tags to process                         |
+| `max_major_versions` | `10`    | Maximum distinct major versions (e.g. v1, v2, …)      |
+| `max_minor_versions` | `10`    | Maximum minor versions per major (e.g. v1.0, v1.1, …) |
 
 ### Tag Filtering
 
-| Input | Default | Description |
-|---|---|---|
-| `include_patterns` | `["v*"]` | JSON array of glob patterns — only matching tags are processed |
-| `exclude_patterns` | `[]` | JSON array of glob patterns — matching tags are skipped |
-| `bot_patterns` | `["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]` | JSON array of name patterns that identify bot-created tags |
+| Input              | Default                                             | Description                                                    |
+| ------------------ | --------------------------------------------------- | -------------------------------------------------------------- |
+| `include_patterns` | `["v*"]`                                            | JSON array of glob patterns — only matching tags are processed |
+| `exclude_patterns` | `[]`                                                | JSON array of glob patterns — matching tags are skipped        |
+| `bot_patterns`     | `["CLDMV Bot", "cldmv-bot", "github-actions[bot]"]` | JSON array of name patterns that identify bot-created tags     |
 
 ---
 
@@ -149,7 +149,7 @@ with:
 
 A successful run looks like this in the Actions log:
 
-```
+```text
 🏷️ Processing v1.2.3 → updating v1.2 and v1
 ✅ Tag v1.2 → abc1234 (was def5678)
 ✅ Tag v1 → abc1234 (was def5678)

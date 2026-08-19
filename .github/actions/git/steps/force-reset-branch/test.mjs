@@ -49,52 +49,20 @@ eq(
 );
 
 console.log("\nisLeaseFailure:");
-eq(
-	isLeaseFailure(" ! [rejected]  master -> refs/heads/next (stale info)\n"),
-	true,
-	"'stale info' classic lease rejection"
-);
-eq(
-	isLeaseFailure("hint: failed to push some refs ... fetch first"),
-	true,
-	"'fetch first' counts as lease-style"
-);
-eq(
-	isLeaseFailure("Rejected: --force-with-lease check failed"),
-	true,
-	"--force-with-lease in message"
-);
-eq(
-	isLeaseFailure("Permission denied (publickey)"),
-	false,
-	"auth error not a lease failure"
-);
-eq(
-	isLeaseFailure("fatal: remote: Repository not found"),
-	false,
-	"missing-repo not a lease failure"
-);
+eq(isLeaseFailure(" ! [rejected]  master -> refs/heads/next (stale info)\n"), true, "'stale info' classic lease rejection");
+eq(isLeaseFailure("hint: failed to push some refs ... fetch first"), true, "'fetch first' counts as lease-style");
+eq(isLeaseFailure("Rejected: --force-with-lease check failed"), true, "--force-with-lease in message");
+eq(isLeaseFailure("Permission denied (publickey)"), false, "auth error not a lease failure");
+eq(isLeaseFailure("fatal: remote: Repository not found"), false, "missing-repo not a lease failure");
 eq(isLeaseFailure(""), false, "empty string");
 eq(isLeaseFailure(null), false, "null input");
 eq(isLeaseFailure(undefined), false, "undefined input");
 
 console.log("\nparseLsRemoteSha:");
 const sample = "deadbeef1234567890123456789012345678abcd\trefs/heads/next\nfeedface1234567890123456789012345678abcd\trefs/heads/master\n";
-eq(
-	parseLsRemoteSha(sample, "refs/heads/next"),
-	"deadbeef1234567890123456789012345678abcd",
-	"full ref match"
-);
-eq(
-	parseLsRemoteSha(sample, "master"),
-	"feedface1234567890123456789012345678abcd",
-	"short name → full ref auto-resolved"
-);
-eq(
-	parseLsRemoteSha(sample, "refs/heads/missing"),
-	"",
-	"missing ref → empty string"
-);
+eq(parseLsRemoteSha(sample, "refs/heads/next"), "deadbeef1234567890123456789012345678abcd", "full ref match");
+eq(parseLsRemoteSha(sample, "master"), "feedface1234567890123456789012345678abcd", "short name → full ref auto-resolved");
+eq(parseLsRemoteSha(sample, "refs/heads/missing"), "", "missing ref → empty string");
 eq(parseLsRemoteSha("", "next"), "", "empty output");
 eq(parseLsRemoteSha(sample, ""), "", "empty ref");
 
@@ -104,11 +72,7 @@ eq(
 	"https://x-access-token:ghs_abc123@github.com/CLDMV/.github.git",
 	"composes x-access-token URL"
 );
-eq(
-	buildRemoteUrl("owner/repo", "tok"),
-	"https://x-access-token:tok@github.com/owner/repo.git",
-	"generic owner/repo"
-);
+eq(buildRemoteUrl("owner/repo", "tok"), "https://x-access-token:tok@github.com/owner/repo.git", "generic owner/repo");
 
 console.log("\nredactToken:");
 eq(
@@ -116,11 +80,7 @@ eq(
 	"git push https://x-access-token:***@github.com/o/r.git master:refs/heads/next --force-with-lease",
 	"masks the token in a push command"
 );
-eq(
-	redactToken("! [rejected] (stale info)"),
-	"! [rejected] (stale info)",
-	"leaves token-free strings unchanged"
-);
+eq(redactToken("! [rejected] (stale info)"), "! [rejected] (stale info)", "leaves token-free strings unchanged");
 eq(redactToken(null), null, "null passthrough");
 
 console.log("\nisFullSha:");
@@ -135,11 +95,7 @@ console.log("\nbuildRefUpdatePayload:");
 eq(buildRefUpdatePayload("deadbeef"), { sha: "deadbeef", force: true }, "force update body");
 
 console.log("\nbuildRefCreatePayload:");
-eq(
-	buildRefCreatePayload("hotfixes", "cafe1234"),
-	{ ref: "refs/heads/hotfixes", sha: "cafe1234" },
-	"create body has fully-qualified ref"
-);
+eq(buildRefCreatePayload("hotfixes", "cafe1234"), { ref: "refs/heads/hotfixes", sha: "cafe1234" }, "create body has fully-qualified ref");
 
 console.log("\nparseRefObjectSha:");
 eq(parseRefObjectSha({ ref: "refs/heads/next", object: { sha: "abc123", type: "commit" } }), "abc123", "extracts object.sha");
@@ -147,9 +103,13 @@ eq(parseRefObjectSha({ ref: "refs/heads/next" }), "", "missing object → empty"
 eq(parseRefObjectSha(null), "", "null → empty");
 
 console.log("\nisRefNotFound:");
-eq(isRefNotFound("GET /git/ref/heads/missing -> 404: {\"message\":\"Not Found\"}"), true, "404 status");
+eq(isRefNotFound('GET /git/ref/heads/missing -> 404: {"message":"Not Found"}'), true, "404 status");
 eq(isRefNotFound("PATCH /git/refs/heads/x -> 422: Not Found somewhere"), true, "'Not Found' phrase");
-eq(isRefNotFound("PATCH /git/refs/heads/x -> 422: {\"message\":\"Changes must be made through a pull request\"}"), false, "rule violation is NOT not-found");
+eq(
+	isRefNotFound('PATCH /git/refs/heads/x -> 422: {"message":"Changes must be made through a pull request"}'),
+	false,
+	"rule violation is NOT not-found"
+);
 eq(isRefNotFound("PATCH /git/refs/heads/x -> 403: forbidden"), false, "403 is not not-found");
 eq(isRefNotFound(null), false, "null");
 

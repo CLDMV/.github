@@ -16,19 +16,7 @@ import { getInput, setOutputs } from "../../../common/common/core.mjs";
  *
  * @public
  */
-export const TYPE_PRIORITY = [
-	"feat",
-	"fix",
-	"perf",
-	"revert",
-	"refactor",
-	"build",
-	"ci",
-	"chore",
-	"test",
-	"docs",
-	"style"
-];
+export const TYPE_PRIORITY = ["feat", "fix", "perf", "revert", "refactor", "build", "ci", "chore", "test", "docs", "style"];
 
 /**
  * Map a (type, isBreaking) pair to an implied semver bump.
@@ -114,7 +102,7 @@ function loadCommits() {
 	try {
 		parsed = JSON.parse(raw);
 	} catch (e) {
-		throw new Error(`Failed to parse commits JSON: ${e.message}`);
+		throw new Error(`Failed to parse commits JSON: ${e.message}`, { cause: e });
 	}
 	if (!Array.isArray(parsed)) {
 		throw new Error("commits JSON must be an array");

@@ -10,7 +10,9 @@ import { execSync } from "node:child_process";
 try {
 	let deleted = "";
 	try {
-		deleted = execSync("git ls-files --deleted -- src/", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+		deleted = execSync("git ls-files --deleted -- src/", { stdio: ["ignore", "pipe", "ignore"] })
+			.toString()
+			.trim();
 	} catch {
 		deleted = "";
 	}

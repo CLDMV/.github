@@ -2,7 +2,6 @@
 
 import fs from "fs";
 import { execSync } from "child_process";
-import { debugLog } from "../../../common/common/core.mjs";
 import { getTagInfo } from "../../utilities/git-utils.mjs";
 
 /**
