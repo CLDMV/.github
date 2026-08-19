@@ -1208,4 +1208,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog };
+export { generateComprehensiveChangelog, readVersionChangelogFile };
