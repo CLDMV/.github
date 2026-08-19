@@ -9,16 +9,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 
-function run(cmd, opts = {}) {
-	console.log(`$ ${cmd}`);
-	return execSync(cmd, { stdio: ["ignore", "pipe", "pipe"], ...opts }).toString().trim();
+// Run git with its argv as an array through execFileSync — NO shell — so values
+// interpolated from inputs/env (target_branch, commit_message, the tokenized
+// remote URL, bot identity) are always literal arguments and can never be
+// interpreted as shell syntax (CWE-78/88 command injection).
+function git(args) {
+	// Redact the access token from the echoed command so it never lands in logs.
+	const shown = args.map((a) => a.replace(/(x-access-token:)[^@]+@/g, "$1***@"));
+	console.log(`$ git ${shown.join(" ")}`);
+	return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
 }
 
-function runIgnoreFail(cmd) {
-	try { return run(cmd); } catch { return ""; }
+function gitIgnoreFail(args) {
+	try {
+		return git(args);
+	} catch {
+		return "";
+	}
 }
 
 /** Copy directory contents (not the dir itself) recursively. */
@@ -75,18 +85,18 @@ try {
 
 	// Try to clone the existing target branch; if it doesn't exist, create orphan.
 	try {
-		run(`git clone --depth=1 --branch=${targetBranch} --single-branch ${remoteUrl} "${tmpDir}"`);
+		git(["clone", "--depth=1", `--branch=${targetBranch}`, "--single-branch", remoteUrl, tmpDir]);
 		console.log(`✅ Cloned existing ${targetBranch} branch`);
 	} catch {
 		console.log(`ℹ️ ${targetBranch} not found — creating orphan branch`);
-		run(`git clone --depth=1 ${remoteUrl} "${tmpDir}"`);
-		run(`git -C "${tmpDir}" checkout --orphan ${targetBranch}`);
-		run(`git -C "${tmpDir}" rm -rf .`);
+		git(["clone", "--depth=1", remoteUrl, tmpDir]);
+		git(["-C", tmpDir, "checkout", "--orphan", targetBranch]);
+		git(["-C", tmpDir, "rm", "-rf", "."]);
 	}
 
 	// Configure git identity in the temp clone
-	run(`git -C "${tmpDir}" config user.name "${botName}"`);
-	run(`git -C "${tmpDir}" config user.email "${botEmail}"`);
+	git(["-C", tmpDir, "config", "user.name", botName]);
+	git(["-C", tmpDir, "config", "user.email", botEmail]);
 
 	// Replace contents
 	clearExceptGit(tmpDir);
@@ -102,8 +112,8 @@ try {
 	}
 
 	// Stage + commit
-	run(`git -C "${tmpDir}" add -A`);
-	const status = runIgnoreFail(`git -C "${tmpDir}" status --porcelain`);
+	git(["-C", tmpDir, "add", "-A"]);
+	const status = gitIgnoreFail(["-C", tmpDir, "status", "--porcelain"]);
 	if (!status) {
 		console.log(`ℹ️ No changes vs current ${targetBranch} — skipping publish.`);
 		appendSummary(`ℹ️ Docs site unchanged; no commit made.`);
@@ -111,8 +121,8 @@ try {
 		process.exit(0);
 	}
 
-	run(`git -C "${tmpDir}" commit -m "${commitMessage.replace(/"/g, '\\"')}"`);
-	run(`git -C "${tmpDir}" push origin ${targetBranch}`);
+	git(["-C", tmpDir, "commit", "-m", commitMessage]);
+	git(["-C", tmpDir, "push", "origin", targetBranch]);
 	console.log(`🚀 Pushed to ${targetBranch}`);
 	appendSummary(`🚀 Published docs to \`${targetBranch}\` (${outputFiles.length} top-level entries)`);
 
