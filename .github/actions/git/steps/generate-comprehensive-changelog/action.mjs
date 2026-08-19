@@ -1,4 +1,5 @@
 import { appendFileSync, readFileSync, existsSync } from "fs";
+import path from "node:path";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
@@ -61,7 +62,7 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		.trim()
 		.replace(/^v/i, "");
 	if (!version) return null;
-	const root = process.env.GITHUB_WORKSPACE || process.cwd();
+	const root = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd());
 	const major = version.split(".")[0];
 	const base = String(dir || "docs/changelog").replace(/\/+$/, "");
 	const subst = (t) => t.replace(/\{version\}/g, version).replace(/\{major\}/g, major);
@@ -69,7 +70,15 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 	if (fileTemplate && fileTemplate.trim()) candidates.push(subst(fileTemplate.trim()));
 	candidates.push(`${base}/v${major}/v${version}.md`, `${base}/v${version}.md`, `${base}/${version}.md`);
 	for (const rel of candidates) {
-		const abs = `${root}/${rel}`;
+		// Resolve and confine to the workspace root. CHANGELOG_DIR/CHANGELOG_FILE
+		// are caller-controlled, so a `../` or absolute value could otherwise read
+		// files outside GITHUB_WORKSPACE and leak them into the release-PR body
+		// (and the squash-merge message). Reject anything that escapes.
+		const abs = path.resolve(root, rel);
+		if (abs !== root && !abs.startsWith(root + path.sep)) {
+			console.log(`⚠️ Ignoring changelog path outside the workspace: ${rel}`);
+			continue;
+		}
 		try {
 			if (!existsSync(abs)) continue;
 			const content = readFileSync(abs, "utf8").trim();
