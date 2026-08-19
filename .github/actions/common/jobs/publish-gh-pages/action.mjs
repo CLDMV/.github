@@ -12,15 +12,41 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 
+// Redact the access token from the tokenized remote URL wherever it may appear:
+// the echoed command, or an execFileSync Error whose .message/.stderr embeds the
+// full argv on failure.
+function redact(str) {
+	return String(str).replace(/(x-access-token:)[^@]+@/g, "$1***@");
+}
+
+// Render an argv for logging: redact the token and single-quote any arg
+// containing whitespace so multi-word values (e.g. the default bot name
+// "CLDMV Bot") aren't ambiguous.
+function showArgs(args) {
+	return args.map((a) => (/\s/.test(a) ? `'${redact(a)}'` : redact(a))).join(" ");
+}
+
 // Run git with its argv as an array through execFileSync — NO shell — so values
 // interpolated from inputs/env (target_branch, commit_message, the tokenized
 // remote URL, bot identity) are always literal arguments and can never be
 // interpreted as shell syntax (CWE-78/88 command injection).
 function git(args) {
-	// Redact the access token from the echoed command so it never lands in logs.
-	const shown = args.map((a) => a.replace(/(x-access-token:)[^@]+@/g, "$1***@"));
-	console.log(`$ git ${shown.join(" ")}`);
-	return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+	console.log(`$ git ${showArgs(args)}`);
+	try {
+		return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+	} catch (err) {
+		// execFileSync's Error embeds the full argv (including the tokenized
+		// remote URL) in .message, and git's own failure output in .stderr/.stdout.
+		// Scrub every field that can carry the token before the error propagates
+		// to the top-level handler that logs error.message.
+		if (err) {
+			if (typeof err.message === "string") err.message = redact(err.message);
+			for (const k of ["stderr", "stdout"]) {
+				if (err[k] != null) err[k] = redact(err[k]);
+			}
+		}
+		throw err;
+	}
 }
 
 function gitIgnoreFail(args) {
@@ -128,6 +154,6 @@ try {
 
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 } catch (error) {
-	console.error(`::error::${error.message}`);
+	console.error(`::error::${redact(error.message)}`);
 	process.exit(1);
 }
