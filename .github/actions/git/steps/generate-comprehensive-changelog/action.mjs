@@ -69,6 +69,15 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		.replace(/^v/i, "");
 	if (!version) return null;
 	const root = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd());
+	// True when `p` is `root` itself or lies within it. Uses path.relative rather
+	// than a `startsWith(root + sep)` prefix test, which mishandles a root that
+	// already ends in a separator (e.g. GITHUB_WORKSPACE = "/", where root + sep
+	// is "//") and cross-drive paths on Windows (path.relative returns an
+	// absolute path there).
+	const isInsideRoot = (p) => {
+		const rel = path.relative(root, p);
+		return rel === "" || (rel !== ".." && !rel.startsWith(".." + path.sep) && !path.isAbsolute(rel));
+	};
 	const major = version.split(".")[0];
 	const base = String(dir || "docs/changelog").replace(/\/+$/, "");
 	const subst = (t) => t.replace(/\{version\}/g, version).replace(/\{major\}/g, major);
@@ -81,7 +90,7 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 		// files outside GITHUB_WORKSPACE and leak them into the release-PR body
 		// (and the squash-merge message). Reject anything that escapes.
 		const abs = path.resolve(root, rel);
-		if (abs !== root && !abs.startsWith(root + path.sep)) {
+		if (!isInsideRoot(abs)) {
 			console.log(`⚠️ Ignoring changelog path outside the workspace: ${oneLine(rel)}`);
 			continue;
 		}
@@ -91,7 +100,7 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 			// is not: readFileSync would follow it and leak external content into
 			// the PR body. Resolve the real path and re-confine before reading.
 			const real = realpathSync(abs);
-			if (real !== root && !real.startsWith(root + path.sep)) {
+			if (!isInsideRoot(real)) {
 				console.log(`⚠️ Ignoring changelog path that resolves outside the workspace: ${oneLine(rel)}`);
 				continue;
 			}
