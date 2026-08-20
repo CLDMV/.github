@@ -427,10 +427,22 @@ jobs:
             # shared `coverage.json` would otherwise let whichever branch
             # last published clobber the others' badge. A caller-supplied
             # non-default `badge_filename` always wins (explicit override).
+            #
+            # Deliberately an explicit allowlist of the two known integration
+            # branch names, NOT `format('coverage-{0}.json', github.ref_name)`
+            # against an arbitrary ref — GitHub Actions expressions have no
+            # string-replace function, so a slash in a branch name (e.g. a
+            # future `feature/*` trigger) would flow straight into the
+            # filename and break `push-badge`, which doesn't create
+            # intermediate directories. `next`/`hotfixes` are guaranteed
+            # slash-free by this repo's own branch-naming convention; any
+            # other ref (including today's only reachable case,
+            # `inputs.default_branch`) falls back to the existing single
+            # `coverage.json`.
             badge_filename: ${{ inputs.badge_filename != 'coverage.json' &&
-                inputs.badge_filename || (github.ref_name ==
-                inputs.default_branch && 'coverage.json' ||
-                format('coverage-{0}.json', github.ref_name)) }}
+                inputs.badge_filename || (github.ref_name == 'next' &&
+                'coverage-next.json') || (github.ref_name == 'hotfixes' &&
+                'coverage-hotfixes.json') || 'coverage.json' }}
             upload_coverage_artifact: ${{ inputs.upload_coverage_artifact }}
             debug: ${{ inputs.debug }}
         secrets:
@@ -457,6 +469,13 @@ jobs:
         # tell a release PR apart from a feature PR. Keying on head_ref
         # excludes feature/fix/etc PRs, which would otherwise get whole-repo
         # coverage injected into their description on every run.
+        #
+        # The same-repo check guards against a FORK PR whose head branch
+        # happens to be literally named `next`/`hotfixes` — head_ref alone
+        # can't tell that apart from the real release PR, and matching it
+        # would run this job (with pull-requests: write + bot secrets) against
+        # untrusted fork code for no benefit, since only same-repo pushes can
+        # ever produce the real release PRs.
         if: >
             !cancelled() &&
             needs.paths-gate.outputs.docs_only != 'true' &&
@@ -464,7 +483,9 @@ jobs:
             == 'success' && (inputs.enable_coverage_pr_comment == true ||
             inputs.enable_coverage_pr_comment == 'true') &&
             github.event_name == 'pull_request' && (github.head_ref == 'next'
-            || github.head_ref == 'hotfixes')
+            || github.head_ref == 'hotfixes') &&
+            github.event.pull_request.head.repo.full_name ==
+            github.repository
         uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
