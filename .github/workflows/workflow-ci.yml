@@ -419,7 +419,30 @@ jobs:
             skip_type_check: ${{ inputs.skip_type_check }}
             coverage_summary_path: ${{ inputs.coverage_summary_path }}
             badges_branch: ${{ inputs.badges_branch }}
-            badge_filename: ${{ inputs.badge_filename }}
+            # This job currently only fires on push to `inputs.default_branch`
+            # (see the `if:` above), so `github.ref_name` is always that
+            # branch today. Deriving per-branch here anyway means the
+            # filename is already correct if this job's trigger is ever
+            # widened to publish coverage for `next`/`hotfixes` too — a
+            # shared `coverage.json` would otherwise let whichever branch
+            # last published clobber the others' badge. A caller-supplied
+            # non-default `badge_filename` always wins (explicit override).
+            #
+            # Deliberately an explicit allowlist of the two known integration
+            # branch names, NOT `format('coverage-{0}.json', github.ref_name)`
+            # against an arbitrary ref — GitHub Actions expressions have no
+            # string-replace function, so a slash in a branch name (e.g. a
+            # future `feature/*` trigger) would flow straight into the
+            # filename and break `push-badge`, which doesn't create
+            # intermediate directories. `next`/`hotfixes` are guaranteed
+            # slash-free by this repo's own branch-naming convention; any
+            # other ref (including today's only reachable case,
+            # `inputs.default_branch`) falls back to the existing single
+            # `coverage.json`.
+            badge_filename: ${{ inputs.badge_filename != 'coverage.json' &&
+                inputs.badge_filename || (github.ref_name == 'next' &&
+                'coverage-next.json') || (github.ref_name == 'hotfixes' &&
+                'coverage-hotfixes.json') || 'coverage.json' }}
             upload_coverage_artifact: ${{ inputs.upload_coverage_artifact }}
             debug: ${{ inputs.debug }}
         secrets:
@@ -438,13 +461,31 @@ jobs:
         # `!cancelled()` guard: same cascade-skip reason as coverage-badge —
         # this job's chain runs through `ci` → `sync-gate`, and `sync-gate`
         # skips on this job's own trigger (pull_request), not just push.
+        #
+        # `github.head_ref` is scoped to the two persistent release PRs
+        # (`next` → master, `hotfixes` → master), not the base branch — every
+        # PR in the flow already targets one of {next, master, hotfixes} as
+        # its BASE (feature branches → next), so a base-branch filter can't
+        # tell a release PR apart from a feature PR. Keying on head_ref
+        # excludes feature/fix/etc PRs, which would otherwise get whole-repo
+        # coverage injected into their description on every run.
+        #
+        # The same-repo check guards against a FORK PR whose head branch
+        # happens to be literally named `next`/`hotfixes` — head_ref alone
+        # can't tell that apart from the real release PR, and matching it
+        # would run this job (with pull-requests: write + bot secrets) against
+        # untrusted fork code for no benefit, since only same-repo pushes can
+        # ever produce the real release PRs.
         if: >
             !cancelled() &&
             needs.paths-gate.outputs.docs_only != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && (inputs.enable_coverage_pr_comment == true ||
             inputs.enable_coverage_pr_comment == 'true') &&
-            github.event_name == 'pull_request'
+            github.event_name == 'pull_request' && (github.head_ref == 'next'
+            || github.head_ref == 'hotfixes') &&
+            github.event.pull_request.head.repo.full_name ==
+            github.repository
         uses: CLDMV/.github/.github/workflows/reusable-coverage-pr-comment.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
