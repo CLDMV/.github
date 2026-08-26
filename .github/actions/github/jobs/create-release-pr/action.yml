@@ -53,6 +53,14 @@ inputs:
     description: "Optional explicit path-template override for the changelog file (supports `{version}`/`{major}`). Takes precedence over the default lookup."
     required: false
     default: ""
+  bot-name:
+    description: "Commit-signing bot identity name (e.g. secrets.CLDMV_BOT_NAME), passed through to generate-comprehensive-changelog so its own commits (a real GitHub user account, not a GitHub App) are recognized as bot commits rather than listed as a contributor."
+    required: false
+    default: ""
+  bot-email:
+    description: "Commit-signing bot identity email (e.g. secrets.CLDMV_BOT_EMAIL). See bot-name."
+    required: false
+    default: ""
 
 outputs:
   pr-created:
@@ -161,6 +169,8 @@ runs:
         new-version: ${{ steps.version.outputs.new-version }}
         changelog-dir: ${{ inputs.changelog-dir }}
         changelog-file: ${{ inputs.changelog-file }}
+        bot-name: ${{ inputs.bot-name }}
+        bot-email: ${{ inputs.bot-email }}
 
     - name: Detect default branch
       id: default-branch

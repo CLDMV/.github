@@ -62,6 +62,45 @@ eq(
 console.log("sanity — dependabot is still a bot author (loop-guards unaffected):");
 eq(isBotAuthor("dependabot[bot]", ""), true, "isBotAuthor unchanged for dependabot");
 
+console.log("\nisBotAuthor — caller-supplied knownBot identity (org's own signing-bot account):");
+const signingBot = { name: "cldmv-bot", email: "230939188+cldmv-bot@users.noreply.github.com" };
+eq(isBotAuthor("cldmv-bot", "230939188+cldmv-bot@users.noreply.github.com", signingBot), true, "exact email+name match recognized as bot");
+eq(
+	isBotAuthor("cldmv-bot", "230939188+cldmv-bot@users.noreply.github.com"),
+	false,
+	"same identity NOT flagged when no knownBot supplied (no static pattern matches a bare, non-'[bot]' name)"
+);
+eq(isBotAuthor("CLDMV-BOT", "230939188+CLDMV-BOT@users.noreply.github.com", signingBot), true, "case-insensitive match");
+eq(isBotAuthor("Someone Else", "someone@example.com", signingBot), false, "unrelated human untouched by an unrelated knownBot identity");
+eq(
+	isBotAuthor("cldmv-bot-but-not-quite", "230939188+cldmv-bot@users.noreply.github.com", signingBot),
+	true,
+	"email match alone is sufficient even if the name differs"
+);
+eq(isBotAuthor("cldmv-bot", "totally-different@example.com", signingBot), true, "name match alone is sufficient even if the email differs");
+eq(
+	isBotAuthor("Someone Who Mentions cldmv-bot In Their Name", "someone@example.com", signingBot),
+	false,
+	"knownBot is an EXACT match, not a substring — avoids false positives against a coincidentally similar human name"
+);
+
+console.log("\nfilterBotCommits — knownBot drops the org's own signing-bot commit (no '[bot]' marker, no automated-subject pattern):");
+const localSigningBotCommit = {
+	author: "cldmv-bot",
+	email: "230939188+cldmv-bot@users.noreply.github.com",
+	subject: "style: apply automated lint/format fixes"
+};
+eq(
+	filterBotCommits([localSigningBotCommit, { ...human, subject: "feat: add a new thing" }], signingBot).map((c) => c.subject),
+	["feat: add a new thing"],
+	"lint/format-autofix commit dropped when knownBot is supplied; human commit kept"
+);
+eq(
+	filterBotCommits([localSigningBotCommit, { ...human, subject: "feat: add a new thing" }]).map((c) => c.subject),
+	["style: apply automated lint/format fixes", "feat: add a new thing"],
+	"same commit is KEPT (looks human) when knownBot is not supplied — the gap this identity fix closes"
+);
+
 if (failures) {
 	console.error(`\n${failures} test(s) failed.`);
 	process.exit(1);
