@@ -44,6 +44,12 @@ on:
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for the bot."
                 required: true
+            BOT_NAME:
+                description: "Optional: this repo's commit-signing bot identity name (e.g. secrets.CLDMV_BOT_NAME) — the same identity reusable-lint-format.yml/reusable-coverage-badge.yml sign commits as. Passed through so this PR's changelog body recognizes it as a bot instead of listing it as a contributor. Unset = no additional identity is excluded."
+                required: false
+            BOT_EMAIL:
+                description: "Optional: this repo's commit-signing bot identity email (e.g. secrets.CLDMV_BOT_EMAIL). See BOT_NAME."
+                required: false
 
 permissions:
     contents: read
@@ -176,6 +182,8 @@ jobs:
               with:
                   commits: ${{ steps.commits.outputs.commits }}
                   commit-range: ${{ steps.commits.outputs.commit-range }}
+                  bot-name: ${{ secrets.BOT_NAME }}
+                  bot-email: ${{ secrets.BOT_EMAIL }}
               env:
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 

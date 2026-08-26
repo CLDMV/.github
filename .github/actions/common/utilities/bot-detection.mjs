@@ -6,13 +6,50 @@
  */
 
 /**
+ * Check whether an identity matches a caller-supplied "known bot" identity —
+ * e.g. this org's own commit-signing bot (the BOT_NAME/BOT_EMAIL secrets used
+ * to author the post-merge lint/format-autofix commit and similar). That
+ * identity commits locally (git commit -S) under a plain, non-"[bot]"
+ * name/email — a real GitHub user account, not a GitHub App — because local
+ * GPG signing needs a real account to register the key against. None of the
+ * static patterns below can recognize it, since it isn't a known third-party
+ * bot and carries no "[bot]" marker.
+ *
+ * Unlike those patterns, this is an EXACT match (case-insensitive): a
+ * caller-supplied value is a specific configured identity, not a fuzzy
+ * pattern, so substring matching would risk a false positive against an
+ * unrelated human author.
+ *
+ * @param {string} author - The commit author name.
+ * @param {string} email - The commit author email.
+ * @param {{name?: string, email?: string}} [knownBot] - Caller-supplied bot identity, threaded from the same BOT_NAME/BOT_EMAIL values used to sign the commit.
+ * @returns {boolean} True when author/email exactly matches the supplied identity.
+ */
+function isKnownBotIdentity(author, email, knownBot) {
+	if (!knownBot) return false;
+
+	const authorLower = (author || "").trim().toLowerCase();
+	const emailLower = (email || "").trim().toLowerCase();
+	const knownName = (knownBot.name || "").trim().toLowerCase();
+	const knownEmail = (knownBot.email || "").trim().toLowerCase();
+
+	if (knownEmail && emailLower && emailLower === knownEmail) return true;
+	if (knownName && authorLower && authorLower === knownName) return true;
+
+	return false;
+}
+
+/**
  * Check if a commit author is a bot based on known patterns
  * @param {string} author - The commit author name
  * @param {string} email - The commit author email
+ * @param {{name?: string, email?: string}} [knownBot] - Optional caller-supplied bot identity (see isKnownBotIdentity) checked in addition to the static patterns below.
  * @returns {boolean} True if the author appears to be a bot
  */
-export function isBotAuthor(author, email) {
+export function isBotAuthor(author, email, knownBot) {
 	if (!author && !email) return false;
+
+	if (isKnownBotIdentity(author, email, knownBot)) return true;
 
 	const authorLower = (author || "").toLowerCase();
 	const emailLower = (email || "").toLowerCase();
@@ -104,12 +141,13 @@ export function isAutomatedCommit(subject) {
 /**
  * Check if a commit is from a bot (combining author and subject checks)
  * @param {Object} commit - Commit object with author, email, and subject
+ * @param {{name?: string, email?: string}} [knownBot] - Optional caller-supplied bot identity (see isKnownBotIdentity).
  * @returns {boolean} True if the commit appears to be from a bot or automated process
  */
-export function isBotCommit(commit) {
+export function isBotCommit(commit, knownBot) {
 	const { author, email, subject } = commit;
 
-	return isBotAuthor(author, email) || isAutomatedCommit(subject);
+	return isBotAuthor(author, email, knownBot) || isAutomatedCommit(subject);
 }
 
 /**
@@ -179,19 +217,21 @@ export function isInternalPlaceholder(author, email) {
  * dependency-update shape and is still dropped.
  *
  * @param {Array} commits - Array of commit objects
+ * @param {{name?: string, email?: string}} [knownBot] - Optional caller-supplied bot identity (see isKnownBotIdentity).
  * @returns {Array} Human commits plus bot-authored dependency updates
  */
-export function filterBotCommits(commits) {
-	return commits.filter((commit) => !isBotCommit(commit) || isDependencyUpdate(commit && commit.subject));
+export function filterBotCommits(commits, knownBot) {
+	return commits.filter((commit) => !isBotCommit(commit, knownBot) || isDependencyUpdate(commit && commit.subject));
 }
 
 /**
  * Get unique human contributors from an array of commits
  * @param {Array} commits - Array of commit objects
+ * @param {{name?: string, email?: string}} [knownBot] - Optional caller-supplied bot identity (see isKnownBotIdentity).
  * @returns {Array} Array of unique contributor objects with author and email
  */
-export function getHumanContributors(commits) {
-	const humanCommits = commits.filter((commit) => !isBotAuthor(commit.author, commit.email));
+export function getHumanContributors(commits, knownBot) {
+	const humanCommits = commits.filter((commit) => !isBotAuthor(commit.author, commit.email, knownBot));
 	const contributorMap = new Map();
 
 	humanCommits.forEach((commit) => {
