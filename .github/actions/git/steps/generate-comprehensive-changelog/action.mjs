@@ -37,6 +37,17 @@ const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "";
 // Optional explicit path template overriding the default lookup order. Supports
 // `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
 const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
+// The caller's own commit-signing bot identity — the same BOT_NAME/BOT_EMAIL
+// used elsewhere (e.g. reusable-lint-format.yml) to author+GPG-sign a commit
+// locally. That identity is a real GitHub user account, not a GitHub App, so
+// it carries no "[bot]" marker and the static patterns in bot-detection.mjs
+// can't recognize it. Threading the actual configured values through here —
+// rather than hardcoding one org's literal name/email — lets any caller's
+// signing identity be recognized correctly. Empty (default) = no additional
+// identity beyond the static third-party-bot patterns.
+const BOT_NAME = process.env.BOT_NAME || "";
+const BOT_EMAIL = process.env.BOT_EMAIL || "";
+const KNOWN_BOT = BOT_NAME || BOT_EMAIL ? { name: BOT_NAME, email: BOT_EMAIL } : undefined;
 
 // Collapse CR/LF in caller-influenced values before logging: a newline in
 // CHANGELOG_DIR/CHANGELOG_FILE could otherwise emit extra log lines or a GitHub
@@ -803,10 +814,11 @@ async function getCoAuthorMentionsFromCommits(commits, token) {
  * @param {Array} commits - Commit objects.
  * @param {string} token - GitHub token for user lookups.
  * @param {boolean} enablePullRequestLookup - Whether PR-based contributor lookup should run.
+ * @param {{name?: string, email?: string}} [knownBot] - Caller's own signing-bot identity (BOT_NAME/BOT_EMAIL), excluded from contributors the same way the static bot patterns are.
  * @returns {Promise<string>} Markdown details section or empty string.
  */
-async function buildContributorMentionsDetails(commits, token, enablePullRequestLookup = false) {
-	const contributors = getHumanContributors(commits);
+async function buildContributorMentionsDetails(commits, token, enablePullRequestLookup = false, knownBot) {
+	const contributors = getHumanContributors(commits, knownBot);
 	const uniqueMentions = new Set();
 	let prMentions = new Set();
 	const coAuthorMentions = await getCoAuthorMentionsFromCommits(commits, token);
@@ -1000,7 +1012,7 @@ async function generateComprehensiveChangelog(
 				}
 
 				const syntheticCommit = [{ subject, body: body || "", author: "", email: "" }];
-				const contributorDetails = await buildContributorMentionsDetails(syntheticCommit, token, true);
+				const contributorDetails = await buildContributorMentionsDetails(syntheticCommit, token, true, KNOWN_BOT);
 				if (contributorDetails) {
 					releaseNotes += contributorDetails;
 				}
@@ -1050,7 +1062,7 @@ async function generateComprehensiveChangelog(
 
 		singleCommitChangelog = stripInternalContributorLines(singleCommitChangelog);
 		singleCommitChangelog = neutralizeJsdocTagMentions(singleCommitChangelog);
-		const contributorDetails = await buildContributorMentionsDetails(commits, token, true);
+		const contributorDetails = await buildContributorMentionsDetails(commits, token, true, KNOWN_BOT);
 		if (contributorDetails) {
 			singleCommitChangelog += contributorDetails;
 		}
@@ -1072,7 +1084,11 @@ async function generateComprehensiveChangelog(
 	// so dropping them (the prior behaviour) left them missing from the notes
 	// while the title still mentioned the bump. The PR title communicates the
 	// version; the section bodies describe the human + dependency changes.
-	commits = filterBotCommits(commits);
+	// KNOWN_BOT additionally drops the caller's own signing-bot commits (e.g.
+	// "style: apply automated lint/format fixes") that carry no "[bot]" marker
+	// and no subject the static isAutomatedCommit patterns recognize — without
+	// it, those commits would show up as ordinary "Other Changes" bullets.
+	commits = filterBotCommits(commits, KNOWN_BOT);
 
 	// Drop merge commits — they're structural artifacts of the v4
 	// merge-commit-only policy on next/hotfixes, not real change-bearing
@@ -1204,7 +1220,7 @@ async function generateComprehensiveChangelog(
 		}
 	}
 
-	const contributorDetails = await buildContributorMentionsDetails(commits, token, false);
+	const contributorDetails = await buildContributorMentionsDetails(commits, token, false, KNOWN_BOT);
 	if (contributorDetails) {
 		changelog += contributorDetails + "\n";
 	}

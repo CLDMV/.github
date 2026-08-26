@@ -38,6 +38,14 @@ inputs:
     description: "Optional explicit path-template override that takes precedence over the default lookup. Supports `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`)."
     required: false
     default: ""
+  bot-name:
+    description: "The caller's own commit-signing bot identity name (e.g. secrets.CLDMV_BOT_NAME) — the same value reusable-lint-format.yml/reusable-coverage-badge.yml use to author+GPG-sign a commit locally. That identity is a real GitHub user account (not a GitHub App), so it carries no '[bot]' marker and would otherwise be listed as a human contributor. Empty (default) = no additional identity is excluded beyond the built-in third-party-bot patterns."
+    required: false
+    default: ""
+  bot-email:
+    description: "The caller's own commit-signing bot identity email (e.g. secrets.CLDMV_BOT_EMAIL). Matched exactly (case-insensitive), not as a substring pattern — see bot-name."
+    required: false
+    default: ""
 
 outputs:
   changelog-content:
@@ -61,6 +69,8 @@ runs:
         NEW_VERSION: ${{ inputs.new-version }}
         CHANGELOG_DIR: ${{ inputs.changelog-dir }}
         CHANGELOG_FILE: ${{ inputs.changelog-file }}
+        BOT_NAME: ${{ inputs.bot-name }}
+        BOT_EMAIL: ${{ inputs.bot-email }}
         # Fall back to ${{ github.token }} so the augmentation can still
         # find squashed-PR refs even when the caller doesn't pass an
         # explicit token. Default github.token carries `pull-requests:

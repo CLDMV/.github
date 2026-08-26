@@ -63,6 +63,12 @@ on:
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for the bot."
                 required: true
+            BOT_NAME:
+                description: "Optional: this repo's commit-signing bot identity name (e.g. secrets.CLDMV_BOT_NAME) — the same identity reusable-lint-format.yml/reusable-coverage-badge.yml sign commits as. Passed through so the changelog's contributor list recognizes it as a bot instead of a human (that identity is a real GitHub user account, not a GitHub App, so it carries no '[bot]' marker). Unset = no additional identity is excluded."
+                required: false
+            BOT_EMAIL:
+                description: "Optional: this repo's commit-signing bot identity email (e.g. secrets.CLDMV_BOT_EMAIL). See BOT_NAME."
+                required: false
             DISCORD_RELEASE_PR_PUBLIC_WEBHOOK:
                 description: "Optional Discord webhook (public) for release-PR version-bump notifications."
                 required: false
@@ -194,6 +200,8 @@ jobs:
                   # var, else the fleet default. `vars` resolves against the caller.
                   changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || '') }}
                   changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
+                  bot-name: ${{ secrets.BOT_NAME }}
+                  bot-email: ${{ secrets.BOT_EMAIL }}
 
     refresh:
         name: "🔁 Refresh hotfix release PR #${{ needs.plan.outputs.pr-number }}"
@@ -225,6 +233,8 @@ jobs:
                   # var, else the fleet default. `vars` resolves against the caller.
                   changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || '') }}
                   changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
+                  bot-name: ${{ secrets.BOT_NAME }}
+                  bot-email: ${{ secrets.BOT_EMAIL }}
 
             # Release-PR notifier — see workflow-next-release.yml for the rationale.
             # Fires only on actual version-bump shifts; secrets unset = no-op.
