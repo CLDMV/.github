@@ -182,11 +182,13 @@ concurrency:
 # inherit but never exercise the surface. The mirror job overrides to
 # `permissions: {}` since it's pure shell.
 permissions:
-    contents: write
-    pull-requests: write
+    contents: read
 
 jobs:
     ci:
+        permissions:
+            contents: write
+            pull-requests: write
         name: 🏗️ Continuous Integration
         # Run on pull_request when:
         #   - The PR is from a fork (push doesn't fire upstream for fork commits).

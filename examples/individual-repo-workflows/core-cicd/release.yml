@@ -116,11 +116,13 @@ concurrency:
 # version-bump commit (`contents:write`) and opens the persistent
 # release PR (`pull-requests:write`).
 permissions:
-    contents: write
-    pull-requests: write
+    contents: read
 
 jobs:
     create-release-pr:
+        permissions:
+            contents: write
+            pull-requests: write
         # Prevent infinite loops: Don't run on bot commits or if PR already exists
         if: |
           github.actor != 'cldmv-bot[bot]' && 

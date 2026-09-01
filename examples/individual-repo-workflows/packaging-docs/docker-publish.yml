@@ -36,11 +36,13 @@ on:
 # image provenance.
 permissions:
     contents: read
-    packages: write
-    id-token: write
 
 jobs:
     docker-publish:
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
         uses: CLDMV/.github/.github/workflows/workflow-docker-publish.yml@v4
         with:
             debug: ${{ github.event.inputs.debug == 'true' }}

@@ -82,6 +82,9 @@ concurrency:
     group: publish-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: false
 
+permissions:
+    contents: read
+
 jobs:
     publish-package:
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

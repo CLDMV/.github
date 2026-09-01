@@ -25,10 +25,12 @@ on:
     workflow_dispatch:
 
 permissions:
-    contents: write
+    contents: read
 
 jobs:
     publish:
+        permissions:
+            contents: write
         uses: CLDMV/.github/.github/workflows/reusable-docs-publish.yml@v4
         with:
             build_command: "npm run docs:build"
