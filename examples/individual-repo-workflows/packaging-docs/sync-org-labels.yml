@@ -15,35 +15,35 @@
 name: 🏷️ Sync Org Labels
 
 on:
-  schedule:
-    # Runs every Monday at 06:00 UTC
-    - cron: "0 6 * * 1"
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run — report what would change without applying it"
-        type: boolean
-        required: false
-        default: false
-      debug:
-        description: "Enable debug logging"
-        type: boolean
-        required: false
-        default: false
+    schedule:
+        # Runs every Monday at 06:00 UTC
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Dry run — report what would change without applying it"
+                type: boolean
+                required: false
+                default: false
+            debug:
+                description: "Enable debug logging"
+                type: boolean
+                required: false
+                default: false
 
 # Workflow-level: the called `workflow-sync-org-labels.yml` mints a
 # bot App token for the actual label mutations (the App carries its own
 # permissions). GITHUB_TOKEN is only used for checkout, so `contents:read`
 # suffices.
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  sync-labels:
-    uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v4
-    with:
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-      debug: ${{ github.event.inputs.debug == 'true' }}
-    secrets:
-      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+    sync-labels:
+        uses: CLDMV/.github/.github/workflows/workflow-sync-org-labels.yml@v4
+        with:
+            dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+            debug: ${{ github.event.inputs.debug == 'true' }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
