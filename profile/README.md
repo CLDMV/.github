@@ -36,6 +36,7 @@ CLDMV builds software — open-source libraries and developer tooling, smart-hom
 
 ## 🏠 Smart-home & device control
 
+- [**droidsock**](https://github.com/CLDMV/droidsock) — A pure-Node.js ADB driver that speaks the protocol directly — no platform-tools download required.
 - [**node-android-tv-remote**](https://github.com/CLDMV/node-android-tv-remote) — Control Android TV devices via ADB keycodes and text input.
 - [**io-kasa-api**](https://github.com/CLDMV/io-kasa-api) — Local-network API for TP-Link **Kasa** smart devices — plugs, switches, dimmers, bulbs, motion sensors.
 - [**wol-proxy**](https://github.com/CLDMV/wol-proxy) — Cross-platform Wake-on-LAN HTTP proxy: power on devices on your network with a single HTTP request.
@@ -62,7 +63,6 @@ Consumer repos pin `@v4` and get the whole pipeline; the `.github` repo dogfoods
 Several larger projects are in private development and will be announced when they're ready:
 
 - A construction-plan production automation suite spanning Adobe Illustrator, Bluebeam Revu, and PDF workflows — with a broader scope on the way.
-- A pure-Node.js ADB driver that speaks the protocol directly, with no platform-tools download required.
 - A self-hosted MCP server and CLI that turns your Claude Code and VS Code chat history into fast, hybrid-searchable agent memory — with "fade, don't forget" ranking that lets unused knowledge decay without ever evicting it.
 - A cross-platform application platform — desktop, iOS, and Android — with batteries-included primitives: a process-isolated extension host, a built-in widget and icon library, boot/splash orchestration, and i18n, plus CLIs that scaffold new apps and extensions so app-level code stays thin.
 - A desktop app built on that platform that discovers, classifies, reconciles, and migrates git repositories across local and SSH sources.
