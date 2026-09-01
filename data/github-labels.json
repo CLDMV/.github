@@ -292,5 +292,35 @@
 		"color": "795548",
 		"description": "No activity for an extended period; will be auto-closed if it stays inactive",
 		"aliases": ["inactive", "no activity", "abandoned", "dormant"]
+	},
+	{
+		"name": "status: not started",
+		"color": "cccccc",
+		"description": "Not implemented yet — no code exists for this",
+		"aliases": ["not-started", "todo", "not implemented", "unstarted"]
+	},
+	{
+		"name": "status: in progress",
+		"color": "fbca04",
+		"description": "Partially implemented — actively being built",
+		"aliases": ["in-progress", "wip", "partial"]
+	},
+	{
+		"name": "status: implemented",
+		"color": "1d76db",
+		"description": "Built and deployed, but not yet fully tested/verified",
+		"aliases": ["implemented", "needs verification", "untested"]
+	},
+	{
+		"name": "status: verified",
+		"color": "0e8a16",
+		"description": "Built and tested end-to-end",
+		"aliases": ["fully tested", "verified end-to-end"]
+	},
+	{
+		"name": "status: blocked",
+		"color": "d93f0b",
+		"description": "Waiting on a dependency or decision before it can proceed",
+		"aliases": ["on hold", "waiting on dependency"]
 	}
 ]
