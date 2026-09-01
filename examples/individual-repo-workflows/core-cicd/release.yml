@@ -36,132 +36,132 @@
 name: 🚀 Create Release PR
 
 on:
-  push:
-    # Bot-managed branches (badges, gh-pages) carry no source to release.
-    branches-ignore: [master, main, badges, gh-pages]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "*.md"
-      - "LICENSE"
-      - ".gitignore"
-      - ".github/workflows/**"
-  workflow_dispatch:
-    inputs:
-      debug:
-        description: "Enable debug logging for troubleshooting"
-        type: boolean
-        required: false
-        default: false
-      dry_run:
-        description: "Dry run mode - validate everything but don't create PR or make changes"
-        type: boolean
-        required: false
-        default: false
-      node_version:
-        description: "Node.js version to use (default: lts/*)"
-        type: string
-        required: false
-        default: "lts/*"
-      min_node_version:
-        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
-        type: string
-        required: false
-        default: "20"
-      max_node_major:
-        description: "Override max Node.js major version (default: 22)"
-        type: string
-        required: false
-        default: "22"
-      package_manager:
-        description: "Package manager (npm or yarn)"
-        type: string
-        required: false
-        default: "npm"
-      test_environment:
-        description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
-        type: string
-        required: false
-        default: "development"
-      version_bump:
-        description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
-        type: string
-        required: false
-        default: ""
-      version:
-        description: "Specific version for release (auto-calculated if not provided)"
-        type: string
-        required: false
-        default: ""
-      is_prerelease:
-        description: "Whether this is a prerelease"
-        type: boolean
-        required: false
-        default: false
-      create_documentation:
-        description: "Whether to create/update VERSION_TAGS.md"
-        type: boolean
-        required: false
-        default: true
+    push:
+        # Bot-managed branches (badges, gh-pages) carry no source to release.
+        branches-ignore: [master, main, badges, gh-pages]
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - "*.md"
+            - "LICENSE"
+            - ".gitignore"
+            - ".github/workflows/**"
+    workflow_dispatch:
+        inputs:
+            debug:
+                description: "Enable debug logging for troubleshooting"
+                type: boolean
+                required: false
+                default: false
+            dry_run:
+                description: "Dry run mode - validate everything but don't create PR or make changes"
+                type: boolean
+                required: false
+                default: false
+            node_version:
+                description: "Node.js version to use (default: lts/*)"
+                type: string
+                required: false
+                default: "lts/*"
+            min_node_version:
+                description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+                type: string
+                required: false
+                default: "20"
+            max_node_major:
+                description: "Override max Node.js major version (default: 22)"
+                type: string
+                required: false
+                default: "22"
+            package_manager:
+                description: "Package manager (npm or yarn)"
+                type: string
+                required: false
+                default: "npm"
+            test_environment:
+                description: "Environment for tests (affects NODE_ENV and NODE_OPTIONS --conditions flag)"
+                type: string
+                required: false
+                default: "development"
+            version_bump:
+                description: "Type of version bump (major, minor, patch). Leave empty for auto-detection from commit message."
+                type: string
+                required: false
+                default: ""
+            version:
+                description: "Specific version for release (auto-calculated if not provided)"
+                type: string
+                required: false
+                default: ""
+            is_prerelease:
+                description: "Whether this is a prerelease"
+                type: boolean
+                required: false
+                default: false
+            create_documentation:
+                description: "Whether to create/update VERSION_TAGS.md"
+                type: boolean
+                required: false
+                default: true
 
 # Rapid successive pushes to a release branch should collapse into a single
 # in-flight Create-Release-PR run. The PR is updated in place by the action,
 # but cancelling superseded runs avoids minutes of wasted build time per push.
 concurrency:
-  group: release-pr-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: release-pr-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 # Workflow-level: matches the broadest surface the called
 # `workflow-release.yml` reaches. Release-PR creation pushes the
 # version-bump commit (`contents:write`) and opens the persistent
 # release PR (`pull-requests:write`).
 permissions:
-  contents: write
-  pull-requests: write
+    contents: write
+    pull-requests: write
 
 jobs:
-  create-release-pr:
-    # Prevent infinite loops: Don't run on bot commits or if PR already exists
-    if: |
-      github.actor != 'cldmv-bot[bot]' && 
-      github.actor != 'github-actions[bot]' &&
-      !startsWith(github.event.head_commit.message, 'chore: bump version')
-    uses: CLDMV/.github/.github/workflows/workflow-release.yml@v4
-    with:
-      package_name: "@your-org/your-package" # Required: replace with your NPM package name
-      debug: ${{ github.event.inputs.debug == 'true' }}
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-      node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
-      min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
-      max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
-      package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
-      test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
-      # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
-      # test_command: "NODE_ENV=test npm test"  # Override NODE_ENV only
-      # test_command: "NODE_ENV=test NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override both
-      test_environment: ${{ github.event.inputs.test_environment || 'development' }} # Alternative to setting in test_command
-      build_command: "npm run build:ci"
-      version_bump: ${{ github.event.inputs.version_bump || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      is_prerelease: ${{ github.event.inputs.is_prerelease == 'true' }}
-      release_source_only: false
-      create_documentation: ${{ github.event.inputs.create_documentation != 'false' }}
-      skip_performance_tests: false
-      skip_matrix_tests: false
+    create-release-pr:
+        # Prevent infinite loops: Don't run on bot commits or if PR already exists
+        if: |
+          github.actor != 'cldmv-bot[bot]' && 
+          github.actor != 'github-actions[bot]' &&
+          !startsWith(github.event.head_commit.message, 'chore: bump version')
+        uses: CLDMV/.github/.github/workflows/workflow-release.yml@v4
+        with:
+            package_name: "@your-org/your-package" # Required: replace with your NPM package name
+            debug: ${{ github.event.inputs.debug == 'true' }}
+            dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+            node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
+            min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
+            max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
+            package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
+            test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
+            # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
+            # test_command: "NODE_ENV=test npm test"  # Override NODE_ENV only
+            # test_command: "NODE_ENV=test NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override both
+            test_environment: ${{ github.event.inputs.test_environment || 'development' }} # Alternative to setting in test_command
+            build_command: "npm run build:ci"
+            version_bump: ${{ github.event.inputs.version_bump || '' }}
+            version: ${{ github.event.inputs.version || '' }}
+            is_prerelease: ${{ github.event.inputs.is_prerelease == 'true' }}
+            release_source_only: false
+            create_documentation: ${{ github.event.inputs.create_documentation != 'false' }}
+            skip_performance_tests: false
+            skip_matrix_tests: false
 
-    # Authentication & Bot Configuration
-    # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
-    # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
-    # - WITHOUT App secrets: Falls back to GitHub Actions bot with standard permissions
-    # To set up App authentication, add these secrets to your repository settings:
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # CLDMV Bot credentials for enhanced permissions and proper attribution
-      # Uncomment these lines to use your bot instead of github-actions[bot]
-      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-      # Optional: GPG signing credentials (only needed if use_gpg: true)
-      TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
-      TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
-      GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
-      GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
+        # Authentication & Bot Configuration
+        # The workflow supports automatic App token detection for enhanced permissions and proper attribution:
+        # - WITH App secrets: Operations attributed to CLDMV bot, enhanced permissions for workflow repositories
+        # - WITHOUT App secrets: Falls back to GitHub Actions bot with standard permissions
+        # To set up App authentication, add these secrets to your repository settings:
+        secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+            # CLDMV Bot credentials for enhanced permissions and proper attribution
+            # Uncomment these lines to use your bot instead of github-actions[bot]
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            # Optional: GPG signing credentials (only needed if use_gpg: true)
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
