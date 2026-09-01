@@ -24,6 +24,14 @@ if (customCommand) {
 	console.log(`🔒 Package access level: ${accessLevel}`);
 	const tool = packageManager === "yarn" ? "yarn publish" : "npm publish";
 	finalCommand = `${tool} --access ${accessLevel}`;
+	// Public npm packages published via the npm CLI carry SLSA build provenance
+	// + a publish attestation (sigstore). Private packages can't, and `yarn
+	// publish` has no equivalent flag — so gate on both. Kept in sync with the
+	// authoritative builder in utilities/repo-detection (this fallback runs only
+	// when no command was pre-derived).
+	if (visibility === "public" && tool === "npm publish") {
+		finalCommand += " --provenance";
+	}
 }
 
 console.log(`📝 Final publish command: ${finalCommand}`);

@@ -39,6 +39,9 @@ concurrency:
     group: hotfix-redirector-${{ github.event.pull_request.number }}
     cancel-in-progress: true
 
+permissions:
+    contents: read
+
 jobs:
     redirect:
         permissions:

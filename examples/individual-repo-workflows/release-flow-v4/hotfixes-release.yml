@@ -31,6 +31,9 @@ concurrency:
     group: hotfixes-release-${{ github.repository }}
     cancel-in-progress: false
 
+permissions:
+    contents: read
+
 jobs:
     release:
         permissions:

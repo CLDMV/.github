@@ -37,6 +37,9 @@ concurrency:
     group: next-release-${{ github.repository }}
     cancel-in-progress: false
 
+permissions:
+    contents: read
+
 jobs:
     release:
         permissions:
