@@ -30,6 +30,15 @@ try {
 	let npmCommand = customNpmCommand;
 	if (!npmCommand) {
 		npmCommand = `${tool} --access ${accessLevel}`;
+		// Public npm packages published via the npm CLI carry SLSA build
+		// provenance + a publish attestation (sigstore). Private packages can't
+		// (provenance is public-only) and `yarn publish` has no equivalent flag,
+		// so gate on both. Requires id-token: write on the publish job (granted)
+		// and a supported CI (GitHub Actions) — both true in this pipeline. A
+		// caller-supplied custom command is left untouched (opts out).
+		if (!isPrivate && tool === "npm publish") {
+			npmCommand += " --provenance";
+		}
 		console.log(`📦 Auto-detected NPM command: ${npmCommand}`);
 	} else {
 		console.log(`📦 Using custom NPM command: ${npmCommand}`);

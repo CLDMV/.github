@@ -201,6 +201,81 @@ runs:
         make_latest: ${{ inputs.make-latest }}
         assets: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
 
+    # Attach a detached ASCII-armored PGP signature (.asc) for every package
+    # asset on the release. This satisfies OpenSSF Scorecard's Signed-Releases
+    # check (signature tier -> 8) and lets consumers verify the tarball. Both
+    # the core release and each satellite release run through this composite,
+    # so signing here covers all of them from one place. Gated on a GPG key
+    # being provided — NOT on `gpg_enabled` (which governs tag signing on
+    # manual dispatch) — so real releases are signed on every publish. The
+    # exact `assets` expression from the create step above is reused so we sign
+    # precisely what was attached. Best-effort: any failure warns and leaves the
+    # already-created release intact rather than failing the publish.
+    - name: Sign release artifacts (GPG)
+      if: inputs.dry-run != 'true' && steps.create-release.outputs.release_id != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
+        GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}
+        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+        ASSETS: ${{ inputs.release-source-only == 'false' && format('{0},{1}', steps.package-files.outputs.tar-gz-path, steps.package-files.outputs.zip-path) || inputs.assets }}
+      run: |
+        set -uo pipefail
+        if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
+          echo "🔏 No GPG key provided — skipping release-artifact signing."
+          exit 0
+        fi
+        if [ -z "${ASSETS:-}" ]; then
+          echo "🔏 No package assets to sign — skipping."
+          exit 0
+        fi
+        # Import the signing key into an ephemeral keyring so we never disturb
+        # any keyring the tag-signing step set up.
+        GNUPGHOME="$(mktemp -d)"; export GNUPGHOME
+        chmod 700 "$GNUPGHOME"
+        if ! printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import 2>/tmp/gpg-import.log; then
+          echo "::warning::GPG key import failed — release left unsigned."
+          cat /tmp/gpg-import.log || true
+          rm -rf "$GNUPGHOME"; exit 0
+        fi
+        keyid="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')"
+        # Build the gpg option list as an array so key id / passphrase flags are
+        # never subject to word-splitting or quote-mangling.
+        gpg_opts=(--batch --yes --armor --detach-sign)
+        [ -n "${keyid:-}" ] && gpg_opts+=(--local-user "$keyid")
+        [ -n "${GPG_PASSPHRASE:-}" ] && gpg_opts+=(--pinentry-mode loopback --passphrase-fd 0)
+        IFS=',' read -ra files <<< "$ASSETS"
+        for raw in "${files[@]}"; do
+          f="$(printf '%s' "$raw" | xargs)"   # trim surrounding whitespace
+          [ -z "$f" ] && continue
+          if [ ! -f "$f" ]; then
+            echo "::warning::Asset not found for signing: $f"; continue
+          fi
+          sig="${f}.asc"
+          if [ -n "${GPG_PASSPHRASE:-}" ]; then
+            printf '%s' "$GPG_PASSPHRASE" | gpg "${gpg_opts[@]}" --output "$sig" "$f" \
+              || { echo "::warning::Signing failed for $f"; continue; }
+          else
+            gpg "${gpg_opts[@]}" --output "$sig" "$f" \
+              || { echo "::warning::Signing failed for $f"; continue; }
+          fi
+          name="$(basename "$sig")"
+          if curl -sSL --fail -X POST \
+               -H "Authorization: Bearer $GH_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               -H "Content-Type: application/octet-stream" \
+               "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=${name}" \
+               --data-binary "@$sig" >/dev/null; then
+            echo "🔏 Signed + attached: $name"
+          else
+            echo "::warning::Upload failed for $name"
+          fi
+        done
+        rm -rf "$GNUPGHOME"
+        exit 0
+
     - name: Verify tag signature
       if: inputs.dry-run != 'true'
       id: verify-tag
