@@ -504,7 +504,7 @@ jobs:
             # Batch 4.2.
             - name: Generate SBOM (CycloneDX)
               if: inputs.generate_sbom == true && inputs.dry_run != true
-              uses: anchore/sbom-action@v0
+              uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
               with:
                   format: ${{ inputs.sbom_format }}
                   output-file: sbom.${{ inputs.sbom_format == 'spdx-json' && 'spdx.json' || 'cdx.json' }}
