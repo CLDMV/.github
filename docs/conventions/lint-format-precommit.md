@@ -26,10 +26,10 @@ Per repo you can: **opt in** by adding `format` / `lint:fix` / `lint` / `format:
 `examples/git-hooks/pre-commit` runs `lint` + `format:check` (check-only) before a commit and **rejects the commit** on any issue — it never modifies your tree. Install it by copying `examples/git-hooks/` into the repo's `.githooks/` and adding a `prepare` script:
 
 ```jsonc
-{ "scripts": { "prepare": "node .githooks/install.mjs" } }
+{ "scripts": { "prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"" } }
 ```
 
-`prepare` fires on `npm install`; `install.mjs` copies `.githooks/pre-commit` into `.git/hooks/pre-commit`.
+`prepare` fires on `npm install` — and on `npm pack` / `npm publish`. The `node -e "import('./.githooks/install.mjs').catch(()=>{})"` wrapper is required, not cosmetic: a bare `node .githooks/install.mjs` aborts pack/publish because `.githooks/` is excluded from the package `files`, so the packed tree can't resolve the module — the crash happens before `install.mjs`'s own guards run. On a normal `npm install` it still installs the hook, copying `.githooks/pre-commit` into `.git/hooks/pre-commit`.
 
 **Why `.git/hooks` and not `core.hooksPath`:** a per-repo `core.hooksPath` shadows a global `core.hooksPath` dispatcher, silently disabling any global commit policy (no-coauthor / no-unsigned-push) for that repo. A global dispatcher chains to `.git/hooks/<name>`, so installing there composes with global policy. The installer no-ops on CI, inside `node_modules`, and when there's no `.git` directory.
 
