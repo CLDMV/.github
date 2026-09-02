@@ -80,7 +80,7 @@ jobs:
                   # poll THAT tag (e.g. @v4 for v4.x). update-major-version-tags
                   # rolls @v<major> to the release commit; a hardcoded @v3 would
                   # never match on a major bump (which creates @v4).
-                  major=$(printf '%s' "$COMMIT_MSG" | grep -oiE 'release:[^0-9]*v?[0-9]+' | grep -oE '[0-9]+$' | head -1)
+                  major=$(printf '%s' "$COMMIT_MSG" | { grep -oiE 'release:[^0-9]*v?[0-9]+' || true; } | { grep -oE '[0-9]+$' || true; } | head -1)
                   if [ -z "$major" ]; then
                       echo "⚠️ Could not parse a major version from the commit subject — skipping the gate."
                       exit 0
@@ -141,7 +141,7 @@ jobs:
                   COMMIT_MSG: ${{ github.event.head_commit.message }}
               run: |
                   # The squash commit ends with "(#N)" — the merged PR number.
-                  prnum=$(printf '%s' "$COMMIT_MSG" | grep -oE '#[0-9]+' | tail -1 | tr -d '#')
+                  prnum=$(printf '%s' "$COMMIT_MSG" | { grep -oE '#[0-9]+' || true; } | tail -1 | tr -d '#')
                   head=""
                   if [ -n "$prnum" ]; then
                       head=$(gh pr view "$prnum" --repo "$GITHUB_REPOSITORY" \
