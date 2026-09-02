@@ -253,8 +253,8 @@ runs:
         RANGE: ${{ steps.get-pr-range.outputs.commit-range }}
       run: |
         types=$(git log --no-merges --format='%s' "$RANGE" \
-            | grep -vE '^(release|chore: bump version)' \
-            | grep -oiE '^[a-z]+(\([^)]+\))?!?:' \
+            | { grep -vE '^(release|chore: bump version)' || true; } \
+            | { grep -oiE '^[a-z]+(\([^)]+\))?!?:' || true; } \
             | sed -E 's/[(!:].*//' \
             | tr '[:upper:]' '[:lower:]' \
             | sort -u | paste -sd,)
