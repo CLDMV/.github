@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/.github",
-	"version": "4.24.0",
+	"version": "4.25.0",
 	"description": "Shared GitHub Actions, reusable workflows, and org-wide tooling for the CLDMV organization.",
 	"author": {
 		"name": "Shinrai",
@@ -37,7 +37,7 @@
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
-		"prepare": "node .githooks/install.mjs"
+		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\""
 	},
 	"devDependencies": {
 		"@cldmv/eslint-plugin-jsonv": "^1.0.3",

@@ -284,7 +284,7 @@ jobs:
                       echo "### ✅ actionlint — no findings" >> "$GITHUB_STEP_SUMMARY"
                       echo "count=0" >> "$GITHUB_OUTPUT"
                   else
-                      lines=$(printf '%s\n' "$out" | grep -c '^[^[:space:]]')
+                      lines=$(printf '%s\n' "$out" | grep -c '^[^[:space:]]' || true)
                       {
                           echo "### ❌ actionlint — $lines line(s) of findings"
                           echo

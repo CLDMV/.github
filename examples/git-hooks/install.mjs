@@ -2,9 +2,13 @@
 /**
  * @fileoverview Installs the committed pre-commit hook into `.git/hooks/pre-commit`.
  *
- * Wire it into package.json so it runs on `npm install`:
- *   "scripts": { "prepare": "node .githooks/install.mjs" }
- * and copy this file + `pre-commit` (from CLDMV/.github examples/git-hooks/) into
+ * Wire it into package.json so it runs on `npm install`. Use the guarded form
+ * below — NOT a bare `node .githooks/install.mjs`: `prepare` also runs on
+ * `npm pack` / `npm publish` against the packed tree, where `.githooks/` is
+ * excluded from `files`, so a bare invocation fails module resolution and
+ * aborts the publish before the guards below can run.
+ *   "scripts": { "prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"" }
+ * Copy this file + `pre-commit` (from CLDMV/.github examples/git-hooks/) into
  * the repo's `.githooks/` directory.
  *
  * Why copy into `.git/hooks` rather than set `core.hooksPath`: a per-repo
