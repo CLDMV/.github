@@ -33,6 +33,12 @@ Per repo you can: **opt in** by adding `format` / `lint:fix` / `lint` / `format:
 
 **Why `.git/hooks` and not `core.hooksPath`:** a per-repo `core.hooksPath` shadows a global `core.hooksPath` dispatcher, silently disabling any global commit policy (no-coauthor / no-unsigned-push) for that repo. A global dispatcher chains to `.git/hooks/<name>`, so installing there composes with global policy. The installer no-ops on CI, inside `node_modules`, and when there's no `.git` directory.
 
+**Project-specific checks — `precommit:local`:** the shared hook runs `lint` + `format:check`, then `npm run precommit:local --if-present`. To add repo-specific pre-commit checks — a type-check, a custom audit, an inventory gate — define a `precommit:local` script and the fleet hook runs it **last, after lint/format**. Don't fork `.githooks/pre-commit` to add checks: that drops the repo off the shared hook and it drifts out of sync. Example (a type-check gate):
+
+```jsonc
+{ "scripts": { "precommit:local": "npm run test:types" } }
+```
+
 ## Debugging a precommit failure
 
 If a commit is rejected by the precommit hook on a CLDMV repo, it is one of these two checks:
