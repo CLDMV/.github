@@ -65,6 +65,25 @@ on:
             BOT_APP_PRIVATE_KEY:
                 description: "GitHub App private key for the bot."
                 required: true
+            # GPG signing identity for the dependabot-security cherry-pick path.
+            # Optional so the plain-hotfix (base-PATCH) path still works without
+            # them — but a caller that redirects Dependabot SECURITY PRs must map
+            # all four, or the cherry-pick pushes an UNSIGNED commit that the
+            # `hotfixes` required-signatures rule silently blocks (issue #257).
+            # The commit is authored as this identity — a real GitHub user account
+            # that owns the GPG key, NOT the App bot — so the signature verifies.
+            BOT_NAME:
+                description: "Git user.name for the signed cherry-pick commit (e.g. secrets.CLDMV_BOT_NAME). Must match the GPG key's GitHub account for a Verified commit."
+                required: false
+            BOT_EMAIL:
+                description: "Git user.email for the signed cherry-pick commit (e.g. secrets.CLDMV_BOT_EMAIL). Must be a verified email on the GPG key's account."
+                required: false
+            BOT_GPG_PRIVATE_KEY:
+                description: "Armored GPG private key used to sign the cherry-picked commit (e.g. secrets.CLDMV_BOT_GPG_PRIVATE_KEY). Empty = signing skipped (only safe for repos that never redirect Dependabot security PRs)."
+                required: false
+            BOT_GPG_PASSPHRASE:
+                description: "Passphrase for BOT_GPG_PRIVATE_KEY (e.g. secrets.CLDMV_BOT_GPG_PASSPHRASE)."
+                required: false
 
 permissions:
     contents: write
@@ -108,6 +127,49 @@ jobs:
               with:
                   app-slug: ${{ steps.app-token.outputs.app-slug }}
                   github-token: ${{ steps.app-token.outputs.token }}
+
+            # The dependabot-security path makes a LOCAL signed commit (a
+            # cherry-pick), so it needs the bot's GPG key imported and the commit
+            # authored as the key's identity. All three steps are gated on the key
+            # being present: the plain-hotfix path (a base PATCH via the API) needs
+            # none of this, and a repo that never redirects Dependabot security PRs
+            # can run without the GPG secrets. `secrets` can't be read in `if:`, so
+            # presence is surfaced through a step output first.
+            - name: Detect GPG signing availability
+              id: gpg
+              shell: bash
+              env:
+                  GPG_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+              run: |
+                  if [ -n "$GPG_KEY" ]; then
+                    echo "present=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "present=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Import bot GPG signing key
+              if: steps.gpg.outputs.present == 'true'
+              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+              with:
+                  gpg_private_key: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.BOT_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+
+            # Author the cherry-pick as the GPG key's own identity (a real user
+            # account), overriding the App-slug identity `setup-git-identity` set
+            # above — the App bot's noreply email would never match the signing
+            # key's account, so the signature must be made under BOT_NAME/BOT_EMAIL
+            # for GitHub to mark the commit Verified.
+            - name: Use bot signing identity for the cherry-pick
+              if: steps.gpg.outputs.present == 'true'
+              shell: bash
+              env:
+                  BOT_NAME: ${{ secrets.BOT_NAME }}
+                  BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+              run: |
+                  if [ -n "$BOT_NAME" ]; then git config --global user.name "$BOT_NAME"; fi
+                  if [ -n "$BOT_EMAIL" ]; then git config --global user.email "$BOT_EMAIL"; fi
 
             - name: Redirect hotfix/security PR to hotfixes
               uses: CLDMV/.github/.github/actions/github/steps/redirect-hotfix-pr@v4
