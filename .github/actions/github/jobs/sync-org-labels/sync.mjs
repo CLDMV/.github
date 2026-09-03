@@ -21,6 +21,7 @@ const TOKEN = process.env.GITHUB_TOKEN;
 const ORG = process.env.ORG;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const DEBUG = process.env.DEBUG === "true";
+const REPOS = (process.env.REPOS || "").trim();
 const LABELS_JSON_PATH = process.env.LABELS_JSON_PATH;
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
@@ -403,8 +404,35 @@ const aliasMap = buildAliasMap(canonicalLabels);
 console.log(`📋 Loaded ${canonicalLabels.length} canonical labels from ${LABELS_JSON_PATH}`);
 console.log(`🏢 Syncing labels for org: ${ORG}${DRY_RUN ? " (DRY RUN)" : ""}`);
 
-// Fetch all repos in the org, sort alphabetically
-const allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
+// Determine the repo set. An explicit `repos` input (comma / space / newline
+// separated, each with or without an `owner/` prefix) scopes the sync to just
+// those repos — e.g. to fix a single newly-onboarded repo on demand without
+// sweeping the whole org. Empty (default) keeps the full-org sweep, so the
+// weekly cron / manual org dispatch is unchanged.
+let allRepos;
+if (REPOS) {
+	const names = [
+		...new Set(
+			REPOS.split(/[\s,]+/)
+				.filter(Boolean)
+				.map((n) => n.replace(/^.*\//, ""))
+		)
+	];
+	console.log(`🎯 Scoped sync to ${names.length} repo(s): ${names.join(", ")}`);
+	allRepos = [];
+	for (const name of names) {
+		const { status, body } = await api(`/repos/${ORG}/${name}`);
+		if (status !== 200) {
+			console.error(`⚠️  Skipping ${ORG}/${name}: GET /repos/${ORG}/${name} → ${status}`);
+			continue;
+		}
+		allRepos.push(body);
+	}
+	allRepos.sort((a, b) => a.name.localeCompare(b.name));
+} else {
+	// Fetch all repos in the org, sort alphabetically
+	allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
+}
 console.log(`📦 Found ${allRepos.length} repositories`);
 
 // Write summary header
