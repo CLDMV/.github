@@ -41,3 +41,10 @@ jobs:
         secrets:
             BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
             BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            # GPG signing identity — the dependabot-security cherry-pick path signs
+            # its commit as this real-user bot account, or `hotfixes` blocks the
+            # unsigned commit under required-signatures (issue #257).
+            BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
