@@ -292,21 +292,37 @@ eq(supersededBody.startsWith(COMMENT_SENTINEL), true, "superseded comment starts
 eq(supersededBody.includes("#999"), true, "superseded comment references the replacement PR number");
 
 console.log("\nmissingCherryPickPrereq:");
-eq(missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: true }), "", "checkout + identity present → no missing prereq");
+const SIGN_REASON =
+	"commit signing is not configured (no user.signingkey / commit.gpgsign) — the cherry-picked commit would be unsigned and blocked by the branch's required-signatures rule";
 eq(
-	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: true }),
-	"the working directory is not a git checkout",
-	"no checkout → reports the missing checkout (even if identity somehow present)"
+	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: true, canSign: true }),
+	"",
+	"checkout + identity + signing present → no missing prereq"
 );
 eq(
-	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: false }),
+	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: true, canSign: true }),
+	"the working directory is not a git checkout",
+	"no checkout → reports the missing checkout (even if identity/signing somehow present)"
+);
+eq(
+	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: false, canSign: true }),
 	"no git identity (user.name / user.email) is configured",
 	"checkout but no identity → reports the missing identity (the silent-conflict trap)"
 );
 eq(
-	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: false }),
+	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: true, canSign: false }),
+	SIGN_REASON,
+	"checkout + identity but no signing → reports the missing signing key (the silent-block trap, #257)"
+);
+eq(
+	missingCherryPickPrereq({ insideWorkTree: true, hasIdentity: false, canSign: false }),
+	"no git identity (user.name / user.email) is configured",
+	"identity checked before signing when both missing"
+);
+eq(
+	missingCherryPickPrereq({ insideWorkTree: false, hasIdentity: false, canSign: false }),
 	"the working directory is not a git checkout",
-	"neither present → checkout reported first (more fundamental)"
+	"none present → checkout reported first (most fundamental)"
 );
 
 console.log("\nCOMMENT_SENTINEL:");

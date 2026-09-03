@@ -185,25 +185,34 @@ export function buildSupersededCommentBody(newNumber, targetBase = "hotfixes") {
  * that produces these booleans lives in the side-effecting wrapper below.
  *
  * The cherry-pick path (unlike the plain-PATCH hotfix path) needs the calling
- * workflow to have run a real checkout of the repo AND configured a git
- * identity — see the module docstring. A caller workflow that predates those
- * requirements (an out-of-date copied `local-*`/example template) would
- * otherwise reach the cherry-pick with no checkout or no identity, where the
- * failure is silent-ish: `git cherry-pick` runs via runCapturing, so a missing
- * identity is misread as a *conflict*, posts a misleading "couldn't cherry-pick
- * cleanly" comment, and exits 0 (green) — leaving the security PR on the default
- * branch to be auto-merged. Detecting the missing prerequisite up front lets the
- * caller fail loudly instead.
+ * workflow to have run a real checkout of the repo, configured a git identity,
+ * AND imported a commit-signing key (the BOT_GPG_* secrets → user.signingkey +
+ * commit.gpgsign) — see the module docstring. A caller workflow that predates
+ * any of those requirements (an out-of-date copied `local-*`/example template)
+ * would otherwise reach the cherry-pick under-provisioned:
+ *   - No checkout or no identity: `git cherry-pick` runs via runCapturing, so
+ *     the failure is silent-ish — a missing identity is misread as a *conflict*,
+ *     posts a misleading "couldn't cherry-pick cleanly" comment, and exits 0
+ *     (green), leaving the security PR on the default branch to be auto-merged.
+ *   - No signing key: the cherry-pick succeeds but produces an UNSIGNED commit.
+ *     Every CLDMV branch requires signed commits, so the redirected replacement
+ *     PR then sits at `mergeable_state: blocked` with no failing check naming
+ *     the cause — exactly the silent block reported in issue #257.
+ * Detecting the missing prerequisite up front lets the caller fail loudly, with
+ * a comment naming the actual cause, instead of any of these silent outcomes.
  *
  * @public
  * @param {object} state
  * @param {boolean} state.insideWorkTree - working directory is a git checkout.
  * @param {boolean} state.hasIdentity - both user.name and user.email are configured.
+ * @param {boolean} state.canSign - a signing key (user.signingkey) AND commit.gpgsign are configured, so the cherry-picked commit will be signed.
  * @returns {string} Empty when prerequisites are met; otherwise why not.
  */
-export function missingCherryPickPrereq({ insideWorkTree, hasIdentity }) {
+export function missingCherryPickPrereq({ insideWorkTree, hasIdentity, canSign }) {
 	if (!insideWorkTree) return "the working directory is not a git checkout";
 	if (!hasIdentity) return "no git identity (user.name / user.email) is configured";
+	if (!canSign)
+		return "commit signing is not configured (no user.signingkey / commit.gpgsign) — the cherry-picked commit would be unsigned and blocked by the branch's required-signatures rule";
 	return "";
 }
 
@@ -258,18 +267,25 @@ function runCapturing(file, args) {
 }
 
 /**
- * Probe the git prerequisites the cherry-pick path needs (a checkout + a
- * configured identity) and return the reason they're insufficient, or "" when
- * they're met. The identity read is gated on being inside a work tree only to
- * report the more fundamental "not a checkout" problem first — `git config`
- * would otherwise succeed against global config even with no repo present.
- * Pure decision logic lives in `missingCherryPickPrereq` (unit-tested).
+ * Probe the git prerequisites the cherry-pick path needs (a checkout, a
+ * configured identity, and a commit-signing key) and return the reason they're
+ * insufficient, or "" when they're met. The identity/signing reads are gated on
+ * being inside a work tree only to report the more fundamental "not a checkout"
+ * problem first — `git config` would otherwise succeed against global config
+ * even with no repo present. Pure decision logic lives in
+ * `missingCherryPickPrereq` (unit-tested).
  */
 function checkCherryPickPrereqs() {
 	const insideWorkTree = runCapturing("git", ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
 	const name = insideWorkTree ? runCapturing("git", ["config", "--get", "user.name"]).stdout.trim() : "";
 	const email = insideWorkTree ? runCapturing("git", ["config", "--get", "user.email"]).stdout.trim() : "";
-	return missingCherryPickPrereq({ insideWorkTree, hasIdentity: Boolean(name) && Boolean(email) });
+	const signingKey = insideWorkTree ? runCapturing("git", ["config", "--get", "user.signingkey"]).stdout.trim() : "";
+	const gpgSign = insideWorkTree ? runCapturing("git", ["config", "--get", "commit.gpgsign"]).stdout.trim() : "";
+	return missingCherryPickPrereq({
+		insideWorkTree,
+		hasIdentity: Boolean(name) && Boolean(email),
+		canSign: Boolean(signingKey) && gpgSign === "true"
+	});
 }
 
 /**
@@ -300,7 +316,12 @@ async function cherryPickOntoBranch({ remoteUrl, targetBase, branch, prNumber, c
 	run("git", ["fetch", "origin", `pull/${prNumber}/head`, "--quiet"]);
 
 	for (const sha of commitShas) {
-		const result = runCapturing("git", ["cherry-pick", "-x", sha]);
+		// -S signs each cherry-picked commit with the configured user.signingkey.
+		// The caller has already verified (checkCherryPickPrereqs) that a signing
+		// key + commit.gpgsign are configured, so -S can't fail for lack of a key;
+		// signing here is what keeps the redirected commit mergeable under the
+		// branch's required-signatures rule (issue #257).
+		const result = runCapturing("git", ["cherry-pick", "-x", "-S", sha]);
 		if (!result.ok) {
 			runCapturing("git", ["cherry-pick", "--abort"]);
 			return { ok: false, reason: `cherry-pick of ${sha.slice(0, 7)} failed: ${result.stderr.trim() || result.stdout.trim()}` };
@@ -308,6 +329,18 @@ async function cherryPickOntoBranch({ remoteUrl, targetBase, branch, prNumber, c
 	}
 
 	const headSha = run("git", ["rev-parse", "HEAD"]);
+	// Defence in depth: never push an UNSIGNED commit onto the hotfix lane — it
+	// would be silently rejected by required-signatures with no failing check to
+	// explain why (the exact failure mode of issue #257). `%G?` is 'N' only when
+	// the commit carries no signature at all; 'G'/'U'/'E' all mean it IS signed
+	// (an own key can read as 'U' unknown-validity or 'E' can't-verify in CI,
+	// which are fine — the signature exists), so we fail only on 'N'.
+	const sigStatus = runCapturing("git", ["log", "-1", "--format=%G?"]).stdout.trim();
+	if (sigStatus === "N") {
+		throw new Error(
+			`Refusing to push: cherry-picked commit ${headSha.slice(0, 7)} is UNSIGNED (git '%G?' = 'N') even though signing prerequisites were met. It would be blocked by the branch's required-signatures rule. Check the BOT_GPG_* secrets and the GPG-import step in workflow-hotfix-redirector.yml.`
+		);
+	}
 	run("git", ["push", "origin", `HEAD:refs/heads/${branch}`]);
 	return { ok: true, branch, headSha };
 }
@@ -383,7 +416,7 @@ async function main() {
 					owner,
 					repo,
 					prNumber,
-					`${COMMENT_SENTINEL} could NOT redirect this Dependabot security update to \`${targetBase}\` because ${prereqReason}. The workflow calling \`redirect-hotfix-pr\` is out of date: it must run \`checkout-code\` (\`ref: ${targetBase}\`, \`fetch-depth: 0\`) and \`setup-git-identity\` (with \`permission_contents: true\` on the token) **before** this step. This PR is still targeting \`${baseRef}\` and must NOT be auto-merged there — handle it manually and update the workflow.`,
+					`${COMMENT_SENTINEL} could NOT redirect this Dependabot security update to \`${targetBase}\` because ${prereqReason}. The workflow calling \`redirect-hotfix-pr\` is out of date: **before** this step it must run \`checkout-code\` (\`ref: ${targetBase}\`, \`fetch-depth: 0\`), \`setup-git-identity\` (with \`permission_contents: true\` on the token), and import the commit-signing key — map the \`CLDMV_BOT_GPG_PRIVATE_KEY\` / \`CLDMV_BOT_GPG_PASSPHRASE\` / \`CLDMV_BOT_NAME\` / \`CLDMV_BOT_EMAIL\` secrets so the cherry-pick is signed. This PR is still targeting \`${baseRef}\` and must NOT be auto-merged there — handle it manually and update the workflow.`,
 					token
 				);
 			}
@@ -398,7 +431,7 @@ async function main() {
 			"replacement-pr": ""
 		});
 		throw new Error(
-			`redirect-hotfix-pr needs a git checkout of the repo AND a configured git identity to cherry-pick a Dependabot security update onto '${targetBase}', but ${prereqReason}. The calling workflow must run checkout-code (ref: ${targetBase}, fetch-depth: 0) and setup-git-identity (with permission_contents: true on the token) before this step — see local-hotfix-redirector.yml / examples/individual-repo-workflows/release-flow-v4/hotfix-redirector.yml for the current shape.`
+			`redirect-hotfix-pr needs a git checkout of the repo, a configured git identity, AND an imported commit-signing key to cherry-pick a Dependabot security update onto '${targetBase}', but ${prereqReason}. The calling workflow must run checkout-code (ref: ${targetBase}, fetch-depth: 0), setup-git-identity (with permission_contents: true on the token), and import the BOT_GPG_* signing key before this step — see local-hotfix-redirector.yml / examples/individual-repo-workflows/release-flow-v4/hotfix-redirector.yml for the current shape.`
 		);
 	}
 
