@@ -82,6 +82,13 @@ jobs:
                   # label is `! <type> → <lane>` so it reflects what the PR actually
                   # is, not a blanket "feature". (Previously every next-lane branch
                   # got `! feature → next`, mislabelling docs/fix/chore PRs.)
+                  # NOTE: the `release/*` and `hotfix/*` arms below are
+                  # deliberately loose. The org branch-naming ruleset
+                  # (scripts/setup-org-rulesets.mjs) is the authoritative
+                  # creation gate and permits only strictly-numeric
+                  # `release/X.Y.Z` / `hotfix/X.Y.Z`, so a non-numeric
+                  # `release/foo` is rejected at push and never reaches
+                  # this case — the loose glob here is intentional.
                   case "$branch" in
                       hotfix/*)              target="hotfixes"; type="hotfix"   ;;
                       feat/*|feature/*)      target="next";     type="feature"  ;;
