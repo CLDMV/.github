@@ -3,8 +3,12 @@ description: "Run tests with configurable command and environment"
 
 inputs:
   test-command:
-    description: "Command to run tests"
+    description: "Command to run tests. A leading npm/npx token is routed through the resolved package manager."
     required: true
+  package-manager:
+    description: "Package manager: 'auto' (default, detect) or explicit npm|yarn|pnpm."
+    required: false
+    default: "auto"
   environment:
     description: "Environment to run tests in (development, production, test)"
     required: false

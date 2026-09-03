@@ -24,10 +24,10 @@ on:
                 default: "lts/*"
 
             package_manager:
-                description: "Package manager (npm or yarn)"
+                description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
 
             # ── Commands ────────────────────────────────────────────────────────
             build_command:
@@ -157,17 +157,28 @@ jobs:
               uses: actions/checkout@v6
 
             # ── 2. Runtime ──────────────────────────────────────────────────────
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
             - name: Setup Node.js
               uses: actions/setup-node@v6
               with:
                   node-version: ${{ inputs.node_version }}
-                  cache: ${{ inputs.package_manager }}
+                  cache: ${{ steps.pm.outputs.cache }}
+
+            - name: Enable corepack
+              if: steps.pm.outputs.package-manager != 'npm'
+              shell: bash
+              run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
               with:
-                  package-manager: ${{ inputs.package_manager }}
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
 
             # ── 4. Build (preserves src/ for coverage) ──────────────────────────
             # The matrix `Build` step in reusable-build-and-test.yml runs on a
@@ -184,16 +195,55 @@ jobs:
             # `skip_build: true` for repos with no build step.
             - name: Build
               if: ${{ !inputs.skip_build }}
-              run: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
 
             # ── 5. Type check ───────────────────────────────────────────────────
             - name: Type check
               if: ${{ !inputs.skip_type_check }}
-              run: ${{ inputs.type_check_command }}
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.type_check_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
 
             # ── 6. Tests + coverage ─────────────────────────────────────────────
             - name: Tests + coverage
-              run: ${{ inputs.coverage_command }}
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.coverage_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
 
             # ── 7. Compute badge JSON ───────────────────────────────────────────
             - name: Compute coverage badge JSON

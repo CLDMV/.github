@@ -31,7 +31,7 @@ on:
             package_manager:
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
             format_command:
                 required: false
                 type: string
@@ -91,16 +91,27 @@ jobs:
                   ref: ${{ github.ref_name }}
                   persist-credentials: false
 
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
             - name: Setup Node.js
               uses: actions/setup-node@v6
               with:
                   node-version: ${{ inputs.node_version }}
-                  cache: ${{ inputs.package_manager }}
+                  cache: ${{ steps.pm.outputs.cache }}
+
+            - name: Enable corepack
+              if: steps.pm.outputs.package-manager != 'npm'
+              shell: bash
+              run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
 
             - name: Install dependencies
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
               with:
-                  package-manager: ${{ inputs.package_manager }}
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
 
             # ── Autofix ──────────────────────────────────────────────────────────
             # Best-effort: never fail the job here. `eslint --fix` exits nonzero
@@ -109,12 +120,36 @@ jobs:
             - name: Apply formatting
               if: inputs.format_command != ''
               shell: bash
-              run: ${{ inputs.format_command }} || true
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.format_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd" || true
 
             - name: Apply lint fixes
               if: inputs.lint_fix_command != ''
               shell: bash
-              run: ${{ inputs.lint_fix_command }} || true
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.lint_fix_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd" || true
 
             - name: Detect changes
               id: diff
@@ -166,8 +201,19 @@ jobs:
             - name: Format check
               if: inputs.format_check_command != ''
               shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.format_check_command }}
               run: |
-                  ${{ inputs.format_check_command }} || {
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd" || {
                     echo "::error::Formatting issues remain after autofix — inspect the formatter output above.";
                     exit 1;
                   }
@@ -175,8 +221,19 @@ jobs:
             - name: Lint check
               if: inputs.lint_command != ''
               shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.lint_command }}
               run: |
-                  ${{ inputs.lint_command }} || {
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd" || {
                     echo "::error::Lint problems reached ${{ github.ref_name }} that could not be auto-fixed. Fix them at source.";
                     exit 1;
                   }

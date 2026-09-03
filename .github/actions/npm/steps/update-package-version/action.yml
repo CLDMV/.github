@@ -6,9 +6,9 @@ inputs:
     description: "New version to set"
     required: true
   package-manager:
-    description: "Package manager (npm or yarn)"
+    description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
     required: false
-    default: "npm"
+    default: "auto"
 
 runs:
   using: "node24"

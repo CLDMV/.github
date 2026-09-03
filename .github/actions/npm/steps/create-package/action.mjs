@@ -8,13 +8,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { getInput, setOutput } from "../../../common/common/core.mjs";
+import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
 
 try {
-	const packageManager = getInput("package-manager", { default: "npm" });
+	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 	const packageName = getInput("package-name");
 
-	console.log("📦 Creating npm package...");
-	execSync(packageManager === "yarn" ? "yarn pack" : "npm pack", { stdio: "inherit" });
+	console.log(`📦 Creating package with ${pm}...`);
+	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
+	if (pm !== "npm") {
+		try {
+			execSync("corepack enable", { stdio: "inherit" });
+		} catch {
+			console.log(`::warning::corepack enable failed; assuming ${pm} is already on PATH.`);
+		}
+	}
+	execSync(pm === "yarn" ? "yarn pack" : pm === "pnpm" ? "pnpm pack" : "npm pack", { stdio: "inherit" });
 
 	// `ls *.tgz | head -1` — first .tgz in lexical order.
 	const packageFile = fs

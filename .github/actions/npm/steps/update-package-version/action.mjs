@@ -7,10 +7,11 @@
 
 import fs from "node:fs";
 import { getInput, exec } from "../../../common/common/core.mjs";
+import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
 
 try {
 	const newVersion = getInput("new-version", { required: true });
-	const packageManager = getInput("package-manager", { default: "npm" });
+	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 
 	const currentVersion = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
 
@@ -18,8 +19,18 @@ try {
 		console.log(`📝 Package.json already at version ${newVersion} - no update needed`);
 	} else {
 		console.log(`📝 Updating package.json from ${currentVersion} to ${newVersion}`);
-		if (packageManager === "yarn") {
+		// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
+		if (pm !== "npm") {
+			try {
+				exec("corepack enable");
+			} catch (error) {
+				console.log(`::warning::corepack enable failed (${error.message}); assuming ${pm} is already on PATH.`);
+			}
+		}
+		if (pm === "yarn") {
 			exec(`yarn version --new-version "${newVersion}" --no-git-tag-version`);
+		} else if (pm === "pnpm") {
+			exec(`pnpm version "${newVersion}" --no-git-tag-version`);
 		} else {
 			exec(`npm version "${newVersion}" --no-git-tag-version`);
 		}

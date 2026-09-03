@@ -7,10 +7,21 @@
  */
 
 import { getInput, exec } from "../../../common/common/core.mjs";
+import { resolvePackageManager, pmCommand } from "../../../npm/utilities/detect-package-manager/resolve.mjs";
 
 try {
-	const testCommand = getInput("test-command", { required: true });
+	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
+	const testCommand = pmCommand(pm, getInput("test-command", { required: true }));
 	const environment = getInput("environment", { default: "development" });
+
+	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
+	if (pm !== "npm") {
+		try {
+			exec("corepack enable");
+		} catch {
+			// Best-effort; assume pnpm/yarn is already on PATH.
+		}
+	}
 
 	console.log(`🔍 DEBUG: test-command input = '${testCommand}'`);
 	console.log(`🔍 DEBUG: environment input = '${environment}'`);

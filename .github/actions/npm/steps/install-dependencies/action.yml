@@ -3,9 +3,9 @@ description: "Install dependencies using the appropriate package manager"
 
 inputs:
   package-manager:
-    description: "Package manager to use (npm or yarn)"
+    description: "Package manager to use: auto (default, detect), or explicit npm | yarn | pnpm"
     required: false
-    default: "npm"
+    default: "auto"
 
 runs:
   using: "node24"
