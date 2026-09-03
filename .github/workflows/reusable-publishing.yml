@@ -232,6 +232,10 @@ permissions:
     contents: write
     packages: write
     id-token: write
+    # actions: read is the ceiling the SLSA provenance job (issue #243) needs to
+    # request — an explicit workflow-level block caps every job, so it must be
+    # granted here for that job's own permissions block to take effect.
+    actions: read
 
 jobs:
     detect-version:
@@ -533,6 +537,108 @@ jobs:
                     "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$SBOM_PATH" \
                     --data-binary "@$SBOM_PATH"
                   echo "📋 SBOM attached to release"
+
+    # ── SLSA build provenance (issue #243) ──────────────────────────────────
+    # Packs the published tarball(s) from the same build artifact and emits the
+    # base64 sha256 subjects the SLSA generator signs. Real, PUBLIC releases only:
+    # SLSA provenance records the repo + tag in the public Rekor transparency log,
+    # so private repos are skipped to avoid leaking their names (opting in would
+    # need private-repository:true). Source-only releases carry no tarball, so
+    # they're skipped too. Gate otherwise mirrors create-release.
+    provenance-subjects:
+        name: "🔏 Compute SLSA provenance subjects"
+        if: |
+            inputs.run_create_release == true &&
+            inputs.dry_run != true &&
+            inputs.release_source_only != true &&
+            needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version &&
+            needs.detect-repo-config.outputs.repo-is-private != 'true'
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        needs: [ detect-version, detect-repo-config, create-release ]
+        outputs:
+            hashes: ${{ steps.hash.outputs.hashes }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Calculate artifact names
+              id: names
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  package-name: ${{ inputs.package_name }}
+                  version: ${{ needs.detect-version.outputs.version }}
+
+            # Overlays the built package (dist + staged dist-packages/) onto the
+            # checkout at cwd — the same layout discover-subpackages + npm pack expect.
+            - name: Download build artifacts
+              uses: actions/download-artifact@v7
+              with:
+                  name: ${{ steps.names.outputs.artifact-name }}
+
+            # Pin Node so the re-packed tarballs are byte-identical to what the
+            # publish jobs packed (same npm version → same sha256 subjects).
+            - name: Setup Node.js (deterministic pack)
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+
+            - name: Discover satellite packages
+              id: discover
+              if: inputs.extra_packages != ''
+              uses: CLDMV/.github/.github/actions/npm/steps/discover-subpackages@v4
+              with:
+                  extra-packages: ${{ inputs.extra_packages }}
+
+            - name: Pack tarballs and compute subjects
+              id: hash
+              shell: bash
+              env:
+                  MATRIX: ${{ steps.discover.outputs.matrix }}
+              run: |
+                  set -euo pipefail
+                  dest="${RUNNER_TEMP}/provenance"
+                  mkdir -p "$dest"
+                  # Core package (the artifact root is the built core package).
+                  npm pack . --pack-destination "$dest" --silent
+                  # Satellites ride the same build artifact under their staged dirs.
+                  if [ -n "${MATRIX:-}" ] && [ "$MATRIX" != "[]" ]; then
+                      while IFS= read -r dir; do
+                          [ -n "$dir" ] || continue
+                          npm pack "./${dir}" --pack-destination "$dest" --silent
+                      done < <(printf '%s' "$MATRIX" | jq -r '.[].dir')
+                  fi
+                  cd "$dest"
+                  echo "🔏 Provenance subjects:"
+                  sha256sum ./*.tgz
+                  hashes=$(sha256sum ./*.tgz | base64 -w0)
+                  echo "hashes=$hashes" >> "$GITHUB_OUTPUT"
+
+    # Generates a genuine SLSA build-provenance .intoto.jsonl (the ONLY suffix
+    # OpenSSF Scorecard credits at the provenance tier — a .sigstore.json bundle
+    # is not) covering every packed tarball, and attaches it to the core release.
+    # The generator MUST be referenced by a full @vX.Y.Z tag — a shorter tag or a
+    # commit SHA fails by its own hardening design. Prereq: the org's allowed
+    # actions/reusable-workflows policy must permit slsa-framework/*.
+    provenance:
+        name: "🔏 SLSA provenance (.intoto.jsonl)"
+        needs: [ detect-version, provenance-subjects ]
+        permissions:
+            actions: read # detect the GitHub Actions environment
+            id-token: write # provenance signing (OIDC)
+            contents: write # upload the .intoto.jsonl release asset
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+        with:
+            base64-subjects: ${{ needs.provenance-subjects.outputs.hashes }}
+            upload-assets: true
+            # The release is created by create-release (not a tag-push trigger), so
+            # target it explicitly by its tag.
+            upload-tag-name: v${{ needs.detect-version.outputs.version }}
+            # Un-validated until a live test release confirms the .intoto.jsonl
+            # attaches (per issue #243, this is not dry-run-provable). Keep a
+            # provenance hiccup from turning an otherwise-successful release run
+            # red on first rollout; flip to false once validated.
+            continue-on-error: true
 
     close-resolved-issues:
         name: "🔗 Close Resolved Issues"
