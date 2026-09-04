@@ -5,9 +5,10 @@
  */
 
 import { appendSummary } from "../../../common/common/core.mjs";
+import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
 
 const nodeVersion = process.env.NODE_VERSION || "";
-const packageManager = process.env.PACKAGE_MANAGER || "npm";
+const packageManager = resolvePackageManager(process.env.PACKAGE_MANAGER || "auto", ".");
 const preTestsOutcome = process.env.PRE_TESTS_OUTCOME || "";
 const buildOutcome = process.env.BUILD_OUTCOME || "";
 

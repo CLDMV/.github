@@ -32,7 +32,7 @@ on:
             package_manager:
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
             node_version:
                 required: false
                 type: string
@@ -71,17 +71,36 @@ jobs:
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   ref: ${{ github.event.pull_request.head.sha }}
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
             - name: Setup Node
               uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
               with:
                   node-version: ${{ inputs.node_version }}
             - name: Install
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              env:
+                  CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
               with:
-                  package-manager: ${{ inputs.package_manager }}
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
             - name: Build
               shell: bash
-              run: ${{ inputs.build_command }}
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.build_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
             - name: Measure
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4
               with:
@@ -102,17 +121,36 @@ jobs:
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   ref: ${{ github.event.pull_request.base.sha }}
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
             - name: Setup Node
               uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
               with:
                   node-version: ${{ inputs.node_version }}
             - name: Install
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              env:
+                  CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
               with:
-                  package-manager: ${{ inputs.package_manager }}
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
             - name: Build
               shell: bash
-              run: ${{ inputs.build_command }}
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.build_command }}
+              run: |
+                  cmd="$CMD"
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
             - name: Measure
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4
               with:

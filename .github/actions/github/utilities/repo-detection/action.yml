@@ -3,9 +3,9 @@ description: "Detect repository visibility and configure publish commands"
 
 inputs:
   package-manager:
-    description: "Package manager (npm or yarn)"
+    description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
     required: false
-    default: "npm"
+    default: "auto"
   custom-npm-command:
     description: "Custom NPM publish command (overrides auto-detection)"
     required: false

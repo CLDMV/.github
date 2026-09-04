@@ -12,7 +12,7 @@ inputs:
   package-manager:
     description: "Package manager used"
     required: false
-    default: "npm"
+    default: "auto"
   ci-result:
     description: "Result of the CI (build & test) job"
     required: true

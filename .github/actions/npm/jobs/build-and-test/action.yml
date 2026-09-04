@@ -7,9 +7,9 @@ inputs:
     required: false
     default: "lts/*"
   package-manager:
-    description: "Package manager (npm or yarn)"
+    description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
     required: false
-    default: "npm"
+    default: "auto"
   test-command:
     description: "Command to run pre-build tests"
     required: false
@@ -66,6 +66,8 @@ runs:
 
     - name: Install dependencies
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+      env:
+        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
       with:
         package-manager: ${{ inputs.package-manager }}
 

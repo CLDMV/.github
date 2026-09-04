@@ -83,10 +83,10 @@ on:
                 type: string
                 default: "lts/*"
             package_manager:
-                description: "Package manager (npm or yarn)"
+                description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
 
             # Version parameter
             version:
@@ -736,17 +736,40 @@ jobs:
               with:
                   node-version: ${{ inputs.node_version }}
 
+            - name: Resolve package manager
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
             - name: Pack satellite tarball
               if: inputs.run_create_release == true && inputs.dry_run != true
               id: pack
               shell: bash
               env:
                   SAT_DIR: ${{ matrix.dir }}
+                  PM: ${{ steps.pm.outputs.package-manager }}
               run: |
                   set -euo pipefail
                   dest="${RUNNER_TEMP}/sat-asset"
                   mkdir -p "$dest"
-                  tgz=$(npm pack "./artifact/${SAT_DIR}" --pack-destination "$dest" --silent | tail -n1)
+                  # pnpm/yarn resolve `workspace:*` deps into the packed tarball; npm
+                  # ships them literally, so route the pack through the resolved PM.
+                  # pnpm/yarn pack the CURRENT directory, so cd into the staged dir.
+                  case "$PM" in
+                    pnpm)
+                      ( cd "./artifact/${SAT_DIR}" && corepack enable >/dev/null 2>&1 || true; pnpm pack --pack-destination "$dest" >/dev/null )
+                      tgz=$(cd "$dest" && ls -1t ./*.tgz | head -n1 | sed 's#^\./##')
+                      ;;
+                    yarn)
+                      ( cd "./artifact/${SAT_DIR}" && corepack enable >/dev/null 2>&1 || true; yarn pack --out "$dest/package.tgz" >/dev/null )
+                      tgz="package.tgz"
+                      ;;
+                    *)
+                      tgz=$(npm pack "./artifact/${SAT_DIR}" --pack-destination "$dest" --silent | tail -n1)
+                      ;;
+                  esac
                   echo "tarball=${dest}/${tgz}" >> "$GITHUB_OUTPUT"
                   echo "📦 Packed ${SAT_DIR} -> ${dest}/${tgz}"
 
