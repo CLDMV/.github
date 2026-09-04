@@ -88,6 +88,8 @@ jobs:
 
             - name: Install
               uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              env:
+                  CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
 

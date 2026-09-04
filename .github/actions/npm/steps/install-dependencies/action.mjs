@@ -16,6 +16,20 @@ import { resolvePackageManager, hasLockfile, installCommand } from "../../utilit
 try {
 	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 
+	// Frozen/reproducible install is the CI default: use the committed lockfile
+	// (`npm ci`, `pnpm`/`yarn install --frozen-lockfile`). A consuming repo opts
+	// OUT only by setting the repo Actions variable CLDMV_SKIP_FROZEN_LOCKFILE to
+	// a truthy value (the reusable jobs expose it to this action via the same-named
+	// env var) — which switches to a plain, lockfile-mutating install. An unset
+	// variable means frozen, so a job that never exposes it still installs frozen.
+	// Absent a lockfile, a frozen install fails loudly, the correct CI signal.
+	const skipFrozen = ["1", "true", "yes"].includes(
+		String(process.env.CLDMV_SKIP_FROZEN_LOCKFILE || "")
+			.trim()
+			.toLowerCase()
+	);
+	const frozen = !skipFrozen;
+
 	// Detect metadata-only packages: no deps + no lockfile + no workspace means
 	// there's nothing to install. A frozen install would fail here; gracefully skip.
 	let hasDeps = false;
@@ -44,7 +58,7 @@ try {
 		}
 	}
 
-	const cmd = installCommand(pm, lockfilePresent);
+	const cmd = installCommand(pm, frozen);
 	console.log(`📦 Installing dependencies with: ${cmd}`);
 	exec(cmd);
 } catch (error) {
