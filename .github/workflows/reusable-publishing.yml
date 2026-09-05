@@ -765,7 +765,8 @@ jobs:
                       # keeps the `|| true` from also masking a failed `cd`, which
                       # would otherwise pack the wrong directory and "succeed".
                       ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && pnpm pack --pack-destination "$dest" >/dev/null )
-                      tgz=$(cd "$dest" && ls -1t ./*.tgz | head -n1 | sed 's#^\./##')
+                      # Newest .tgz basename, via find (not `ls`, per shellcheck SC2012).
+                      tgz=$(cd "$dest" && find . -maxdepth 1 -name '*.tgz' -printf '%T@\t%f\n' | sort -rn | head -n1 | cut -f2)
                       ;;
                     yarn)
                       ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && yarn pack --out "$dest/package.tgz" >/dev/null )
