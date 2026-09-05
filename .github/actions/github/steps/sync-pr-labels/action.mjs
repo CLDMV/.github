@@ -53,7 +53,16 @@ async function ensureCatalogLabels(labels, { token, owner, repo }) {
 	for (const entry of catalog) {
 		if (entry && entry.name) byName.set(entry.name.toLowerCase(), entry);
 	}
-	const wanted = labels.map((name) => byName.get(name.toLowerCase())).filter(Boolean);
+	// Resolve the labels being applied to their catalog entries, deduped by
+	// canonical name: several input aliases can resolve to the same canonical
+	// label, and ensuring it more than once is redundant API calls plus a noisy
+	// 422 on the second create.
+	const byCanonical = new Map();
+	for (const name of labels) {
+		const entry = byName.get(name.toLowerCase());
+		if (entry) byCanonical.set(entry.name.toLowerCase(), entry);
+	}
+	const wanted = [...byCanonical.values()];
 	if (wanted.length === 0) return;
 
 	let existing;
