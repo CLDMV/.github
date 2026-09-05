@@ -54,7 +54,7 @@ on:
                 type: string
                 default: ""
             runs_on:
-                description: "Runner label for the subjects job. Empty = auto: the caller's RUNS_ON_DEFAULT Actions variable, else cldmv-runners for private CLDMV repos, else ubuntu-latest."
+                description: "Runner label for the subjects job. Must be a Linux/GNU runner — the job assumes bash, gh, jq, unzip, and sha256sum. Empty = auto: the caller's RUNS_ON_DEFAULT Actions variable, else cldmv-runners for private CLDMV repos, else ubuntu-latest."
                 required: false
                 type: string
                 default: ""
@@ -171,7 +171,9 @@ jobs:
                   cd "$dest"
                   echo "🔏 Provenance subjects:"
                   sha256sum ./*.tgz
-                  hashes=$(sha256sum ./*.tgz | base64 -w0)
+                  # `base64 | tr -d '\n'` (not GNU-only `base64 -w0`) so the
+                  # single-line encoding doesn't depend on a GNU userland.
+                  hashes=$(sha256sum ./*.tgz | base64 | tr -d '\n')
                   echo "hashes=$hashes" >> "$GITHUB_OUTPUT"
 
     # Genuine SLSA build-provenance .intoto.jsonl (the ONLY suffix OpenSSF
