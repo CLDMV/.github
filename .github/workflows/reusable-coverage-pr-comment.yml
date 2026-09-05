@@ -186,7 +186,7 @@ jobs:
                   if [ "$PM" != "npm" ]; then
                     case "$cmd" in
                       "npm "*) cmd="$PM ${cmd#npm }" ;;
-                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
                     esac
                   fi
                   echo "▶ $cmd"
@@ -204,7 +204,7 @@ jobs:
                   if [ "$PM" != "npm" ]; then
                     case "$cmd" in
                       "npm "*) cmd="$PM ${cmd#npm }" ;;
-                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
                     esac
                   fi
                   echo "▶ $cmd"
@@ -221,7 +221,7 @@ jobs:
                   if [ "$PM" != "npm" ]; then
                     case "$cmd" in
                       "npm "*) cmd="$PM ${cmd#npm }" ;;
-                      "npx "*) cmd="$PM dlx ${cmd#npx }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
                     esac
                   fi
                   echo "▶ $cmd"

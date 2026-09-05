@@ -99,7 +99,7 @@ export function installCommand(pm, frozen) {
  * commands that don't start with npm/npx (e.g. `make build`). Used at the exec
  * chokepoints so configurable command inputs default to the detected PM.
  *   `npm run build`  →  `pnpm run build`   (pnpm)
- *   `npx foo`        →  `pnpm dlx foo`     (pnpm) / `yarn dlx foo` (yarn)
+ *   `npx foo`        →  `pnpm dlx foo`     (pnpm only; left as `npx foo` for yarn)
  * @public
  * @param {"npm"|"yarn"|"pnpm"} pm
  * @param {string} command
@@ -118,9 +118,11 @@ export function pmCommand(pm, command) {
 	if (/^npm\s+(run|test|start|stop|restart|exec)(\s|$)/.test(cmd)) {
 		return cmd.replace(/^npm(\s)/, `${pm}$1`);
 	}
-	if (/^npx\s/.test(cmd)) {
-		const dlx = pm === "yarn" ? "yarn dlx" : "pnpm dlx";
-		return cmd.replace(/^npx(\s)/, `${dlx}$1`);
+	// Only pnpm rewrites `npx` → `pnpm dlx`. `npx` already works in a yarn repo
+	// (it ships with Node), and `yarn dlx` is Yarn Berry-only — rewriting it would
+	// break Yarn classic (v1) repos, which `auto` also detects from yarn.lock.
+	if (pm === "pnpm" && /^npx\s/.test(cmd)) {
+		return cmd.replace(/^npx(\s)/, "pnpm dlx$1");
 	}
 	return cmd;
 }

@@ -85,7 +85,7 @@ eq("pnpm keeps --if-present suffix", pmCommand("pnpm", "npm run format --if-pres
 eq("yarn rewrites npm run", pmCommand("yarn", "npm run test"), "yarn run test");
 eq("pnpm rewrites bare npm", pmCommand("pnpm", "npm"), "pnpm");
 eq("pnpm rewrites npx → pnpm dlx", pmCommand("pnpm", "npx tsc"), "pnpm dlx tsc");
-eq("yarn rewrites npx → yarn dlx", pmCommand("yarn", "npx tsc"), "yarn dlx tsc");
+eq("yarn leaves npx unchanged (yarn dlx is Berry-only)", pmCommand("yarn", "npx tsc"), "npx tsc");
 eq("non-npm command left alone", pmCommand("pnpm", "make build"), "make build");
 eq("empty stays empty", pmCommand("pnpm", ""), "");
 // Only script/tool subcommands are rewritten — install-style ones are left as-is
