@@ -969,6 +969,36 @@ async function convertAuthorToGitHubLink(author, email, token) {
 }
 
 /**
+ * Fail loud when a commit-range endpoint isn't present in this checkout.
+ *
+ * A range whose base or head sha is missing locally makes categorizeCommits
+ * (through gitCommand's silent mode) return zero commits, which then ships an
+ * empty but "successful" changelog. That happens when an upstream step feeds a
+ * sha created via the GitHub API but never fetched into this job's local .git
+ * (see github/steps/get-pr-commit-range). A range that resolves but simply
+ * matches no commits is legitimate and passes. Only proper `base..head` ranges
+ * with both endpoints present are checked; anything else (a bare ref, a
+ * tag-less `..HEAD`) is left untouched.
+ * @param {string} range - "base..head" (or "base...head") range string.
+ * @throws {Error} When an endpoint doesn't resolve to a commit locally.
+ */
+function assertRangeResolvable(range) {
+	if (!range) return;
+	const m = range.match(/^(.+?)\.{2,3}(.+)$/);
+	if (!m) return;
+	for (const endpoint of [m[1], m[2]]) {
+		const resolved = gitCommand(`git rev-parse --verify --quiet "${endpoint}^{commit}"`, true);
+		if (!resolved) {
+			throw new Error(
+				`Commit range endpoint '${endpoint}' (from range '${range}') is not present in this checkout — ` +
+					`refusing to generate an empty changelog from an unresolvable range. This usually means a commit ` +
+					`was created via the GitHub API but never fetched locally (see get-pr-commit-range).`
+			);
+		}
+	}
+}
+
+/**
  * Generate comprehensive changelog based on git commit history
  * @param {string} commitRange - Git commit range (e.g., "v1.0.0..HEAD")
  * @param {Array} commits - Optional pre-categorized commits array for testing
@@ -1043,6 +1073,7 @@ async function generateComprehensiveChangelog(
 	}
 
 	if (!commits) {
+		assertRangeResolvable(range);
 		console.log(`⚠️ No commits provided, using categorizeCommits with range: ${range}`);
 		commits = categorizeCommits(range);
 		console.log(`📋 Categorized ${commits.length} commits from git history`);
