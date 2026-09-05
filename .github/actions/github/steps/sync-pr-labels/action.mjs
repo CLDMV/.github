@@ -34,7 +34,16 @@ async function ensureCatalogLabels(labels, { token, owner, repo }) {
 		const catalogPath = join(dirname(fileURLToPath(import.meta.url)), "../../../../../data/github-labels.json");
 		catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
 	} catch (error) {
-		console.log(`::warning::Skipping catalog label ensure — could not read the label catalog: ${error.message}`);
+		console.log(`::warning::Skipping catalog label ensure — could not read the label catalog: ${error?.message ?? error}`);
+		return;
+	}
+
+	// Best-effort guard: a catalog that parses as valid JSON but isn't an array
+	// (e.g. an object) would throw a non-caught TypeError at the `for...of` below
+	// and fail the whole apply step — the opposite of the "never block apply"
+	// contract. Skip cleanly instead.
+	if (!Array.isArray(catalog)) {
+		console.log("::warning::Skipping catalog label ensure — data/github-labels.json did not parse to a JSON array.");
 		return;
 	}
 
