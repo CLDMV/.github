@@ -116,11 +116,23 @@ jobs:
             # `target_base` (a trusted base-repo branch, not the PR head) — the
             # dependabot-security path cherry-picks onto its tip. Cheap no-op
             # for the plain-PATCH "hotfix" path, which doesn't need it.
+            #
+            # persist-credentials: false — the dependabot-security path pushes the
+            # cherry-pick with the APP token via an x-access-token URL that
+            # redirect-hotfix-pr builds (buildRemoteUrl). If actions/checkout
+            # persists the default GITHUB_TOKEN as an http.extraheader (its
+            # default), that header overrides the URL credential and the push
+            # authenticates as GITHUB_TOKEN — which does NOT trigger on:push CI, so
+            # the required "✅ Required PR Check" never posts and the redirected PR
+            # sits `blocked` forever (issue #269). Not persisting the default token
+            # lets the App-token URL authenticate the push, re-triggering CI —
+            # exactly how reusable-lint-format.yml's App-token push re-verifies.
             - name: Checkout target base
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   ref: ${{ inputs.target_base }}
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: Setup bot git identity
               uses: CLDMV/.github/.github/actions/github/steps/setup-git-identity@v4
