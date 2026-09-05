@@ -88,6 +88,13 @@ eq("pnpm rewrites npx → pnpm dlx", pmCommand("pnpm", "npx tsc"), "pnpm dlx tsc
 eq("yarn rewrites npx → yarn dlx", pmCommand("yarn", "npx tsc"), "yarn dlx tsc");
 eq("non-npm command left alone", pmCommand("pnpm", "make build"), "make build");
 eq("empty stays empty", pmCommand("pnpm", ""), "");
+// Only script/tool subcommands are rewritten — install-style ones are left as-is
+// so they never become an invalid `pnpm ci` / `yarn ci` (#267 review).
+eq("pnpm rewrites npm test", pmCommand("pnpm", "npm test"), "pnpm test");
+eq("pnpm rewrites npm start", pmCommand("pnpm", "npm start"), "pnpm start");
+eq("pnpm leaves npm ci untouched", pmCommand("pnpm", "npm ci"), "npm ci");
+eq("yarn leaves npm install untouched", pmCommand("yarn", "npm install"), "npm install");
+eq("pnpm leaves npm publish untouched", pmCommand("pnpm", "npm publish"), "npm publish");
 
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

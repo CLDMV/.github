@@ -109,7 +109,15 @@ export function pmCommand(pm, command) {
 	const cmd = String(command ?? "").trim();
 	if (!cmd || pm === "npm") return cmd;
 	if (cmd === "npm") return pm;
-	if (/^npm\s/.test(cmd)) return cmd.replace(/^npm(\s)/, `${pm}$1`);
+	// Only rewrite npm SCRIPT/tool subcommands. Install-style subcommands (ci,
+	// install, publish, pack, …) are left untouched: `pnpm ci` / `yarn ci` don't
+	// exist, and installs/publishes have their own PM-aware handling
+	// (installCommand + the publish actions). A caller who passes e.g. `npm ci`
+	// as a test/build command then gets a runnable `npm ci`, not a corrupted
+	// `pnpm ci`.
+	if (/^npm\s+(run|test|start|stop|restart|exec)(\s|$)/.test(cmd)) {
+		return cmd.replace(/^npm(\s)/, `${pm}$1`);
+	}
 	if (/^npx\s/.test(cmd)) {
 		const dlx = pm === "yarn" ? "yarn dlx" : "pnpm dlx";
 		return cmd.replace(/^npx(\s)/, `${dlx}$1`);
