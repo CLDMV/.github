@@ -252,6 +252,13 @@ runs:
       env:
         RANGE: ${{ steps.get-pr-range.outputs.commit-range }}
       run: |
+        base="${RANGE%%..*}"
+        head="${RANGE##*..}"
+        if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null 2>&1 \
+           || ! git rev-parse --verify --quiet "${head}^{commit}" >/dev/null 2>&1; then
+            echo "::error::Commit range '$RANGE' has an endpoint not present in this checkout — cannot compute PR commit types. A commit was likely created via the GitHub API but never fetched locally (see get-pr-commit-range)."
+            exit 1
+        fi
         types=$(git log --no-merges --format='%s' "$RANGE" \
             | { grep -vE '^(release|chore: bump version)' || true; } \
             | { grep -oiE '^[a-z]+(\([^)]+\))?!?:' || true; } \

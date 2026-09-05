@@ -1,0 +1,198 @@
+#
+# @Project: workflows
+# @Filename: /reusable-provenance.yml
+# @Date: 2026-09-05 00:00:00 -07:00 (1788591600)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Reusable: SLSA build provenance (.intoto.jsonl) for a published release
+# (issue #243). DECOUPLED from the publish pipeline on purpose (issue #268): the
+# SLSA generator is itself a reusable-workflow call, and a reusable-workflow-call
+# job cannot carry `continue-on-error` (it isn't a supported keyword there). So
+# if this lived inside reusable-publishing.yml, a provenance hiccup would turn an
+# otherwise-successful release run red with no way to make it non-blocking.
+# Running it in its own workflow, triggered by `release: published`, keeps its
+# outcome entirely independent of the release run's conclusion.
+#
+# Flow: re-pack the SAME build artifact the publish run uploaded — looked up by
+# name via the Actions API (the publish run is a different workflow run, so
+# actions/download-artifact, which only sees the current run, can't reach it) —
+# so the subjects are byte-identical to what was published; emit the base64
+# sha256 subjects; then call the SLSA generator to sign them into a genuine
+# .intoto.jsonl and attach it to the release tag.
+#
+# Real, PUBLIC package releases only: SLSA provenance records the repo + tag in
+# the public Rekor transparency log, so the caller gates to public,
+# non-draft/non-prerelease releases (see the example caller). A release with no
+# build artifact (source-only, or the artifact expired) is skipped cleanly.
+#
+# STATUS: v4. Prereq: the org's allowed actions/reusable-workflows policy must
+# permit slsa-framework/*.
+name: 🔏 SLSA Provenance (v4 reusable)
+
+on:
+    workflow_call:
+        inputs:
+            tag:
+                description: "Release tag to attach the provenance to (e.g. v1.2.3). The version is derived by stripping a leading 'v'."
+                required: true
+                type: string
+            package_name:
+                description: "NPM package name (e.g. @cldmv/slothlet) — used to resolve the build artifact name."
+                required: true
+                type: string
+            node_version:
+                description: "Node.js version to pin for a deterministic re-pack. Must match the publish run's node_version so the re-packed tarballs are byte-identical."
+                required: false
+                type: string
+                default: "lts/*"
+            extra_packages:
+                description: "Satellite packages that ride the build artifact (the same value passed to reusable-publishing.yml). Empty (default) disables satellite subjects."
+                required: false
+                type: string
+                default: ""
+            runs_on:
+                description: "Runner label for the subjects job. Must be a Linux/GNU runner — the job assumes bash, gh, jq, unzip, and sha256sum. Empty = auto: the caller's RUNS_ON_DEFAULT Actions variable, else cldmv-runners for private CLDMV repos, else ubuntu-latest."
+                required: false
+                type: string
+                default: ""
+
+jobs:
+    subjects:
+        name: "🔏 Compute SLSA provenance subjects"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read # checkout the released tag
+            actions: read # look up + download the publish run's build artifact
+        outputs:
+            hashes: ${{ steps.hash.outputs.hashes }}
+            found: ${{ steps.artifact.outputs.found }}
+        steps:
+            - name: Checkout released tag
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ inputs.tag }}
+
+            - name: Resolve version
+              id: ver
+              shell: bash
+              env:
+                  TAG: ${{ inputs.tag }}
+              run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+            - name: Calculate artifact names
+              id: names
+              uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  package-name: ${{ inputs.package_name }}
+                  version: ${{ steps.ver.outputs.version }}
+
+            # Overlay the SAME build artifact the publish run uploaded (dist +
+            # staged dist-packages/) onto the checkout, so the re-pack is
+            # byte-identical to what was published. The publish run is a
+            # different workflow run, so it's fetched via the Actions API rather
+            # than actions/download-artifact (which only sees the current run).
+            #
+            # The artifact NAME (e.g. build-artifacts-lts) is stable across
+            # releases, so a bare name+per_page=1 lookup could grab a NEWER
+            # release's artifact — match it to the run that built THIS tag's
+            # commit (workflow_run.head_sha == the checked-out tag commit) and
+            # require it un-expired. Everything here is fail-OPEN: any gh/
+            # download/unzip error, or no matching artifact (source-only release,
+            # expired, or no matching run), skips provenance cleanly (found=false)
+            # rather than failing the run — provenance is best-effort by design.
+            - name: Download the publish run's build artifact
+              id: artifact
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+                  ART_NAME: ${{ steps.names.outputs.artifact-name }}
+              run: |
+                  set -uo pipefail
+                  sha="$(git rev-parse HEAD)"
+                  json="$(gh api "/repos/${REPO}/actions/artifacts?name=${ART_NAME}&per_page=100" 2>/dev/null)" || {
+                    echo "::warning::provenance: artifact lookup failed for '${ART_NAME}'; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  }
+                  id="$(printf '%s' "$json" | jq -r --arg sha "$sha" \
+                    '[.artifacts[] | select(.expired == false and .workflow_run.head_sha == $sha)] | sort_by(.created_at) | last | .id // empty')"
+                  if [ -z "${id:-}" ]; then
+                    echo "::warning::provenance: no un-expired build artifact '${ART_NAME}' for commit ${sha} — skipping (source-only release, expired artifact, or no matching run)."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  fi
+                  if ! gh api "/repos/${REPO}/actions/artifacts/${id}/zip" > "${RUNNER_TEMP}/build-artifact.zip" 2>/dev/null; then
+                    echo "::warning::provenance: artifact download failed; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  fi
+                  if ! unzip -q -o "${RUNNER_TEMP}/build-artifact.zip" -d .; then
+                    echo "::warning::provenance: artifact unzip failed; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  fi
+                  echo "found=true" >> "$GITHUB_OUTPUT"
+
+            # Pin Node so the re-packed tarballs are byte-identical to what the
+            # publish jobs packed (same npm version → same sha256 subjects).
+            - name: Setup Node.js (deterministic pack)
+              if: steps.artifact.outputs.found == 'true'
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+              with:
+                  node-version: ${{ inputs.node_version }}
+
+            - name: Discover satellite packages
+              id: discover
+              if: steps.artifact.outputs.found == 'true' && inputs.extra_packages != ''
+              uses: CLDMV/.github/.github/actions/npm/steps/discover-subpackages@v4
+              with:
+                  extra-packages: ${{ inputs.extra_packages }}
+
+            - name: Pack tarballs and compute subjects
+              id: hash
+              if: steps.artifact.outputs.found == 'true'
+              shell: bash
+              env:
+                  MATRIX: ${{ steps.discover.outputs.matrix }}
+              run: |
+                  set -euo pipefail
+                  dest="${RUNNER_TEMP}/provenance"
+                  mkdir -p "$dest"
+                  # Core package (the artifact root is the built core package).
+                  npm pack . --pack-destination "$dest" --silent
+                  # Satellites ride the same build artifact under their staged dirs.
+                  if [ -n "${MATRIX:-}" ] && [ "$MATRIX" != "[]" ]; then
+                      while IFS= read -r dir; do
+                          [ -n "$dir" ] || continue
+                          npm pack "./${dir}" --pack-destination "$dest" --silent
+                      done < <(printf '%s' "$MATRIX" | jq -r '.[].dir')
+                  fi
+                  cd "$dest"
+                  echo "🔏 Provenance subjects:"
+                  sha256sum ./*.tgz
+                  # `base64 | tr -d '\n'` (not GNU-only `base64 -w0`) so the
+                  # single-line encoding doesn't depend on a GNU userland.
+                  hashes=$(sha256sum ./*.tgz | base64 | tr -d '\n')
+                  echo "hashes=$hashes" >> "$GITHUB_OUTPUT"
+
+    # Genuine SLSA build-provenance .intoto.jsonl (the ONLY suffix OpenSSF
+    # Scorecard credits at the provenance tier — a .sigstore.json bundle is not)
+    # covering every packed tarball, attached to the release tag. The generator
+    # MUST be referenced by a full @vX.Y.Z tag — a shorter tag or a commit SHA
+    # fails by its own hardening design.
+    provenance:
+        name: "🔏 SLSA provenance (.intoto.jsonl)"
+        needs: [subjects]
+        if: needs.subjects.outputs.found == 'true' && needs.subjects.outputs.hashes != ''
+        permissions:
+            actions: read # detect the GitHub Actions environment
+            id-token: write # provenance signing (OIDC)
+            contents: write # upload the .intoto.jsonl release asset
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+        with:
+            base64-subjects: ${{ needs.subjects.outputs.hashes }}
+            upload-assets: true
+            # The release already exists (this fires on release:published), so
+            # target it explicitly by its tag.
+            upload-tag-name: ${{ inputs.tag }}

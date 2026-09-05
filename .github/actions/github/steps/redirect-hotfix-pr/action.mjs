@@ -216,6 +216,31 @@ export function missingCherryPickPrereq({ insideWorkTree, hasIdentity, canSign }
 	return "";
 }
 
+/**
+ * Whether a git `%G?` signature status means the commit carries a signature we
+ * can safely push to a required-signatures branch. Fail-CLOSED: only the
+ * definitely-signed statuses pass — 'G' (good), 'U' (good, unknown validity),
+ * and 'E' (a signature IS present but can't be verified locally, e.g. the bot's
+ * public key isn't in the runner keyring — GitHub still verifies it against the
+ * account). Everything else is treated as unsigned/unsafe: 'N' (no signature),
+ * 'B' (bad), 'X'/'Y' (expired signature / expired key), 'R' (revoked), the empty
+ * string (the `git log --format=%G?` probe itself failed), or any unexpected
+ * value.
+ *
+ * This is deliberately the inverse of an `=== 'N'` check, which is fail-OPEN: an
+ * empty result from a failed probe — or any non-'N' value for an effectively
+ * unsigned commit — slips past it and pushes an unsigned commit onto the hotfix
+ * lane, where required-signatures then blocks the redirected PR with no failing
+ * check naming the cause (issue #271).
+ *
+ * @public
+ * @param {string} status - the trimmed output of `git log -1 --format=%G?` (or "" if that probe failed).
+ * @returns {boolean}
+ */
+export function isPushableSignature(status) {
+	return status === "G" || status === "U" || status === "E";
+}
+
 // ---- side-effecting main flow (gated to script entry only) ----------------
 
 async function fetchPR(owner, repo, prNumber, token) {
@@ -329,16 +354,19 @@ async function cherryPickOntoBranch({ remoteUrl, targetBase, branch, prNumber, c
 	}
 
 	const headSha = run("git", ["rev-parse", "HEAD"]);
-	// Defence in depth: never push an UNSIGNED commit onto the hotfix lane — it
-	// would be silently rejected by required-signatures with no failing check to
-	// explain why (the exact failure mode of issue #257). `%G?` is 'N' only when
-	// the commit carries no signature at all; 'G'/'U'/'E' all mean it IS signed
-	// (an own key can read as 'U' unknown-validity or 'E' can't-verify in CI,
-	// which are fine — the signature exists), so we fail only on 'N'.
-	const sigStatus = runCapturing("git", ["log", "-1", "--format=%G?"]).stdout.trim();
-	if (sigStatus === "N") {
+	// Defence in depth: never push a commit that isn't verifiably signed onto the
+	// hotfix lane — required-signatures would reject it with no failing check to
+	// explain why (issues #257, #271). Fail CLOSED: push only when `%G?` is a
+	// definitely-signed status ('G'/'U'/'E' — see isPushableSignature). A bare
+	// `=== 'N'` check is fail-OPEN — if the probe itself fails (empty output) or
+	// `-S` soft-produces an unsigned commit that reads as anything other than the
+	// literal 'N', the unsigned commit is pushed anyway (issue #271). Treat a
+	// failed probe as unsigned.
+	const sigProbe = runCapturing("git", ["log", "-1", "--format=%G?"]);
+	const sigStatus = sigProbe.ok ? sigProbe.stdout.trim() : "";
+	if (!isPushableSignature(sigStatus)) {
 		throw new Error(
-			`Refusing to push: cherry-picked commit ${headSha.slice(0, 7)} is UNSIGNED (git '%G?' = 'N') even though signing prerequisites were met. It would be blocked by the branch's required-signatures rule. Check the BOT_GPG_* secrets and the GPG-import step in workflow-hotfix-redirector.yml.`
+			`Refusing to push: cherry-picked commit ${headSha.slice(0, 7)} is not verifiably signed (git '%G?' = '${sigStatus || "<empty>"}'; a pushable signature is 'G', 'U', or 'E') even though signing prerequisites were met. It would be blocked by the branch's required-signatures rule. Check the BOT_GPG_* secrets and the GPG-import step in workflow-hotfix-redirector.yml.`
 		);
 	}
 	run("git", ["push", "origin", `HEAD:refs/heads/${branch}`]);
