@@ -36,6 +36,7 @@ const RULESET = {
 					"release/[0-9]+\\.[0-9]+\\.[0-9]+",
 					"hotfix/[0-9]+\\.[0-9]+\\.[0-9]+",
 					"feat/*",
+					"feature/*",
 					"fix/*",
 					"chore/*",
 					"deps/*",
