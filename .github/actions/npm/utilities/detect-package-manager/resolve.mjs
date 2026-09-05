@@ -74,12 +74,17 @@ export function hasLockfile(pm, cwd = ".") {
 }
 
 /**
- * The install command for a package manager. A frozen/CI install is used only
- * when the matching lockfile is present; otherwise a plain install (workspace
- * repos often carry no in-repo lockfile).
+ * The install command for a package manager. When `frozen` is true, returns the
+ * reproducible/CI install (`npm ci` / `pnpm install --frozen-lockfile` /
+ * `yarn install --frozen-lockfile`); otherwise a plain, lockfile-mutating
+ * install. `frozen` is a caller POLICY decision, not a lockfile-presence check:
+ * installs are frozen by default across the pipeline (opt out per-repo with the
+ * `CLDMV_SKIP_FROZEN_LOCKFILE` Actions variable), and a repo that stays frozen
+ * without committing a lockfile is meant to fail loudly — that guard lives at
+ * the call site (install-dependencies), not here.
  * @public
  * @param {"npm"|"yarn"|"pnpm"} pm
- * @param {boolean} frozen - Whether the matching lockfile exists.
+ * @param {boolean} frozen - Whether to emit the frozen/reproducible install command (caller policy — NOT derived from lockfile presence).
  * @returns {string}
  */
 export function installCommand(pm, frozen) {

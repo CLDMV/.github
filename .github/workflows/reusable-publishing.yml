@@ -759,11 +759,16 @@ jobs:
                   # pnpm/yarn pack the CURRENT directory, so cd into the staged dir.
                   case "$PM" in
                     pnpm)
-                      ( cd "./artifact/${SAT_DIR}" && corepack enable >/dev/null 2>&1 || true; pnpm pack --pack-destination "$dest" >/dev/null )
+                      # cd must succeed (fail-fast if the staged dir is missing);
+                      # only `corepack enable` is best-effort. Grouping the `|| true`
+                      # with `&&` around it — rather than `cd && corepack || true` —
+                      # keeps the `|| true` from also masking a failed `cd`, which
+                      # would otherwise pack the wrong directory and "succeed".
+                      ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && pnpm pack --pack-destination "$dest" >/dev/null )
                       tgz=$(cd "$dest" && ls -1t ./*.tgz | head -n1 | sed 's#^\./##')
                       ;;
                     yarn)
-                      ( cd "./artifact/${SAT_DIR}" && corepack enable >/dev/null 2>&1 || true; yarn pack --out "$dest/package.tgz" >/dev/null )
+                      ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && yarn pack --out "$dest/package.tgz" >/dev/null )
                       tgz="package.tgz"
                       ;;
                     *)
