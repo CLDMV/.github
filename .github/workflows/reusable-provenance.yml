@@ -93,9 +93,17 @@ jobs:
             # Overlay the SAME build artifact the publish run uploaded (dist +
             # staged dist-packages/) onto the checkout, so the re-pack is
             # byte-identical to what was published. The publish run is a
-            # different workflow run, so it's fetched by name via the Actions API
-            # rather than actions/download-artifact (which only sees the current
-            # run). No artifact (source-only release, or expired) → skip cleanly.
+            # different workflow run, so it's fetched via the Actions API rather
+            # than actions/download-artifact (which only sees the current run).
+            #
+            # The artifact NAME (e.g. build-artifacts-lts) is stable across
+            # releases, so a bare name+per_page=1 lookup could grab a NEWER
+            # release's artifact — match it to the run that built THIS tag's
+            # commit (workflow_run.head_sha == the checked-out tag commit) and
+            # require it un-expired. Everything here is fail-OPEN: any gh/
+            # download/unzip error, or no matching artifact (source-only release,
+            # expired, or no matching run), skips provenance cleanly (found=false)
+            # rather than failing the run — provenance is best-effort by design.
             - name: Download the publish run's build artifact
               id: artifact
               shell: bash
@@ -104,15 +112,26 @@ jobs:
                   REPO: ${{ github.repository }}
                   ART_NAME: ${{ steps.names.outputs.artifact-name }}
               run: |
-                  set -euo pipefail
-                  id=$(gh api "/repos/${REPO}/actions/artifacts?name=${ART_NAME}&per_page=1" --jq '.artifacts[0].id // empty')
+                  set -uo pipefail
+                  sha="$(git rev-parse HEAD)"
+                  json="$(gh api "/repos/${REPO}/actions/artifacts?name=${ART_NAME}&per_page=100" 2>/dev/null)" || {
+                    echo "::warning::provenance: artifact lookup failed for '${ART_NAME}'; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  }
+                  id="$(printf '%s' "$json" | jq -r --arg sha "$sha" \
+                    '[.artifacts[] | select(.expired == false and .workflow_run.head_sha == $sha)] | sort_by(.created_at) | last | .id // empty')"
                   if [ -z "${id:-}" ]; then
-                    echo "::warning::No build artifact named '${ART_NAME}' found — skipping provenance (source-only release, or the build artifact expired)."
-                    echo "found=false" >> "$GITHUB_OUTPUT"
-                    exit 0
+                    echo "::warning::provenance: no un-expired build artifact '${ART_NAME}' for commit ${sha} — skipping (source-only release, expired artifact, or no matching run)."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
                   fi
-                  gh api "/repos/${REPO}/actions/artifacts/${id}/zip" > "${RUNNER_TEMP}/build-artifact.zip"
-                  unzip -q -o "${RUNNER_TEMP}/build-artifact.zip" -d .
+                  if ! gh api "/repos/${REPO}/actions/artifacts/${id}/zip" > "${RUNNER_TEMP}/build-artifact.zip" 2>/dev/null; then
+                    echo "::warning::provenance: artifact download failed; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  fi
+                  if ! unzip -q -o "${RUNNER_TEMP}/build-artifact.zip" -d .; then
+                    echo "::warning::provenance: artifact unzip failed; skipping."
+                    echo "found=false" >> "$GITHUB_OUTPUT"; exit 0
+                  fi
                   echo "found=true" >> "$GITHUB_OUTPUT"
 
             # Pin Node so the re-packed tarballs are byte-identical to what the
