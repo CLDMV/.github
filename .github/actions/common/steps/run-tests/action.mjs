@@ -11,7 +11,8 @@ import { resolvePackageManager, pmCommand } from "../../../npm/utilities/detect-
 
 try {
 	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
-	const testCommand = pmCommand(pm, getInput("test-command", { required: true }));
+	const rawTestCommand = getInput("test-command", { required: true });
+	const testCommand = pmCommand(pm, rawTestCommand);
 	const environment = getInput("environment", { default: "development" });
 
 	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
@@ -23,7 +24,11 @@ try {
 		}
 	}
 
-	console.log(`🔍 DEBUG: test-command input = '${testCommand}'`);
+	// Log the raw input AND the package-manager-resolved command separately — the
+	// two differ once pmCommand() rewrites a leading npm/npx token (e.g.
+	// `npm run test` → `pnpm run test`), so labelling the resolved value as the
+	// "input" is misleading when diagnosing why a command ran under pnpm/yarn.
+	console.log(`🔍 DEBUG: test-command input = '${rawTestCommand}' (resolved for ${pm}: '${testCommand}')`);
 	console.log(`🔍 DEBUG: environment input = '${environment}'`);
 
 	const hasNodeEnv = testCommand.includes("NODE_ENV=");
