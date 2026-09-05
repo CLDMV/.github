@@ -25,7 +25,9 @@ try {
 	// out at its content tip (the bump commit's parent), and the bump commit is
 	// filtered out of the changelog/label steps regardless — so the local HEAD is
 	// both the correct range head and always locally resolvable. Prefer it; fall
-	// back to the API head only if HEAD can't be read (an edge/detached checkout).
+	// back to the API head only if HEAD can't be read at all — i.e. the workspace
+	// isn't a git checkout, or git is unavailable (NOT a detached HEAD, where
+	// `git rev-parse HEAD` resolves fine).
 	let headSha = pr.head.sha;
 	try {
 		const localHead = execFileSync("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "ignore"] })
