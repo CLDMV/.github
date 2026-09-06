@@ -106,11 +106,12 @@ try {
 		};
 		const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 		// ls-remote reflects a tag a concurrent release just pushed, regardless of
-		// what this checkout fetched; static command, no interpolation.
-		let tagNames = tryGit("git ls-remote --tags origin")
+		// what this checkout fetched. argv form (execFileSync, no shell), consistent
+		// with tryGitArgs above — the args are static, so this is for consistency.
+		let tagNames = tryGitArgs(["ls-remote", "--tags", "origin"])
 			.split("\n")
 			.map((l) => (l.split("\t")[1] || "").replace(/^refs\/tags\//, "").replace(/\^\{\}$/, ""));
-		if (!tagNames.some((n) => parseSemver(n))) tagNames = tryGit("git tag --list").split("\n");
+		if (!tagNames.some((n) => parseSemver(n))) tagNames = tryGitArgs(["tag", "--list"]).split("\n");
 		let top = null;
 		for (const n of tagNames) {
 			const p = parseSemver(n);
