@@ -56,23 +56,54 @@ try {
 		}
 	}
 
-	fs.copyFileSync(stashedBadge, badgeFile);
-	execSync(`git add "${badgeFile}"`);
+	// Commit + push with retry. The coverage-badge trigger fires on the
+	// default branch, `next`, AND `hotfixes`, so several branch runs can
+	// target the shared `badges` branch at once. Each writes a DISTINCT
+	// filename (coverage.json / coverage-next.json / coverage-hotfixes.json),
+	// so there is never a content conflict — but a concurrent job can still
+	// advance the branch tip between our fetch and our push, rejecting ours
+	// as non-fast-forward. On rejection, re-sync onto the latest tip and
+	// replay our badge on top so a concurrent loser never drops its badge.
+	const remote = `https://x-access-token:${botToken}@github.com/${repository}.git`;
+	const maxAttempts = 5;
+	/** Synchronous, dependency-free sleep so retries don't collide in lockstep. */
+	const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-	let unchanged = false;
-	try {
-		execSync("git diff --cached --quiet", { stdio: "ignore" });
-		unchanged = true;
-	} catch {
-		unchanged = false;
-	}
-	if (unchanged) {
-		console.log("Badge unchanged — skipping commit.");
-		process.exit(0);
-	}
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		fs.copyFileSync(stashedBadge, badgeFile);
+		execSync(`git add "${badgeFile}"`);
 
-	execSync('git commit -S -m "ci: update coverage badge"', { stdio: "inherit" });
-	execSync(`git push "https://x-access-token:${botToken}@github.com/${repository}.git" "${badgesBranch}"`, { stdio: "inherit" });
+		let unchanged = false;
+		try {
+			execSync("git diff --cached --quiet", { stdio: "ignore" });
+			unchanged = true;
+		} catch {
+			unchanged = false;
+		}
+		if (unchanged) {
+			console.log("Badge unchanged — skipping commit.");
+			process.exit(0);
+		}
+
+		execSync('git commit -S -m "ci: update coverage badge"', { stdio: "inherit" });
+
+		try {
+			execSync(`git push "${remote}" "${badgesBranch}"`, { stdio: "inherit" });
+			process.exit(0);
+		} catch (pushError) {
+			if (attempt === maxAttempts) throw pushError;
+			console.log(
+				`::warning::badge push rejected (attempt ${attempt}/${maxAttempts}) — re-syncing '${badgesBranch}' and retrying…`
+			);
+			// A concurrent badge job advanced the tip. Move onto it (dropping
+			// our just-made commit) and let the loop replay our badge file on
+			// the new base — distinct per-branch filenames guarantee a clean
+			// replay with no conflict.
+			sleepSync(200 + Math.floor(Math.random() * 400));
+			execSync(`git fetch origin "${badgesBranch}"`, { stdio: "ignore" });
+			execSync("git reset --hard FETCH_HEAD", { stdio: "inherit" });
+		}
+	}
 } catch (error) {
 	console.error(`::error::${error.message}`);
 	process.exit(1);
