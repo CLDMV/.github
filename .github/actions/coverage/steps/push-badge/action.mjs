@@ -22,15 +22,21 @@ import { getInput } from "../../../common/common/core.mjs";
  */
 const git = (args, opts = {}) => execFileSync("git", args, opts);
 
-// Read the push token up front so both the push and the top-level error handler
-// can scrub it from any log line — git errors (and Node's own) can echo the
-// token-bearing remote URL. `redact` replaces the token with `***` everywhere
-// we print or rethrow. (App tokens are also GitHub-Actions-masked; this is
-// defense-in-depth.)
-const botToken = process.env.BOT_TOKEN || getInput("bot-token");
+// The push token is read inside the try below (so a missing token surfaces as a
+// clear, caught error instead of an `...:undefined@...` auth failure). It's
+// declared here at module scope only so `redact` — used by the top-level catch
+// handler — can scrub it from any log line: git errors can echo the
+// token-bearing remote URL. App tokens are also GitHub-Actions-masked, so this
+// is defense-in-depth.
+let botToken;
 const redact = (value) => (botToken ? String(value).split(botToken).join("***") : String(value));
 
 try {
+	botToken = process.env.BOT_TOKEN || getInput("bot-token");
+	if (!botToken) {
+		throw new Error("push-badge: a push token is required — set the BOT_TOKEN env var or the bot-token input.");
+	}
+
 	const badgesBranch = getInput("badges-branch", { default: "badges" });
 	const badgeFile = getInput("badge-filename", { default: "coverage.json" });
 	const botName = getInput("bot-name", { required: true });
@@ -81,7 +87,7 @@ try {
 	// filename (coverage.json / coverage-next.json / coverage-hotfixes.json),
 	// so there is never a content conflict — but a concurrent job can still
 	// advance the branch tip between our fetch and our push, rejecting ours
-	// as non-fast-forward. On rejection, re-sync onto the latest tip and
+	// as non-fast-forward. On that rejection, re-sync onto the latest tip and
 	// replay our badge on top so a concurrent loser never drops its badge.
 	const remote = `https://x-access-token:${botToken}@github.com/${repository}.git`;
 	const maxAttempts = 5;
@@ -107,17 +113,26 @@ try {
 		git(["commit", "-S", "-m", "ci: update coverage badge"], { stdio: "inherit" });
 
 		try {
-			git(["push", remote, badgesBranch], { stdio: "inherit" });
+			// Pipe stderr so a rejection can be classified below; git writes push
+			// progress to stderr, so nothing actionable is lost on success.
+			git(["push", remote, badgesBranch], { stdio: ["ignore", "inherit", "pipe"] });
 			process.exit(0);
 		} catch (pushError) {
-			if (attempt === maxAttempts) throw pushError;
+			const stderr = pushError.stderr ? redact(pushError.stderr.toString()).trim() : "";
+			// Only a non-fast-forward rejection (a concurrent badge job advanced
+			// the shared `badges` tip) is retryable. Auth / permission / network
+			// failures are surfaced immediately rather than retried behind a
+			// misleading "rejected" warning.
+			const nonFastForward = /\[rejected\]|fetch first|non-fast-forward|updates were rejected/i.test(stderr);
+			if (!nonFastForward || attempt === maxAttempts) {
+				throw new Error(stderr || redact(pushError.message), { cause: pushError });
+			}
 			console.log(
-				`::warning::badge push rejected (attempt ${attempt}/${maxAttempts}) — re-syncing '${badgesBranch}' and retrying…`
+				`::warning::badge push rejected (non-fast-forward, attempt ${attempt}/${maxAttempts}) — re-syncing '${badgesBranch}' and retrying…`
 			);
-			// A concurrent badge job advanced the tip. Move onto it (dropping
-			// our just-made commit) and let the loop replay our badge file on
-			// the new base — distinct per-branch filenames guarantee a clean
-			// replay with no conflict.
+			// Move onto the tip the concurrent job advanced (dropping our
+			// just-made commit) and let the loop replay our badge file on the new
+			// base — distinct per-branch filenames guarantee a clean replay.
 			sleepSync(200 + Math.floor(Math.random() * 400));
 			git(["fetch", "origin", badgesBranch], { stdio: "ignore" });
 			git(["reset", "--hard", "FETCH_HEAD"], { stdio: "inherit" });
