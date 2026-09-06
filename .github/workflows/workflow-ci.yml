@@ -400,8 +400,8 @@ jobs:
             == 'success' && (inputs.enable_coverage_badge == true ||
             inputs.enable_coverage_badge == 'true') &&
             github.event_name == 'push' && (github.ref ==
-            format('refs/heads/{0}', inputs.default_branch) ||
-            github.ref_name == 'next' || github.ref_name == 'hotfixes')
+            format('refs/heads/{0}', inputs.default_branch) || github.ref ==
+            'refs/heads/next' || github.ref == 'refs/heads/hotfixes')
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
