@@ -76,6 +76,40 @@ try {
 		}
 	}
 
+	// Floor the base version at the highest already-released tag (#278). The base
+	// above is origin/<default>:package.json, which can LAG the newest published
+	// tag — e.g. a concurrent hotfix ships X.Y.Z (and tags it) while this branch's
+	// view of the default branch is a step behind. Bumping a lagging base would
+	// recompute a version that already shipped, which the publish step cannot
+	// republish. Taking the max with the highest release tag keeps "base = latest
+	// published state" true. Degrades to no floor when tags can't be read.
+	if (baseVersion) {
+		const parseSemver = (v) => {
+			const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec((v || "").trim());
+			return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+		};
+		const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+		// ls-remote reflects a tag a concurrent release just pushed, regardless of
+		// what this checkout fetched; static command, no interpolation.
+		let tagNames = tryGit("git ls-remote --tags origin")
+			.split("\n")
+			.map((l) => (l.split("\t")[1] || "").replace(/^refs\/tags\//, "").replace(/\^\{\}$/, ""));
+		if (!tagNames.some((n) => parseSemver(n))) tagNames = tryGit("git tag --list").split("\n");
+		let top = null;
+		for (const n of tagNames) {
+			const p = parseSemver(n);
+			if (p && (!top || cmp(p, top) > 0)) top = p;
+		}
+		const base = parseSemver(baseVersion);
+		if (top && base && cmp(top, base) > 0) {
+			const floored = `${top[0]}.${top[1]}.${top[2]}`;
+			console.log(
+				`📈 Highest released tag v${floored} exceeds base ${baseVersion} — flooring base at v${floored} to avoid recomputing a shipped version (#278)`
+			);
+			baseVersion = floored;
+		}
+	}
+
 	setOutput("merge-base", mergeBase);
 	if (baseVersion) {
 		console.log(`📦 Base version on origin/${defaultBranch}: ${baseVersion}`);
