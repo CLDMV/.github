@@ -6,10 +6,11 @@
 
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { getInput, setOutputs } from "../../../common/common/core.mjs";
+import { resolvePackageManager } from "../../../npm/utilities/detect-package-manager/resolve.mjs";
 
 try {
 	const token = getInput("github-token", { required: true });
-	const packageManager = getInput("package-manager", { default: "npm" });
+	const packageManager = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 	const customNpmCommand = getInput("custom-npm-command");
 	const customGithubPackagesCommand = getInput("custom-github-packages-command");
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
@@ -25,7 +26,7 @@ try {
 			: "🌍 Public repository detected - using public access for auto-detection"
 	);
 
-	const tool = packageManager === "yarn" ? "yarn publish" : "npm publish";
+	const tool = packageManager === "yarn" ? "yarn publish" : packageManager === "pnpm" ? "pnpm publish" : "npm publish";
 
 	let npmCommand = customNpmCommand;
 	if (!npmCommand) {

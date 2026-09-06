@@ -32,8 +32,8 @@ on:
             package_manager:
                 required: false
                 type: string
-                default: "npm"
-                description: "Package manager (npm or yarn)"
+                default: "auto"
+                description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
             version:
                 required: false
                 type: string

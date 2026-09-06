@@ -1,0 +1,18 @@
+name: "Detect Package Manager"
+description: "Resolve which package manager (npm, yarn, or pnpm) a repository uses. An explicit npm/yarn/pnpm is honored verbatim; 'auto' (default) detects from the package.json packageManager field, then lockfile/workspace signals, falling back to npm."
+
+inputs:
+  package-manager:
+    description: "Requested package manager: 'auto' (default, detect), or an explicit 'npm' | 'yarn' | 'pnpm' (honored verbatim)."
+    required: false
+    default: "auto"
+
+outputs:
+  package-manager:
+    description: "The resolved concrete package manager: 'npm' | 'yarn' | 'pnpm'."
+  cache:
+    description: "Value for actions/setup-node's `cache:` — the PM when it is npm/yarn AND its lockfile is present, else empty (setup-node then skips caching instead of erroring)."
+
+runs:
+  using: "node24"
+  main: "action.mjs"

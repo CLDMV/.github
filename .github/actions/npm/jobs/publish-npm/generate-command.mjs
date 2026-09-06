@@ -6,9 +6,10 @@
  */
 
 import { getEventPayload, setOutput } from "../../../common/common/core.mjs";
+import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
 
 const customCommand = process.env.CUSTOM_CMD || "";
-const packageManager = process.env.PACKAGE_MANAGER || "npm";
+const packageManager = resolvePackageManager(process.env.PACKAGE_MANAGER || "auto", ".");
 
 let finalCommand;
 if (customCommand) {
@@ -22,7 +23,7 @@ if (customCommand) {
 	console.log(`📊 Repository visibility: ${visibility}`);
 	const accessLevel = visibility === "public" ? "public" : "restricted";
 	console.log(`🔒 Package access level: ${accessLevel}`);
-	const tool = packageManager === "yarn" ? "yarn publish" : "npm publish";
+	const tool = packageManager === "yarn" ? "yarn publish" : packageManager === "pnpm" ? "pnpm publish" : "npm publish";
 	finalCommand = `${tool} --access ${accessLevel}`;
 	// Public npm packages published via the npm CLI carry SLSA build provenance
 	// + a publish attestation (sigstore). Private packages can't, and `yarn

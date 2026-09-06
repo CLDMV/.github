@@ -83,10 +83,10 @@ on:
                 type: string
                 default: "lts/*"
             package_manager:
-                description: "Package manager (npm or yarn)"
+                description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
 
             # Version parameter
             version:
@@ -736,17 +736,49 @@ jobs:
               with:
                   node-version: ${{ inputs.node_version }}
 
+            - name: Resolve package manager
+              if: inputs.run_create_release == true && inputs.dry_run != true
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
             - name: Pack satellite tarball
               if: inputs.run_create_release == true && inputs.dry_run != true
               id: pack
               shell: bash
               env:
                   SAT_DIR: ${{ matrix.dir }}
+                  PM: ${{ steps.pm.outputs.package-manager }}
               run: |
                   set -euo pipefail
                   dest="${RUNNER_TEMP}/sat-asset"
                   mkdir -p "$dest"
-                  tgz=$(npm pack "./artifact/${SAT_DIR}" --pack-destination "$dest" --silent | tail -n1)
+                  # pnpm/yarn resolve `workspace:*` deps into the packed tarball; npm
+                  # ships them literally, so route the pack through the resolved PM.
+                  # pnpm/yarn pack the CURRENT directory, so cd into the staged dir.
+                  case "$PM" in
+                    pnpm)
+                      # cd must succeed (fail-fast if the staged dir is missing);
+                      # only `corepack enable` is best-effort. Grouping the `|| true`
+                      # with `&&` around it — rather than `cd && corepack || true` —
+                      # keeps the `|| true` from also masking a failed `cd`, which
+                      # would otherwise pack the wrong directory and "succeed".
+                      ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && pnpm pack --pack-destination "$dest" >/dev/null )
+                      # Newest .tgz basename, via find (not `ls`, per shellcheck SC2012).
+                      tgz=$(cd "$dest" && find . -maxdepth 1 -name '*.tgz' -printf '%T@\t%f\n' | sort -rn | head -n1 | cut -f2)
+                      ;;
+                    yarn)
+                      # Flag-less `yarn pack` (NOT `--out`, which is Yarn Berry-only):
+                      # classic (v1) writes <name>-v<ver>.tgz and Berry (v2+) writes
+                      # package.tgz, both into the CURRENT dir — move it into $dest.
+                      ( cd "./artifact/${SAT_DIR}" && { corepack enable >/dev/null 2>&1 || true; } && yarn pack >/dev/null && mv ./*.tgz "$dest/" )
+                      tgz=$(cd "$dest" && find . -maxdepth 1 -name '*.tgz' -printf '%T@\t%f\n' | sort -rn | head -n1 | cut -f2)
+                      ;;
+                    *)
+                      tgz=$(npm pack "./artifact/${SAT_DIR}" --pack-destination "$dest" --silent | tail -n1)
+                      ;;
+                  esac
                   echo "tarball=${dest}/${tgz}" >> "$GITHUB_OUTPUT"
                   echo "📦 Packed ${SAT_DIR} -> ${dest}/${tgz}"
 

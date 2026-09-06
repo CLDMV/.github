@@ -14,3 +14,10 @@ runs:
       uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
+
+    # Enable the corepack shims (bundled with Node — no third-party action) so a
+    # pnpm/yarn repo's run-blocks resolve `pnpm`/`yarn` on this step's Node.
+    # Harmless for npm repos. Best-effort: a failure must not abort setup.
+    - name: Enable corepack
+      shell: bash
+      run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
