@@ -125,13 +125,14 @@ jobs:
                   permission_contents: "true"
                   permission_workflows: "true"
                   # Reading the released PR's head ref (the lane detection below)
-                  # needs pull-requests. create-app-token enters fine-grained mode
-                  # as soon as ANY permission flag is set — granting ONLY the flags
-                  # requested — so without this the token has no pull-requests scope,
-                  # `gh pr view` is silently denied, the lane resolves to "other" for
-                  # EVERY hotfix release, and next is force-reset instead of merged,
-                  # dropping its queued work. (#278)
-                  permission_pull_requests: "true"
+                  # needs pull-requests READ. create-app-token enters fine-grained
+                  # mode as soon as ANY permission flag is set — granting ONLY the
+                  # flags requested — so without this the token has no pull-requests
+                  # scope, `gh pr view` is silently denied, the lane resolves to
+                  # "other" for EVERY hotfix release, and next is force-reset instead
+                  # of merged, dropping its queued work. Read (not write) is enough —
+                  # this workflow only reads the PR, it never mutates one. (#278)
+                  permission_pull_requests_read: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
