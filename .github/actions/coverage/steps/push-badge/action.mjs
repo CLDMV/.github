@@ -39,6 +39,14 @@ try {
 
 	const badgesBranch = getInput("badges-branch", { default: "badges" });
 	const badgeFile = getInput("badge-filename", { default: "coverage.json" });
+	// badge-filename becomes a filesystem path segment (the RUNNER_TEMP stash
+	// path and the file committed to the badges branch). Require a bare filename
+	// so a misconfigured caller can't write outside the temp dir or fail on a
+	// missing intermediate directory via separators/traversal (`../x.json`,
+	// `a/b.json`). Callers in this repo already pass plain basenames.
+	if (!badgeFile || badgeFile !== path.basename(badgeFile) || badgeFile === "." || badgeFile === "..") {
+		throw new Error(`push-badge: badge-filename must be a bare filename with no path separators (got "${badgeFile}").`);
+	}
 	const botName = getInput("bot-name", { required: true });
 	const botEmail = getInput("bot-email", { required: true });
 	const repository = getInput("repository", { required: true });
