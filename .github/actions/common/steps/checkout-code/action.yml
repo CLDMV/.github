@@ -10,6 +10,10 @@ inputs:
     description: "The branch, tag, or SHA to checkout. Empty (default) uses the workflow's triggering ref."
     required: false
     default: ""
+  persist-credentials:
+    description: "Whether actions/checkout leaves the GITHUB_TOKEN persisted as an http.extraheader credential after checkout. Default 'true' (back-compat). Set 'false' when a later step pushes with a DIFFERENT token (e.g. a GitHub App token) via an x-access-token remote URL: a persisted default-token extraheader overrides the URL credential, so the push authenticates as the default GITHUB_TOKEN, which does not trigger on:push workflows (issue #269)."
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -19,3 +23,4 @@ runs:
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         ref: ${{ inputs.ref }}
+        persist-credentials: ${{ inputs.persist-credentials }}

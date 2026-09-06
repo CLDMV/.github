@@ -21,6 +21,7 @@ const TOKEN = process.env.GITHUB_TOKEN;
 const ORG = process.env.ORG;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const DEBUG = process.env.DEBUG === "true";
+const REPOS = (process.env.REPOS || "").trim();
 const LABELS_JSON_PATH = process.env.LABELS_JSON_PATH;
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
@@ -403,8 +404,42 @@ const aliasMap = buildAliasMap(canonicalLabels);
 console.log(`📋 Loaded ${canonicalLabels.length} canonical labels from ${LABELS_JSON_PATH}`);
 console.log(`🏢 Syncing labels for org: ${ORG}${DRY_RUN ? " (DRY RUN)" : ""}`);
 
-// Fetch all repos in the org, sort alphabetically
-const allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
+// Determine the repo set. An explicit `repos` input (comma / space / newline
+// separated, each with or without an `owner/` prefix) scopes the sync to just
+// those repos — e.g. to fix a single newly-onboarded repo on demand without
+// sweeping the whole org. Empty (default) keeps the full-org sweep, so the
+// weekly cron / manual org dispatch is unchanged.
+let allRepos;
+// Strip an optional `owner/` prefix and trim BEFORE filtering empties, so inputs
+// like `CLDMV/` or separators-only (`,`) can't leave an empty repo name — which
+// would make an invalid `GET /repos/${ORG}/` call or a misleading "scoped to 0
+// repos" no-op. If nothing resolves, fall back to the full-org sweep.
+const scoped = REPOS
+	? [
+			...new Set(
+				REPOS.split(/[\s,]+/)
+					.map((n) => n.replace(/^.*\//, "").trim())
+					.filter(Boolean)
+			)
+		]
+	: [];
+if (scoped.length > 0) {
+	console.log(`🎯 Scoped sync to ${scoped.length} repo(s): ${scoped.join(", ")}`);
+	allRepos = [];
+	for (const name of scoped) {
+		const { status, body } = await api(`/repos/${ORG}/${name}`);
+		if (status !== 200) {
+			console.error(`⚠️  Skipping ${ORG}/${name}: GET /repos/${ORG}/${name} → ${status}`);
+			continue;
+		}
+		allRepos.push(body);
+	}
+	allRepos.sort((a, b) => a.name.localeCompare(b.name));
+} else {
+	if (REPOS) console.log(`ℹ️  repos input '${REPOS}' resolved to no repo names — falling back to the full-org sweep.`);
+	// Fetch all repos in the org, sort alphabetically
+	allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
+}
 console.log(`📦 Found ${allRepos.length} repositories`);
 
 // Write summary header

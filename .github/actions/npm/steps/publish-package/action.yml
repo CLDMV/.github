@@ -19,9 +19,9 @@ inputs:
     description: "Node.js version to use"
     required: true
   package-manager:
-    description: "Package manager (npm or yarn)"
+    description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
     required: true
-    default: "npm"
+    default: "auto"
   publish-command:
     description: "Primary publish command to execute"
     required: true

@@ -5,10 +5,11 @@
  */
 
 import { getInput, getBooleanInput, appendSummary } from "../../common/common/core.mjs";
+import { resolvePackageManager } from "../../npm/utilities/detect-package-manager/resolve.mjs";
 
 const packageName = getInput("package-name", { required: true });
 const nodeVersion = getInput("node-version", { default: "lts/*" });
-const packageManager = getInput("package-manager", { default: "npm" });
+const packageManager = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 const ciResult = getInput("ci-result");
 const enableCoverageBadge = getBooleanInput("enable-coverage-badge");
 const badgesBranch = getInput("badges-branch", { default: "badges" });

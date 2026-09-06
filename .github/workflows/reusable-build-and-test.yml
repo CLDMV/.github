@@ -66,10 +66,10 @@ on:
                 type: boolean
                 default: false
             package_manager:
-                description: "Package manager (npm or yarn)"
+                description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
                 required: false
                 type: string
-                default: "npm"
+                default: "auto"
             test_command:
                 description: "Command to run tests"
                 required: false

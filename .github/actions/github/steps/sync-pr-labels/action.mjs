@@ -4,8 +4,97 @@
  * @module @cldmv/.github.github.steps.sync-pr-labels
  */
 
-import { api, parseRepo } from "../../api/_api/core.mjs";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { api, parseRepo, paginate } from "../../api/_api/core.mjs";
 import { getInput } from "../../../common/common/core.mjs";
+
+/**
+ * Ensure every label about to be applied exists in the repo with the catalog's
+ * color/description, creating or correcting it first.
+ *
+ * `POST /issues/{n}/labels` silently auto-creates any label name it doesn't
+ * recognize with a default gray color and empty description. On a freshly
+ * onboarded repo — before its first org-label sync — that leaves every v4 flow
+ * label flat gray until the weekly sweep runs. Seeding the target labels from
+ * data/github-labels.json first means the apply step finds them already
+ * correct. Non-destructive by design: it only touches the labels being applied
+ * and never deletes anything (unlike the full org sync), so it is safe to run
+ * on every PR-label apply. Entirely best-effort — a missing catalog or an
+ * insufficient token scope logs a warning and lets the apply proceed unchanged.
+ *
+ * @param {string[]} labels - Label names about to be applied.
+ * @param {{token: string, owner: string, repo: string}} ctx
+ * @returns {Promise<void>}
+ */
+async function ensureCatalogLabels(labels, { token, owner, repo }) {
+	let catalog;
+	try {
+		const catalogPath = join(dirname(fileURLToPath(import.meta.url)), "../../../../../data/github-labels.json");
+		catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+	} catch (error) {
+		console.log(`::warning::Skipping catalog label ensure — could not read the label catalog: ${error?.message ?? error}`);
+		return;
+	}
+
+	// Best-effort guard: a catalog that parses as valid JSON but isn't an array
+	// (e.g. an object) would throw a non-caught TypeError at the `for...of` below
+	// and fail the whole apply step — the opposite of the "never block apply"
+	// contract. Skip cleanly instead.
+	if (!Array.isArray(catalog)) {
+		console.log("::warning::Skipping catalog label ensure — data/github-labels.json did not parse to a JSON array.");
+		return;
+	}
+
+	// Canonical name (lowercased) → catalog entry. Only labels being applied
+	// that the catalog actually knows about are candidates.
+	const byName = new Map();
+	for (const entry of catalog) {
+		if (entry && entry.name) byName.set(entry.name.toLowerCase(), entry);
+	}
+	// Resolve the labels being applied to their catalog entries, deduped by
+	// canonical name: several input aliases can resolve to the same canonical
+	// label, and ensuring it more than once is redundant API calls plus a noisy
+	// 422 on the second create.
+	const byCanonical = new Map();
+	for (const name of labels) {
+		const entry = byName.get(name.toLowerCase());
+		if (entry) byCanonical.set(entry.name.toLowerCase(), entry);
+	}
+	const wanted = [...byCanonical.values()];
+	if (wanted.length === 0) return;
+
+	let existing;
+	try {
+		const { items } = await paginate("/labels", { token, owner, repo });
+		existing = new Map((items || []).map((l) => [l.name.toLowerCase(), l]));
+	} catch (error) {
+		console.log(`::warning::Skipping catalog label ensure — could not list repo labels: ${error.message}`);
+		return;
+	}
+
+	for (const label of wanted) {
+		const current = existing.get(label.name.toLowerCase());
+		const description = label.description ?? "";
+		try {
+			if (!current) {
+				await api("POST", "/labels", { name: label.name, color: label.color, description }, { token, owner, repo });
+				console.log(`🎨 Created catalog label \`${label.name}\` (#${label.color})`);
+			} else if ((current.color || "").toLowerCase() !== (label.color || "").toLowerCase() || (current.description ?? "") !== description) {
+				await api(
+					"PATCH",
+					`/labels/${encodeURIComponent(current.name)}`,
+					{ new_name: label.name, color: label.color, description },
+					{ token, owner, repo }
+				);
+				console.log(`🎨 Corrected catalog label \`${label.name}\` (#${label.color})`);
+			}
+		} catch (error) {
+			console.log(`::warning::Could not ensure catalog label \`${label.name}\`: ${error.message}`);
+		}
+	}
+}
 
 try {
 	const token = process.env.GITHUB_TOKEN || getInput("github-token", { required: true });
@@ -27,6 +116,13 @@ try {
 	if (labels.length === 0) {
 		console.log("ℹ️ No labels to apply.");
 		process.exit(0);
+	}
+
+	// Seed/correct the target labels from the catalog before applying them, so a
+	// freshly onboarded repo doesn't get flat-gray auto-created labels (best-effort).
+	const ensureCatalog = (getInput("ensure-catalog-labels", { default: "true" }) || "true").toLowerCase() !== "false";
+	if (ensureCatalog) {
+		await ensureCatalogLabels(labels, { token, owner, repo });
 	}
 
 	if (mode === "add") {

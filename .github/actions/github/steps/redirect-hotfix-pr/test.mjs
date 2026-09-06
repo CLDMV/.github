@@ -13,6 +13,7 @@ import {
 	buildReplacementPrBody,
 	buildSupersededCommentBody,
 	missingCherryPickPrereq,
+	isPushableSignature,
 	COMMENT_SENTINEL
 } from "./action.mjs";
 
@@ -324,6 +325,20 @@ eq(
 	"the working directory is not a git checkout",
 	"none present → checkout reported first (most fundamental)"
 );
+
+console.log("\nisPushableSignature (fail-closed guard, #271):");
+// Definitely-signed statuses push.
+eq(isPushableSignature("G"), true, "'G' (good signature) is pushable");
+eq(isPushableSignature("U"), true, "'U' (good, unknown validity) is pushable");
+eq(isPushableSignature("E"), true, "'E' (present but unverifiable locally) is pushable");
+// Everything else is treated as unsigned/unsafe — the fail-closed behavior.
+eq(isPushableSignature("N"), false, "'N' (no signature) is not pushable");
+eq(isPushableSignature(""), false, "empty (the %G? probe itself failed) is not pushable — the #271 fail-open hole");
+eq(isPushableSignature("B"), false, "'B' (bad signature) is not pushable");
+eq(isPushableSignature("X"), false, "'X' (expired signature) is not pushable");
+eq(isPushableSignature("Y"), false, "'Y' (expired key) is not pushable");
+eq(isPushableSignature("R"), false, "'R' (revoked) is not pushable");
+eq(isPushableSignature("garbage"), false, "an unexpected value is not pushable (fail closed)");
 
 console.log("\nCOMMENT_SENTINEL:");
 eq(typeof COMMENT_SENTINEL === "string" && COMMENT_SENTINEL.length > 0, true, "sentinel is non-empty");

@@ -3,8 +3,12 @@ description: "Build project with configurable command and environment"
 
 inputs:
   build-command:
-    description: "Command to build the project"
+    description: "Command to build the project. A leading npm/npx token is routed through the resolved package manager."
     required: true
+  package-manager:
+    description: "Package manager: 'auto' (default, detect) or explicit npm|yarn|pnpm."
+    required: false
+    default: "auto"
   environment:
     description: "Environment to build for (production, development)"
     required: false

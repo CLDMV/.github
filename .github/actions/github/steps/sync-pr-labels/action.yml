@@ -20,6 +20,10 @@ inputs:
     description: "Comma-separated allowlist of labels this sync may remove. In 'replace' mode WITH managed-labels set, only labels in this set are removed when not in 'labels' — anything outside the set (e.g. path-based labels added by the labeler workflow) is left alone. Empty (default) = the historical full-replace behavior."
     required: false
     default: ""
+  ensure-catalog-labels:
+    description: "When 'true' (default), create/correct each applied label in the repo from data/github-labels.json before applying, so a newly onboarded repo doesn't get flat-gray auto-created labels. Non-destructive (only touches the labels being applied; never deletes) and best-effort (failures warn and never block the apply). Set 'false' to skip."
+    required: false
+    default: "true"
 
 runs:
   using: "node24"
