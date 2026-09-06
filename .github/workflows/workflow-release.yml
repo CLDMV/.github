@@ -250,6 +250,7 @@ jobs:
               uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: ${{ github.ref_name }}
+                  skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
                   pr-number: ${{ needs.check-existing-pr.outputs.pr-number }}
                   package-name: ${{ inputs.package_name }}
                   package-manager: ${{ inputs.package_manager }}

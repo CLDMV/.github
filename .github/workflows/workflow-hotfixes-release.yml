@@ -202,6 +202,7 @@ jobs:
                   changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
                   bot-name: ${{ secrets.BOT_NAME }}
                   bot-email: ${{ secrets.BOT_EMAIL }}
+                  skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
 
     refresh:
         name: "🔁 Refresh hotfix release PR #${{ needs.plan.outputs.pr-number }}"
@@ -224,6 +225,7 @@ jobs:
               uses: CLDMV/.github/.github/actions/github/jobs/update-release-pr@v4
               with:
                   head-ref: hotfixes
+                  skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
                   pr-number: ${{ needs.plan.outputs.pr-number }}
                   package-name: ${{ inputs.package_name }}
                   build-command: ${{ inputs.build_command }}

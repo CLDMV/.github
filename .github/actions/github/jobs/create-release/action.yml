@@ -79,6 +79,10 @@ inputs:
   gpg_passphrase:
     description: "Passphrase for the private key (if protected)"
     required: false
+  skip-frozen-lockfile:
+    description: "Value of the CLDMV_SKIP_FROZEN_LOCKFILE repo/org variable, passed from the calling workflow (which has the vars context — composite actions do not). Empty = frozen install."
+    required: false
+    default: ""
 
 outputs:
   release-id:
@@ -162,7 +166,7 @@ runs:
       if: inputs.release-source-only == 'false'
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
       env:
-        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ inputs.skip-frozen-lockfile }}
       with:
         package-manager: ${{ inputs.package-manager }}
 

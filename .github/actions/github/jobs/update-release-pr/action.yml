@@ -59,6 +59,10 @@ inputs:
     description: "Commit-signing bot identity email (e.g. secrets.CLDMV_BOT_EMAIL). See bot-name."
     required: false
     default: ""
+  skip-frozen-lockfile:
+    description: "Value of the CLDMV_SKIP_FROZEN_LOCKFILE repo/org variable, passed from the calling workflow (which has the vars context — composite actions do not). Empty = frozen install."
+    required: false
+    default: ""
 
 outputs:
   new-version:
@@ -134,7 +138,7 @@ runs:
       if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
       env:
-        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ inputs.skip-frozen-lockfile }}
       with:
         package-manager: ${{ inputs.package-manager }}
 
