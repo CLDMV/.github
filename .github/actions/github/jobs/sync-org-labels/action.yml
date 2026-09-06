@@ -9,6 +9,10 @@ inputs:
     description: "GitHub organisation to sync (defaults to current repo owner)"
     required: false
     default: ${{ github.repository_owner }}
+  repos:
+    description: "Optional comma / space / newline separated repo list (each with or without an `owner/` prefix) to scope the sync to just those repos — e.g. to fix one newly-onboarded repo on demand. Empty (default) sweeps every repo in the org."
+    required: false
+    default: ""
   dry-run:
     description: "Dry run — report changes without applying them"
     required: false
@@ -27,6 +31,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         ORG: ${{ inputs.org }}
+        REPOS: ${{ inputs.repos }}
         DRY_RUN: ${{ inputs.dry-run }}
         DEBUG: ${{ inputs.debug }}
         # github.action_path is the action's own directory inside the runner's _actions cache,
