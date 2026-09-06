@@ -399,8 +399,9 @@ jobs:
             needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
             == 'success' && (inputs.enable_coverage_badge == true ||
             inputs.enable_coverage_badge == 'true') &&
-            github.event_name == 'push' && github.ref ==
-            format('refs/heads/{0}', inputs.default_branch)
+            github.event_name == 'push' && (github.ref ==
+            format('refs/heads/{0}', inputs.default_branch) || github.ref ==
+            'refs/heads/next' || github.ref == 'refs/heads/hotfixes')
         uses: CLDMV/.github/.github/workflows/reusable-coverage-badge.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
@@ -419,14 +420,15 @@ jobs:
             skip_type_check: ${{ inputs.skip_type_check }}
             coverage_summary_path: ${{ inputs.coverage_summary_path }}
             badges_branch: ${{ inputs.badges_branch }}
-            # This job currently only fires on push to `inputs.default_branch`
-            # (see the `if:` above), so `github.ref_name` is always that
-            # branch today. Deriving per-branch here anyway means the
-            # filename is already correct if this job's trigger is ever
-            # widened to publish coverage for `next`/`hotfixes` too — a
+            # This job fires on push to `inputs.default_branch`, `next`, and
+            # `hotfixes` (see the `if:` above), so each integration branch
+            # publishes its OWN badge JSON under a per-branch filename — a
             # shared `coverage.json` would otherwise let whichever branch
             # last published clobber the others' badge. A caller-supplied
             # non-default `badge_filename` always wins (explicit override).
+            # All three branches push to the single `badges` branch; the
+            # `push-badge` action re-syncs and retries on a non-fast-forward
+            # so concurrent per-branch pushes never drop a badge.
             #
             # Deliberately an explicit allowlist of the two known integration
             # branch names, NOT `format('coverage-{0}.json', github.ref_name)`
@@ -435,10 +437,9 @@ jobs:
             # future `feature/*` trigger) would flow straight into the
             # filename and break `push-badge`, which doesn't create
             # intermediate directories. `next`/`hotfixes` are guaranteed
-            # slash-free by this repo's own branch-naming convention; any
-            # other ref (including today's only reachable case,
-            # `inputs.default_branch`) falls back to the existing single
-            # `coverage.json`.
+            # slash-free by this repo's own branch-naming convention; the
+            # default branch (and any other ref) falls back to the existing
+            # single `coverage.json`.
             badge_filename: ${{ inputs.badge_filename != 'coverage.json' &&
                 inputs.badge_filename || (github.ref_name == 'next' &&
                 'coverage-next.json') || (github.ref_name == 'hotfixes' &&
