@@ -124,6 +124,14 @@ jobs:
                   # .github/workflows/**) requires contents + workflows write.
                   permission_contents: "true"
                   permission_workflows: "true"
+                  # Reading the released PR's head ref (the lane detection below)
+                  # needs pull-requests. create-app-token enters fine-grained mode
+                  # as soon as ANY permission flag is set — granting ONLY the flags
+                  # requested — so without this the token has no pull-requests scope,
+                  # `gh pr view` is silently denied, the lane resolves to "other" for
+                  # EVERY hotfix release, and next is force-reset instead of merged,
+                  # dropping its queued work. (#278)
+                  permission_pull_requests: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -141,17 +149,37 @@ jobs:
                   COMMIT_MSG: ${{ github.event.head_commit.message }}
               run: |
                   # The squash commit ends with "(#N)" — the merged PR number.
+                  # The lane decides next's fate: a NORMAL release (next → master)
+                  # means next's work just shipped, so next is RESET to master; a
+                  # HOTFIX release (hotfixes → master) leaves next's queued work
+                  # unshipped, so master is MERGED into next to preserve it. Guessing
+                  # "other" (reset) when it was really a hotfix is a SILENT DATA-LOSS
+                  # bug — so this fails SAFE: the reset path runs only when the head
+                  # ref is POSITIVELY a non-hotfixes branch. An unreadable / unknown
+                  # head falls through to the hotfix/preserve (merge) path, never the
+                  # reset. The gh error is surfaced, not swallowed (a hidden failure
+                  # here is exactly what mis-fired every hotfix reset before). (#278)
                   prnum=$(printf '%s' "$COMMIT_MSG" | { grep -oE '#[0-9]+' || true; } | tail -1 | tr -d '#')
-                  head=""
+                  head=""; err=""
                   if [ -n "$prnum" ]; then
-                      head=$(gh pr view "$prnum" --repo "$GITHUB_REPOSITORY" \
-                             --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+                      if out=$(gh pr view "$prnum" --repo "$GITHUB_REPOSITORY" \
+                               --json headRefName --jq '.headRefName' 2>"$RUNNER_TEMP/gh_err"); then
+                          head="$out"
+                      else
+                          err=$(cat "$RUNNER_TEMP/gh_err" 2>/dev/null || true)
+                      fi
                   fi
                   echo "released PR #${prnum:-?} head ref: ${head:-<unknown>}"
+                  [ -n "$err" ] && echo "⚠️ gh pr view failed: $err"
                   if [ "$head" = "hotfixes" ]; then
+                      echo "✅ hotfix lane → MERGE master into next (preserve queued work)"
                       echo "lane=hotfix" >> "$GITHUB_OUTPUT"
-                  else
+                  elif [ -n "$head" ]; then
+                      echo "✅ normal lane (head=$head) → reset next to master"
                       echo "lane=other" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "⚠️ lane indeterminate — failing SAFE: MERGE master into next (never reset)"
+                      echo "lane=hotfix" >> "$GITHUB_OUTPUT"
                   fi
 
             - name: Guard — is this repo on v4? (do next/hotfixes exist?)
