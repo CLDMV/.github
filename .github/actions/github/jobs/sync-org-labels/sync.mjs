@@ -410,17 +410,23 @@ console.log(`🏢 Syncing labels for org: ${ORG}${DRY_RUN ? " (DRY RUN)" : ""}`)
 // sweeping the whole org. Empty (default) keeps the full-org sweep, so the
 // weekly cron / manual org dispatch is unchanged.
 let allRepos;
-if (REPOS) {
-	const names = [
-		...new Set(
-			REPOS.split(/[\s,]+/)
-				.filter(Boolean)
-				.map((n) => n.replace(/^.*\//, ""))
-		)
-	];
-	console.log(`🎯 Scoped sync to ${names.length} repo(s): ${names.join(", ")}`);
+// Strip an optional `owner/` prefix and trim BEFORE filtering empties, so inputs
+// like `CLDMV/` or separators-only (`,`) can't leave an empty repo name — which
+// would make an invalid `GET /repos/${ORG}/` call or a misleading "scoped to 0
+// repos" no-op. If nothing resolves, fall back to the full-org sweep.
+const scoped = REPOS
+	? [
+			...new Set(
+				REPOS.split(/[\s,]+/)
+					.map((n) => n.replace(/^.*\//, "").trim())
+					.filter(Boolean)
+			)
+		]
+	: [];
+if (scoped.length > 0) {
+	console.log(`🎯 Scoped sync to ${scoped.length} repo(s): ${scoped.join(", ")}`);
 	allRepos = [];
-	for (const name of names) {
+	for (const name of scoped) {
 		const { status, body } = await api(`/repos/${ORG}/${name}`);
 		if (status !== 200) {
 			console.error(`⚠️  Skipping ${ORG}/${name}: GET /repos/${ORG}/${name} → ${status}`);
@@ -430,6 +436,7 @@ if (REPOS) {
 	}
 	allRepos.sort((a, b) => a.name.localeCompare(b.name));
 } else {
+	if (REPOS) console.log(`ℹ️  repos input '${REPOS}' resolved to no repo names — falling back to the full-org sweep.`);
 	// Fetch all repos in the org, sort alphabetically
 	allRepos = (await paginate(`/orgs/${ORG}/repos`)).sort((a, b) => a.name.localeCompare(b.name));
 }
