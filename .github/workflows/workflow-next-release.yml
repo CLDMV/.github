@@ -166,9 +166,30 @@ jobs:
                   # base=$BASE. There is at most one (concurrency-serialized).
                   pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head next --base "$BASE" \
                        --state open --json number --jq '.[0].number // ""')
+                  if [ -z "$pr" ]; then
+                      # No OPEN release PR. When next is reset to equal base — an
+                      # erroneous reset, the very bug #279 fixes — this PR's head
+                      # becomes == base (nothing left to compare) and it closes as if
+                      # merged, attributed to whichever identity made the ref update
+                      # (the bot, in the gh-broker incident), not to a human. Reopen
+                      # the most recent closed-but-UNMERGED next→base PR to preserve
+                      # its number and history instead of orphaning it; create a fresh
+                      # one only when none exists. (#278)
+                      closed=$(gh pr list --repo "$GITHUB_REPOSITORY" --head next --base "$BASE" \
+                               --state closed --json number,mergedAt \
+                               --jq 'map(select(.mergedAt == null)) | sort_by(.number) | last | .number // ""')
+                      if [ -n "$closed" ]; then
+                          if gh pr reopen "$closed" --repo "$GITHUB_REPOSITORY"; then
+                              pr="$closed"
+                              echo "♻️ reopened spuriously-closed release PR #$closed"
+                          else
+                              echo "⚠️ could not reopen #$closed — will create a fresh release PR"
+                          fi
+                      fi
+                  fi
                   echo "pr-number=$pr" >> "$GITHUB_OUTPUT"
                   if [ -n "$pr" ]; then
-                      echo "🔁 existing release PR: #$pr — will refresh"
+                      echo "🔁 release PR #$pr — will refresh"
                   else
                       echo "🆕 no release PR yet — will create"
                   fi
