@@ -496,6 +496,7 @@ jobs:
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
                   gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+                  skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
 
             # SBOM generation + attestation. Anchore's syft does the per-
             # ecosystem dep-tree walking (~2000 lines of correctness logic);

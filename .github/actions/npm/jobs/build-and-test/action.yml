@@ -36,6 +36,10 @@ inputs:
     description: "Fetch and run private tests from embedded anonymous gitlinks via the org bot App. See docs/conventions/embedded-tests-ci.md."
     required: false
     default: "false"
+  skip-frozen-lockfile:
+    description: "Value of the CLDMV_SKIP_FROZEN_LOCKFILE repo/org variable, passed from the calling workflow (which has the vars context — composite actions do not). Empty = frozen install."
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -67,7 +71,7 @@ runs:
     - name: Install dependencies
       uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
       env:
-        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+        CLDMV_SKIP_FROZEN_LOCKFILE: ${{ inputs.skip-frozen-lockfile }}
       with:
         package-manager: ${{ inputs.package-manager }}
 
