@@ -24,7 +24,7 @@ try {
 	// See issue #2.
 	const min = getInput("min-node-version");
 	const maxInput = getInput("max-node-major");
-	const max = maxInput ? Number.parseInt(maxInput, 10) : 22;
+	const max = maxInput ? Number.parseInt(maxInput, 10) : 26;
 	const ltsOnly = getBooleanInput("lts-only-matrix");
 
 	console.log(`🔍 DEBUG (build-and-test): min_node_version = '${min}'`);
