@@ -45,6 +45,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
+# libatomic1 — actions/setup-node downloads its own prebuilt Node tarballs
+# from actions/node-versions, independently of the NodeSource install above,
+# whenever a workflow pins a specific version via setup-node. Node 26's
+# official linux-x64 build links against libatomic.so.1, which this minimal
+# base image doesn't ship (hosted ubuntu-latest runners already have it).
+# Without it, any job that requests Node 26 via setup-node fails immediately
+# with "error while loading shared libraries: libatomic.so.1: cannot open
+# shared object file" before it can even print `node --version`.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libatomic1 \
+ && rm -rf /var/lib/apt/lists/*
+
 # Add further hosted-runner tools here as #210's audit surfaces them.
 
 # Back to the runner user the entrypoint expects.
