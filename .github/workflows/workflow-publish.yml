@@ -83,8 +83,8 @@ on:
             max_node_major:
                 required: false
                 type: string
-                default: "22"
-                description: "Override max Node.js major version (default: 22)"
+                default: "26"
+                description: "Override max Node.js major version (default: 26)"
             lts_only_matrix:
                 required: false
                 type: boolean

@@ -55,10 +55,10 @@ on:
                 type: string
                 default: "20"
             max_node_major:
-                description: "Override max Node.js major version (default: 22)"
+                description: "Override max Node.js major version (default: 26)"
                 required: false
                 type: string
-                default: "22"
+                default: "26"
             lts_only_matrix:
                 description: "Only include even-numbered (LTS) Node.js major versions in the
                     test matrix"
