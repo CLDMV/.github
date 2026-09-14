@@ -127,14 +127,41 @@ jobs:
             # sits `blocked` forever (issue #269). Not persisting the default token
             # lets the App-token URL authenticate the push, re-triggering CI —
             # exactly how reusable-lint-format.yml's App-token push re-verifies.
+            #
+            # continue-on-error: `target_base` (hotfixes) can be transiently
+            # ABSENT even on a fully-adopted repo — e.g. right after a
+            # hotfixes→master release squash, in the brief window before it's
+            # recreated, any PR that happens to open (including a routine,
+            # unrelated Dependabot bump that will never need a redirect) hits
+            # this checkout. Failing the whole job here blocked routine PRs
+            # with a raw "branch not found" error that had nothing to do with
+            # them (their own redirect decision below never even looks at
+            # `target_base`). Downstream identity/signing steps are gated on
+            # this succeeding; if it fails, the redirect step below still
+            # runs unconditionally and reaches its own authoritative
+            # shouldSkip() check via the GitHub API (no checkout needed for
+            # that decision) — a PR that truly doesn't need redirecting skips
+            # cleanly regardless, and one that DOES need the cherry-pick path
+            # but has no checkout gets the existing loud, actionable
+            # missingCherryPickPrereq error instead of an opaque checkout
+            # failure.
             - name: Checkout target base
+              id: checkout-target-base
+              continue-on-error: true
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
                   ref: ${{ inputs.target_base }}
                   fetch-depth: 0
                   persist-credentials: false
 
+            - name: Warn if target base checkout failed
+              if: steps.checkout-target-base.outcome != 'success'
+              shell: bash
+              run: |
+                  echo "::warning::Could not check out '${{ inputs.target_base }}' (likely transient — e.g. it was just reset by a release and hasn't been recreated yet). Continuing without it: the redirect decision below doesn't require a checkout unless this PR actually needs the dependabot-security cherry-pick path."
+
             - name: Setup bot git identity
+              if: steps.checkout-target-base.outcome == 'success'
               uses: CLDMV/.github/.github/actions/github/steps/setup-git-identity@v4
               with:
                   app-slug: ${{ steps.app-token.outputs.app-slug }}
@@ -149,6 +176,7 @@ jobs:
             # presence is surfaced through a step output first.
             - name: Detect GPG signing availability
               id: gpg
+              if: steps.checkout-target-base.outcome == 'success'
               shell: bash
               env:
                   GPG_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
@@ -160,7 +188,7 @@ jobs:
                   fi
 
             - name: Import bot GPG signing key
-              if: steps.gpg.outputs.present == 'true'
+              if: steps.checkout-target-base.outcome == 'success' && steps.gpg.outputs.present == 'true'
               uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
               with:
                   gpg_private_key: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
@@ -174,7 +202,7 @@ jobs:
             # key's account, so the signature must be made under BOT_NAME/BOT_EMAIL
             # for GitHub to mark the commit Verified.
             - name: Use bot signing identity for the cherry-pick
-              if: steps.gpg.outputs.present == 'true'
+              if: steps.checkout-target-base.outcome == 'success' && steps.gpg.outputs.present == 'true'
               shell: bash
               env:
                   BOT_NAME: ${{ secrets.BOT_NAME }}
