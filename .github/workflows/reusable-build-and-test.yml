@@ -87,6 +87,15 @@ on:
                 required: false
                 type: string
                 default: ""
+            docs_check_command:
+                description: "Command run once on PRs to validate documentation generation (e.g.
+                    jsdoc / jsdoc2md type parsing) — catches a JSDoc type the doc tooling can't
+                    parse on the PR instead of only at the post-release docs publish. Default runs
+                    the repo's `docs:build` script if present (a no-op where it's absent). Set empty
+                    to disable; override to a lighter check (e.g. a src-only docs build)."
+                required: false
+                type: string
+                default: "npm run docs:build --if-present"
 
             # Test control options
             skip_performance_tests:
@@ -174,3 +183,27 @@ jobs:
                   test-environment: ${{ inputs.test_environment }}
                   enable-embedded-tests: ${{ inputs.enable_embedded_tests }}
                   skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+
+    validate-docs:
+        name: "📖 Validate Docs Generation"
+        # Single (non-matrix) run so a JSDoc type the doc tooling can't parse fails the PR here,
+        # rather than surfacing only at the post-release docs publish. No-op when the repo has no
+        # `docs:build` script (--if-present), and skipped entirely when docs_check_command is empty.
+        if: inputs.run_build_and_test == true && inputs.docs_check_command != ''
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        steps:
+            - name: Checkout code
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+            - name: Setup Node.js
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+            - name: Install dependencies
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+            - name: Validate docs generation
+              shell: bash
+              env:
+                  DOCS_CHECK_COMMAND: ${{ inputs.docs_check_command }}
+              run: |
+                  echo "▶ $DOCS_CHECK_COMMAND"
+                  eval "$DOCS_CHECK_COMMAND"
