@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + Node.js.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -18,13 +18,17 @@
 FROM ghcr.io/actions/actions-runner:latest
 
 LABEL org.opencontainers.image.source="https://github.com/CLDMV/.github"
-LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, Node.js LTS for CLDMV self-hosted cldmv-runners"
+LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS for CLDMV self-hosted cldmv-runners"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Package installs need root; the base runs as the non-root `runner` user.
 USER root
 
-# gh via GitHub's official apt repo (keeps it upgradable with the image).
+# gh via GitHub's official apt repo (keeps it upgradable with the image); jq and
+# zip/unzip come from the base Ubuntu repos. zip is needed by
+# workflow-publish.yml's create-package-files step, which shells out to `zip`
+# to build the release .zip and failed with "zip: not found" on every private
+# release routed here. See #291 (same class as #210's gh gap).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates \
  && install -m 0755 -d /etc/apt/keyrings \
@@ -34,7 +38,7 @@ RUN apt-get update \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends gh jq \
+ && apt-get install -y --no-install-recommends gh jq zip unzip \
  && rm -rf /var/lib/apt/lists/*
 
 # Node.js current LTS via NodeSource's lts channel (includes npm/npx). The
@@ -63,4 +67,5 @@ RUN apt-get update \
 USER runner
 
 # Build-time gate: fail the build if any expected tool isn't on PATH.
-RUN gh --version && jq --version && node --version && npm --version
+RUN gh --version && jq --version && node --version && npm --version \
+ && zip -v >/dev/null && unzip -v >/dev/null
