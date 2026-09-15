@@ -246,6 +246,7 @@ runs:
         new-version: ${{ steps.display-version.outputs.version }}
         title-suffix: ${{ steps.release-check.outputs.title-suffix }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
+        co-authors: ${{ steps.changelog.outputs.co-authors }}
 
     # Extract the set of conventional-commit types present in the PR range so a
     # mixed PR (e.g. feat: + fix:) gets BOTH type: feature + type: bug

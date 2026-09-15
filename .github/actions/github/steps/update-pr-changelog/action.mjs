@@ -72,6 +72,7 @@ try {
 	const newVersion = getInput("new-version", { required: true });
 	const titleSuffix = (getInput("title-suffix") || "").trim();
 	const changelog = getInput("changelog-content");
+	const coAuthors = (getInput("co-authors") || "").trim();
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 
 	console.log(`📝 Updating PR #${prNumber} title and description...`);
@@ -91,7 +92,14 @@ try {
 	}
 	const stickyBlocks = extractStickyBlocks(currentBody);
 
-	const composedBody = stickyBlocks.length ? `${changelogBody}\n\n---\n\n${stickyBlocks.join("\n\n")}` : changelogBody;
+	let composedBody = stickyBlocks.length ? `${changelogBody}\n\n---\n\n${stickyBlocks.join("\n\n")}` : changelogBody;
+
+	// Co-authored-by trailers (from generate-comprehensive-changelog's `co-authors` output) must be
+	// the FINAL paragraph of the body — GitHub only credits co-author trailers that sit in the commit
+	// message's last paragraph. Append them AFTER the sticky (coverage) blocks. The block carries a
+	// leading `<!-- co-authors -->` marker (its own paragraph) so update-pr-coverage can insert its
+	// badge ABOVE this block on a first add without displacing the trailers from last position.
+	if (coAuthors) composedBody = `${composedBody.replace(/\s+$/, "")}\n\n${coAuthors}`;
 
 	const title = titleSuffix ? `release: v${newVersion} - ${titleSuffix}` : `release: v${newVersion}`;
 	console.log(`📝 Updating PR title to: ${title}`);

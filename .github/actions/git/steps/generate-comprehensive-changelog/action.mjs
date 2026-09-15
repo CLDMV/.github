@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync, existsSync, realpathSync } from "fs";
 import path from "node:path";
 import { gitCommand } from "../../utilities/git-utils.mjs";
-import { getHumanContributors } from "../../../common/utilities/bot-detection.mjs";
+import { getHumanContributors, isBotAuthor } from "../../../common/utilities/bot-detection.mjs";
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { filterBotCommits, isDependencyUpdate } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
@@ -886,6 +886,45 @@ async function buildContributorMentionsDetails(commits, token, enablePullRequest
 }
 
 /**
+ * Stash for the release commit's `Co-authored-by:` trailer block. Set at each site that builds the
+ * contributor @mention details (same commits, same execution path), then emitted by `main()` as the
+ * `co-authors` output so `update-pr-changelog` can place it dead-last in the PR body.
+ * @type {string}
+ */
+let coAuthorsBlock = "";
+
+/**
+ * Build the release commit's `Co-authored-by:` trailer block for the human contributors — a markdown
+ * @mention gives no contributor-graph credit, only a trailer does. Returned with a leading
+ * `<!-- co-authors -->` marker line and the trailers as the final paragraph; the marker is a separate
+ * preceding paragraph (blank line between), so it lets other body editors (e.g. update-pr-coverage)
+ * find and stay ABOVE this block without breaking GitHub's rule that co-author trailers must be the
+ * commit message's last paragraph. Deduped by email; bots and the caller's own signing bot excluded.
+ * @param {Array<{author?: string, email?: string, body?: string}>} commits - Release-range commits.
+ * @param {{name?: string, email?: string}} [knownBot] - Caller's signing-bot identity, excluded.
+ * @returns {string} The `<!-- co-authors -->` block, or "" when there are no human contributors.
+ */
+function buildCoAuthorTrailers(commits, knownBot) {
+	const byEmail = new Map();
+	const add = (author, email) => {
+		const name = (author || "").trim();
+		const mail = (email || "").trim();
+		if (!name || !mail) return;
+		if (isBotAuthor(name, mail, knownBot)) return;
+		const key = mail.toLowerCase();
+		if (!byEmail.has(key)) byEmail.set(key, `Co-authored-by: ${name} <${mail}>`);
+	};
+	// Commit authors (getHumanContributors already drops bots + internal placeholders) plus any
+	// Co-authored-by trailers carried in the commit bodies, deduped by email.
+	for (const c of getHumanContributors(commits || [], knownBot)) add(c.author, c.email);
+	for (const c of commits || []) {
+		for (const co of extractCoAuthorIdentitiesFromBody(c?.body || "")) add(co.author, co.email);
+	}
+	const lines = Array.from(byEmail.values()).sort((a, b) => a.localeCompare(b));
+	return lines.length ? `<!-- co-authors -->\n\n${lines.join("\n")}` : "";
+}
+
+/**
  * Look up GitHub username from email address using GitHub API
  * @param {string} email - Email address to look up
  * @param {string} token - GitHub API token
@@ -1043,6 +1082,7 @@ async function generateComprehensiveChangelog(
 
 				const syntheticCommit = [{ subject, body: body || "", author: "", email: "" }];
 				const contributorDetails = await buildContributorMentionsDetails(syntheticCommit, token, true, KNOWN_BOT);
+				coAuthorsBlock = buildCoAuthorTrailers(syntheticCommit, KNOWN_BOT);
 				if (contributorDetails) {
 					releaseNotes += contributorDetails;
 				}
@@ -1094,6 +1134,7 @@ async function generateComprehensiveChangelog(
 		singleCommitChangelog = stripInternalContributorLines(singleCommitChangelog);
 		singleCommitChangelog = neutralizeJsdocTagMentions(singleCommitChangelog);
 		const contributorDetails = await buildContributorMentionsDetails(commits, token, true, KNOWN_BOT);
+		coAuthorsBlock = buildCoAuthorTrailers(commits, KNOWN_BOT);
 		if (contributorDetails) {
 			singleCommitChangelog += contributorDetails;
 		}
@@ -1252,6 +1293,7 @@ async function generateComprehensiveChangelog(
 	}
 
 	const contributorDetails = await buildContributorMentionsDetails(commits, token, false, KNOWN_BOT);
+	coAuthorsBlock = buildCoAuthorTrailers(commits, KNOWN_BOT);
 	if (contributorDetails) {
 		changelog += contributorDetails + "\n";
 	}
@@ -1290,6 +1332,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		// Output the changelog content using a unique delimiter
 		const delimiter = `EOF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 		appendFileSync(process.env.GITHUB_OUTPUT, `changelog-content<<${delimiter}\n${changelog}\n${delimiter}\n`);
+
+		// Output the Co-authored-by trailer block separately (set by generateComprehensiveChangelog
+		// alongside the contributor @mentions). update-pr-changelog places it dead-last in the PR body,
+		// below the sticky (coverage) blocks, so GitHub credits the contributors on the release commit.
+		const coDelimiter = `EOF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		appendFileSync(process.env.GITHUB_OUTPUT, `co-authors<<${coDelimiter}\n${coAuthorsBlock}\n${coDelimiter}\n`);
 	}
 
 	// Run the main function
@@ -1300,4 +1348,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog, readVersionChangelogFile };
+export { generateComprehensiveChangelog, readVersionChangelogFile, buildCoAuthorTrailers };
