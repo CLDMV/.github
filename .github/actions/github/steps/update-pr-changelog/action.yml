@@ -20,6 +20,10 @@ inputs:
     description: "Generated changelog markdown for the PR body"
     required: false
     default: ""
+  co-authors:
+    description: "Co-authored-by: trailer block (from generate-comprehensive-changelog's co-authors output) appended as the final paragraph of the PR body, below the sticky (coverage) blocks, so GitHub credits contributors on the squashed release commit. Empty = none."
+    required: false
+    default: ""
 
 runs:
   using: "node24"

@@ -12,6 +12,10 @@ import { getInput, getEventPayload, floorToFixed } from "../../../common/common/
 
 const START = "<!-- coverage-start -->";
 const END = "<!-- coverage-end -->";
+// Leading marker of update-pr-changelog's Co-authored-by trailer block. When the badge is first
+// appended, it must land ABOVE this marker: GitHub only credits co-author trailers that sit in the
+// commit message's final paragraph, so the trailer block has to stay last in the PR body.
+const COAUTHOR_MARKER = "<!-- co-authors -->";
 
 // Legacy marker pair from the original implementation. Strip any stray
 // `coverage-badge-*` block from in-flight PR bodies on first run after
@@ -98,9 +102,17 @@ try {
 		const after = currentBody.slice(currentBody.indexOf(END) + END.length);
 		newBody = before + block + after;
 	} else {
-		// Append the block, separated by a horizontal rule when the body is non-empty.
-		const separator = currentBody.trimEnd().length > 0 ? "\n\n---\n\n" : "";
-		newBody = currentBody + separator + block;
+		const coAuthorAt = currentBody.indexOf(COAUTHOR_MARKER);
+		if (coAuthorAt !== -1) {
+			// Insert ABOVE the Co-authored-by trailer block so it stays the final paragraph.
+			const head = currentBody.slice(0, coAuthorAt).replace(/\s+$/, "");
+			const tail = currentBody.slice(coAuthorAt);
+			newBody = `${head ? `${head}\n\n---\n\n` : ""}${block}\n\n${tail}`;
+		} else {
+			// Append the block, separated by a horizontal rule when the body is non-empty.
+			const separator = currentBody.trimEnd().length > 0 ? "\n\n---\n\n" : "";
+			newBody = currentBody + separator + block;
+		}
 	}
 
 	if (newBody === currentBody) {

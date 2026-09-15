@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readVersionChangelogFile } from "./action.mjs";
+import { readVersionChangelogFile, buildCoAuthorTrailers } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -112,6 +112,28 @@ console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflo
 			.some((line) => line.startsWith("::")),
 		"no logged line starts with :: (workflow-command injection blocked)"
 	);
+}
+
+// --- buildCoAuthorTrailers: release-commit Co-authored-by trailer block ---
+{
+	console.log("\nbuildCoAuthorTrailers — release-commit contributor credit:");
+	const commits = [
+		{ author: "Alice", email: "alice@example.com", body: "" },
+		{ author: "Alice", email: "alice@example.com", body: "" }, // repeat → deduped
+		{ author: "cldmv-bot", email: "bot@cldmv.net", body: "" }, // caller's signing bot (knownBot)
+		{ author: "dependabot[bot]", email: "49699333+dependabot[bot]@users.noreply.github.com", body: "" }, // static-pattern bot
+		{ author: "Bob", email: "bob@example.com", body: "Co-authored-by: Carol <carol@example.com>" } // Carol via body trailer
+	];
+	const out = buildCoAuthorTrailers(commits, { name: "cldmv-bot", email: "bot@cldmv.net" });
+	ok(out.startsWith("<!-- co-authors -->\n\n"), "leads with the <!-- co-authors --> marker");
+	ok(/\n\nCo-authored-by:[^\n]+(\nCo-authored-by:[^\n]+)*$/.test(out), "trailers are the final paragraph (GitHub-creditable)");
+	ok(out.includes("Co-authored-by: Alice <alice@example.com>"), "credits a commit author");
+	ok(out.includes("Co-authored-by: Bob <bob@example.com>"), "credits a commit author (Bob)");
+	ok(out.includes("Co-authored-by: Carol <carol@example.com>"), "credits a body Co-authored-by contributor");
+	ok((out.match(/alice@example\.com/g) || []).length === 1, "dedupes a repeated contributor");
+	ok(!out.includes("bot@cldmv.net"), "excludes the caller's signing bot (knownBot)");
+	ok(!out.toLowerCase().includes("dependabot"), "excludes a static-pattern bot (dependabot)");
+	eq(buildCoAuthorTrailers([], undefined), "", "empty when there are no human contributors");
 }
 
 fs.rmSync(scratch, { recursive: true, force: true });
