@@ -51,6 +51,9 @@ outputs:
   changelog-content:
     description: "Generated changelog content in markdown format"
     value: ${{ steps.changelog.outputs.changelog-content }}
+  co-authors:
+    description: "Co-authored-by: trailer block (leading `<!-- co-authors -->` marker + trailers) for the release-range human contributors, or empty. Placed dead-last in the release-PR body by update-pr-changelog so GitHub credits contributors on the squashed release commit."
+    value: ${{ steps.changelog.outputs.co-authors }}
 
 runs:
   using: "composite"
