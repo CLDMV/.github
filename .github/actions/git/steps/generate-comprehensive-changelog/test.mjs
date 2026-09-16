@@ -136,6 +136,39 @@ console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflo
 	eq(buildCoAuthorTrailers([], undefined), "", "empty when there are no human contributors");
 }
 
+// --- buildCoAuthorTrailers: same GitHub account, plain vs. ID-prefixed noreply email ---
+{
+	console.log("\nbuildCoAuthorTrailers — collapses one account's noreply email variants:");
+	// Real-world shape: a local commit under the bare noreply address, plus that same account's
+	// GitHub-generated merge commit under the ID-prefixed form and a different local display name —
+	// same person, three differently-spelled trailers pre-fix.
+	const commits = [
+		{ author: "Shinrai", email: "Shinrai@users.noreply.github.com", body: "" },
+		{ author: "Nathaniel H", email: "7722267+Shinrai@users.noreply.github.com", body: "" },
+		{ author: "Nate Corcoran", email: "Shinrai@users.noreply.github.com", body: "" }
+	];
+	const out = buildCoAuthorTrailers(commits, undefined);
+	ok((out.match(/Co-authored-by:/g) || []).length === 1, "one trailer line for one GitHub account, not three");
+	ok(
+		out.includes("Co-authored-by: Nathaniel H <7722267+Shinrai@users.noreply.github.com>"),
+		"prefers the ID-prefixed noreply variant + its paired name"
+	);
+	// Case-insensitive login match: same account, differently-cased login in the bare form.
+	const caseCommits = [
+		{ author: "shinrai", email: "shinrai@users.noreply.github.com", body: "" },
+		{ author: "Shinrai", email: "Shinrai@users.noreply.github.com", body: "" }
+	];
+	const caseOut = buildCoAuthorTrailers(caseCommits, undefined);
+	ok((caseOut.match(/Co-authored-by:/g) || []).length === 1, "dedupes case-differing logins on the same bare noreply form");
+	// A DIFFERENT account's noreply email must never collapse with this one.
+	const distinctCommits = [
+		{ author: "Shinrai", email: "Shinrai@users.noreply.github.com", body: "" },
+		{ author: "Someone Else", email: "42+someone-else@users.noreply.github.com", body: "" }
+	];
+	const distinctOut = buildCoAuthorTrailers(distinctCommits, undefined);
+	ok((distinctOut.match(/Co-authored-by:/g) || []).length === 2, "keeps two distinct accounts as two trailers");
+}
+
 fs.rmSync(scratch, { recursive: true, force: true });
 
 if (failures > 0) {
