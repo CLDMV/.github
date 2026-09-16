@@ -894,33 +894,61 @@ async function buildContributorMentionsDetails(commits, token, enablePullRequest
 let coAuthorsBlock = "";
 
 /**
+ * Derive the co-author dedup key for an email. A GitHub noreply address
+ * (`{id}+{login}@users.noreply.github.com` or bare `{login}@users.noreply.github.com`) identifies the
+ * SAME account either way — which variant a given commit carries depends only on whether the "keep my
+ * email private" ID-prefixed form was active on the machine/account that made it, not on who the
+ * contributor is. Keying dedup on the raw email (as a plain string) treats those as two different
+ * people; keying on the extracted login collapses them to one. A non-noreply email has no such
+ * variant and dedupes on itself, as before.
+ * @param {string} email - Commit author (or trailer) email.
+ * @returns {{key: string, idPrefixed: boolean}} Lowercased dedup key, and whether this variant carries
+ *   the numeric ID prefix (preferred when two variants collide — see {@link buildCoAuthorTrailers}).
+ */
+function coAuthorIdentityKey(email) {
+	const mail = (email || "").trim();
+	const noreplyMatch = mail.match(/^(?:(\d+)\+)?([^@]+)@users\.noreply\.github\.com$/i);
+	if (noreplyMatch) return { key: `gh:${noreplyMatch[2].toLowerCase()}`, idPrefixed: Boolean(noreplyMatch[1]) };
+	return { key: `email:${mail.toLowerCase()}`, idPrefixed: false };
+}
+
+/**
  * Build the release commit's `Co-authored-by:` trailer block for the human contributors — a markdown
  * @mention gives no contributor-graph credit, only a trailer does. Returned with a leading
  * `<!-- co-authors -->` marker line and the trailers as the final paragraph; the marker is a separate
  * preceding paragraph (blank line between), so it lets other body editors (e.g. update-pr-coverage)
  * find and stay ABOVE this block without breaking GitHub's rule that co-author trailers must be the
- * commit message's last paragraph. Deduped by email; bots and the caller's own signing bot excluded.
+ * commit message's last paragraph. Deduped by GitHub login where the email is a noreply address (so the
+ * same account's ID-prefixed and bare noreply variants collapse to one trailer instead of crediting the
+ * account twice under different-looking lines — see {@link coAuthorIdentityKey}), else by email; bots
+ * and the caller's own signing bot excluded.
  * @param {Array<{author?: string, email?: string, body?: string}>} commits - Release-range commits.
  * @param {{name?: string, email?: string}} [knownBot] - Caller's signing-bot identity, excluded.
  * @returns {string} The `<!-- co-authors -->` block, or "" when there are no human contributors.
  */
 function buildCoAuthorTrailers(commits, knownBot) {
-	const byEmail = new Map();
+	const byKey = new Map();
 	const add = (author, email) => {
 		const name = (author || "").trim();
 		const mail = (email || "").trim();
 		if (!name || !mail) return;
 		if (isBotAuthor(name, mail, knownBot)) return;
-		const key = mail.toLowerCase();
-		if (!byEmail.has(key)) byEmail.set(key, `Co-authored-by: ${name} <${mail}>`);
+		const { key, idPrefixed } = coAuthorIdentityKey(mail);
+		const existing = byKey.get(key);
+		// Prefer the ID-prefixed noreply variant (the form GitHub's own merge/squash commits use) when
+		// two variants of the same account collide, so the choice is deterministic rather than whichever
+		// commit happened to be seen first; otherwise keep the first-seen entry so re-runs stay stable.
+		if (!existing || (idPrefixed && !existing.idPrefixed)) byKey.set(key, { name, mail, idPrefixed });
 	};
 	// Commit authors (getHumanContributors already drops bots + internal placeholders) plus any
-	// Co-authored-by trailers carried in the commit bodies, deduped by email.
+	// Co-authored-by trailers carried in the commit bodies, deduped by identity.
 	for (const c of getHumanContributors(commits || [], knownBot)) add(c.author, c.email);
 	for (const c of commits || []) {
 		for (const co of extractCoAuthorIdentitiesFromBody(c?.body || "")) add(co.author, co.email);
 	}
-	const lines = Array.from(byEmail.values()).sort((a, b) => a.localeCompare(b));
+	const lines = Array.from(byKey.values())
+		.map(({ name, mail }) => `Co-authored-by: ${name} <${mail}>`)
+		.sort((a, b) => a.localeCompare(b));
 	return lines.length ? `<!-- co-authors -->\n\n${lines.join("\n")}` : "";
 }
 
