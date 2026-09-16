@@ -12,6 +12,15 @@ try {
 	const baseBranch = getInput("base-branch", { required: true });
 	const headBranch = getInput("head-branch", { required: true });
 	const bodyContent = getInput("body-content", { required: true });
+	// Co-authored-by trailer block (from generate-comprehensive-changelog's
+	// `co-authors` output). Appended as the final paragraph so GitHub credits
+	// contributors on the squashed release commit. Mirrors update-pr-changelog,
+	// which threads it on the release-PR refresh path — the create path must
+	// match so a freshly-opened release PR carries the trailer too, not only
+	// after its first refresh (#301). Kept dead-last, below any sticky/coverage
+	// block a later step inserts above the `<!-- co-authors -->` marker.
+	const coAuthors = getInput("co-authors", { default: "" }).trim();
+	const composedBody = coAuthors ? `${bodyContent.replace(/\s+$/, "")}\n\n${coAuthors}` : bodyContent;
 	const labels = getInput("labels", { default: "release" })
 		.split(",")
 		.map((label) => label.trim())
@@ -51,7 +60,7 @@ try {
 	 * only add labels it owns).
 	 */
 	async function updatePr(number) {
-		await api("PATCH", `/pulls/${number}`, { title, body: bodyContent }, { token, owner, repo });
+		await api("PATCH", `/pulls/${number}`, { title, body: composedBody }, { token, owner, repo });
 		if (labels.length === 0) return;
 		const currentArr = await api("GET", `/issues/${number}/labels`, null, { token, owner, repo });
 		const current = new Set((currentArr || []).map((l) => l?.name).filter(Boolean));
@@ -93,7 +102,7 @@ try {
 			"X-GitHub-Api-Version": "2022-11-28",
 			"Content-Type": "application/json"
 		},
-		body: JSON.stringify({ title, head: headBranch, base: baseBranch, body: bodyContent })
+		body: JSON.stringify({ title, head: headBranch, base: baseBranch, body: composedBody })
 	});
 	const data = await response.json().catch(() => ({}));
 

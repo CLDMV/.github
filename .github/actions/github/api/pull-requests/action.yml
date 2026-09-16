@@ -27,6 +27,10 @@ inputs:
   body-content:
     description: "PR body content"
     required: true
+  co-authors:
+    description: "Optional Co-authored-by: trailer block (from generate-comprehensive-changelog's co-authors output). When set, appended as the final paragraph of the PR body — below any sticky/coverage block a later step inserts above the `<!-- co-authors -->` marker — so GitHub credits contributors on the squashed release commit. Empty (default) = none."
+    required: false
+    default: ""
   labels:
     description: "Comma-separated list of labels"
     required: false
