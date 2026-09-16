@@ -705,6 +705,49 @@ async function getContributorMentionsFromPullRequest(pullNumber, token, reposito
 }
 
 /**
+ * Extract the trailing `(#N)` PR reference from a squash-merge commit subject.
+ * GitHub appends `(#N)` to a squash commit's subject, so a release commit like
+ * `release: v3.16.2 - … (#387)` yields 387. Anchored to the end so a `(#N)` that
+ * happens to appear inside the description isn't mistaken for the PR ref.
+ * @param {string} subject - Commit subject line.
+ * @returns {number|null} The PR number, or null when absent.
+ */
+function extractTrailingPrNumber(subject) {
+	const m = (subject || "").match(/\(#(\d+)\)\s*$/);
+	return m ? Number(m[1]) : null;
+}
+
+/**
+ * Recover a release's notes from its source PR body. A `next → master` (or
+ * `hotfixes → master`) squash can land title-only — an empty commit body despite
+ * the repo's `squash_merge_commit_message: PR_BODY` setting — which strips the
+ * curated changelog + coverage from the Release and tag. When that happens the
+ * release PR still holds the full artifact, so fetch its body via the trailing
+ * `(#N)` ref. Best-effort: returns "" on any miss/failure (no ref, no token, API
+ * error) so callers fall back to the commit-message behaviour. See #298.
+ * @param {string} subject - Release commit subject (carries the `(#N)` ref).
+ * @param {string} token - GitHub API token (needs `pull-requests: read`).
+ * @returns {Promise<string>} The PR body (trimmed), or "" when unavailable.
+ */
+async function recoverReleaseNotesFromPullBody(subject, token) {
+	if (!token || !GITHUB_REPOSITORY) return "";
+	const pullNumber = extractTrailingPrNumber(subject);
+	if (!pullNumber) return "";
+	const [owner, repo] = GITHUB_REPOSITORY.split("/");
+	try {
+		const pr = await api("GET", `/pulls/${pullNumber}`, null, { token, owner, repo });
+		const body = pr && typeof pr.body === "string" ? pr.body.trim() : "";
+		if (body) {
+			console.log(`📝 Release commit body empty — recovered notes from PR #${pullNumber} body (${body.length} chars) [#298]`);
+		}
+		return body;
+	} catch (error) {
+		console.log(`⚠️ Could not fetch PR #${pullNumber} body for release notes: ${error.message}`);
+		return "";
+	}
+}
+
+/**
  * Extract co-author identities from commit body text.
  * @param {string} body - Commit message body.
  * @returns {Array<{author: string, email: string}>} Co-author identities.
@@ -1152,6 +1195,23 @@ async function generateComprehensiveChangelog(
 	if (commits.length === 1 && useSingleCommitMessage) {
 		const commit = commits[0];
 		console.log(`📝 Single commit detected with flag enabled, using commit message as changelog`);
+
+		// A release squash can land title-only — an empty commit body despite
+		// squash_merge_commit_message: PR_BODY — which strips the curated
+		// changelog + coverage from the Release and tag (#298). When the commit
+		// body is empty, recover the full artifact from the release PR body and
+		// use it verbatim: it already carries the changelog, coverage, and a
+		// human-only contributor block, so we neither strip nor re-append a
+		// contributor block (re-deriving one from the single bot-authored
+		// release commit would list the signing bot).
+		if (!commit.body || !commit.body.trim()) {
+			const recoveredBody = await recoverReleaseNotesFromPullBody(commit.subject, token);
+			if (recoveredBody) {
+				coAuthorsBlock = buildCoAuthorTrailers(commits, KNOWN_BOT);
+				return neutralizeJsdocTagMentions(stripInternalContributorLines(`${commit.subject}\n\n${recoveredBody}`));
+			}
+		}
+
 		const cleanedBody = stripContributorDetailsSections(stripCoAuthorTrailers(removeDuplicatedLeadingSubject(commit.subject, commit.body)));
 
 		let singleCommitChangelog = commit.subject;
@@ -1376,4 +1436,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog, readVersionChangelogFile, buildCoAuthorTrailers };
+export { generateComprehensiveChangelog, readVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber };

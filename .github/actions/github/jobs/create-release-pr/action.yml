@@ -282,6 +282,10 @@ runs:
         base-branch: ${{ inputs.default-branch != '' && inputs.default-branch || steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
         body-content: ${{ steps.changelog.outputs.changelog-content }}
+        # Credit release contributors on the squashed release commit from the
+        # moment the PR is created — matching update-release-pr's refresh path,
+        # so a freshly-opened release PR carries the trailer too (#301).
+        co-authors: ${{ steps.changelog.outputs.co-authors }}
         labels: ${{ steps.final-labels.outputs.labels }}
         managed-labels: ${{ steps.final-labels.outputs.managed-labels }}
       env:

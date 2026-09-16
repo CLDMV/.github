@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readVersionChangelogFile, buildCoAuthorTrailers } from "./action.mjs";
+import { readVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -167,6 +167,17 @@ console.log("\nreadVersionChangelogFile — log sanitization (no CR/LF / workflo
 	];
 	const distinctOut = buildCoAuthorTrailers(distinctCommits, undefined);
 	ok((distinctOut.match(/Co-authored-by:/g) || []).length === 2, "keeps two distinct accounts as two trailers");
+}
+
+// --- extractTrailingPrNumber: recover the release PR ref from a squash subject ---
+{
+	console.log("\nextractTrailingPrNumber — trailing (#N) PR ref from a squash subject:");
+	eq(extractTrailingPrNumber("release: v3.16.2 - define an @callback typedef for… (#387)"), 387, "trailing (#N) parsed");
+	eq(extractTrailingPrNumber("release: v3.16.2 - fix (#387)  "), 387, "tolerates trailing whitespace");
+	eq(extractTrailingPrNumber("fix: something without a pr ref"), null, "no ref → null");
+	eq(extractTrailingPrNumber("chore: mentions (#12) mid-subject but ends here"), null, "a mid-subject (#N) is not the trailing ref → null");
+	eq(extractTrailingPrNumber(""), null, "empty subject → null");
+	eq(extractTrailingPrNumber(undefined), null, "undefined subject → null");
 }
 
 fs.rmSync(scratch, { recursive: true, force: true });
