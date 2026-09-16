@@ -34,10 +34,10 @@ The common thread: **per-PR release PRs encode too much state on each contributo
 
 ## 3. Non-goals
 
-- Replacing GitHub's UI for merging. Maintainers still click "Squash and merge."
+- Replacing GitHub's UI for merging. Maintainers still click "Squash and merge" — or, opt-in, approve the release PR and let an approval-triggered API merge land it (§5.3, `release-merge.yml`).
 - Mandatory contributor sign-up to changeset tooling.
 - Per-commit releases (semantic-release style).
-- Auto-merging release PRs to master. Releases are always a manual click.
+- **Unattended** auto-merge of release PRs — merging with no human decision. A release always requires the maintainer's explicit action; the opt-in approval-triggered API merge (§5.3) replaces the manual squash-click with an approval-gated merge, it does not remove the human gate.
 
 ## 4. Branch model
 
@@ -103,7 +103,7 @@ hotfixes ───────────────────────�
 - Body: full changelog from `master..next`, bot commits filtered, contributors deduped.
 - Labels: reflect the projected bump (`semver: major/minor/patch`, plus `release`, plus type/area labels aggregated from contained commits).
 - **Updates on every push to `next`** — workflow recalculates version, regenerates body, syncs labels via delta (v3.2.4's label fix carries forward).
-- **Maintainer click required to merge.** No auto-merge to master.
+- **A maintainer decision is required to merge — never unattended.** By default that's the manual "Squash and merge" click. Optionally (per repo, via the `release-merge.yml` caller → `workflow-release-merge.yml`), the maintainer's **approval** instead triggers an API squash-merge once every check on the head is green — required AND non-required (e.g. the coverage badge and this release-PR body refresh), so the body is never captured stale. The commit message is set explicitly to the PR body, so the release commit is exactly the curated body: no mobile Default-path title-only drop, and no GitHub squash-UI `Co-authored-by:` auto-append (which is neither deduped by account nor bot-stripped) — the clean `<!-- co-authors -->` block already in the body is the whole credit. It merges via `PUT …/merge` (which succeeds precisely when the PR is mergeable, unlike native auto-merge's "clean status" refusal) and never approves as the bot.
 - On merge: master gets one `release: vX.Y.Z - <subject>` commit. Tag + publish flow runs. `next` is **force-reset to master HEAD** (§7).
 
 ### 5.4 Hotfix release PR (`hotfixes → master`)
