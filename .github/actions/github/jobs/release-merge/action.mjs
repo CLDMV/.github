@@ -129,21 +129,30 @@ async function listCheckRuns(sha, { token, owner, repo }) {
 	return out;
 }
 
-/** Resolve the release PR number this event is about, or null when it isn't one. */
-async function resolvePrNumber(event, { integrationBranches, releaseBaseBranches, token, owner, repo }) {
-	if (event.pull_request?.number) return event.pull_request.number;
-
-	// check_suite / check_run / workflow_run / status events carry a head branch
-	// (or SHA) rather than a PR — find the open release PR from that branch.
-	const headBranch =
-		event.check_suite?.head_branch ||
-		event.check_run?.check_suite?.head_branch ||
-		event.workflow_run?.head_branch ||
-		(Array.isArray(event.branches) && event.branches[0]?.name) ||
-		"";
-	if (headBranch && integrationBranches.has(headBranch)) {
-		const prs = await api("GET", `/pulls?head=${owner}:${headBranch}&state=open`, null, { token, owner, repo });
+/**
+ * Resolve the release PR number to act on. Event fields arrive as inputs from
+ * the workflow's `github` context — we deliberately do NOT read
+ * GITHUB_EVENT_PATH, since flowing event-file data into the outbound API calls
+ * is what CodeQL flags as js/file-access-to-http. `prNumberInput` is set on a
+ * pull_request_review, `headBranchInput` on a check_suite; otherwise
+ * (workflow_dispatch, or neither field) fall back to scanning open PRs for the
+ * single release PR. Returns null when none matches.
+ * @returns {Promise<number|null>}
+ */
+async function resolveReleasePr({ prNumberInput, headBranchInput, integrationBranches, releaseBaseBranches, token, owner, repo }) {
+	// 1. Direct PR number (pull_request_review).
+	if (prNumberInput && /^\d+$/.test(prNumberInput)) return Number(prNumberInput);
+	// 2. Head branch (check_suite) → its open PR into a release base.
+	if (headBranchInput && integrationBranches.has(headBranchInput)) {
+		const prs = await api("GET", `/pulls?head=${owner}:${headBranchInput}&state=open`, null, { token, owner, repo });
 		const match = (prs || []).find((p) => releaseBaseBranches.has(p.base?.ref));
+		if (match) return match.number;
+	}
+	// 3. Fallback (workflow_dispatch / neither field): the single open release PR
+	//    — an integration branch open against a release base.
+	for (const base of releaseBaseBranches) {
+		const prs = await api("GET", `/pulls?base=${base}&state=open`, null, { token, owner, repo });
+		const match = (prs || []).find((p) => integrationBranches.has(p.head?.ref));
 		if (match) return match.number;
 	}
 	return null;
@@ -158,14 +167,16 @@ async function main() {
 	const mergeMethod = (getInput("merge_method") || "squash").toLowerCase();
 	const allowFailing = csvSet(getInput("allow_failing_checks"), "");
 	const selfPattern = getInput("self_check_pattern") || process.env.GITHUB_WORKFLOW || "";
+	// Event fields, passed by the workflow from its `github` context — never read
+	// from GITHUB_EVENT_PATH (that flows file data into the API calls → CodeQL
+	// js/file-access-to-http). Empty when the triggering event lacks the field.
+	const prNumberInput = getInput("pr_number");
+	const headBranchInput = getInput("head_branch");
 
 	const [owner, repo] = (process.env.GITHUB_REPOSITORY || "").split("/");
-	const eventPath = process.env.GITHUB_EVENT_PATH;
-	if (!owner || !repo || !eventPath) throw new Error("GITHUB_REPOSITORY / GITHUB_EVENT_PATH not set");
-	const fs = await import("node:fs");
-	const event = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+	if (!owner || !repo) throw new Error("GITHUB_REPOSITORY not set");
 
-	const prNumber = await resolvePrNumber(event, { integrationBranches, releaseBaseBranches, token, owner, repo });
+	const prNumber = await resolveReleasePr({ prNumberInput, headBranchInput, integrationBranches, releaseBaseBranches, token, owner, repo });
 	if (!prNumber) {
 		console.log("ℹ️ No release PR associated with this event; skipping.");
 		setOutputs({ merged: "false", "pr-number": "" });

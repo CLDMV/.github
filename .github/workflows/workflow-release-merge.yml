@@ -99,3 +99,9 @@ jobs:
                   # Exclude this workflow's own check-run from the gate so it
                   # never waits on itself. Matches the job name above.
                   self_check_pattern: "Release Merge"
+                  # Event fields from the caller's github context — passed as
+                  # inputs so the action never reads GITHUB_EVENT_PATH (file data
+                  # into the API calls is flagged by CodeQL js/file-access-to-http).
+                  # Empty when the triggering event lacks the field.
+                  pr_number: ${{ github.event.pull_request.number }}
+                  head_branch: ${{ github.event.check_suite.head_branch }}
