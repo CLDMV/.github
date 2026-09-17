@@ -9,6 +9,19 @@
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
+/**
+ * Structural branches branch-retention must NEVER delete, regardless of the
+ * configured `exempt_patterns` / `retention_rules`. `next` / `hotfixes` are the
+ * permanent v4 integration branches (the persistent release PR merges with one of
+ * them as its HEAD; deleting a merged PR's head branch makes GitHub auto-close every
+ * other open PR still based on it), and `master` / `main` are the default branch.
+ * `exempt_patterns` SHOULD already cover these, but a misconfigured caller must not
+ * be able to delete them — this hard guard is the backstop the org ruleset can't be,
+ * because the bot App is a ruleset bypass actor (it needs the bypass to force-reset
+ * `next`, and that same bypass would let a delete through).
+ */
+const PERMANENT_BRANCHES = new Set(["master", "main", "next", "hotfixes"]);
+
 /** fnmatch-style glob (`*` matches non-/, `**` matches any). */
 function globMatch(name, pattern) {
 	let re = "^";
@@ -114,6 +127,14 @@ try {
 	}
 	console.log(`🌿 Just-merged branch: ${branch}`);
 
+	// Hard guard — never delete a permanent structural branch, even if a misconfigured
+	// `exempt_patterns` omits it. This is the backstop that runs before any delete path.
+	if (PERMANENT_BRANCHES.has(branch)) {
+		console.log(`🛡️ "${branch}" is a permanent structural branch — never deleted (hard guard).`);
+		appendSummary(`🛡️ \`${branch}\` is a permanent branch; branch-retention never deletes it.`);
+		process.exit(0);
+	}
+
 	// Exempt check
 	for (const p of exemptPatterns) {
 		if (globMatch(branch, p)) {
@@ -149,7 +170,8 @@ try {
 	console.log(`📦 ${stillExisting.length} are still present as refs`);
 
 	const keepCount = Number(matchingRule.keep_last || 5);
-	const toDelete = stillExisting.slice(keepCount);
+	// Never prune a permanent structural branch, even if a retention rule's glob matched it.
+	const toDelete = stillExisting.slice(keepCount).filter((h) => !PERMANENT_BRANCHES.has(h.ref));
 
 	const summaryLines = [`🔒 Kept \`${branch}\` (retention rule \`${matchingRule.pattern}\`, keep_last=${keepCount})`];
 	if (toDelete.length === 0) {
