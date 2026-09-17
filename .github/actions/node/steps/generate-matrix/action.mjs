@@ -7,14 +7,45 @@
 
 import { getInput, getBooleanInput, setOutput } from "../../../common/common/core.mjs";
 
-try {
-	// Skip mode: a single version, no matrix.
-	if (getBooleanInput("skip-matrix-tests")) {
-		const single = getInput("node-version", { default: "lts/*" });
-		console.log(`📍 Matrix testing skipped, using single version: ${single}`);
-		setOutput("matrix", JSON.stringify([single]));
-		process.exit(0);
-	}
+/**
+ * Extract the Node.js major from a resolved version string (`"24.9.0"`, `"v24.9.0"`, or a bare
+ * `"24"`). Used to compare `lts/*`'s actual resolved major against the matrix's own explicit entries.
+ * @param {string} version - Resolved version string.
+ * @returns {number|null} The major, or null when `version` is empty/unparseable.
+ */
+function parseMajor(version) {
+	const m = String(version || "")
+		.trim()
+		.match(/^v?(\d+)/);
+	return m ? Number.parseInt(m[1], 10) : null;
+}
+
+/**
+ * Build the Node.js version matrix. Pure (no I/O beyond `console.log`) so it's directly testable; the
+ * CLI section below is a thin wrapper that reads inputs and writes the `matrix` output.
+ *
+ * `currentLtsVersion` is the ACTUAL resolved `lts/*` version — e.g. `actions/setup-node`'s own
+ * `node-version` output from a step that installed `lts/*` — not a guess. Node's Active-LTS major
+ * changes over time (historically every October, six months after that major's April release), and
+ * once the matrix's own explicit sweep already reaches that major, appending a separate `"lts/*"`
+ * entry re-runs the IDENTICAL Node version under a second label — e.g. `max-node-major: 26` once
+ * Node 26 is Active LTS produces `["...", "26", "lts/*"]` where the last two entries are the same
+ * install. Dropping the sentinel in that case avoids the duplicate CI job. A hardcoded
+ * promotion-date table could do this without the extra `setup-node` call, but Node's schedule is an
+ * external fact this workflow shouldn't have to track/update by hand — reading the real resolution is
+ * exact and self-updating. An empty/unresolvable `currentLtsVersion` disables the dedup (never treat
+ * "unknown" as "duplicate") — `"lts/*"` is always included in that case, matching prior behavior.
+ * @param {object} opts
+ * @param {string} opts.min - `min-node-version` input, raw. Empty = "no matrix" (single max + lts).
+ * @param {string} opts.maxInput - `max-node-major` input, raw. Empty = default max of 26.
+ * @param {boolean} opts.ltsOnly - `lts-only-matrix` input — only even (LTS-track) majors in the sweep.
+ * @param {string} [opts.currentLtsVersion] - Resolved `lts/*` version, e.g. from `actions/setup-node`.
+ * @returns {string[]} Matrix version strings.
+ * @throws {Error} When `min` is set but not a valid major or major.minor.
+ */
+function buildMatrix({ min, maxInput, ltsOnly, currentLtsVersion }) {
+	const max = maxInput ? Number.parseInt(maxInput, 10) : 26;
+	const lts = parseMajor(currentLtsVersion);
 
 	// Empty min-node-version explicitly means "no matrix" — run only
 	// max_node_major + lts/*. Use this from workflows that don't need the
@@ -22,20 +53,12 @@ try {
 	// confidence check, not a regression sweep). Aligns the implementation
 	// with the input description that says "enables matrix when set."
 	// See issue #2.
-	const min = getInput("min-node-version");
-	const maxInput = getInput("max-node-major");
-	const max = maxInput ? Number.parseInt(maxInput, 10) : 26;
-	const ltsOnly = getBooleanInput("lts-only-matrix");
-
-	console.log(`🔍 DEBUG (build-and-test): min_node_version = '${min}'`);
-	console.log(`🔍 DEBUG (build-and-test): max_node_major = '${maxInput}'`);
-
 	if (!min) {
-		const versions = [String(max), "lts/*"];
-		const matrix = JSON.stringify(versions);
-		console.log(`📍 min_node_version not set — running single max + lts: ${matrix}`);
-		setOutput("matrix", matrix);
-		process.exit(0);
+		if (lts !== null && lts === max) {
+			console.log(`⏭️  Skipping redundant lts/* — v${lts} is already the max-node-major entry`);
+			return [String(max)];
+		}
+		return [String(max), "lts/*"];
 	}
 
 	const versions = [];
@@ -58,12 +81,47 @@ try {
 		}
 		major++;
 	}
-	versions.push("lts/*");
 
-	const matrix = JSON.stringify(versions);
-	console.log(`📊 Matrix testing enabled with versions: ${matrix}`);
-	setOutput("matrix", matrix);
-} catch (error) {
-	console.error(`::error::${error.message}`);
-	process.exit(1);
+	if (lts !== null && versions.includes(String(lts))) {
+		console.log(`⏭️  Skipping redundant lts/* — v${lts} is already explicit in the matrix`);
+	} else {
+		versions.push("lts/*");
+	}
+
+	return versions;
 }
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+	try {
+		// Skip mode: a single version, no matrix.
+		if (getBooleanInput("skip-matrix-tests")) {
+			const single = getInput("node-version", { default: "lts/*" });
+			console.log(`📍 Matrix testing skipped, using single version: ${single}`);
+			setOutput("matrix", JSON.stringify([single]));
+			process.exit(0);
+		}
+
+		const min = getInput("min-node-version");
+		const maxInput = getInput("max-node-major");
+		const ltsOnly = getBooleanInput("lts-only-matrix");
+		const currentLtsVersion = getInput("current-lts-version");
+
+		console.log(`🔍 DEBUG (build-and-test): min_node_version = '${min}'`);
+		console.log(`🔍 DEBUG (build-and-test): max_node_major = '${maxInput}'`);
+
+		const versions = buildMatrix({ min, maxInput, ltsOnly, currentLtsVersion });
+		const matrix = JSON.stringify(versions);
+		if (!min) {
+			console.log(`📍 min_node_version not set — running single max + lts: ${matrix}`);
+		} else {
+			console.log(`📊 Matrix testing enabled with versions: ${matrix}`);
+		}
+		setOutput("matrix", matrix);
+	} catch (error) {
+		console.error(`::error::${error.message}`);
+		process.exit(1);
+	}
+}
+
+// Export functions for testing
+export { buildMatrix, parseMajor };
