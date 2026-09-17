@@ -26,7 +26,16 @@ on:
             exempt_patterns:
                 required: false
                 type: string
-                default: '["master","main","badges","gh-pages"]'
+                # `next` / `hotfixes` are PERMANENT v4 integration branches and MUST be exempt: the
+                # persistent `next → master` / `hotfixes → master` release PR merges with one of them as
+                # its HEAD, and deleting a merged PR's head branch makes GitHub auto-close EVERY other
+                # open PR still based on it (they lose their base). The reset workflow force-resets these
+                # in place instead of relying on delete-then-recreate. `dev` is a persistent non-v4
+                # development line some repos keep; `master`/`main`/`badges`/`gh-pages` are default /
+                # bot-managed branches. (Was `["master","main","badges","gh-pages"]` — omitting the
+                # integration branches silently closed in-flight PRs on every release.)
+                default: '["master","main","badges","gh-pages","dev","next","hotfixes"]'
+                description: "Head-branch names branch-retention must never delete. Includes the permanent v4 integration branches next/hotfixes — deleting one on its release-PR merge auto-closes every open PR based on it."
         secrets:
             BOT_APP_CLIENT_ID:
                 required: true
