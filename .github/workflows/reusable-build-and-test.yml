@@ -146,6 +146,18 @@ jobs:
         outputs:
             node-matrix: ${{ steps.set-matrix.outputs.matrix }}
         steps:
+            # Resolve what "lts/*" actually installs RIGHT NOW so generate-matrix can drop it when an
+            # explicit major already in the matrix (e.g. max-node-major) is the same install — Node's
+            # Active-LTS major changes over time and a hardcoded date table would need a manual edit
+            # (and could drift wrong) every time Node promotes a new one. Reading the real resolution
+            # here is exact and self-updating. Skipped in skip-matrix-tests mode, which doesn't dedupe.
+            - name: Resolve lts/* Node.js version
+              id: resolve-lts
+              if: inputs.skip_matrix_tests != true
+              uses: actions/setup-node@v6
+              with:
+                  node-version: "lts/*"
+
             - id: set-matrix
               uses: CLDMV/.github/.github/actions/node/steps/generate-matrix@v4
               with:
@@ -153,6 +165,7 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   min-node-version: ${{ inputs.min_node_version }}
                   max-node-major: ${{ inputs.max_node_major }}
+                  current-lts-version: ${{ steps.resolve-lts.outputs.node-version }}
                   lts-only-matrix: ${{ inputs.lts_only_matrix }}
 
     build-and-test:

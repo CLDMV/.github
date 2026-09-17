@@ -15,13 +15,17 @@ inputs:
     required: false
     default: ""
   max-node-major:
-    description: "Maximum Node.js major version (defaults to 22)"
+    description: "Maximum Node.js major version (defaults to 26)"
     required: false
     default: ""
   lts-only-matrix:
     description: "Only include even-numbered (LTS) majors in the matrix"
     required: false
     default: "false"
+  current-lts-version:
+    description: "Resolved `lts/*` version (e.g. actions/setup-node's `node-version` output from a step that installed lts/*). When its major already appears in the matrix as an explicit entry, the trailing `lts/*` sentinel is dropped so the same Node version isn't tested twice under two labels. Empty (default) = dedup disabled, `lts/*` is always included."
+    required: false
+    default: ""
 
 outputs:
   matrix:
