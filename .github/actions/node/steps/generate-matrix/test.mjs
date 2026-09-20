@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
  * @fileoverview Unit tests for generate-matrix's buildMatrix/parseMajor — the
- * Node.js test-matrix builder, focused on the `lts/*` redundancy dedup: an
- * explicit major already in the matrix (e.g. max-node-major, or an even major
- * from the lts-only sweep) must not also be tested a second time under the
- * "lts/*" label once that major IS the resolved current LTS. Run: `node test.mjs`.
+ * Node.js test-matrix builder, focused on the `lts/*` redundancy dedup: when an
+ * explicit major in the matrix (e.g. max-node-major, or an even major from the
+ * lts-only sweep) IS the resolved current LTS, that version must not be tested
+ * twice. The dedup drops the redundant EXPLICIT NUMERIC entry and KEEPS `lts/*`
+ * (replacing the numeric in place) — never the reverse — because the publish
+ * flow downloads `build-artifacts-lts`, which only the `lts/*` leg produces.
+ * Run: `node test.mjs`.
  */
 
 import { buildMatrix, parseMajor } from "./action.mjs";
@@ -37,8 +40,8 @@ eq(
 );
 eq(
 	buildMatrix({ min: "", maxInput: "26", ltsOnly: false, currentLtsVersion: "26.1.0" }),
-	["26"],
-	"max IS the resolved current LTS → lts/* dropped, no duplicate job"
+	["lts/*"],
+	"max IS the resolved current LTS → drop the explicit max, keep lts/* (preserves build-artifacts-lts)"
 );
 eq(
 	buildMatrix({ min: "", maxInput: "26", ltsOnly: false, currentLtsVersion: "" }),
@@ -49,18 +52,18 @@ eq(
 console.log("\nbuildMatrix — full sweep (min set):");
 eq(
 	buildMatrix({ min: "22.12.0", maxInput: "26", ltsOnly: false, currentLtsVersion: "24.9.0" }),
-	["22.12", "23", "24", "25", "26"],
-	"current LTS (24) already explicit mid-range → still a literal duplicate install, lts/* dropped"
+	["22.12", "23", "lts/*", "25", "26"],
+	"current LTS (24) already explicit mid-range → replace the numeric 24 with lts/* (same install)"
 );
 eq(
 	buildMatrix({ min: "22.12.0", maxInput: "26", ltsOnly: false, currentLtsVersion: "26.1.0" }),
-	["22.12", "23", "24", "25", "26"],
-	"current LTS === max and already explicit in the full sweep → lts/* dropped"
+	["22.12", "23", "24", "25", "lts/*"],
+	"current LTS === max and already explicit in the full sweep → replace the numeric 26 with lts/*"
 );
 eq(
 	buildMatrix({ min: "22.12.0", maxInput: "26", ltsOnly: true, currentLtsVersion: "24.9.0" }),
-	["22.12", "24", "26"],
-	"lts-only sweep already contains the current LTS (24, even) explicitly → lts/* dropped"
+	["22.12", "lts/*", "26"],
+	"lts-only sweep already contains the current LTS (24, even) → replace the numeric 24 with lts/*"
 );
 eq(
 	buildMatrix({ min: "22.12.0", maxInput: "26", ltsOnly: true, currentLtsVersion: "" }),
@@ -79,6 +82,21 @@ eq(
 	["26.0", "lts/*"],
 	"exact major.minor pin (26.0) is NOT the same install as lts/*'s latest patch → not deduped"
 );
+
+// Publish contract: the reusable-publishing flow downloads the build artifact by the fixed name
+// `build-artifacts-lts`, produced only by the `lts/*` matrix leg. So whenever `lts/*` is in play,
+// the dedup must leave an `lts/*` entry in the matrix — dropping it (as an earlier version did)
+// removed the artifact and failed every publish with "Artifact not found for build-artifacts-lts".
+console.log("\nbuildMatrix — publish contract (lts/* survives dedup):");
+for (const scenario of [
+	{ min: "", maxInput: "26", ltsOnly: false, currentLtsVersion: "26.1.0" },
+	{ min: "22.12.0", maxInput: "26", ltsOnly: false, currentLtsVersion: "24.9.0" },
+	{ min: "22.12.0", maxInput: "26", ltsOnly: false, currentLtsVersion: "26.1.0" },
+	{ min: "22.12.0", maxInput: "26", ltsOnly: true, currentLtsVersion: "24.9.0" }
+]) {
+	const out = buildMatrix(scenario);
+	eq(out.includes("lts/*"), true, `lts/* preserved for ${JSON.stringify(scenario)} → ${JSON.stringify(out)}`);
+}
 
 console.log("\nbuildMatrix — error handling:");
 try {
