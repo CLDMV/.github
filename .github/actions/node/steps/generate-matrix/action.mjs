@@ -27,14 +27,19 @@ function parseMajor(version) {
  * `currentLtsVersion` is the ACTUAL resolved `lts/*` version — e.g. `actions/setup-node`'s own
  * `node-version` output from a step that installed `lts/*` — not a guess. Node's Active-LTS major
  * changes over time (historically every October, six months after that major's April release), and
- * once the matrix's own explicit sweep already reaches that major, appending a separate `"lts/*"`
- * entry re-runs the IDENTICAL Node version under a second label — e.g. `max-node-major: 26` once
- * Node 26 is Active LTS produces `["...", "26", "lts/*"]` where the last two entries are the same
- * install. Dropping the sentinel in that case avoids the duplicate CI job. A hardcoded
- * promotion-date table could do this without the extra `setup-node` call, but Node's schedule is an
+ * when the matrix's own explicit sweep already reaches that major, an explicit numeric entry and the
+ * `"lts/*"` sentinel resolve to the IDENTICAL install — e.g. `max-node-major: 26` once Node 26 is
+ * Active LTS would run `["...", "26", "lts/*"]` where the last two entries are the same Node version
+ * under two labels. To drop the duplicate CI job we remove the redundant NUMERIC entry and KEEP
+ * `"lts/*"` (replacing the numeric with the sentinel in place) — NOT the other way round. The publish
+ * flow's `calculate-names` downloads the build artifact by the fixed name `build-artifacts-lts`, and
+ * that artifact is produced ONLY by the matrix leg whose input is literally `"lts/*"` (see
+ * build-and-test's get-node-version label). Dropping `"lts/*"` instead would delete that artifact and
+ * break every publish with "Artifact not found for name: build-artifacts-lts". A hardcoded
+ * promotion-date table could dedup without the extra `setup-node` call, but Node's schedule is an
  * external fact this workflow shouldn't have to track/update by hand — reading the real resolution is
  * exact and self-updating. An empty/unresolvable `currentLtsVersion` disables the dedup (never treat
- * "unknown" as "duplicate") — `"lts/*"` is always included in that case, matching prior behavior.
+ * "unknown" as "duplicate") — both the numeric entry and `"lts/*"` are kept in that case.
  * @param {object} opts
  * @param {string} opts.min - `min-node-version` input, raw. Empty = "no matrix" (single max + lts).
  * @param {string} opts.maxInput - `max-node-major` input, raw. Empty = default max of 26.
@@ -55,8 +60,11 @@ function buildMatrix({ min, maxInput, ltsOnly, currentLtsVersion }) {
 	// See issue #2.
 	if (!min) {
 		if (lts !== null && lts === max) {
-			console.log(`⏭️  Skipping redundant lts/* — v${lts} is already the max-node-major entry`);
-			return [String(max)];
+			// max and lts/* install the same Node — keep lts/* (the publish flow's
+			// build-artifacts-lts artifact is produced only by the lts/* leg) and drop the
+			// redundant explicit max.
+			console.log(`⏭️  Dropping redundant explicit v${max} — same install as lts/* (keeping lts/* for build-artifacts-lts)`);
+			return ["lts/*"];
 		}
 		return [String(max), "lts/*"];
 	}
@@ -82,8 +90,14 @@ function buildMatrix({ min, maxInput, ltsOnly, currentLtsVersion }) {
 		major++;
 	}
 
-	if (lts !== null && versions.includes(String(lts))) {
-		console.log(`⏭️  Skipping redundant lts/* — v${lts} is already explicit in the matrix`);
+	const ltsIdx = lts !== null ? versions.indexOf(String(lts)) : -1;
+	if (ltsIdx !== -1) {
+		// lts/* installs a major already swept in explicitly — replace that numeric entry
+		// with the lts/* sentinel (same install, one label) rather than appending a second
+		// leg. Keep lts/*, not the numeric: the publish flow's build-artifacts-lts artifact
+		// is produced only by the lts/* leg, so dropping lts/* would break every publish.
+		console.log(`⏭️  Replacing explicit v${lts} with lts/* — same install; preserves the build-artifacts-lts artifact`);
+		versions[ltsIdx] = "lts/*";
 	} else {
 		versions.push("lts/*");
 	}
