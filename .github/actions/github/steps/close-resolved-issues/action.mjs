@@ -145,6 +145,44 @@ async function listRangeCommits(owner, repo, base, head, token) {
 	return all;
 }
 
+/**
+ * From the PRs associated with a commit (GitHub's "list pull requests
+ * associated with a commit" API), pick the release PR: the most-recently-merged
+ * one, falling back to the last entry when none report a merge time. Pure — the
+ * network fetch lives in {@link resolveReleasePRFromCommit}. Returns the PR
+ * number or null when the list is empty / has no usable number.
+ * @public
+ */
+export function pickReleasePR(prs) {
+	if (!Array.isArray(prs) || prs.length === 0) return null;
+	const merged = prs.filter((p) => p && p.merged_at);
+	const pick = (merged.length ? merged : prs)
+		.slice()
+		.sort((a, b) => String(a?.merged_at || "").localeCompare(String(b?.merged_at || "")))
+		.pop();
+	return pick && Number.isInteger(pick.number) ? pick.number : null;
+}
+
+/**
+ * Resolve the release PR that produced this squash/merge commit, via the
+ * commit→PR association API — independent of the commit message. The v4 release
+ * squash message is fully custom (subject = the release PR title, body = the
+ * changelog) and carries NO trailing "(#N)", so parsing the subject finds
+ * nothing and every release then closes zero issues. This reads the PR
+ * association directly instead. Returns the release PR number, or null when none
+ * is found / the lookup fails.
+ * @public
+ */
+export async function resolveReleasePRFromCommit(sha, token, owner, repo) {
+	try {
+		const prs = await api("GET", `/commits/${encodeURIComponent(sha)}/pulls`, null, { token, owner, repo });
+		return pickReleasePR(prs);
+	} catch (err) {
+		console.log(`⚠️ commit→PR lookup for ${String(sha).slice(0, 7)} failed: ${err.message}`);
+		return null;
+	}
+}
+
 /** Add every number `extract(text)` finds to `map`, keeping the first source PR seen per issue. */
 function collectInto(map, extract, text, sourcePR) {
 	for (const n of extract(text)) {
@@ -163,10 +201,18 @@ async function main() {
 	console.log(`🔍 Resolving the release PR for ${sha.slice(0, 7)}...`);
 	const commit = await api("GET", `/commits/${sha}`, null, { token, owner, repo });
 	const subject = (commit?.commit?.message || "").split("\n", 1)[0] || "";
-	const releasePR = extractTrailingPRRef(subject);
+
+	// Identify the release PR from the squash commit itself via the commit→PR
+	// association API — NOT the trailing "(#N)" on the subject. The v4 release
+	// squash message is fully custom (subject = the release PR title, body = the
+	// changelog) and carries no trailing "(#N)", so a subject parse finds nothing
+	// and closes zero issues (the bug this fixes). Fall back to the subject
+	// "(#N)" only when the API yields nothing — e.g. a plain feat → master squash
+	// that kept its "(#N)".
+	const releasePR = (await resolveReleasePRFromCommit(sha, token, owner, repo)) ?? extractTrailingPRRef(subject);
 
 	if (!releasePR) {
-		console.log(`ℹ️ No trailing "(#N)" reference in "${subject}" — nothing to close.`);
+		console.log(`ℹ️ Could not resolve a release PR for ${sha.slice(0, 7)} ("${subject}") — nothing to close.`);
 		setOutput("closed", "");
 		return;
 	}
