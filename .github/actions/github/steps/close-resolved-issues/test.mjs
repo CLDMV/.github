@@ -5,7 +5,14 @@
  * closing-keyword parser. Run: `node test.mjs`.
  */
 
-import { extractMergedPRRefs, extractTrailingPRRef, extractResolvesMarkers, extractCloseKeywords, sourcePRTexts } from "./action.mjs";
+import {
+	extractMergedPRRefs,
+	extractTrailingPRRef,
+	extractResolvesMarkers,
+	extractCloseKeywords,
+	sourcePRTexts,
+	pickReleasePR
+} from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -88,6 +95,21 @@ eq(
 	["b", "", "", "", ""],
 	"missing body/message fields coerce to empty strings"
 );
+
+console.log("\npickReleasePR (commit→PR association, message-independent):");
+eq(pickReleasePR([{ number: 412, merged_at: "2026-09-20T15:33:33Z" }]), 412, "single merged PR (custom squash subject, no trailing (#N))");
+eq(
+	pickReleasePR([
+		{ number: 1, merged_at: "2026-01-01T00:00:00Z" },
+		{ number: 412, merged_at: "2026-09-20T15:33:33Z" }
+	]),
+	412,
+	"most-recently-merged wins when several PRs are associated"
+);
+eq(pickReleasePR([{ number: 9, merged_at: null }]), 9, "falls back to a PR with no merge time rather than null");
+eq(pickReleasePR([]), null, "empty association list -> null (fail-safe: nothing to close)");
+eq(pickReleasePR(null), null, "non-array -> null");
+eq(pickReleasePR([{ merged_at: "2026-09-20T15:33:33Z" }]), null, "entry with no number -> null");
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);
