@@ -38,7 +38,7 @@ inputs:
     required: false
     default: ""
   head_branch:
-    description: "Head branch from the caller's `github.event.check_suite.head_branch` (check_suite events). Empty otherwise. When set to an integration branch, resolves that branch's open release PR. See pr_number for why this is an input."
+    description: "Head branch from the caller's `github.event.workflow_run.head_branch` (workflow_run events, the primary re-evaluation trigger — see #318) or `github.event.check_suite.head_branch` (check_suite events, a fallback that rarely fires for Actions-created checks). Empty otherwise. When set to an integration branch, resolves that branch's open release PR. See pr_number for why this is an input."
     required: false
     default: ""
 

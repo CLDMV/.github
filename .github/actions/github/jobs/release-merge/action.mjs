@@ -134,15 +134,17 @@ async function listCheckRuns(sha, { token, owner, repo }) {
  * the workflow's `github` context — we deliberately do NOT read
  * GITHUB_EVENT_PATH, since flowing event-file data into the outbound API calls
  * is what CodeQL flags as js/file-access-to-http. `prNumberInput` is set on a
- * pull_request_review, `headBranchInput` on a check_suite; otherwise
- * (workflow_dispatch, or neither field) fall back to scanning open PRs for the
- * single release PR. Returns null when none matches.
+ * pull_request_review, `headBranchInput` on a workflow_run (the primary
+ * re-evaluation trigger, #318) or check_suite (a fallback that rarely fires
+ * for GitHub Actions-created checks); otherwise (workflow_dispatch, or
+ * neither field) fall back to scanning open PRs for the single release PR.
+ * Returns null when none matches.
  * @returns {Promise<number|null>}
  */
 async function resolveReleasePr({ prNumberInput, headBranchInput, integrationBranches, releaseBaseBranches, token, owner, repo }) {
 	// 1. Direct PR number (pull_request_review).
 	if (prNumberInput && /^\d+$/.test(prNumberInput)) return Number(prNumberInput);
-	// 2. Head branch (check_suite) → its open PR into a release base.
+	// 2. Head branch (workflow_run / check_suite) → its open PR into a release base.
 	if (headBranchInput && integrationBranches.has(headBranchInput)) {
 		const prs = await api("GET", `/pulls?head=${owner}:${headBranchInput}&state=open`, null, { token, owner, repo });
 		const match = (prs || []).find((p) => releaseBaseBranches.has(p.base?.ref));

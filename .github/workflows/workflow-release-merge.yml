@@ -16,8 +16,10 @@
 # finished and passed, so the body it reads is never stale.
 #
 # The caller fires this on `pull_request_review` (approved) to arm it and on
-# `check_suite: completed` to re-evaluate, so an approval given before CI is
-# green still merges once the last check goes green. See #303.
+# `workflow_run: completed` (of the caller's own CI workflow) to re-evaluate,
+# so an approval given before CI is green still merges once the last check
+# goes green. See #303, #318 (check_suite doesn't fire for Actions-created
+# checks — workflow_run is the trigger that actually works here).
 name: 🚦 Release Merge (v4 reusable)
 
 on:
@@ -103,5 +105,12 @@ jobs:
                   # inputs so the action never reads GITHUB_EVENT_PATH (file data
                   # into the API calls is flagged by CodeQL js/file-access-to-http).
                   # Empty when the triggering event lacks the field.
+                  #
+                  # head_branch checks workflow_run first: that's the caller's
+                  # actual re-evaluation trigger (#318 — check_suite doesn't fire
+                  # for Actions-created checks). check_suite.head_branch stays as
+                  # a fallback for a caller that still listens on it (a
+                  # third-party App's check suite completing) or hasn't
+                  # re-synced its copy of the caller template yet.
                   pr_number: ${{ github.event.pull_request.number }}
-                  head_branch: ${{ github.event.check_suite.head_branch }}
+                  head_branch: ${{ github.event.workflow_run.head_branch || github.event.check_suite.head_branch }}
