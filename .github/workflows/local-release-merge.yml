@@ -1,0 +1,58 @@
+#
+# @Project: workflows
+# @Filename: /local-release-merge.yml
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# v4 core (opt-in): squash-merge the persistent `next → master` release PR on
+# MY APPROVAL, via the REST merge API with the PR body as the commit message.
+# Thin caller — all logic lives in workflow-release-merge.yml (this repo's own
+# copy, referenced via a relative `uses:` since it's a local workflow calling
+# another local workflow) so bumping it carries fixes without editing this file.
+#
+# NOTE: pull_request_review / workflow_run events run the copy of this file
+# (and of workflow-release-merge.yml) that's on the DEFAULT branch, so this
+# only takes effect once it ships to master with a release — the PR that adds
+# this file must still be merged manually the first time.
+#
+# Re-evaluation when an approval precedes green CI uses `workflow_run`, not
+# `check_suite` — GitHub does not send `check_suite: completed` for a suite
+# created by GitHub Actions itself (which is every check in this repo's CI),
+# only for suites created by a third-party App. #318: an approval given before
+# CI finished left a release PR stuck fully green with nothing re-firing the
+# merge check, because check_suite silently never fires for that case at all.
+# `workflow_run` is GitHub's documented replacement for exactly this — it
+# fires on completion of the named workflow regardless of who created its
+# checks. Must name every top-level workflow this repo's own CI runs as, that
+# could plausibly finish last.
+# STATUS: v4.
+name: 🚦 Local Release Merge (v4)
+
+on:
+    pull_request_review:
+        types: [submitted] # approval arms it
+    workflow_run:
+        workflows: ["🧪 Local CI"] # re-evaluate once CI actually finishes — see #318
+        types: [completed]
+    workflow_dispatch: # manual re-evaluation
+
+# Serialize: each run re-resolves the release PR + re-gates the head, so queue
+# (don't cancel) to avoid racing a merge that's already in flight.
+concurrency:
+    group: local-release-merge-${{ github.repository }}
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    merge:
+        permissions:
+            contents: write
+            pull-requests: write
+            checks: read
+            statuses: read
+        uses: ./.github/workflows/workflow-release-merge.yml
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
