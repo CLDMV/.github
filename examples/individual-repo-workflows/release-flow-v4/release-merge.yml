@@ -19,8 +19,17 @@
 #
 # How you use it: approve the release PR as you normally do. The merge fires when
 # CI is green — if you approve before CI finishes, it re-evaluates on each check
-# completion and merges once the last one passes. Nothing auto-merges without
-# your approval.
+# completion (and, failing that, on the next scheduled tick) and merges once the
+# last one passes. Nothing auto-merges without your approval.
+#
+# `check_suite: completed` is a best-effort fast path, not a guarantee — GitHub
+# does not reliably deliver it for an integration branch's own check suite (see
+# CLDMV/.github#318: an approval given before CI finished left a release PR
+# stuck fully green with nothing to re-fire the merge check). `schedule` is the
+# actual guarantee: it re-evaluates unconditionally on a timer, so an approval
+# given before CI is green always converges within one interval even if
+# check_suite never fires. Cheap when idle — no open release PR means a couple
+# of GET calls and exit; adjust the cron cadence to taste.
 #
 # Thin caller: all logic lives in the reusable, pinned at @v4.
 # NOTE: pull_request_review / check_suite events run the copy of this file on the
@@ -31,7 +40,9 @@ on:
     pull_request_review:
         types: [submitted] # your approval arms it
     check_suite:
-        types: [completed] # re-evaluate when CI finishes (approval may precede green)
+        types: [completed] # best-effort re-evaluate fast path — see #318, not reliable alone
+    schedule:
+        - cron: "*/10 * * * *" # guaranteed re-evaluate fallback — see #318
     workflow_dispatch: # manual re-evaluation
 
 # Serialize per repo: each run re-resolves the release PR + re-gates the head,

@@ -14,6 +14,15 @@
 # of workflow-release-merge.yml) that's on the DEFAULT branch, so this only
 # takes effect once it ships to master with a release — the PR that adds this
 # file must still be merged manually the first time.
+#
+# `check_suite: completed` is a best-effort fast path, not a guarantee — GitHub
+# does not reliably deliver it for an integration branch's own check suite (see
+# #318: an approval given before CI finished left a release PR stuck fully
+# green with nothing to re-fire the merge check). `schedule` is the actual
+# guarantee: it re-evaluates unconditionally on a timer, so an approval given
+# before CI is green always converges within one interval even if check_suite
+# never fires. Cheap when idle — no open release PR means a couple of GET
+# calls and exit.
 # STATUS: v4.
 name: 🚦 Local Release Merge (v4)
 
@@ -21,7 +30,9 @@ on:
     pull_request_review:
         types: [submitted] # approval arms it
     check_suite:
-        types: [completed] # re-evaluate when CI finishes (approval may precede green)
+        types: [completed] # best-effort re-evaluate fast path — see #318, not reliable alone
+    schedule:
+        - cron: "*/10 * * * *" # guaranteed re-evaluate fallback — see #318
     workflow_dispatch: # manual re-evaluation
 
 # Serialize: each run re-resolves the release PR + re-gates the head, so queue
