@@ -387,26 +387,36 @@ jobs:
 
     coverage-badge:
         name: "📊 Coverage & Badge Push"
-        needs: [ paths-gate, commit-gate, ci ]
+        # Deliberately does NOT `need` (and therefore does not wait on) `ci` —
+        # this job runs its own full checkout/build/type-check/test+coverage on
+        # its own runner (see reusable-coverage-badge.yml) and shares no
+        # artifacts with the `ci` matrix, so gating it behind `ci`'s completion
+        # only added wall-clock time for no correctness benefit: it re-verifies
+        # tests pass on its own (a failure there fails this job independently),
+        # while `ci` re-runs across the full Node matrix in parallel. `next`
+        # pushes are the case this matters most for — coverage now starts
+        # alongside the matrix instead of waiting for the whole matrix to
+        # finish first. `sync-gate` is `need`ed directly (instead of inherited
+        # via `ci`) purely to reach its `is_master_sync` output.
+        needs: [ sync-gate, paths-gate, commit-gate ]
         # NOTE: a `type: boolean` input arrives as the STRING "true"/"false"
         # when a consumer passes it through a `${{ }}` expression — the standard
         # template does `enable_*: ${{ github.event.inputs.* != 'false' }}` — so
         # a bare `inputs.* == true` silently evaluates false and the job skips
         # (green, no error). Accept both the boolean and string forms.
         #
-        # `!cancelled()` is load-bearing here too, same reason as on `ci` above:
-        # this job's transitive dependency chain runs through `ci`, which
-        # depends on `sync-gate` — and `sync-gate` skips on every push to
-        # `master` (it only runs for next/hotfixes). Without an explicit guard,
-        # GitHub's implicit `success()` wrapping treats that upstream skip as
-        # cascading forward through the whole chain, so this job silently
-        # skipped on every real push to master regardless of every other
-        # condition being true.
+        # `!cancelled()` is load-bearing here too: `sync-gate` skips on every
+        # push to `master` (it only runs for next/hotfixes). Without an
+        # explicit guard, GitHub's implicit `success()` wrapping treats that
+        # upstream skip as cascading forward, so this job would silently skip
+        # on every real push to master regardless of every other condition
+        # being true.
         if: >
             !cancelled() &&
+            needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
-            needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
-            == 'success' && (inputs.enable_coverage_badge == true ||
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            (inputs.enable_coverage_badge == true ||
             inputs.enable_coverage_badge == 'true') &&
             github.event_name == 'push' && (github.ref ==
             format('refs/heads/{0}', inputs.default_branch) || github.ref ==
@@ -465,12 +475,18 @@ jobs:
 
     coverage-pr-comment:
         name: "PR Coverage Badge"
-        needs: [ paths-gate, commit-gate, ci ]
+        # Deliberately does NOT `need` `ci` — see coverage-badge above: this
+        # job runs its own full build/type-check/test+coverage and doesn't
+        # wait on the Node matrix, so it starts alongside `ci` instead of
+        # after it. `sync-gate` is `need`ed directly purely to reach its
+        # `is_master_sync` output (a no-op here in practice, since sync-gate
+        # only runs on `push` and this job only runs on `pull_request`).
+        needs: [ sync-gate, paths-gate, commit-gate ]
         # NOTE: see coverage-badge above — a `${{ }}`-passed boolean input
         # arrives as the STRING "true", so a bare `== true` skips the job.
-        # `!cancelled()` guard: same cascade-skip reason as coverage-badge —
-        # this job's chain runs through `ci` → `sync-gate`, and `sync-gate`
-        # skips on this job's own trigger (pull_request), not just push.
+        # `!cancelled()` guard: `sync-gate` skips on this job's own trigger
+        # (pull_request), not just push, so its output is empty here — the
+        # guard just protects against upstream skip cascading incorrectly.
         #
         # `github.head_ref` is scoped to the two persistent release PRs
         # (`next` → master, `hotfixes` → master), not the base branch — every
@@ -488,9 +504,10 @@ jobs:
         # ever produce the real release PRs.
         if: >
             !cancelled() &&
+            needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
-            needs.commit-gate.outputs.should_skip != 'true' && needs.ci.result
-            == 'success' && (inputs.enable_coverage_pr_comment == true ||
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            (inputs.enable_coverage_pr_comment == true ||
             inputs.enable_coverage_pr_comment == 'true') &&
             github.event_name == 'pull_request' && (github.head_ref == 'next'
             || github.head_ref == 'hotfixes') &&
