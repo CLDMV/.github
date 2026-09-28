@@ -12,9 +12,19 @@ import { gzipSync, brotliCompressSync, constants } from "node:zlib";
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
-/** Recursive directory walk matching a glob (very simple: `*` and `**` only). */
+/**
+ * Recursive walk of a pattern root. A directory yields every file beneath it; a
+ * plain file (a wildcard-free pattern such as `index.mjs`) yields itself, so a
+ * single-file entry in `dist_paths` is measured instead of silently skipped.
+ */
 function* walk(dir) {
-	if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
+	if (!fs.existsSync(dir)) return;
+	const stat = fs.statSync(dir);
+	if (stat.isFile()) {
+		yield dir;
+		return;
+	}
+	if (!stat.isDirectory()) return;
 	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, entry.name);
 		if (entry.isDirectory()) yield* walk(p);
@@ -94,6 +104,14 @@ async function measure() {
 	const result = { files, total };
 
 	fs.writeFileSync(outputFile, JSON.stringify(result, null, 2));
+	if (files.length === 0) {
+		// Misconfigured dist_paths (or a build that emitted nothing) would otherwise
+		// surface only as an empty size table — flag it in the job log and summary.
+		// Not a failure: the measurement still completes and the job still passes.
+		const message = `dist_paths matched 0 files (${distPatterns.join(", ")}). Set dist_paths to the files the package publishes — see \`npm pack --dry-run\` or package.json \`files\`.`;
+		console.log(`::warning title=Bundle size - no files measured::${message}`);
+		appendSummary(`⚠️ ${message}`);
+	}
 	console.log(`📊 Measured ${files.length} files`);
 	console.log(`   raw    : ${formatBytes(total.raw)}`);
 	console.log(`   gzip   : ${formatBytes(total.gzip)}`);

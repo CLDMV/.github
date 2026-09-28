@@ -39,7 +39,9 @@
 # exactly this way). The list below covers the standard v4 template set by their
 # template `name:`s — names are matched literally (not by filename), so fix any
 # you renamed, and add any extra PR-triggered workflow your repo has. Listing a
-# workflow your repo doesn't have is harmless. `branches:` limits re-fires to
+# workflow your repo doesn't have is harmless, so keep the list verbatim: don't
+# prune entries for workflows your repo lacks (a later adoption would then
+# silently never re-fire this merge check). `branches:` limits re-fires to
 # runs on the integration branches, so feature-branch CI doesn't wake this up.
 #
 # Thin caller: all logic lives in the reusable, pinned at @v4.
