@@ -23,17 +23,41 @@
 # merge check, because check_suite silently never fires for that case at all.
 # `workflow_run` is GitHub's documented replacement for exactly this — it
 # fires on completion of the named workflow regardless of who created its
-# checks. Must name every top-level workflow this repo's own CI runs as, that
-# could plausibly finish last.
+# checks.
+#
+# The merge gate waits on EVERY check-run on the release PR's head commit, from
+# any workflow, so `workflows:` must name every workflow that puts a check on
+# that commit — not just CI. Whichever finishes last is the only one whose
+# completion can see a fully green head; if it isn't listed, nothing re-fires
+# and the PR sits approved + green (v4.29.1, PR #322: CI finished at 05:00:10,
+# the last re-evaluation saw CodeQL still running, CodeQL finished at 05:00:51
+# and wasn't listed). `branches:` limits re-fires to runs on the integration
+# branches, so feature-branch CI doesn't wake this up.
+#
+# Concurrency below keeps one run + one pending; a newer arrival replaces the
+# pending run (even with cancel-in-progress: false). That's harmless — every
+# run re-reads the approval and check state from the API, so the newest
+# pending run always covers the ones it replaced.
 # STATUS: v4.
 name: 🚦 Local Release Merge (v4)
 
 on:
     pull_request_review:
         types: [submitted] # approval arms it
-    workflow_run:
-        workflows: ["🧪 Local CI"] # re-evaluate once CI actually finishes — see #318
+    workflow_run: # re-evaluate as each check-producing workflow finishes — see #318
+        workflows:
+            - "🧪 Local CI"
+            - "🔍 Local CodeQL"
+            - "🚀 Local Next Release (v4)"
+            - "🚑 Local Hotfixes Release (v4)"
+            - "🌿 Local Branch Retention"
+            - "🏷️ Local PR Labeler"
+            - "🏷️ Local PR Title Normalizer"
+            - "👋 Local Welcome"
+            - "🔀 Local Hotfix PR Redirector (v4)"
+            - "🚀 Local Member Auto-Enable Auto-Merge"
         types: [completed]
+        branches: [next, hotfixes]
     workflow_dispatch: # manual re-evaluation
 
 # Serialize: each run re-resolves the release PR + re-gates the head, so queue
