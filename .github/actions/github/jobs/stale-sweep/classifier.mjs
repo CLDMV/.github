@@ -52,22 +52,28 @@ export function classify({ item, isPR, config, staleAddedAtMs, lastActivityMs, n
 	const daysBeforeStale = isPR ? config.daysBeforePrStale : config.daysBeforeIssueStale;
 	const daysBeforeClose = isPR ? config.daysBeforePrClose : config.daysBeforeIssueClose;
 
+	const isStale = labels.includes(staleLabel);
+
+	// Exempt items are never marked or closed. One that was marked stale before it
+	// became exempt (e.g. someone added `pinned` during the grace period) gets the
+	// stale label removed, so it doesn't sit labeled stale forever.
+	const exempt = (reason) =>
+		isStale ? { action: Action.UNSTALE, reason: `${reason}; removing stale label` } : { action: Action.SKIP, reason };
+
 	// Exempt by label
-	for (const exempt of exemptLabels) {
-		if (labels.includes(exempt)) {
-			return { action: Action.SKIP, reason: `exempt label: ${exempt}` };
+	for (const exemptLabel of exemptLabels) {
+		if (labels.includes(exemptLabel)) {
+			return exempt(`exempt label: ${exemptLabel}`);
 		}
 	}
 	// Exempt by assignee
 	if (config.exemptAllAssignees && Array.isArray(item.assignees) && item.assignees.length > 0) {
-		return { action: Action.SKIP, reason: `has assignee: ${item.assignees.map((a) => a.login).join(",")}` };
+		return exempt(`has assignee: ${item.assignees.map((a) => a.login).join(",")}`);
 	}
 	// Exempt by milestone
 	if (config.exemptAllMilestones && item.milestone) {
-		return { action: Action.SKIP, reason: `has milestone: ${item.milestone.title}` };
+		return exempt(`has milestone: ${item.milestone.title}`);
 	}
-
-	const isStale = labels.includes(staleLabel);
 
 	if (isStale) {
 		if (staleAddedAtMs == null) {

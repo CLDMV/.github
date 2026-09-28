@@ -23,15 +23,15 @@ on:
             days_before_issue_stale: { required: false, type: number, default: 60 }
             days_before_issue_close: { required: false, type: number, default: 14 }
             stale_issue_label: { required: false, type: string, default: "stale" }
-            stale_issue_message: { required: false, type: string, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, or close if no longer relevant." }
+            stale_issue_message: { required: false, type: string, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, add the `pinned` label to exempt it permanently, or close it if it is no longer relevant." }
             close_issue_message: { required: false, type: string, default: "Closed due to inactivity. Reopen if this is still relevant." }
             days_before_pr_stale: { required: false, type: number, default: 30 }
             days_before_pr_close: { required: false, type: number, default: 7 }
             stale_pr_label: { required: false, type: string, default: "stale" }
-            stale_pr_message: { required: false, type: string, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open." }
+            stale_pr_message: { required: false, type: string, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open, or add the `pinned` label to exempt it." }
             close_pr_message: { required: false, type: string, default: "Closed due to inactivity. Reopen the branch and PR when ready to resume." }
-            exempt_issue_labels: { required: false, type: string, default: "pinned,security,help-wanted,good-first-issue,blocked" }
-            exempt_pr_labels: { required: false, type: string, default: "pinned,work-in-progress,dependencies,blocked" }
+            exempt_issue_labels: { required: false, type: string, default: "pinned,security,help wanted,good first issue,status: blocked" }
+            exempt_pr_labels: { required: false, type: string, default: "pinned,work-in-progress,dependencies,type: dependencies,status: blocked" }
             exempt_all_milestones: { required: false, type: boolean, default: true }
             exempt_all_assignees: { required: false, type: boolean, default: true }
             operations_per_run: { required: false, type: number, default: 100 }
