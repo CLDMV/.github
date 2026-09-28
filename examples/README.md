@@ -13,16 +13,19 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 
 ## Template Catalog
 
-Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into six subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them — except `release-flow-v4/`, which is adopted as a set.
+Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into six subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them — except `release-flow-v4/`, which is adopted as a set, and the standard `core-cicd/` files every v4 repo carries.
 
-### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD (most repos want all four)
+### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD
 
-| Template                        | Triggers                   | Calls                                    | What it does                                                        |
-| ------------------------------- | -------------------------- | ---------------------------------------- | ------------------------------------------------------------------- |
-| `ci.yml`                        | push, fork-PR              | `workflow-ci.yml`                        | Build + test matrix; PR gate via status check on SHA                |
-| `release.yml`                   | push to non-default branch | `workflow-release.yml`                   | Detects `release:`/`release!:` commits → opens/updates a release PR |
-| `publish.yml`                   | push to default branch     | `workflow-publish.yml`                   | Publishes to NPM + GitHub Packages, creates GitHub release          |
-| `update-major-version-tags.yml` | `release: published`       | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags                                |
+Every v4 repo carries `ci.yml`, `publish.yml`, `update-major-version-tags.yml`, and `bundle-size.yml`. `release.yml` is the v3 per-PR flow — don't install it alongside `release-flow-v4/`.
+
+| Template                        | Triggers                   | Calls                                    | What it does                                                                                                                                       |
+| ------------------------------- | -------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`                        | push, fork-PR              | `workflow-ci.yml`                        | Build + test matrix; PR gate via status check on SHA                                                                                               |
+| `release.yml`                   | push to non-default branch | `workflow-release.yml`                   | Detects `release:`/`release!:` commits → opens/updates a release PR                                                                                |
+| `publish.yml`                   | push to default branch     | `workflow-publish.yml`                   | Publishes to NPM + GitHub Packages, creates GitHub release                                                                                         |
+| `update-major-version-tags.yml` | `release: published`       | `workflow-update-major-version-tags.yml` | Maintains rolling `vX` / `vX.Y` tags                                                                                                               |
+| `bundle-size.yml`               | PR to master/main          | `reusable-bundle-size.yml`               | Comments raw / gzip / brotli size delta of the published files. Set `build_command` + `dist_paths` (from `npm pack --dry-run` or `files`) per repo |
 
 ### 🔀 [`release-flow-v4/`](individual-repo-workflows/release-flow-v4/) — v4 staging-branch release flow (recommended)
 
@@ -74,7 +77,6 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 | Template              | Triggers                         | What it does                                                                                                     |
 | --------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `docker-publish.yml`  | push to default + dispatch       | Build + push image to GHCR.                                                                                      |
-| `bundle-size.yml`     | PR                               | Comments size delta of `dist/` (raw, gzip, brotli). For runtime libs.                                            |
 | `docs.yml`            | push to default (paths-filtered) | Builds docs and publishes to `gh-pages`.                                                                         |
 | `sync-org-labels.yml` | manual / cron                    | Syncs `data/github-labels.json` across all repos in the org. (Org-admin repo only — most repos don't need this.) |
 

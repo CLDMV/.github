@@ -12,6 +12,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Core CI/CD         | [Create Release PR](#-create-release-pr)                          | `core-cicd/release.yml`                      | push to non-default               | Opens versioned release PRs                                                                                        |
 | Core CI/CD         | [Release and Publish](#-release-and-publish)                      | `core-cicd/publish.yml`                      | push to master/main               | Publishes to NPM / GitHub Packages                                                                                 |
 | Core CI/CD         | [Update Major Version Tags](#%EF%B8%8F-update-major-version-tags) | `core-cicd/update-major-version-tags.yml`    | release published                 | Maintains `vX` / `vX.Y` floating tags                                                                              |
+| Core CI/CD         | [Bundle Size](#-bundle-size)                                      | `core-cicd/bundle-size.yml`                  | PR to master/main                 | Comments size delta of the published files (standard in every v4 repo)                                             |
 | Release flow v4    | [Next Release](#-next-release-v4)                                 | `release-flow-v4/next-release.yml`           | push to `next`                    | Refreshes persistent `next → master` release PR                                                                    |
 | Release flow v4    | [Hotfixes Release](#-hotfixes-release-v4)                         | `release-flow-v4/hotfixes-release.yml`       | push to `hotfixes`                | Refreshes persistent `hotfixes → master` release PR                                                                |
 | Release flow v4    | [Next/Hotfixes Reset](#%EF%B8%8F-nexthotfixes-reset-v4)           | `release-flow-v4/next-reset.yml`             | push to `master` (release commit) | Re-syncs integration branches after a release                                                                      |
@@ -33,7 +34,6 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Automation         | [Stale](#-stale)                                                  | `automation/stale.yml`                       | daily cron                        | Marks/closes inactive issues + PRs                                                                                 |
 | Automation         | [Branch Retention](#-branch-retention)                            | `automation/branch-retention.yml`            | PR merged                         | Prunes head branches with retention                                                                                |
 | Packaging/docs     | [Docker Publish](#-docker-publish)                                | `packaging-docs/docker-publish.yml`          | push to default + dispatch        | Builds + pushes image to GHCR                                                                                      |
-| Packaging/docs     | [Bundle Size](#-bundle-size)                                      | `packaging-docs/bundle-size.yml`             | PR                                | Comments `dist/` size delta                                                                                        |
 | Packaging/docs     | [Docs Publish](#-docs-publish)                                    | `packaging-docs/docs.yml`                    | push to default (filtered)        | Publishes docs to `gh-pages`                                                                                       |
 | Packaging/docs     | [Sync Org Labels](#%EF%B8%8F-sync-org-labels)                     | `packaging-docs/sync-org-labels.yml`         | manual / weekly cron              | Syncs labels across org repos                                                                                      |
 
@@ -105,6 +105,25 @@ After a release, creates or force-updates the floating `vX.Y` and `vX` tags poin
 **Required secrets** — bot App credentials, plus GPG signing secrets (default `use_gpg: true`).
 
 **Prereqs** — at least one `vX.Y.Z` tag must exist — this workflow updates floating tags, it doesn't create the initial patch tag.
+
+---
+
+### 📊 Bundle Size
+
+**File:** `core-cicd/bundle-size.yml` &nbsp;·&nbsp; **Calls:** `reusable-bundle-size.yml@v4`
+
+**Standard in every v4 repo** — adopt it alongside `ci.yml` whatever the package ships (runtime library, CLI, tool, or source-only). On every PR against the default branch (in the v4 flow, the persistent release PRs), builds the package at the PR head and at the base and posts a comment with raw / gzip / brotli size deltas of the published files. Its `📊 Bundle Size` name is part of `release-merge.yml`'s `workflows:` list — keep that entry.
+
+**Required `package.json` scripts** — whatever `build_command` runs (default `npm run build`).
+
+**Required secrets** — none required. **Optional**: pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` to post the size-diff comment as your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset. (Fork PRs can't access org secrets, so attribution only applies to same-repo PRs there.)
+
+**Per-repo inputs** — set both:
+
+- `build_command` — the repo's real build.
+- `dist_paths` — comma-separated globs (relative to the repo root) of the files the package publishes. Take them from `npm pack --dry-run` or `package.json` `files`. Examples: `dist/**` (bundled output), `index.mjs,src/**` or `bin/**,lib/**` (source-shipped packages). Only `*` (one path segment) and `**` (any depth) are supported; a plain path such as `index.mjs` matches that one file. If the globs match no files, the measure step emits a `::warning::` and the size table is empty — the job still passes, so check the log after the first run.
+
+**Other inputs** — `warning_pct`, `warning_bytes`, `comment_mode`.
 
 ---
 
@@ -527,22 +546,6 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 **Key inputs** — `image_namespace` (default `cldmv`), `pre_publish_command`, `dockerfile` path.
 
 **Optional pre-push vulnerability gate.** Set `enable_container_scan: true` to run Trivy against the image _before_ it's pushed. The workflow builds the image once into an OCI tarball (`outputs: type=oci`), feeds the tarball to Trivy via its native `--input` mode, optionally uploads SARIF to the GitHub Security tab, and only pushes when the scan exits 0. The same OCI artifact is then shipped to the registry by [`crane push`](https://github.com/google/go-containerregistry/tree/main/cmd/crane) (SHA-pinned `imjasonh/setup-crane`) — multi-platform manifest lists are preserved intact, so the gate works for single- and multi-platform builds with one code path. Knobs: `scan_severity` (default `CRITICAL,HIGH`), `scan_fail_on_severity` (default `true` — set `false` for report-only), `scan_ignore_unfixed` (default `true`), `scan_sarif_upload` (default `true`), `scan_sarif_category` (default `trivy`).
-
----
-
-### 📊 Bundle Size
-
-**File:** `packaging-docs/bundle-size.yml` &nbsp;·&nbsp; **Calls:** `reusable-bundle-size.yml@v4`
-
-Runtime-library helper: on every PR against default, builds the package and posts a comment with raw / gzip / brotli size deltas against the base branch. Adopt only for repos that ship a runtime bundle.
-
-**Required `package.json` scripts** — `build` (default `npm run build`; configurable via `build_command`).
-
-**Required secrets** — none required. **Optional**: pass `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` to post the size-diff comment as your bot App instead of `github-actions[bot]`. Falls back to `GITHUB_TOKEN` if unset. (Fork PRs can't access org secrets, so attribution only applies to same-repo PRs there.)
-
-**Prereqs** — buildable distributable in `dist/` (or `dist_paths`).
-
-**Key inputs** — `build_command`, `dist_paths` (default `dist/**`), `warning_pct`, `warning_bytes`, `comment_mode`.
 
 ---
 

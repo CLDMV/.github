@@ -29,7 +29,7 @@ v3 is mostly additive — the existing `workflow-ci.yml` / `workflow-release.yml
 | `reusable-dependabot-auto-merge.yml`                      | `examples/.../automation/dependabot-auto-merge.yml`    |
 | `reusable-pr-labeler.yml`                                 | `examples/.../automation/labeler.yml`                  |
 | `reusable-welcome.yml`                                    | `examples/.../automation/welcome.yml`                  |
-| `reusable-bundle-size.yml`                                | `examples/.../packaging-docs/bundle-size.yml`          |
+| `reusable-bundle-size.yml`                                | `examples/.../core-cicd/bundle-size.yml`               |
 | `reusable-docs-publish.yml`                               | `examples/.../packaging-docs/docs.yml`                 |
 | `reusable-release-notifier.yml`                           | `examples/.../release-companions/release-notify.yml`   |
 | `reusable-branch-retention.yml`                           | `examples/.../automation/branch-retention.yml`         |
@@ -113,7 +113,7 @@ Idempotent — re-running updates the existing ruleset.
    | Master-commit audit               | `release-companions/master-commit-audit.yml` |
    | Tag-health weekly sweep           | `release-companions/tag-health.yml`          |
    | Discord / Slack release notify    | `release-companions/release-notify.yml`      |
-   | Bundle-size diff on PRs           | `packaging-docs/bundle-size.yml`             |
+   | Bundle-size diff on PRs           | `core-cicd/bundle-size.yml`                  |
    | gh-pages docs publish             | `packaging-docs/docs.yml`                    |
 
 5. **First-run guidance for `stale.yml`**: dispatch with `dry_run: true` first to preview the marking/closing set; flip to live once you're comfortable.

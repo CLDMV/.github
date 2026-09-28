@@ -12,14 +12,63 @@ import { gzipSync, brotliCompressSync, constants } from "node:zlib";
 import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
-/** Recursive directory walk matching a glob (very simple: `*` and `**` only). */
-function* walk(dir) {
-	if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
+/** Directories the walk never descends into — nothing under them is a published file. */
+const SKIP_DIRS = new Set(["node_modules", ".git"]);
+
+/**
+ * Recursive walk of a pattern root. A directory yields every file beneath it; a
+ * plain file (a wildcard-free pattern such as `index.mjs`) yields itself, so a
+ * single-file entry in `dist_paths` is measured instead of silently skipped.
+ * Subdirectories named in SKIP_DIRS, and any the `canDescend(relPath)` predicate
+ * rejects (no pattern can match beneath them), are not entered.
+ */
+function* walk(dir, canDescend = () => true) {
+	if (!fs.existsSync(dir)) return;
+	const stat = fs.statSync(dir);
+	if (stat.isFile()) {
+		yield dir;
+		return;
+	}
+	if (!stat.isDirectory()) return;
 	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, entry.name);
-		if (entry.isDirectory()) yield* walk(p);
-		else if (entry.isFile()) yield p;
+		if (entry.isDirectory()) {
+			if (SKIP_DIRS.has(entry.name) || !canDescend(p.split(path.sep).join("/"))) continue;
+			yield* walk(p, canDescend);
+		} else if (entry.isFile()) yield p;
 	}
+}
+
+/** Strip leading `./` segments: walked paths are recorded without them. */
+function normalizePattern(pattern) {
+	let p = pattern;
+	while (p.startsWith("./")) p = p.slice(2);
+	return p;
+}
+
+/** Walk root for a pattern: the whole path segments before the first wildcard. */
+function patternRoot(pattern) {
+	const segments = pattern.split("/");
+	const firstWild = segments.findIndex((seg) => /[*?]/.test(seg));
+	if (firstWild === -1) return pattern;
+	return segments.slice(0, firstWild).join("/") || ".";
+}
+
+/**
+ * Whether files matching `pattern` could exist beneath directory `dirRel` — i.e.
+ * each of the dir's segments matches the pattern's segment at that depth (a `**`
+ * segment matches any remainder) and the pattern has segments left for a file.
+ */
+function canContainMatch(dirRel, pattern) {
+	const dirSegs = dirRel.split("/");
+	const patSegs = pattern.split("/");
+	for (let i = 0; i < dirSegs.length; i++) {
+		const seg = patSegs[i];
+		if (seg === undefined) return false;
+		if (seg.includes("**")) return true;
+		if (!globRegex(seg).test(dirSegs[i])) return false;
+	}
+	return patSegs.length > dirSegs.length;
 }
 
 /** Convert glob to regex (handles `**` and `*` only). Anchored. */
@@ -57,24 +106,24 @@ function formatDelta(d) {
 async function measure() {
 	const distPatterns = (getInput("dist_paths") || "dist/**")
 		.split(",")
-		.map((s) => s.trim())
+		.map((s) => normalizePattern(s.trim()))
 		.filter(Boolean);
 	const outputFile = getInput("output_file") || "sizes.json";
 
 	const regexes = distPatterns.map(globRegex);
 	const files = [];
-	// Walk possible roots (everything before the first wildcard).
-	const roots = new Set();
-	for (const pattern of distPatterns) {
-		const cut = pattern.search(/[*?]/);
-		const root = cut === -1 ? pattern : pattern.slice(0, cut).replace(/\/$/, "");
-		roots.add(root || ".");
-	}
+	const seen = new Set();
+	// Walk each pattern's root (the whole segments before its first wildcard),
+	// descending only into directories some pattern can still match beneath.
+	const roots = new Set(distPatterns.map(patternRoot));
+	const canDescend = (dirRel) => distPatterns.some((pattern) => canContainMatch(dirRel, pattern));
 
 	for (const root of roots) {
-		for (const filePath of walk(root)) {
+		for (const filePath of walk(root, canDescend)) {
 			const rel = filePath.split(path.sep).join("/");
+			if (seen.has(rel)) continue;
 			if (regexes.some((re) => re.test(rel))) {
+				seen.add(rel);
 				const buf = fs.readFileSync(filePath);
 				const gzip = gzipSync(buf, { level: 9 }).length;
 				const brotli = brotliCompressSync(buf, {
@@ -94,6 +143,14 @@ async function measure() {
 	const result = { files, total };
 
 	fs.writeFileSync(outputFile, JSON.stringify(result, null, 2));
+	if (files.length === 0) {
+		// Misconfigured dist_paths (or a build that emitted nothing) would otherwise
+		// surface only as an empty size table — flag it in the job log and summary.
+		// Not a failure: the measurement still completes and the job still passes.
+		const message = `dist_paths matched 0 files (${distPatterns.join(", ")}). Set dist_paths to the files the package publishes — see \`npm pack --dry-run\` or package.json \`files\`.`;
+		console.log(`::warning title=Bundle size - no files measured::${message}`);
+		appendSummary(`⚠️ ${message}`);
+	}
 	console.log(`📊 Measured ${files.length} files`);
 	console.log(`   raw    : ${formatBytes(total.raw)}`);
 	console.log(`   gzip   : ${formatBytes(total.gzip)}`);
