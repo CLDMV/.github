@@ -14,6 +14,13 @@
 # Recommended: enable with `dry_run: true` first, dispatch manually to
 # preview, then flip to live. The dispatch input below makes this easy.
 #
+# Keeping an issue open indefinitely: add the `pinned` label (part of the org
+# label set). Pinned issues and PRs are never marked stale or closed, and adding
+# it to one that's already marked stale removes the stale label on the next run.
+# Also exempt by default: `security`, `help wanted`, `good first issue`,
+# `status: blocked`, anything with an assignee or a milestone, and (PRs)
+# `work-in-progress` / `dependencies` / `type: dependencies`.
+#
 # Batch 2.3 from tmp/plan-future-workflows.md.
 name: 🍂 Stale Issues & PRs
 
@@ -41,6 +48,8 @@ jobs:
             # days_before_issue_close: 14
             # days_before_pr_stale: 30
             # days_before_pr_close: 7
+            # Override exemptions (replaces the default list — keep `pinned`):
+            # exempt_issue_labels: "pinned,security,help wanted,good first issue,status: blocked"
         secrets:
             BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
             BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
