@@ -16,7 +16,7 @@ inputs:
     required: true
   # measure mode
   dist_paths:
-    description: "Comma-sep globs (relative to repo root) of files to measure"
+    description: "Comma-sep globs (relative to repo root) of the files the package publishes. Only `*` and `**` wildcards; a plain path matches one file. Zero matches logs a warning (the step still passes)."
     required: false
     default: "dist/**"
   output_file:
