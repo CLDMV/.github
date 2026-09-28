@@ -27,7 +27,8 @@
 #           "bin/**,lib/**"         source-shipped CLI: bin/ + lib/ trees
 #       Only `*` (within one path segment) and `**` (any depth) are
 #       supported — no `?`, `[...]`, `{a,b}`, or `!negation`. A plain file
-#       path (e.g. `index.mjs`) matches that one file. If the globs match
+#       path (e.g. `index.mjs`, `lib/util.mjs`) matches that one file; no
+#       leading-`*` workaround (`*index.mjs`) is needed. If the globs match
 #       no files, the measure step logs a warning and the size table is
 #       empty, so check the job log after the first run.
 #
