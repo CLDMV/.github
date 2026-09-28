@@ -7,6 +7,7 @@
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { getInput, setOutputs } from "../../../common/common/core.mjs";
 import { resolvePackageManager } from "../../../npm/utilities/detect-package-manager/resolve.mjs";
+import { buildPublishCommand } from "../../../npm/utilities/publish-command/build.mjs";
 
 try {
 	const token = getInput("github-token", { required: true });
@@ -19,27 +20,20 @@ try {
 	const isPrivate = repoInfo.private === true;
 	console.log(`Repository is private: ${isPrivate}`);
 
-	const accessLevel = isPrivate ? "restricted" : "public";
 	console.log(
 		isPrivate
 			? "🔒 Private repository detected - using restricted access for auto-detection"
 			: "🌍 Public repository detected - using public access for auto-detection"
 	);
 
-	const tool = packageManager === "yarn" ? "yarn publish" : packageManager === "pnpm" ? "pnpm publish" : "npm publish";
-
 	let npmCommand = customNpmCommand;
 	if (!npmCommand) {
-		npmCommand = `${tool} --access ${accessLevel}`;
-		// Public npm packages published via the npm CLI carry SLSA build
-		// provenance + a publish attestation (sigstore). Private packages can't
-		// (provenance is public-only) and `yarn publish` has no equivalent flag,
-		// so gate on both. Requires id-token: write on the publish job (granted)
-		// and a supported CI (GitHub Actions) — both true in this pipeline. A
-		// caller-supplied custom command is left untouched (opts out).
-		if (!isPrivate && tool === "npm publish") {
-			npmCommand += " --provenance";
-		}
+		// Adds --ignore-scripts always and --provenance for public npm-CLI
+		// publishes (see buildPublishCommand). Provenance requires id-token:
+		// write on the publish job (granted) and a supported CI (GitHub
+		// Actions) — both true in this pipeline. A caller-supplied custom
+		// command is left untouched (opts out of both).
+		npmCommand = buildPublishCommand({ packageManager, isPrivate, registry: "npm" });
 		console.log(`📦 Auto-detected NPM command: ${npmCommand}`);
 	} else {
 		console.log(`📦 Using custom NPM command: ${npmCommand}`);
@@ -47,7 +41,7 @@ try {
 
 	let githubPackagesCommand = customGithubPackagesCommand;
 	if (!githubPackagesCommand) {
-		githubPackagesCommand = `${tool} --access ${accessLevel}`;
+		githubPackagesCommand = buildPublishCommand({ packageManager, isPrivate, registry: "github-packages" });
 		console.log(`📦 Auto-detected GitHub Packages command: ${githubPackagesCommand}`);
 	} else {
 		console.log(`📦 Using custom GitHub Packages command: ${githubPackagesCommand}`);
