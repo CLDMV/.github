@@ -115,6 +115,55 @@ try {
 
 	r = measure("index.mjs");
 	eq(r.status, 0, "a matching run exits 0");
+
+	console.log("measure — `./`-prefixed patterns (#327):");
+	r = measure("./index.mjs");
+	eq(r.paths, ["index.mjs"], "`./index.mjs` is measured and recorded as `index.mjs`");
+
+	r = measure("./src/**");
+	eq(r.paths, ["src/b.mjs", "src/sub/c.mjs"], "`./src/**` walks src/ at any depth");
+
+	r = measure("./lib/util.mjs, ./bin/**");
+	eq(r.paths, ["bin/cli.mjs", "lib/util.mjs"], "mixed `./` exact path and glob");
+
+	console.log("measure — wildcard mid-segment (#327):");
+	r = measure("lib/ut*.mjs");
+	eq(r.paths, ["lib/util.mjs"], "`lib/ut*.mjs` walks lib/, not a nonexistent `lib/ut`");
+
+	console.log("measure — overlapping patterns count a file once:");
+	r = measure("index.mjs,*.mjs");
+	eq(r.paths, ["index.mjs"], "`index.mjs,*.mjs` measures index.mjs once, not once per matching root");
+
+	console.log("measure — the walk skips node_modules/.git and unreachable dirs (#327):");
+	for (const rel of ["node_modules/pkg/index.mjs", ".git/hooks/pre-commit.mjs", "src/node_modules/dep/x.mjs"]) {
+		const abs = path.join(fixture, rel);
+		fs.mkdirSync(path.dirname(abs), { recursive: true });
+		fs.writeFileSync(abs, "export {};\n");
+	}
+	r = measure("**/*.mjs");
+	eq(
+		r.paths,
+		["bin/cli.mjs", "index.mjs", "lib/deep/more.mjs", "lib/util.mjs", "src/b.mjs", "src/sub/c.mjs"],
+		"`**/*.mjs` never includes files under node_modules/ or .git/"
+	);
+
+	// A directory the walk can't read makes readdirSync throw — so a pattern that
+	// can't reach it must not descend into it. (Skipped as root: root reads anything.)
+	if (typeof process.getuid !== "function" || process.getuid() !== 0) {
+		const locked = path.join(fixture, "locked");
+		fs.mkdirSync(locked);
+		fs.writeFileSync(path.join(locked, "x.mjs"), "export {};\n");
+		fs.chmodSync(locked, 0o000);
+		try {
+			r = measure("*.mjs");
+			eq(r.status, 0, "top-level `*.mjs` doesn't descend into an unreachable (unreadable) subdirectory");
+			eq(r.paths, ["index.mjs"], "top-level `*.mjs` still measures the root-level file");
+			r = measure("src/**");
+			eq(r.status, 0, "`src/**` doesn't descend into a sibling directory");
+		} finally {
+			fs.chmodSync(locked, 0o755);
+		}
+	}
 } finally {
 	fs.rmSync(fixture, { recursive: true, force: true });
 }
