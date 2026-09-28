@@ -15,6 +15,19 @@
  *   - workflow_dispatch / schedule       → no diff context; output is empty
  *     (callers should treat empty as "not docs_only" — i.e. run normally)
  *
+ * Fallback: whenever the diff can't be trusted, the gate emits
+ * `docs_only=false` plus a `::notice::` naming the reason, so the full CI runs.
+ * It never fails the run because of the comparison. That covers:
+ *   - a push whose `before` is missing or the zero SHA (new branch / new ref);
+ *   - a compare API failure — `404 No common ancestor` when the pushed ref's
+ *     history was rewritten (e.g. a new root commit force-pushed over the old
+ *     tip), `404 Not Found` when `before` no longer exists, or any other error;
+ *   - a compare whose `status` is not `ahead`/`identical` (`diverged` or
+ *     `behind`), i.e. `before` is not an ancestor of `after` after a
+ *     force-push. A three-dot diff there would describe the wrong change set
+ *     (a force-push back to an older commit diffs as empty → docs_only=true).
+ *   - a failure listing a pull request's files.
+ *
  * Glob semantics mirror GitHub's `paths-ignore`: `*` matches non-slash, `**`
  * matches any (including slashes). Patterns are anchored at the path root.
  *
@@ -61,8 +74,10 @@ function globMatch(name, pattern) {
  * @param {string} args.token
  * @param {string} args.owner
  * @param {string} args.repo
- * @returns {Promise<{files: string[] | null, reason: string}>}
- *          `files` is `null` when the event has no diff context.
+ * @returns {Promise<{files: string[] | null, reason: string, fallback?: boolean}>}
+ *          `files` is `null` when the event has no diff context. `fallback` is
+ *          true when a diff was expected but can't be trusted — the caller
+ *          must then run the full CI (`docs_only=false`).
  */
 async function collectChangedFiles({ token, owner, repo }) {
 	const eventName = process.env.GITHUB_EVENT_NAME || "";
@@ -71,18 +86,45 @@ async function collectChangedFiles({ token, owner, repo }) {
 	if (eventName === "pull_request" || eventName === "pull_request_target") {
 		const prNumber = event.pull_request?.number ?? event.number;
 		if (!prNumber) return { files: null, reason: "pull_request event without PR number" };
-		const { items } = await paginate(`/pulls/${prNumber}/files`, { token, owner, repo });
-		return { files: items.map((f) => f.filename), reason: `PR #${prNumber}` };
+		try {
+			const { items } = await paginate(`/pulls/${prNumber}/files`, { token, owner, repo });
+			return { files: items.map((f) => f.filename), reason: `PR #${prNumber}` };
+		} catch (error) {
+			return { files: null, fallback: true, reason: `listing PR #${prNumber} files failed (${error.message})` };
+		}
 	}
 
 	if (eventName === "push") {
 		const before = event.before || "";
 		const after = event.after || process.env.GITHUB_SHA || "";
 		if (!before || /^0+$/.test(before)) {
-			return { files: null, reason: "push event with no `before` SHA (new branch)" };
+			return {
+				files: null,
+				fallback: true,
+				reason: `push has no usable \`before\` SHA (${before ? "zero SHA — new branch or ref" : "missing"})`
+			};
 		}
-		const compare = await api("GET", `/compare/${before}...${after}`, null, { token, owner, repo });
-		return { files: (compare.files || []).map((f) => f.filename), reason: `compare ${before}...${after}` };
+		let compare;
+		try {
+			compare = await api("GET", `/compare/${before}...${after}`, null, { token, owner, repo });
+		} catch (error) {
+			const noAncestor = /no common ancestor/i.test(error.message);
+			const why = noAncestor
+				? "no common ancestor — the pushed ref's history was rewritten"
+				: / -> 404:/.test(error.message)
+					? "`before` not found — likely removed by a force-push"
+					: "compare API error";
+			return { files: null, fallback: true, reason: `compare ${before}...${after} failed: ${why} (${error.message})` };
+		}
+		const status = compare?.status || "";
+		if (status && status !== "ahead" && status !== "identical") {
+			return {
+				files: null,
+				fallback: true,
+				reason: `compare ${before}...${after} status=${status} — \`before\` is not an ancestor of \`after\` (force-push)`
+			};
+		}
+		return { files: (compare?.files || []).map((f) => f.filename), reason: `compare ${before}...${after}` };
 	}
 
 	return { files: null, reason: `event=${eventName} has no diff context` };
@@ -107,9 +149,14 @@ try {
 	console.log("📑 Patterns:");
 	for (const p of patterns) console.log(`  ${p}`);
 
-	const { files, reason } = await collectChangedFiles({ token, owner, repo });
+	const { files, reason, fallback } = await collectChangedFiles({ token, owner, repo });
 
-	if (files === null) {
+	if (fallback) {
+		// Workflow commands are single-line; `%` must be escaped as `%25`.
+		const message = reason.replace(/%/g, "%25").replace(/\s*[\r\n]+\s*/g, " ");
+		console.log(`::notice title=Paths Gate::Running full CI (docs_only=false): ${message}`);
+		setOutputs({ docs_only: "false" });
+	} else if (files === null) {
 		console.log(`ℹ️ No diff context (${reason}) — emitting empty docs_only.`);
 		setOutputs({ docs_only: "" });
 	} else if (files.length === 0) {
