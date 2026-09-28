@@ -7,6 +7,7 @@
 
 import { getEventPayload, setOutput } from "../../../common/common/core.mjs";
 import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
+import { buildPublishCommand } from "../../utilities/publish-command/build.mjs";
 
 const customCommand = process.env.CUSTOM_CMD || "";
 const packageManager = resolvePackageManager(process.env.PACKAGE_MANAGER || "auto", ".");
@@ -24,8 +25,9 @@ if (customCommand) {
 	console.log(`📊 Repository visibility: ${visibility}`);
 	const accessLevel = visibility === "public" ? "public" : "restricted";
 	console.log(`🔒 Package access level: ${accessLevel}`);
-	const tool = packageManager === "yarn" ? "yarn publish" : packageManager === "pnpm" ? "pnpm publish" : "npm publish";
-	finalCommand = `${tool} --access ${accessLevel}`;
+	// Shared with the authoritative builder in utilities/repo-detection
+	// (--ignore-scripts always; no provenance on GitHub Packages).
+	finalCommand = buildPublishCommand({ packageManager, isPrivate: visibility !== "public", registry: "github-packages" });
 }
 
 console.log(`📝 Final publish command: ${finalCommand}`);
