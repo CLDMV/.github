@@ -1,5 +1,5 @@
 name: "Merge Master Into Branch"
-description: "Merge master (or another source ref) into a target branch via the GitHub Merges API. Used by §7.2 of the v4 design: after a hotfix lands on master, merge master into next so accumulated feature work is preserved (rather than force-reset and lost). Handles the three GitHub-defined outcomes: 201 created merge commit, 204 already-up-to-date, 409 merge conflict."
+description: "Merge master (or another source ref) into a target branch via the GitHub Merges API. Used by §7.2 of the v4 design: after a hotfix lands on master, merge master into next so accumulated feature work is preserved (rather than force-reset and lost). Handles the three GitHub-defined outcomes: 201 created merge commit, 204 already-up-to-date, 409 merge conflict. On a 409 it re-does the merge locally and, when EVERY conflict is a release version field (root `version` in package.json, root `version` + `packages[\"\"].version` in package-lock.json), keeps the target branch's version and publishes the two-parent merge commit through the Git Data API (signed by GitHub for the bot App, like the Merges API commit); any other conflict still fails. The fallback needs a full-history checkout of the repo in the workspace."
 
 inputs:
   target-branch:
@@ -10,7 +10,7 @@ inputs:
     required: false
     default: "master"
   github-token:
-    description: "GitHub token with write access to the target branch."
+    description: "GitHub token with write access to the target branch (contents write; workflows write when the merged tree touches .github/workflows). Also used to fetch the branches for the 409 fallback."
     required: false
     default: ${{ github.token }}
   commit-message:
@@ -27,7 +27,9 @@ outputs:
   merge-performed:
     description: "'true' when a merge commit was created; 'false' on no-op (204 already up-to-date)."
   had-conflict:
-    description: "'true' when the API returned 409 (merge conflict). On conflict, the step also fails."
+    description: "'true' when the API returned 409 (merge conflict). The step fails unless the conflict was version-only and auto-resolved (see conflict-resolved)."
+  conflict-resolved:
+    description: "'true' when a 409 was resolved by the version-only fallback and the merge commit was created; merge-sha is then that commit."
 
 runs:
   using: "node24"
