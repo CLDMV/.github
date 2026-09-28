@@ -235,7 +235,12 @@ jobs:
                   github-token: ${{ steps.app-token.outputs.token }}
 
             # Hotfix release + next still exists → merge master into next to
-            # preserve its accumulated feature work (§7.2 option B).
+            # preserve its accumulated feature work (§7.2 option B). When next has
+            # a pending release, both sides bumped the package.json /
+            # package-lock.json version and the Merges API 409s; the action then
+            # merges locally (needs the full-history checkout above), keeps next's
+            # version when those version fields are the ONLY conflicts, and
+            # publishes the merge commit via the API. Any other conflict fails. (#334)
             - name: Merge master into next (hotfix release; next exists)
               if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'true'
               uses: CLDMV/.github/.github/actions/github/steps/merge-master-into-branch@v4
