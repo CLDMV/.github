@@ -15,17 +15,17 @@ inputs:
   days_before_issue_stale: { required: false, default: "60" }
   days_before_issue_close: { required: false, default: "14" }
   stale_issue_label: { required: false, default: "stale" }
-  stale_issue_message: { required: false, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, or close if no longer relevant." }
+  stale_issue_message: { required: false, default: "This issue has been inactive for 60 days. It will be auto-closed in 14 days if there is no further activity. Comment to keep it open, add the `pinned` label to exempt it permanently, or close it if it is no longer relevant." }
   close_issue_message: { required: false, default: "Closed due to inactivity. Reopen if this is still relevant." }
   # PRs
   days_before_pr_stale: { required: false, default: "30" }
   days_before_pr_close: { required: false, default: "7" }
   stale_pr_label: { required: false, default: "stale" }
-  stale_pr_message: { required: false, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open." }
+  stale_pr_message: { required: false, default: "This PR has been inactive for 30 days. It will be auto-closed in 7 days if there is no further activity. Push a commit or comment to keep it open, or add the `pinned` label to exempt it." }
   close_pr_message: { required: false, default: "Closed due to inactivity. Reopen the branch and PR when ready to resume." }
   # Exemptions
-  exempt_issue_labels: { required: false, default: "pinned,security,help-wanted,good-first-issue,blocked" }
-  exempt_pr_labels: { required: false, default: "pinned,work-in-progress,dependencies,blocked" }
+  exempt_issue_labels: { required: false, default: "pinned,security,help wanted,good first issue,status: blocked" }
+  exempt_pr_labels: { required: false, default: "pinned,work-in-progress,dependencies,type: dependencies,status: blocked" }
   exempt_all_milestones: { required: false, default: "true" }
   exempt_all_assignees: { required: false, default: "true" }
   # Operation

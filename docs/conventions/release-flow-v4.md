@@ -306,6 +306,8 @@ Options:
 
 **Picking B.** Merge master into next via API (allow-merge-commit on next is fine, since next isn't user-facing). Simple, idempotent, no force-push risk. The release PR's diff against master cleanly shows only feature work.
 
+**Version-only conflicts are resolved automatically.** When `next` has a pending release, `next-release` has already bumped `next`'s `package.json` / `package-lock.json` version (e.g. 0.4.0) while the hotfix release bumped `master`'s (e.g. 0.3.3). Both sides changed the same `"version"` lines, so the Merges API answers 409 on every hotfix released while a `next` release is pending. On a 409, `merge-master-into-branch` re-does the merge locally with `git merge-tree` and checks each conflict: when every conflicted file is the root `package.json` or `package-lock.json`, and resolving it to either side yields JSON documents that differ only at `version` (plus `packages[""].version` in the lockfile), it keeps `next`'s version — `next-release` recomputes the pending version from `master` anyway. The resolved two-parent merge commit is published through the Git Data API (blobs → tree → commit → fast-forward ref update), so it is signed by GitHub for the bot App and the ruleset bypass applies, exactly like the Merges API commit. Any other conflict (another file, another field, a nested dependency's `version`, modify/delete, …) still fails the step for manual resolution.
+
 The API merge counts as a push to `next`, which triggers §6.1's existing `on: push: next` pathway — the persistent release PR refreshes automatically, recalculating bump and changelog against the new master base. No separate trigger needed.
 
 ### 7.3 Race protection
@@ -336,7 +338,7 @@ Therefore the version bump must be present on `next` before the squash, exactly 
 | Action                        | Purpose                                                                                                                                      |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `force-reset-branch`          | Wraps the `--force-with-lease` reset with retry-on-lease-failure. Used by `local-next-reset.yml`.                                            |
-| `merge-master-into-branch`    | API-driven merge for §7.2's option B.                                                                                                        |
+| `merge-master-into-branch`    | API-driven merge for §7.2's option B, with a local fallback that auto-resolves version-only `package.json` / `package-lock.json` conflicts.  |
 | `normalize-pr-title`          | Implements §6.4's PR title rewrite.                                                                                                          |
 | `redirect-hotfix-pr`          | Implements §6.5's PR target change.                                                                                                          |
 | `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`).                                                        |
