@@ -11,7 +11,7 @@ inputs:
     default: ${{ github.token }}
 outputs:
   docs_only:
-    description: "true if every changed file matched a paths_ignore glob; false otherwise. Empty string when the event has no diff context (workflow_dispatch / schedule / new-branch push)."
+    description: "true if every changed file matched a paths_ignore glob; false otherwise. `false` (with a `::notice::`) when a diff was expected but can't be trusted — zero/missing `before`, a failed compare (e.g. `404 No common ancestor`), or a `before` that isn't an ancestor of the pushed commit. Empty string when the event has no diff context (workflow_dispatch / schedule)."
 runs:
   using: "node24"
   main: "action.mjs"
