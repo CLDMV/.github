@@ -58,14 +58,16 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 
 ### Always (v4 release flow — adopt as a set)
 
-| Template                  | From                                      | Note                                                       |
-| ------------------------- | ----------------------------------------- | ---------------------------------------------------------- |
-| `next-release.yml`        | `release-flow-v4/next-release.yml`        | Customize `package-name` + `build-command`                 |
-| `hotfixes-release.yml`    | `release-flow-v4/hotfixes-release.yml`    | Customize `package-name` + `build-command`                 |
-| `next-reset.yml`          | `release-flow-v4/next-reset.yml`          | No customization                                           |
-| `hotfix-redirector.yml`   | `release-flow-v4/hotfix-redirector.yml`   | No customization                                           |
-| `pr-title-normalizer.yml` | `release-flow-v4/pr-title-normalizer.yml` | No customization                                           |
-| `v4-bootstrap.yml`        | `release-flow-v4/v4-bootstrap.yml`        | No customization (manual-dispatch, run once after install) |
+| Template                  | From                                      | Note                                                                                              |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `next-release.yml`        | `release-flow-v4/next-release.yml`        | Customize `package-name` + `build-command`                                                        |
+| `hotfixes-release.yml`    | `release-flow-v4/hotfixes-release.yml`    | Customize `package-name` + `build-command`                                                        |
+| `next-reset.yml`          | `release-flow-v4/next-reset.yml`          | No customization                                                                                  |
+| `hotfix-redirector.yml`   | `release-flow-v4/hotfix-redirector.yml`   | No customization                                                                                  |
+| `pr-title-normalizer.yml` | `release-flow-v4/pr-title-normalizer.yml` | No customization                                                                                  |
+| `v4-bootstrap.yml`        | `release-flow-v4/v4-bootstrap.yml`        | No customization (manual-dispatch, run once after install)                                        |
+| `feature-pr.yml`          | `release-flow-v4/feature-pr.yml`          | No customization (keep the full branch-prefix list — it mirrors the reusable's `case`)            |
+| `release-merge.yml`       | `release-flow-v4/release-merge.yml`       | No customization — keep the `workflows:` list verbatim, even entries for workflows the repo lacks |
 
 ### Always (core CI/CD)
 
