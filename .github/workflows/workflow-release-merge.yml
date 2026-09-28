@@ -16,9 +16,9 @@
 # finished and passed, so the body it reads is never stale.
 #
 # The caller fires this on `pull_request_review` (approved) to arm it and on
-# `workflow_run: completed` (of the caller's own CI workflow) to re-evaluate,
-# so an approval given before CI is green still merges once the last check
-# goes green. See #303, #318 (check_suite doesn't fire for Actions-created
+# `workflow_run: completed` (of every caller workflow that puts a check on the
+# release PR's head — CI, CodeQL, …) to re-evaluate, so an approval given
+# before CI is green still merges once the last check goes green. See #303, #318 (check_suite doesn't fire for Actions-created
 # checks — workflow_run is the trigger that actually works here).
 name: 🚦 Release Merge (v4 reusable)
 
