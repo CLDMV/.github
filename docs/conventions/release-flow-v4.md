@@ -130,6 +130,7 @@ Job graph:
    - Bot commits, release commits, merge commits filtered (v3.2.4 logic)
    - Title-suffix = oldest matching commit (v3.2.4 logic)
    - Label sync = delta-only (v3.2.4 logic)
+5. **mark-implemented** — runs alongside create/refresh on every non-bump push that leaves `next` ahead of master. Walks the pushed range (minus anything already on master) for `Fixes/Closes/Resolves #N` keywords and `gh-broker:resolves:` markers — in the merged PR's description, comments, and commits, and in direct-pushed commit messages — and moves each referenced open issue to `status: implemented` (replacing its other `status:` labels, never downgrading `status: verified`), with a comment naming the resolving PR. The issue stays open; `close-resolved-issues` closes it when the release lands on master. Best-effort: it never fails the lane.
 
 ### 6.2 `local-hotfixes-release.yml` (new)
 
@@ -335,14 +336,15 @@ Therefore the version bump must be present on `next` before the squash, exactly 
 
 ### 8.2 New
 
-| Action                        | Purpose                                                                                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `force-reset-branch`          | Wraps the `--force-with-lease` reset with retry-on-lease-failure. Used by `local-next-reset.yml`.                                            |
-| `merge-master-into-branch`    | API-driven merge for §7.2's option B, with a local fallback that auto-resolves version-only `package.json` / `package-lock.json` conflicts.  |
-| `normalize-pr-title`          | Implements §6.4's PR title rewrite.                                                                                                          |
-| `redirect-hotfix-pr`          | Implements §6.5's PR target change.                                                                                                          |
-| `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`).                                                        |
-| `pending-release-reminder`    | Implements §6.6 — ages master's last release, finds open `next`/`hotfixes` release PRs, files a deduped tracking issue + comment when stale. |
+| Action                        | Purpose                                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `force-reset-branch`          | Wraps the `--force-with-lease` reset with retry-on-lease-failure. Used by `local-next-reset.yml`.                                             |
+| `merge-master-into-branch`    | API-driven merge for §7.2's option B, with a local fallback that auto-resolves version-only `package.json` / `package-lock.json` conflicts.   |
+| `normalize-pr-title`          | Implements §6.4's PR title rewrite.                                                                                                           |
+| `redirect-hotfix-pr`          | Implements §6.5's PR target change.                                                                                                           |
+| `compute-highest-commit-type` | Standalone helper for the title normalizer (also reusable in `check-release-commit`).                                                         |
+| `pending-release-reminder`    | Implements §6.6 — ages master's last release, finds open `next`/`hotfixes` release PRs, files a deduped tracking issue + comment when stale.  |
+| `mark-implemented-issues`     | Implements §6.1 step 5 — labels issues resolved by work merged into `next`/`hotfixes` as `status: implemented` until the release closes them. |
 
 ### 8.3 Unchanged (reused as-is)
 
