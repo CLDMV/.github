@@ -9,7 +9,7 @@ These workflows ship a complete CI / release / publish pipeline tuned for the **
 1. **Adopt the v4 release-flow workflows** — copy the set from [`examples/individual-repo-workflows/release-flow-v4/`](examples/individual-repo-workflows/release-flow-v4/) into your repo's `.github/workflows/`. These are adopted as a set (they depend on each other).
 2. **Copy the core CI / publish / tag / bundle-size templates** from [`examples/individual-repo-workflows/core-cicd/`](examples/individual-repo-workflows/core-cicd/) (every v4 repo carries all of them except the v3-only `release.yml`), update `package_name` to your NPM package name, and set `bundle-size.yml`'s `build_command` + `dist_paths` to the repo's real build and published files. Add the security / automation templates you want from the other subfolders.
 3. **Bootstrap the repo** — applies branches + rulesets + security toggles + repo settings in one shot. Two ways:
-   - **Org-wide fanout (recommended for ≥3 repos)** — add the target repos to a batch file in [`data/onboarding-batches/`](data/onboarding-batches/) and dispatch `local-org-onboarding.yml` from `CLDMV/.github`'s Actions tab. Runs against N repos in parallel; idempotent.
+   - **Org-wide fanout (recommended for ≥3 repos)** — dispatch `org-onboarding.yml` from the org's **private** org-admin repo (template: [`examples/individual-repo-workflows/packaging-docs/org-onboarding.yml`](examples/individual-repo-workflows/packaging-docs/org-onboarding.yml)), with the targets inline or in a batch file kept in that private repo. Never run it from a public repo: its job names and run summary list every target, so an auto-discovery run would publish the names of the org's private repos. Runs against N repos in parallel; idempotent.
    - **Per-repo dispatch (one-offs)** — dispatch `v4-bootstrap.yml` from the target repo's Actions tab. Same baseline, scoped to the one repo.
 4. **Configure fork-PR approval** — **Settings → Actions → General → Fork pull request workflows from outside collaborators** → "Require approval for all outside collaborators" (or stricter). No public REST API for this knob, so it stays a manual step. The example `ci.yml` runs on `push` for in-repo branches and on `pull_request_target` only for forks; the approval setting prevents fork CI from burning runner minutes until a maintainer clicks **"Approve and run"** on the PR. See [GitHub's docs on approving workflow runs from public forks](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
 
@@ -88,7 +88,7 @@ examples/
     ├── release-companions/(tag-health, release-notify, master-commit-audit)
     ├── security/          (codeql, dependency-review, scorecard, cla)
     ├── automation/        (dependabot, dependabot-auto-merge, labeler, welcome, stale, branch-retention)
-    └── packaging-docs/    (docker-publish, docs, sync-org-labels)
+    └── packaging-docs/    (docker-publish, docs, sync-org-labels, org-onboarding)
 ```
 
 ## 🔀 Release flow — v4 (current)

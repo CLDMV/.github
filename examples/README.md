@@ -74,11 +74,12 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 
 ### 📦 [`packaging-docs/`](individual-repo-workflows/packaging-docs/) — Packaging / docs (opt-in)
 
-| Template              | Triggers                         | What it does                                                                                                     |
-| --------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `docker-publish.yml`  | push to default + dispatch       | Build + push image to GHCR.                                                                                      |
-| `docs.yml`            | push to default (paths-filtered) | Builds docs and publishes to `gh-pages`.                                                                         |
-| `sync-org-labels.yml` | manual / cron                    | Syncs `data/github-labels.json` across all repos in the org. (Org-admin repo only — most repos don't need this.) |
+| Template              | Triggers                         | What it does                                                                                                                                    |
+| --------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker-publish.yml`  | push to default + dispatch       | Build + push image to GHCR.                                                                                                                     |
+| `docs.yml`            | push to default (paths-filtered) | Builds docs and publishes to `gh-pages`.                                                                                                        |
+| `sync-org-labels.yml` | manual / cron                    | Syncs `data/github-labels.json` across all repos in the org. (Org-admin repo only — most repos don't need this.)                                |
+| `org-onboarding.yml`  | manual                           | Applies the v4 baseline (`org-bootstrap-repo`) to many repos in parallel. (Private org-admin repo only — its job names list every target repo.) |
 
 ## How to use
 

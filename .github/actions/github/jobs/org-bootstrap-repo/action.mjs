@@ -31,7 +31,8 @@
  *     in the bootstrap summary so it's not silently missed.
  *
  * Called by:
- *   - local-org-onboarding.yml (matrix fanout across many repos)
+ *   - org-onboarding.yml in the org's private org-admin repo (matrix fanout
+ *     across many repos; template in examples/.../packaging-docs/)
  *   - examples/.../v4-bootstrap.yml (per-repo dispatch)
  *
  * @module @cldmv/.github.github.jobs.org-bootstrap-repo
