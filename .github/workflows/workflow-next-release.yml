@@ -280,3 +280,40 @@ jobs:
                   SLACK_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.SLACK_RELEASE_PR_PRIVATE_WEBHOOK }}
                   GENERIC_RELEASE_PR_PUBLIC_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PUBLIC_WEBHOOK }}
                   GENERIC_RELEASE_PR_PRIVATE_WEBHOOK: ${{ secrets.GENERIC_RELEASE_PR_PRIVATE_WEBHOOK }}
+
+    mark-implemented:
+        name: "🏷️ Mark implemented issues"
+        # Moves every open issue this push resolves (Fixes/Closes/Resolves #N or a
+        # gh-broker:resolves: marker, in the merged PR or its commits) to
+        # `status: implemented`. The issue stays open — close-resolved-issues
+        # closes it when the release reaches the default branch. Push-only (the
+        # range is github.event.before..after); `needs: plan` inherits the
+        # chore-bump loop guard, and has-changes skips a push that left the
+        # branch in sync with the base (a reset). Runs alongside create/refresh.
+        # Job-level continue-on-error too: it also covers a failure to resolve
+        # the action itself, so labeling can never turn the release lane red.
+        needs: plan
+        continue-on-error: true
+        if: github.event_name == 'push' && needs.plan.outputs.has-changes == 'true'
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            # Best-effort: a labeling failure logs but never fails the release lane.
+            - name: Mark resolved issues as implemented
+              continue-on-error: true
+              uses: CLDMV/.github/.github/actions/github/steps/mark-implemented-issues@v4
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  before: ${{ github.event.before }}
+                  after: ${{ github.event.after }}
+                  base-branch: ${{ needs.plan.outputs.default-branch }}
+                  branch: next

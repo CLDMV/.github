@@ -1,0 +1,47 @@
+#
+# @Project: mark-implemented-issues
+# @Filename: /action.yml
+# @Date: 2026-09-28 00:00:00 -07:00 (1790578800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Mark Implemented Issues"
+description: "When work lands on an integration branch (next/hotfixes), walk the pushed commit range — commit messages plus each merged source PR's description, comments, and commits — for Fixes/Closes/Resolves #N keywords and `<!-- gh-broker:resolves:N -->` markers, and move every referenced open issue to the `status: implemented` label (replacing any other `status:` label), with a comment naming the resolving PR. Commits already on the release base are excluded, so a master→next sync never re-marks shipped work. The issue itself stays open — close-resolved-issues closes it when the release reaches the default branch. Roll-our-own implementation."
+
+inputs:
+  github-token:
+    description: "App installation token with issues: write and pull-requests: read."
+    required: true
+  before:
+    description: "SHA the branch pointed at before the push (github.event.before). All-zeros or empty = branch creation; the whole base..after range is used."
+    required: false
+    default: ""
+  after:
+    description: "SHA the branch points at after the push (github.event.after). Defaults to $GITHUB_SHA."
+    required: false
+    default: ""
+  base-branch:
+    description: "Release base branch (e.g. master). Commits already reachable from it are excluded."
+    required: true
+  branch:
+    description: "Integration branch the work landed on, cited in the issue comment (e.g. next). Defaults to $GITHUB_REF_NAME."
+    required: false
+    default: ""
+  label:
+    description: "Status label to apply."
+    required: false
+    default: "status: implemented"
+  label-color:
+    description: "Hex color (no #) used only when the label doesn't exist in the repo yet. Default matches `status: implemented` in data/github-labels.json."
+    required: false
+    default: "1d76db"
+
+outputs:
+  marked:
+    description: "Comma-sep list of issue numbers moved to the status label this run (empty when nothing matched)."
+
+runs:
+  using: node24
+  main: action.mjs

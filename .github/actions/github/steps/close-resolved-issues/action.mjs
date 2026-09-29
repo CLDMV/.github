@@ -126,7 +126,12 @@ export function sourcePRTexts({ body, comments, commits } = {}) {
 	return [body || "", ...(comments || []).map((c) => c?.body || ""), ...(commits || []).map((c) => c?.commit?.message || "")];
 }
 
-async function listRangeCommits(owner, repo, base, head, token) {
+/**
+ * List every commit in `base...head` via the compare REST endpoint, paging
+ * until the reported total is reached (20-page safety cap).
+ * @public
+ */
+export async function listRangeCommits(owner, repo, base, head, token) {
 	const all = [];
 	let page = 1;
 	while (true) {
