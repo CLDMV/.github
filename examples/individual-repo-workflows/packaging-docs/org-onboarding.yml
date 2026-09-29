@@ -1,33 +1,45 @@
 #
 # @Project: workflows
-# @Filename: /local-org-onboarding.yml
+# @Filename: /org-onboarding.yml
 # @Date: 2026-05-26 00:00:00 -07:00 (1780124400)
 # @Author: Nate Corcoran <CLDMV>
 # @Email: <Shinrai@users.noreply.github.com>
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# Org-wide v4 onboarding fanout. Run ONCE from this repo's Actions tab and
-# bootstrap up to N target repos in parallel. Each target gets the full
-# baseline applied by the `org-bootstrap-repo` composite action:
+# Private org-admin repo: .github/workflows/org-onboarding.yml
+#
+# Org-wide v4 onboarding fanout. Bootstraps up to N target repos in
+# parallel. Each target gets the full baseline applied by the
+# `org-bootstrap-repo` composite action from CLDMV/.github:
 #   - next + hotfixes branches created if missing
 #   - repo settings flipped to v4 defaults
 #   - security toggles enabled (alerts, secret scanning + push protection,
 #     dependabot security updates, private vulnerability reporting)
 #   - the three rulesets replaced with the org canonical defaults
 #
+# RUN THIS FROM A PRIVATE REPOSITORY ONLY. Every matrix job is named after
+# its target repo, and the plan step writes the full target list to the run
+# summary. In a public repo those job names and summaries are public, so an
+# auto-discovery run publishes the name of every private repo in the org.
+# The logic stays in the public CLDMV/.github composite actions; only this
+# caller (and its batch files under data/onboarding-batches/) lives in the
+# private repo.
+#
 # Job order:
 #   1. plan + bootstrap-self run in parallel.
-#   2. plan resolves the target-repo list (always filters THIS repo out).
-#   3. bootstrap-self dogfoods the baseline on THIS repo before the fanout.
-#      If it fails, the matrix never runs — protects the rest of the org
-#      from a baseline that can't apply cleanly to its source of truth.
+#   2. plan resolves the target-repo list (always filters the org's .github
+#      repo out; bootstrap-self handles it).
+#   3. bootstrap-self dogfoods the baseline on the org's .github repo (the
+#      source of truth for the baseline) before the fanout. If it fails, the
+#      matrix never runs — protects the rest of the org from a baseline that
+#      can't apply cleanly to its source of truth.
 #   4. bootstrap (matrix) fans out across the rest of the list.
 #   5. summary always runs, regardless of which jobs above failed.
 #
 # Concurrency: serialized at the workflow level. A second dispatch while
 # one is mid-flight queues behind it instead of racing on shared state
-# (org rulesets, App token, this repo's own settings).
+# (org rulesets, App token, the .github repo's own settings).
 #
 # Overwrite-with-warn policy: existing diverged values are overwritten and
 # logged in the run summary so the audit trail captures what changed.
@@ -43,7 +55,7 @@ on:
                 required: false
                 default: ""
             repos_file:
-                description: 'OVERRIDE: path in THIS repo to a newline-delimited list of `owner/name` entries. Blank lines and `#` comments allowed. Example: `data/onboarding-batches/batch-1.txt`. Leave blank for auto-discovery.'
+                description: 'OVERRIDE: path in THIS (private) repo to a newline-delimited list of `owner/name` entries. Blank lines and `#` comments allowed. Example: `data/onboarding-batches/batch-1.txt`. Leave blank for auto-discovery.'
                 required: false
                 default: ""
             exclude:
@@ -83,9 +95,11 @@ on:
                 required: false
                 # No code_scanning_config override input here: workflow_dispatch
                 # caps at 10 inputs and this workflow already carries 9. The
-                # org fanout always uses the bundled data/code-scanning-skips.json
-                # (this repo IS the source of truth); the per-repo v4-bootstrap
-                # template exposes the override for third-party callers.
+                # org fanout uses the data/code-scanning-skips.json bundled with
+                # the CLDMV/.github action. That file is public, so a private
+                # repo's name must never go into its `scan` opt-in list; if one
+                # is ever needed, keep that config in this private repo and pass
+                # it as `code_scanning_config` on both bootstrap steps.
                 default: "branches,settings,security,rulesets,variables"
             concurrency:
                 description: "Max parallel per-repo jobs. GitHub Actions caps matrix at 256."
@@ -97,7 +111,7 @@ permissions:
 
 # Serialize concurrent dispatches at the workflow level. Two onboarding
 # runs going at once would race on shared state (org-level rulesets, the
-# bot's installation token, this repo's own settings via bootstrap-self).
+# bot's installation token, the .github repo's settings via bootstrap-self).
 # `cancel-in-progress: false` queues the second dispatch instead of killing
 # the first — safer than dropping a run mid-mutation.
 concurrency:
@@ -141,7 +155,7 @@ jobs:
                   INCLUDE_FORKS: ${{ github.event.inputs.include_forks }}
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
                   GH_OWNER: ${{ github.repository_owner }}
-                  THIS_REPO: ${{ github.repository }}
+                  SOURCE_REPO: ${{ github.repository_owner }}/.github
               run: |
                   set -euo pipefail
 
@@ -188,18 +202,12 @@ jobs:
                       | awk 'NF' \
                       | sort -u)
 
-                  # The matrix NEVER bootstraps this repo regardless of mode —
+                  # The matrix NEVER bootstraps the org's .github repo —
                   # `bootstrap-self` (a dedicated pre-matrix job) already does
                   # it. Letting the matrix include it too would double-apply
                   # every mutation (delete-and-recreate the rulesets twice in
-                  # the same run, the second pass against the first pass's
-                  # state, fighting itself). Filtering here keeps the rule
-                  # "self goes through bootstrap-self; everything else goes
-                  # through the matrix" clean for explicit, file, and
-                  # auto-discover modes alike. If a user explicitly types this
-                  # repo's name in `repos:`, they still get bootstrapped via
-                  # bootstrap-self — just not twice.
-                  list=$(printf '%s\n' "$list" | grep -vxF "$THIS_REPO" || true)
+                  # the same run, fighting itself).
+                  list=$(printf '%s\n' "$list" | grep -vixF "$SOURCE_REPO" || true)
 
                   # Apply user-supplied excludes (auto-discovery only; explicit
                   # modes ignore this — the user already picked the list).
@@ -257,18 +265,18 @@ jobs:
                       echo "</details>"
                   } >> "$GITHUB_STEP_SUMMARY"
 
-    # Dogfood the latest baseline on the source-of-truth repo BEFORE fanning
-    # out to the rest of the org. If something in the action is broken — a
+    # Dogfood the latest baseline on the org's .github repo (the source of
+    # truth) BEFORE fanning out to the rest of the org. If something in the action is broken — a
     # new setting GitHub rejects, a malformed ruleset shape, an API contract
     # drift — it fails here, the matrix never fires, and the rest of the org
-    # is protected from a bad baseline. Side-benefit: this repo no longer
+    # is protected from a bad baseline. Side-benefit: the .github repo no longer
     # drifts silently because the matrix skips it. Runs in parallel with
     # `plan`; the matrix waits on both via `needs: [plan, bootstrap-self]`.
     bootstrap-self:
-        name: "🪞 Bootstrap self (CLDMV/.github)"
+        name: "🪞 Bootstrap source of truth (${{ github.repository_owner }}/.github)"
         runs-on: ubuntu-latest
         steps:
-            - name: Create App token (this repo's owner)
+            - name: Create App token (org owner)
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
@@ -279,11 +287,11 @@ jobs:
                   BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
 
-            - name: Bootstrap this repo
+            - name: Bootstrap the .github repo
               id: bootstrap
               uses: CLDMV/.github/.github/actions/github/jobs/org-bootstrap-repo@v4
               with:
-                  target_repo: ${{ github.repository }}
+                  target_repo: ${{ github.repository_owner }}/.github
                   github_token: ${{ steps.app-token.outputs.token }}
                   dry_run: ${{ github.event.inputs.dry_run }}
                   steps: ${{ github.event.inputs.steps }}
@@ -361,6 +369,6 @@ jobs:
                       echo ""
                       echo "See individual per-repo job pages for the warn-on-diff details — each repo's run summary lists every divergence that was overwritten."
                       echo ""
-                      echo "**Self-bootstrap (CLDMV/.github):** \`${{ needs.bootstrap-self.result }}\`"
+                      echo "**Source-of-truth bootstrap (${{ github.repository_owner }}/.github):** \`${{ needs.bootstrap-self.result }}\`"
                       echo "**Matrix bootstrap overall:** \`${{ needs.bootstrap.result }}\` (count=${{ needs.plan.outputs.count }})"
                   } >> "$GITHUB_STEP_SUMMARY"

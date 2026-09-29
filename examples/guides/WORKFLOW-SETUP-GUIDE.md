@@ -223,7 +223,7 @@ One-shot setup, run once per repo via the Actions tab. Thin wrapper around the s
 
 Idempotent — re-running is safe. Overwrite-with-warn policy: existing diverged values are overwritten and surfaced in the run summary so the audit trail captures what changed. Defaults `dry_run: true`.
 
-**For onboarding many repos at once**, prefer `local-org-onboarding.yml` in `CLDMV/.github` — it fans out across a list of target repos in parallel, applying the same baseline.
+**For onboarding many repos at once**, prefer an `org-onboarding.yml` fanout in the org's **private** org-admin repo (template: `examples/individual-repo-workflows/packaging-docs/org-onboarding.yml`) — it fans out across a list of target repos in parallel, applying the same baseline. Keep it out of public repos: the run lists every target repo by name.
 
 **Required `package.json` scripts** — none.
 
