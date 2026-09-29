@@ -38,7 +38,7 @@
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
 		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"",
-		"test": "node .github/actions/common/utilities/bot-detection.test.mjs && node .github/actions/npm/jobs/bundle-size/action.test.mjs && node .github/actions/common/steps/paths-gate/action.test.mjs && node .github/actions/github/steps/merge-master-into-branch/test.mjs"
+		"test": "node .github/actions/common/utilities/bot-detection.test.mjs && node .github/actions/npm/jobs/bundle-size/action.test.mjs && node .github/actions/common/steps/paths-gate/action.test.mjs && node .github/actions/github/steps/merge-master-into-branch/test.mjs && node .github/actions/github/steps/mark-implemented-issues/action.test.mjs"
 	},
 	"devDependencies": {
 		"@cldmv/eslint-plugin-jsonv": "^1.0.3",
