@@ -8,7 +8,7 @@
 #
 
 name: "Org Bootstrap (single repo)"
-description: "Apply the v4 org-wide baseline to one repo: create next/hotfixes branches, flip repo settings, enable security toggles, replace the three rulesets. Idempotent — re-running is safe. Overwrites diverged settings/rulesets and surfaces every divergence as a warning so the audit trail captures what changed. Used by both v4-bootstrap.yml (per-repo dispatch) and local-org-onboarding.yml (org-wide fanout)."
+description: "Apply the v4 org-wide baseline to one repo: create next/hotfixes branches, flip repo settings, enable security toggles, replace the three rulesets. Idempotent — re-running is safe. Overwrites diverged settings/rulesets and surfaces every divergence as a warning so the audit trail captures what changed. Used by both v4-bootstrap.yml (per-repo dispatch) and the org-onboarding.yml fanout in the org's private org-admin repo."
 
 inputs:
   target_repo:

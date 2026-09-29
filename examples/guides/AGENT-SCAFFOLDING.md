@@ -193,7 +193,7 @@ You cannot do these from the CLI. Report them all at the end of your scaffolding
 
 **Two ways to run it — pick one:**
 
-- **Org-wide fanout (recommended for ≥3 repos):** add this repo to a batch file in `CLDMV/.github/data/onboarding-batches/`, then dispatch `local-org-onboarding.yml` from the `CLDMV/.github` Actions tab with `dry_run: true` (preview), then `dry_run: false` (apply). One run handles N repos in parallel.
+- **Org-wide fanout (recommended for ≥3 repos):** dispatch `org-onboarding.yml` from the org's private org-admin repo (for CLDMV, `CLDMV/internal-github-tools`), naming this repo in `repos` or in a batch file kept in that private repo, with `dry_run: true` (preview), then `dry_run: false` (apply). One run handles N repos in parallel.
 - **Per-repo dispatch (one-offs):** in this repo's Actions tab, dispatch `v4-bootstrap.yml` with `dry_run: true`, then `dry_run: false`.
 
 Either path applies the same baseline (idempotent, re-run safe, overwrite-with-warn):

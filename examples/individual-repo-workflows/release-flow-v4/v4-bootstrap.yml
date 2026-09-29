@@ -11,8 +11,10 @@
 #
 # Per-repo v4 bootstrap — thin wrapper around the shared
 # `org-bootstrap-repo@v4` action. Run once per repo from the Actions tab
-# (or, for org-wide rollout, prefer `local-org-onboarding.yml` in
-# CLDMV/.github which fans out across many repos in parallel).
+# (or, for org-wide rollout, prefer the `org-onboarding.yml` fanout in the
+# org's private org-admin repo — template in
+# examples/individual-repo-workflows/packaging-docs/ — which runs across
+# many repos in parallel).
 #
 # What gets applied (overwrite-with-warn — divergences are surfaced in the
 # run summary):
