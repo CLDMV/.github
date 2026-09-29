@@ -137,6 +137,7 @@ jobs:
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
             - name: Build
+              id: build
               shell: bash
               env:
                   PM: ${{ steps.pm.outputs.package-manager }}
@@ -149,14 +150,33 @@ jobs:
                       "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
                     esac
                   fi
+                  # A base that predates the build script (the first release PR of a
+                  # newly onboarded repo, whose master is still the initial commit)
+                  # has no bundle to measure: record an empty baseline, so every head
+                  # file shows as new, instead of failing on the missing script.
+                  if [[ "$cmd" =~ ^(npm|pnpm|yarn)[[:space:]]+run[[:space:]]+([^[:space:]]+)$ ]]; then
+                    script="${BASH_REMATCH[2]}"
+                    if ! node -e 'const s = require("./package.json").scripts || {}; process.exit(Object.hasOwn(s, process.argv[1]) ? 0 : 1);' "$script" 2>/dev/null; then
+                      message="The base has no \`$script\` script, so there is no baseline to measure; every file counts as new."
+                      echo "::notice title=Bundle size - no baseline::$message"
+                      echo "ℹ️ $message" >> "$GITHUB_STEP_SUMMARY"
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      exit 0
+                    fi
+                  fi
                   echo "▶ $cmd"
                   eval "$cmd"
             - name: Measure
+              if: steps.build.outputs.skip != 'true'
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4
               with:
                   mode: measure
                   dist_paths: ${{ inputs.dist_paths }}
                   output_file: sizes.json
+            - name: Empty baseline
+              if: steps.build.outputs.skip == 'true'
+              shell: bash
+              run: echo '{"files":[],"total":{"raw":0,"gzip":0,"brotli":0}}' > sizes.json
             - name: Upload base sizes
               uses: actions/upload-artifact@v6
               with:
