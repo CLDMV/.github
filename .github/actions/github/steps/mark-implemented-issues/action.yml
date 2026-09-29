@@ -33,6 +33,10 @@ inputs:
     description: "Status label to apply."
     required: false
     default: "status: implemented"
+  label-color:
+    description: "Hex color (no #) used only when the label doesn't exist in the repo yet. Default matches `status: implemented` in data/github-labels.json."
+    required: false
+    default: "1d76db"
 
 outputs:
   marked:

@@ -31,7 +31,6 @@
  * @module @cldmv/.github.github.steps.mark-implemented-issues
  */
 
-import { readFileSync } from "node:fs";
 import { api, paginate, parseRepo } from "../../api/_api/core.mjs";
 import { getInput, setOutput } from "../../../common/common/core.mjs";
 import {
@@ -113,24 +112,14 @@ function collectInto(map, extract, text, source) {
 	}
 }
 
-/** Color for `name` from the org label definitions shipped alongside this action; null when not found. */
-function orgLabelColor(name) {
-	try {
-		const defs = JSON.parse(readFileSync(new URL("../../../../../data/github-labels.json", import.meta.url), "utf8"));
-		return defs.find((d) => d?.name === name)?.color || null;
-	} catch {
-		return null;
-	}
-}
-
 /** Create `name` in the repo when it's missing (org label sync may not have run yet). */
-async function ensureLabel(name, ctx) {
+async function ensureLabel(name, color, ctx) {
 	try {
 		await api("GET", `/labels/${encodeURIComponent(name)}`, null, ctx);
 	} catch (err) {
 		if (!/-> 404:/.test(err.message)) throw err;
 		console.log(`🏷️ Label "${name}" missing — creating it.`);
-		await api("POST", "/labels", { name, color: orgLabelColor(name) || "1d76db" }, ctx);
+		await api("POST", "/labels", { name, color }, ctx);
 	}
 }
 
@@ -138,6 +127,7 @@ async function main() {
 	const token = getInput("github-token", { required: true });
 	const baseBranch = getInput("base-branch", { required: true });
 	const label = getInput("label") || "status: implemented";
+	const labelColor = getInput("label-color") || "1d76db";
 	const after = getInput("after") || process.env.GITHUB_SHA;
 	const before = getInput("before");
 	const branch = getInput("branch") || process.env.GITHUB_REF_NAME || "next";
@@ -203,7 +193,7 @@ async function main() {
 		return;
 	}
 
-	await ensureLabel(label, ctx);
+	await ensureLabel(label, labelColor, ctx);
 
 	const marked = [];
 	for (const [issueNumber, source] of [...issueSources.entries()].sort((a, b) => a[0] - b[0])) {
