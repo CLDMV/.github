@@ -305,9 +305,13 @@ jobs:
         # `✅ Required PR Check`, it would green-light the ruleset (and enable
         # auto-merge) while the push run's real mirror hadn't been created yet
         # (it only appears once `ci` finishes), letting a PR merge mid-test or
-        # even override a red result. Giving the skipped path a different name
-        # keeps the required check pending until the push run reports. The
-        # condition must stay identical to the `if:` below.
+        # even override a red result. An expression name keeps the skipped job
+        # off the required name: GitHub does not evaluate the name of a skipped
+        # job, so it shows up as the raw expression text (still not the
+        # required name), while every path that runs evaluates to
+        # `✅ Required PR Check`. The condition is written out anyway so the
+        # name stays correct if GitHub ever starts evaluating it, and must stay
+        # identical to the `if:` below.
         name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes') && '✅ Required PR Check' || '⏭️ Required PR Check (reported by the push run)' }}
         needs: ci
         # Mirror the `ci` job's gating exactly. The four cases that run:

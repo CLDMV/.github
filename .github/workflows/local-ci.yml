@@ -424,8 +424,10 @@ jobs:
         # Renamed on the skipped path: a skipped job still posts a check run,
         # and GitHub treats a SKIPPED required check as satisfied. Under the
         # real name, an in-repo feature PR's `pull_request` run would
-        # green-light the ruleset before the push run's mirror exists. Keep the
-        # condition identical to the `if:` below.
+        # green-light the ruleset before the push run's mirror exists. GitHub
+        # does not evaluate a skipped job's name (it shows the raw expression),
+        # which is also not the required name. Keep the condition identical to
+        # the `if:` below.
         name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes') && '✅ Required PR Check' || '⏭️ Required PR Check (reported by the push run)' }}
         needs: [sync-gate, paths-gate, validate]
         # Mirror the validate job's gating exactly so the status is posted
