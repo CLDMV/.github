@@ -421,35 +421,34 @@ jobs:
                   fi
 
     required-check:
-        # Renamed on the skipped path: a skipped job still posts a check run,
-        # and GitHub treats a SKIPPED required check as satisfied. Under the
-        # real name, an in-repo feature PR's `pull_request` run would
-        # green-light the ruleset before the push run's mirror exists. GitHub
-        # does not evaluate a skipped job's name (it shows the raw expression),
-        # which is also not the required name. Keep the condition identical to
-        # the `if:` below.
+        # `✅ Required PR Check` gates merges, so it must only exist on a head
+        # SHA once validate has finished for it (`needs:` guarantees that). On an
+        # in-repo feature PR the push run owns the status, and this run must not
+        # post that name at all. A job skipped by `if:` still posts a check under
+        # its name (GitHub treats a skipped required check as satisfied), and a
+        # skipped job's `name:` expression is never evaluated (it shows up raw,
+        # #350). So the job never skips: the name is always evaluated, and the
+        # in-repo PR path passes as a no-op under a non-required name. Keep the
+        # condition identical to the step's OWNS_STATUS.
         name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes') && '✅ Required PR Check' || '⏭️ Required PR Check (reported by the push run)' }}
         needs: [sync-gate, paths-gate, validate]
-        # Mirror the validate job's gating exactly so the status is posted
-        # on the SHA that branch protection actually inspects. Includes
-        # `always()` so the docs-only / master-sync paths (where validate
-        # is skipped) still post a green status.
-        if: |
-            always() && (
-                github.event_name != 'pull_request' ||
-                github.event.pull_request.head.repo.fork == true ||
-                github.event.pull_request.head.ref == 'next' ||
-                github.event.pull_request.head.ref == 'hotfixes'
-            )
+        # always(): run when validate is skipped (docs-only / master-sync /
+        # in-repo PR paths) or failed.
+        if: always()
         runs-on: ubuntu-latest
         steps:
             - name: Mirror validate result
               shell: bash
               env:
+                  OWNS_STATUS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes' }}
                   IS_MASTER_SYNC: ${{ needs.sync-gate.outputs.is_master_sync }}
                   DOCS_ONLY: ${{ needs.paths-gate.outputs.docs_only }}
                   VALIDATE_RESULT: ${{ needs.validate.result }}
               run: |
+                  if [ "$OWNS_STATUS" != "true" ]; then
+                      echo "In-repo PR event — the push run reports ✅ Required PR Check for this SHA."
+                      exit 0
+                  fi
                   if [ "$IS_MASTER_SYNC" = "true" ]; then
                       echo "Branch tip matches master — Required PR Check passes without running validate."
                       exit 0
