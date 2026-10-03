@@ -20,7 +20,7 @@ inputs:
     description: "Path inside the consumer repo where an override CLA may exist. If the file is present at this path, the bot uses override scope and reads the version from its header."
   exempt_users:
     required: false
-    default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
+    default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot],Copilot,copilot-swe-agent[bot]"
     description: "Comma-separated logins always exempt"
   exempt_org_members:
     required: false

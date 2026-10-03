@@ -53,7 +53,7 @@ on:
             exempt_users:
                 required: false
                 type: string
-                default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot]"
+                default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot],Copilot,copilot-swe-agent[bot]"
             exempt_org_members:
                 required: false
                 type: boolean
@@ -89,6 +89,10 @@ on:
                 required: false
             CLA_BOT_APP_PRIVATE_KEY:
                 required: false
+            # Deprecated and ignored. Ledger commits now go out under the App's
+            # own identity so GitHub signs them; a custom author/committer on a
+            # Contents API write makes the commit unverified. Still declared so
+            # callers that pass them keep working.
             TAGGER_NAME:
                 required: false
             TAGGER_EMAIL:
@@ -145,7 +149,9 @@ jobs:
     record:
         # Runs on issue_comment events — no git checkout needed since the
         # record action writes to the ledger repo via the Contents API.
-        if: github.event_name == 'issue_comment' && github.event.action == 'created'
+        # Bot comments (including the CLA bot's own request) never count as an
+        # acceptance, so don't spend a runner on them.
+        if: github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.comment.user.type != 'Bot'
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Validate CLA bot credentials are paired
@@ -174,10 +180,8 @@ jobs:
               with:
                   cla_version: ${{ inputs.cla_version }}
                   cla_path: ${{ inputs.cla_path }}
+                  exempt_users: ${{ inputs.exempt_users }}
                   required_text_template: ${{ inputs.required_text_template }}
                   ledger_repo: ${{ inputs.ledger_repo }}
                   ledger_platform: ${{ inputs.ledger_platform }}
                   github_token: ${{ steps.app-token.outputs.token }}
-              env:
-                  TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
-                  TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}

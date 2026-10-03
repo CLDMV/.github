@@ -247,7 +247,7 @@ try {
 		const login = c.author?.login;
 		const id = c.author?.id;
 		if (login && id != null) {
-			authors.set(login, { login, id: String(id) });
+			authors.set(login, { login, id: String(id), type: c.author?.type || "" });
 		} else {
 			console.log(`::warning::Commit ${c.sha.slice(0, 7)} has no GitHub-resolved author; CLA bot can't check email-only authors.`);
 		}
@@ -257,7 +257,10 @@ try {
 	const status = [];
 	let allCovered = true;
 	for (const a of authors.values()) {
-		if (exemptList.includes(a.login)) {
+		// Bots can't be legal signatories. Match on the account type as well as
+		// the login list: the Copilot coding agent commits as `Copilot`, not
+		// `copilot[bot]`, so a login-only list misses it.
+		if (exemptList.includes(a.login) || a.type === "Bot") {
 			status.push({ login: a.login, state: "exempt-bot", emoji: "✅" });
 			continue;
 		}

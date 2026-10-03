@@ -30,6 +30,10 @@
 #   - Bot App must have `Organization permissions → Members: read` for the
 #     org-member exemption.
 #   - Bot App must have `Repository contents: write` on the ledger repo.
+#   - The ledger repo must NOT carry the v4 code-repo rulesets (PR required,
+#     `✅ Required PR Check`, required signatures). The bot writes signatures
+#     straight to its default branch through the Contents API, and those rules
+#     block every write. Exclude the ledger from org-wide bootstrap/onboarding.
 #   - Optional `CLDMV_CLA_BOT_APP_CLIENT_ID` / `CLDMV_CLA_BOT_APP_PRIVATE_KEY`
 #     org secrets override the general bot identity for CLA actions only.
 name: 📜 CLA
@@ -58,5 +62,3 @@ jobs:
             BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
             CLA_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_CLA_BOT_APP_CLIENT_ID }}
             CLA_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_CLA_BOT_APP_PRIVATE_KEY }}
-            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
-            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
