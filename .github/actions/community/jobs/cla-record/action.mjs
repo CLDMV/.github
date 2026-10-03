@@ -34,6 +34,9 @@ import { getInput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
 
 const STATUS_CONTEXT = "CLA / signature-check";
+// Must match cla-check's marker: the request comment embeds the acceptance
+// sentence, so it has to be recognised and never treated as an acceptance.
+const REQUEST_COMMENT_MARKER = "<!-- cla-bot-request -->";
 
 function normalizeVersion(v) {
 	const cleaned = String(v).trim().replace(/^v/i, "");
@@ -136,16 +139,18 @@ async function ledgerGet({ token, ledgerRepo, path }) {
 	}
 }
 
-async function ledgerPut({ token, ledgerRepo, path, content, message, committer }) {
+/**
+ * Write a file via the Contents API. No custom author/committer is sent:
+ * GitHub only signs (and marks Verified) a bot's API commit when the request
+ * carries no custom identity, so the App's own identity is what keeps ledger
+ * commits verifiable.
+ */
+async function ledgerPut({ token, ledgerRepo, path, content, message }) {
 	const [ledgerOwner, ledgerName] = ledgerRepo.split("/");
 	const body = {
 		message,
 		content: Buffer.from(content, "utf8").toString("base64")
 	};
-	if (committer?.name && committer?.email) {
-		body.committer = { name: committer.name, email: committer.email };
-		body.author = { name: committer.name, email: committer.email };
-	}
 	return await api("PUT", `/contents/${path}`, body, { token, owner: ledgerOwner, repo: ledgerName });
 }
 
@@ -185,10 +190,10 @@ try {
 	const ledgerRepo = getInput("ledger_repo") || "CLDMV/.cla-signatures";
 	const ledgerPlatform = getInput("ledger_platform") || "github";
 	const token = getInput("github_token", { required: true });
-
-	const taggerName = process.env.TAGGER_NAME || "";
-	const taggerEmail = process.env.TAGGER_EMAIL || "";
-	const committer = taggerName && taggerEmail ? { name: taggerName, email: taggerEmail } : null;
+	const exemptList = (getInput("exempt_users") || "")
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 
 	const repository = process.env.GITHUB_REPOSITORY || "";
 	const [owner, repo] = repository.split("/");
@@ -222,6 +227,16 @@ try {
 	const signerId = comment.user?.id;
 	if (!signerLogin || signerId == null) {
 		console.log(`::warning::Comment is missing user identity; skipping.`);
+		process.exit(0);
+	}
+	// Bots can't sign. This also stops the bot's own request comment, which
+	// quotes the acceptance sentence, from being recorded as the bot signing.
+	if (comment.user?.type === "Bot" || exemptList.includes(signerLogin)) {
+		console.log(`ℹ️ @${signerLogin} is a bot or exempt account; skipping.`);
+		process.exit(0);
+	}
+	if ((comment.body || "").includes(REQUEST_COMMENT_MARKER)) {
+		console.log("ℹ️ Comment is the CLA bot's own request; skipping.");
 		process.exit(0);
 	}
 	const commentUrl = comment.html_url;
@@ -331,8 +346,7 @@ try {
 				ledgerRepo,
 				path: activeClaPathInLedger,
 				content: consumerCla.text,
-				message: bootstrapMsg,
-				committer
+				message: bootstrapMsg
 			});
 			bootstrapCommitSha = mdRes?.commit?.sha || null;
 			// Companion .sha256 file
@@ -342,8 +356,7 @@ try {
 				ledgerRepo,
 				path: shaPath,
 				content: `sha256:${consumerCla.sha256}\n`,
-				message: bootstrapMsg.replace(".md", ".sha256"),
-				committer
+				message: bootstrapMsg.replace(".md", ".sha256")
 			});
 			console.log(`✅ Bootstrapped override snapshot at ${ledgerRepo}:${activeClaPathInLedger}`);
 		}
@@ -496,8 +509,7 @@ try {
 			ledgerRepo,
 			path: signaturePath,
 			content,
-			message: commitMessage,
-			committer
+			message: commitMessage
 		});
 		console.log(`✅ Wrote signature to ${ledgerRepo}:${signaturePath}`);
 	} catch (err) {
@@ -506,7 +518,7 @@ try {
 			"POST",
 			`/issues/${prNumber}/comments`,
 			{
-				body: `⚠️ Failed to record CLA signature for @${signerLogin} in the [${ledgerName}](${serverUrl}/${ledgerOwner}/${ledgerName}) ledger (${err.message}). Your acceptance comment at ${commentUrl} stands as the legal record; we'll retry on the next CLA bot run.`
+				body: `⚠️ Failed to record CLA signature for @${signerLogin} in the [${ledgerName}](${serverUrl}/${ledgerOwner}/${ledgerName}) ledger (${err.message}). Your acceptance comment at ${commentUrl} stands as the legal record, but it has not been recorded yet and is not retried automatically: once the ledger issue is fixed, re-post the acceptance sentence as a new comment to record it.`
 			},
 			{ token, owner, repo }
 		);
