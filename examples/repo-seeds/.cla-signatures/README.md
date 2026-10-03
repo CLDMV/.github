@@ -4,6 +4,10 @@ The authoritative record of CLA acceptances for contributions to CLDMV projects.
 
 **This repository is private.** Signature records contain commit-author email addresses and other identifying metadata that should not be aggregated into a public, searchable index. The CLA bot reads and writes the ledger via a GitHub App installation token; org members can clone the repository for internal audit. External contributors cannot browse the ledger directly — see [Auditing a signature](#auditing-a-signature) below for how a contributor verifies their own signature.
 
+## Repository settings
+
+The CLA bot writes each signature straight to the default branch through the Contents API, so this repository must **not** carry the v4 code-repo rulesets (PR required, `✅ Required PR Check`, required signatures). Those rules reject every write, and no signature can be recorded. Keep it out of `v4-bootstrap` and list it in the org onboarding fanout's `data/onboarding-exclude.txt`. If you want branch protection here, use a ledger-only ruleset that blocks deletion and force-pushes on the default branch, nothing more.
+
 ## What's in here
 
 - **[`cla-versions/`](cla-versions/)** — Immutable archive of every published CLA version. Org-wide default texts live at `v<X.Y>.md`; per-repo **override snapshots** live under `overrides/<owner>/<repo>/v<X.Y>.md` and are written **once** when the first signature for that scope+version is recorded.

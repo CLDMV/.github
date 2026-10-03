@@ -23,7 +23,8 @@
 # summary. In a public repo those job names and summaries are public, so an
 # auto-discovery run publishes the name of every private repo in the org.
 # The logic stays in the public CLDMV/.github composite actions; only this
-# caller (and its batch files under data/onboarding-batches/) lives in the
+# caller (and its batch files under data/onboarding-batches/, plus the
+# permanent exclude list at data/onboarding-exclude.txt) lives in the
 # private repo.
 #
 # Job order:
@@ -156,6 +157,7 @@ jobs:
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
                   GH_OWNER: ${{ github.repository_owner }}
                   SOURCE_REPO: ${{ github.repository_owner }}/.github
+                  PERMANENT_EXCLUDES: data/onboarding-exclude.txt
               run: |
                   set -euo pipefail
 
@@ -209,6 +211,28 @@ jobs:
                   # the same run, fighting itself).
                   list=$(printf '%s\n' "$list" | grep -vixF "$SOURCE_REPO" || true)
 
+                  # Permanent excludes (data/onboarding-exclude.txt in THIS
+                  # repo, optional) apply in EVERY mode, explicit lists
+                  # included. List repos that aren't code repos and that the
+                  # baseline would break, each with a `#` reason. At minimum,
+                  # list the CLA signatures ledger (e.g. <owner>/.cla-signatures):
+                  # the CLA bot writes signatures straight to its default
+                  # branch, and the code-repo rulesets reject every write.
+                  permanent_skipped=""
+                  if [ -f "$PERMANENT_EXCLUDES" ]; then
+                      while IFS= read -r excl; do
+                          if printf '%s\n' "$list" | grep -qixF "$excl"; then
+                              permanent_skipped="${permanent_skipped}${excl}"$'\n'
+                              list=$(printf '%s\n' "$list" | grep -vixF "$excl" || true)
+                          fi
+                      done < <(sed -E 's/#.*$//' "$PERMANENT_EXCLUDES" | tr -d '\r' | awk 'NF {print $1}')
+                  fi
+                  if [ -n "$permanent_skipped" ]; then
+                      while IFS= read -r skipped; do
+                          [ -n "$skipped" ] && echo "::notice::Skipping $skipped (listed in $PERMANENT_EXCLUDES)"
+                      done <<< "$permanent_skipped"
+                  fi
+
                   # Apply user-supplied excludes (auto-discovery only; explicit
                   # modes ignore this — the user already picked the list).
                   if [ "$mode" = "auto-discover" ] && [ -n "${EXCLUDE}" ]; then
@@ -256,6 +280,9 @@ jobs:
                       echo "**Source:** \`$mode\`"
                       echo "**Count:** $count repo(s)"
                       echo "**Dry run:** \`${{ github.event.inputs.dry_run }}\`"
+                      if [ -n "$permanent_skipped" ]; then
+                          echo "**Permanently excluded:** $(printf '%s' "$permanent_skipped" | awk 'NF' | paste -sd ',' | sed 's/,/, /g') (\`$PERMANENT_EXCLUDES\`)"
+                      fi
                       echo ""
                       echo '<details><summary>Target repos</summary>'
                       echo ""
