@@ -165,7 +165,17 @@ jobs:
                     fi
                   fi
                   echo "▶ $cmd"
-                  eval "$cmd"
+                  # The base is code that has already landed, so this PR cannot fix a
+                  # base whose build script is broken (e.g. a pre-onboarding master
+                  # pointing at a script that no longer exists). Fall back to an empty
+                  # baseline with a warning; the head build is still measured and still
+                  # fails the run if it breaks.
+                  if ! eval "$cmd"; then
+                    message="The base build (\`$cmd\`) failed, so there is no baseline to measure; every file counts as new. The head build is measured separately."
+                    echo "::warning title=Bundle size - no baseline::$message"
+                    echo "⚠️ $message" >> "$GITHUB_STEP_SUMMARY"
+                    echo "skip=true" >> "$GITHUB_OUTPUT"
+                  fi
             - name: Measure
               if: steps.build.outputs.skip != 'true'
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4
