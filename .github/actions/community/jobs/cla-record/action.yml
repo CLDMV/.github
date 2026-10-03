@@ -22,6 +22,10 @@ inputs:
     required: false
     default: "I have read and I agree to the CLA ${cla_version}"
     description: "Template for the required acceptance text. ${cla_version} expands to the effective version (header version for override, input version for default)."
+  exempt_users:
+    required: false
+    default: "cldmv-bot[bot],dependabot[bot],github-actions[bot],renovate[bot],copilot[bot],Copilot,copilot-swe-agent[bot]"
+    description: "Comma-separated logins that can never record a signature. Comments from any account GitHub reports as a Bot are ignored regardless."
   ledger_repo:
     required: false
     default: "CLDMV/.cla-signatures"
