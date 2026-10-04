@@ -80,12 +80,19 @@ async function getAllReleases() {
 
 		const { owner, repo } = parseRepo(repository);
 
-		// Use the raw API function to get all releases
-		const releases = await api("GET", "/releases", null, {
-			token: GITHUB_TOKEN.trim(),
-			owner,
-			repo
-		});
+		// Page through every release (drafts included for a token with push
+		// access). A bare GET /releases returns only the first 30, so an orphaned
+		// older release was never examined.
+		const releases = [];
+		for (let page = 1; page <= 10; page++) {
+			const pageItems = await api("GET", `/releases?per_page=100&page=${page}`, null, {
+				token: GITHUB_TOKEN.trim(),
+				owner,
+				repo
+			});
+			releases.push(...(pageItems || []));
+			if (!pageItems || pageItems.length < 100) break;
+		}
 
 		if (!releases || releases.length === 0) {
 			console.log("ℹ️ No releases found in repository");

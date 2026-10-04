@@ -1,4 +1,5 @@
 import { debugLog } from "../../../../common/common/core.mjs";
+import { stripReleaseSubject, stripCommitTrailers, neutralizeMentions, contributorHandles } from "../../../utilities/release-notes.mjs";
 
 /**
  * Normalize arbitrary values to boolean.
@@ -32,128 +33,25 @@ function toBoolean(value, fallback = false) {
 }
 
 /**
- * Remove duplicated title lines from the beginning of release body.
- * This handles cases where the commit message subject is also present
- * as the first line of the body.
+ * Normalize a release body before it is written: drop a leading line that only
+ * repeats the release title (the release name or the squash subject
+ * `release: vX.Y.Z - …`), drop the squash trailer tail (`Co-authored-by:` …),
+ * and neutralize accidental `@word` mentions in prose (wrapped in a code span)
+ * so GitHub doesn't ping, or add to the release's Contributors avatars, an
+ * account that only appears in text such as a fix-headers `@Author` tag. The
+ * handles in the body's own Contributors block stay live mentions.
  * @param {string} body - Raw release body markdown.
  * @param {string} title - Release title/name.
+ * @param {string} tagName - Release tag (used to derive the version).
  * @returns {string} Normalized release body.
  */
-function normalizeReleaseBody(body, title) {
+function normalizeReleaseBody(body, title, tagName = "") {
 	if (!body) {
 		return "";
 	}
-
-	const normalizedBody = String(body).replace(/\r\n/g, "\n");
-	const normalizedTitle = (title || "").trim();
-
-	if (!normalizedTitle) {
-		return normalizedBody;
-	}
-
-	const lines = normalizedBody.split("\n");
-	const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
-
-	if (firstNonEmptyIndex === -1) {
-		return normalizedBody;
-	}
-
-	const firstLine = lines[firstNonEmptyIndex].trim();
-	if (firstLine.toLowerCase() === normalizedTitle.toLowerCase()) {
-		lines.splice(firstNonEmptyIndex, 1);
-		while (lines.length > 0 && lines[0].trim() === "") {
-			lines.shift();
-		}
-	}
-
-	return lines.join("\n");
-}
-
-/**
- * Escape JSDoc-style tags in release body so they are not interpreted as GitHub mentions.
- * @param {string} content - Release body markdown.
- * @returns {string} Sanitized release body.
- */
-function neutralizeJsdocTagMentions(content) {
-	if (!content) {
-		return "";
-	}
-
-	const jsdocTags = [
-		"abstract",
-		"access",
-		"alias",
-		"async",
-		"augments",
-		"author",
-		"borrows",
-		"callback",
-		"class",
-		"classdesc",
-		"constant",
-		"constructs",
-		"default",
-		"deprecated",
-		"description",
-		"enum",
-		"event",
-		"example",
-		"exports",
-		"extends",
-		"external",
-		"file",
-		"fires",
-		"function",
-		"generator",
-		"global",
-		"hideconstructor",
-		"ignore",
-		"implements",
-		"inheritdoc",
-		"inner",
-		"instance",
-		"interface",
-		"kind",
-		"lends",
-		"license",
-		"listens",
-		"member",
-		"memberof",
-		"mixes",
-		"mixin",
-		"module",
-		"name",
-		"namespace",
-		"override",
-		"package",
-		"param",
-		"private",
-		"property",
-		"protected",
-		"public",
-		"readonly",
-		"returns",
-		"return",
-		"see",
-		"since",
-		"static",
-		"summary",
-		"template",
-		"this",
-		"throws",
-		"todo",
-		"tutorial",
-		"type",
-		"typedef",
-		"variation",
-		"version",
-		"yields",
-		"yield",
-		"internal"
-	];
-
-	const tagPattern = new RegExp(`@(${jsdocTags.join("|")})(?=$|[\\s.,;:!?()[\\]{}])`, "gi");
-	return String(content).replace(tagPattern, "@​$1");
+	const version = String(tagName || title || "").replace(/^.*@(?=\d)/, "");
+	const cleaned = stripCommitTrailers(stripReleaseSubject(body, { name: title, version }));
+	return neutralizeMentions(cleaned, contributorHandles(cleaned));
 }
 
 /**
@@ -214,7 +112,7 @@ export async function run({ token, repo, tag_name, name, body, is_prerelease, is
 	)
 		? String(make_latest).trim().toLowerCase()
 		: undefined;
-	const finalBody = neutralizeJsdocTagMentions(normalizeReleaseBody(body, name));
+	const finalBody = normalizeReleaseBody(body, name, tag_name);
 	// Satellite tags (@scope/name@version) contain "/" and "@"; encode the tag in
 	// URL path segments so the lookups below resolve. No-op for core v<version>.
 	const encTag = encodeURIComponent(tag_name);

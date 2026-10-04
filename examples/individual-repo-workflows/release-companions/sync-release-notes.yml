@@ -1,0 +1,81 @@
+#
+# @Project: @cldmv/.github
+# @Filename: /examples/individual-repo-workflows/release-companions/sync-release-notes.yml
+# @Date: 2026-10-04 00:00:00 -07:00 (1791097200)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Individual repo: .github/workflows/sync-release-notes.yml
+#
+# Manual repair tool. Rewrites this repository's GitHub Release bodies from the
+# committed per-version changelog files (docs/changelog[s]/v<major>/v<version>.md)
+# — the way to give releases made before a changelog existed (or with a
+# backfilled one) their curated notes. Keeps the Contributors and coverage
+# blocks, drops the duplicated "release: vX.Y.Z - …" subject line, neutralizes
+# accidental @word mentions.
+#
+# Also reports release/tag drift: draft releases, versions with no tag, tags
+# with no release, duplicate releases. Dry run by default; each repair is its
+# own opt-in. Results land in the job summary.
+#
+# Thin caller: all logic lives in workflow-sync-release-notes.yml@v4.
+name: 📝 Sync Release Notes
+
+on:
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Report only; change nothing"
+                type: boolean
+                required: false
+                default: true
+            versions:
+                description: "Versions to limit the run to (comma/space-separated, e.g. 1.2.0 1.2.2). Empty = all"
+                type: string
+                required: false
+                default: ""
+            create_missing_tags:
+                description: "Create missing vX.Y.Z tags at their release commits (signed)"
+                type: boolean
+                required: false
+                default: false
+            create_missing_releases:
+                description: "Create missing GitHub Releases for tagged versions"
+                type: boolean
+                required: false
+                default: false
+            publish_drafts:
+                description: "Publish draft releases whose tag exists"
+                type: boolean
+                required: false
+                default: false
+            normalize_all:
+                description: "Also tidy bodies of releases with no changelog file"
+                type: boolean
+                required: false
+                default: false
+
+permissions:
+    contents: read
+
+jobs:
+    sync:
+        permissions:
+            contents: write
+        uses: CLDMV/.github/.github/workflows/workflow-sync-release-notes.yml@v4
+        with:
+            dry_run: ${{ inputs.dry_run }}
+            versions: ${{ inputs.versions }}
+            create_missing_tags: ${{ inputs.create_missing_tags }}
+            create_missing_releases: ${{ inputs.create_missing_releases }}
+            publish_drafts: ${{ inputs.publish_drafts }}
+            normalize_all: ${{ inputs.normalize_all }}
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
