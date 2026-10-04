@@ -23,7 +23,7 @@ import { execFileSync } from "node:child_process";
 import { getInput, getBooleanInput, setOutputs, appendSummary } from "../../../common/common/core.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { run as createTag } from "../../api/tag/create/_impl.mjs";
-import { buildReleaseBody, readChangelogAtRef, sameBody } from "../../utilities/release-notes.mjs";
+import { buildReleaseBody, escapeTableCell, readChangelogAtRef, sameBody } from "../../utilities/release-notes.mjs";
 
 const token = getInput("github-token", { required: true });
 const repoFull = process.env.GITHUB_REPOSITORY || "";
@@ -215,7 +215,7 @@ for (const version of [...versions].sort(cmpVersion)) {
 	rows.push(row);
 }
 
-const esc = (s) => String(s || "").replace(/\|/g, "\\|");
+const esc = escapeTableCell;
 let md = `## 📝 Release notes sync — ${repoFull}${dryRun ? " (dry run)" : ""}\n\n`;
 md += "| Version | Tag | Release | Changelog | Actions | Problems |\n|---|---|---|---|---|---|\n";
 for (const r of rows) {

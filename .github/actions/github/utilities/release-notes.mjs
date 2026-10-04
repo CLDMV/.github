@@ -243,3 +243,17 @@ export function sameBody(a, b) {
 			.trim();
 	return n(a) === n(b);
 }
+
+/**
+ * Make arbitrary text safe for one cell of a markdown table: backslashes are
+ * escaped first (so an input `\|` can't turn into an unescaped pipe), then
+ * the pipe that would end the cell, and line breaks collapse to a space.
+ * @param {unknown} value - Cell text (git output, API error text, …).
+ * @returns {string} Escaped single-line cell content.
+ */
+export function escapeTableCell(value) {
+	return String(value ?? "")
+		.replace(/\\/g, "\\\\")
+		.replace(/\|/g, "\\|")
+		.replace(/[\r\n]+/g, " ");
+}

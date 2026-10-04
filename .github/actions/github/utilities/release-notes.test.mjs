@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Ad-hoc checks for release-notes.mjs. Run: node .github/actions/github/utilities/release-notes.test.mjs
 import assert from "node:assert/strict";
-import { buildReleaseBody, neutralizeMentions, stripReleaseSubject, stripCommitTrailers, changelogCandidates, sameBody } from "./release-notes.mjs";
+import { escapeTableCell, buildReleaseBody, neutralizeMentions, stripReleaseSubject, stripCommitTrailers, changelogCandidates, sameBody } from "./release-notes.mjs";
 
 const contributors = "<details>\n<summary>👥 Contributors</summary>\n\n- @Shinrai\n\n</details>";
 const coverage = "<!-- coverage-start -->\ncov\n<!-- coverage-end -->";
@@ -37,5 +37,12 @@ assert.equal(stripReleaseSubject("Intro\nrelease: v1.0.0", { version: "1.0.0" })
 assert.equal(stripCommitTrailers("a\n\n---\n\nb\n\n---------\n\nCo-authored-by: x <y>"), "a\n\n---\n\nb");
 assert.deepEqual(changelogCandidates("v4.30.6").slice(0, 2), ["docs/changelog/v4/v4.30.6.md", "docs/changelog/v4.30.6.md"]);
 assert.deepEqual(changelogCandidates("../etc"), []);
+
+// Table cells: backslash escaped before the pipe, newlines collapsed.
+assert.equal(escapeTableCell("a|b"), "a\\|b");
+assert.equal(escapeTableCell("a\\|b"), "a\\\\\\|b");
+assert.equal(escapeTableCell("C:\\path\\x"), "C:\\\\path\\\\x");
+assert.equal(escapeTableCell("line1\r\nline2"), "line1 line2");
+assert.equal(escapeTableCell(null), "");
 
 console.log("release-notes: all checks passed");
