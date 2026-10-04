@@ -45,11 +45,12 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 
 ### 📋 [`release-companions/`](individual-repo-workflows/release-companions/) — Release-flow companions
 
-| Template                  | Triggers                      | What it does                                                                                     |
-| ------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| `tag-health.yml`          | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags.                              |
-| `release-notify.yml`      | `release: published`          | Posts to configured Discord/Slack/generic webhook channels.                                      |
-| `master-commit-audit.yml` | push to default               | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern. |
+| Template                  | Triggers                      | What it does                                                                                                                                                |
+| ------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tag-health.yml`          | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags.                                                                                         |
+| `release-notify.yml`      | `release: published`          | Posts to configured Discord/Slack/generic webhook channels.                                                                                                 |
+| `master-commit-audit.yml` | push to default               | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern.                                                            |
+| `sync-release-notes.yml`  | manual dispatch               | Rewrites release bodies from `docs/changelog[s]/v<major>/v<version>.md`; reports (and on opt-in repairs) draft releases, missing tags and missing releases. |
 
 ### 🔒 [`security/`](individual-repo-workflows/security/) — Security baseline (recommended for OSS repos)
 

@@ -22,6 +22,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Release companions | [Tag Health](#-tag-health)                                        | `release-companions/tag-health.yml`          | weekly cron + dispatch            | Validates / repairs tags                                                                                           |
 | Release companions | [Release Notifier](#-release-notifier)                            | `release-companions/release-notify.yml`      | release published                 | Notifies Discord / Slack / webhooks                                                                                |
 | Release companions | [Master Commit Audit](#%EF%B8%8F-master-commit-audit)             | `release-companions/master-commit-audit.yml` | push to default                   | Files Issues on subject-line drift                                                                                 |
+| Release companions | [Sync Release Notes](#-sync-release-notes)                        | `release-companions/sync-release-notes.yml`  | manual dispatch                   | Re-syncs release bodies from changelog files; repairs drafts / missing tags on opt-in                              |
 | Security           | [CodeQL](#-codeql)                                                | `security/codeql.yml`                        | push / PR / weekly cron           | SAST via CodeQL                                                                                                    |
 | Security           | [Dependency Review](#%EF%B8%8F-dependency-review)                 | `security/dependency-review.yml`             | PR                                | Blocks PRs with high-severity new deps                                                                             |
 | Security           | [OpenSSF Scorecard](#-openssf-scorecard)                          | `security/scorecard.yml`                     | weekly + dispatch                 | Publishes OSSF Scorecard score                                                                                     |
@@ -271,6 +272,20 @@ Fires on `release: published`. Each channel is a single secret — set the secre
 Repo secret overrides org secret of the same name (built-in GitHub precedence). Set a repo secret to an empty string to mute that channel for this repo.
 
 **Prereqs** — none. No config file required.
+
+---
+
+### 📝 Sync Release Notes
+
+**File:** `release-companions/sync-release-notes.yml` &nbsp;·&nbsp; **Calls:** `workflow-sync-release-notes.yml@v4`
+
+Manual dispatch. For every released version (version tags, GitHub Releases and `release: vX.Y.Z` commits on the default branch) that has a committed changelog file — `docs/changelog[s]/v<major>/v<version>.md`, read at the default-branch tip (which carries later corrections and backfills), else at the release tag — it rewrites the release body from that file. The Contributors and coverage blocks are kept, the duplicated `release: vX.Y.Z - …` subject line is dropped, and accidental `@word` mentions in prose are wrapped in code spans so GitHub doesn't add those accounts to the release's Contributors.
+
+It also reports drift: draft releases, versions with no tag, tags with no release, and duplicate releases for one tag. `dry_run` is on by default. Repairs are separate opt-ins: `create_missing_tags` (signed tag at the release commit), `create_missing_releases`, `publish_drafts`, and `normalize_all` (tidy bodies that have no changelog file). The results table goes to the job summary.
+
+**Required secrets** — bot App credentials; GPG signing secrets for signed tags.
+
+**Prereqs** — none.
 
 ---
 

@@ -137,7 +137,7 @@ on:
 
             # GPG signing control
             use_gpg:
-                description: "If true, use GPG signing for release tags"
+                description: "Force GPG signing for release tags. Signing is also enabled automatically whenever the GPG_PRIVATE_KEY secret is provided."
                 required: false
                 type: boolean
                 default: false
@@ -491,7 +491,12 @@ jobs:
                   dry-run: ${{ inputs.dry_run }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # GPG signing parameters
-                  gpg_enabled: ${{ inputs.use_gpg }}
+                  # Sign whenever the bot GPG key is mapped, not only when use_gpg
+                  # is passed: the publish template sets use_gpg only on manual
+                  # dispatch, so push-triggered releases got LIGHTWEIGHT unsigned
+                  # tags that tag-health later deleted and re-pushed — unpublishing
+                  # the release (CLDMV/.github#362).
+                  gpg_enabled: ${{ inputs.use_gpg || secrets.GPG_PRIVATE_KEY != '' }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -628,7 +633,12 @@ jobs:
               with:
                   debug: ${{ inputs.debug }}
                   github_token: ${{ steps.app-token.outputs.token }}
-                  gpg_enabled: ${{ inputs.use_gpg }}
+                  # Sign whenever the bot GPG key is mapped, not only when use_gpg
+                  # is passed: the publish template sets use_gpg only on manual
+                  # dispatch, so push-triggered releases got LIGHTWEIGHT unsigned
+                  # tags that tag-health later deleted and re-pushed — unpublishing
+                  # the release (CLDMV/.github#362).
+                  gpg_enabled: ${{ inputs.use_gpg || secrets.GPG_PRIVATE_KEY != '' }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -801,7 +811,12 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   dry-run: ${{ inputs.dry_run }}
                   github-token: ${{ steps.app-token.outputs.token }}
-                  gpg_enabled: ${{ inputs.use_gpg }}
+                  # Sign whenever the bot GPG key is mapped, not only when use_gpg
+                  # is passed: the publish template sets use_gpg only on manual
+                  # dispatch, so push-triggered releases got LIGHTWEIGHT unsigned
+                  # tags that tag-health later deleted and re-pushed — unpublishing
+                  # the release (CLDMV/.github#362).
+                  gpg_enabled: ${{ inputs.use_gpg || secrets.GPG_PRIVATE_KEY != '' }}
                   tagger_name: ${{ secrets.TAGGER_NAME }}
                   tagger_email: ${{ secrets.TAGGER_EMAIL }}
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
