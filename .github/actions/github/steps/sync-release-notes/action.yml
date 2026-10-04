@@ -59,7 +59,9 @@ outputs:
   changed-count:
     description: "Number of tags/releases created or updated."
   problems-count:
-    description: "Number of problems left (drafts, missing tags/releases, duplicates, failures)."
+    description: "Number of items left that need a manual decision (drafts not published, missing tags/releases, duplicates)."
+  failures-count:
+    description: "Number of repairs this run attempted that failed. The step fails only when this is non-zero."
 
 runs:
   using: node24

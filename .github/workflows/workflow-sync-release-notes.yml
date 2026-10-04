@@ -5,10 +5,14 @@
 # and report — optionally repair — release/tag drift: draft releases, versions
 # with no tag, tags with no release, duplicate releases.
 #
-# Consumers call it from a workflow_dispatch wrapper
-# (examples/individual-repo-workflows/release-companions/sync-release-notes.yml).
-# Runs against the CALLING repository with the bot App token. Dry run by
-# default; every repair is a separate opt-in. See CLDMV/.github#362.
+# Part of the standard v4 set: every repo carries the caller
+# (examples/individual-repo-workflows/release-companions/sync-release-notes.yml),
+# which runs it automatically when a release is published and when a changelog
+# file lands on the default branch, and by manual dispatch. Runs against the
+# CALLING repository with the bot App token. Concurrent runs for one repo queue
+# (one running + the newest pending); every run is a full, idempotent sweep, so
+# a superseded pending run loses nothing. The inputs default to a dry run; the
+# caller passes the automatic-run settings. See CLDMV/.github#362.
 name: 📝 Sync Release Notes (Org-Level)
 
 on:
@@ -70,13 +74,16 @@ jobs:
     sync:
         name: "📝 Sync release notes"
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        # Every write (release PATCH/POST, tag push) goes through the bot App
+        # token, so the workflow GITHUB_TOKEN only needs to read.
         permissions:
-            contents: write
+            contents: read
         concurrency:
             group: sync-release-notes-${{ github.repository }}
             cancel-in-progress: false
         steps:
-            # App token: creating a tag on a release commit that touches
+            # App token: release edits and tag pushes run as the bot. Creating a
+            # tag on a release commit that touches
             # .github/workflows/ needs the `workflows` scope the Actions
             # GITHUB_TOKEN can never hold.
             - name: Create App token (auto-detect)

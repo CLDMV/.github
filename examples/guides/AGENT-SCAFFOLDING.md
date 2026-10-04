@@ -85,6 +85,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | ------------------------- | -------------------------------------------- | -------------------------------------------- |
 | `master-commit-audit.yml` | `release-companions/master-commit-audit.yml` | No customization needed for default patterns |
 | `tag-health.yml`          | `release-companions/tag-health.yml`          | No customization needed                      |
+| `sync-release-notes.yml`  | `release-companions/sync-release-notes.yml`  | No customization needed (standard v4 set)    |
 
 ### Conditional (based on Phase 1)
 
