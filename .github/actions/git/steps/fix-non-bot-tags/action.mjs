@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
+import { getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
