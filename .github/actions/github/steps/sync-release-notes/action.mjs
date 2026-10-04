@@ -127,7 +127,9 @@ for (const version of [...versions].sort(cmpVersion)) {
 	const rels = releases.filter((r) => r.tag_name === tagName);
 	const primary = rels.find((r) => !r.draft) || [...rels].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
 	if (rels.length > 1) {
-		row.issues.push(`${rels.length} releases share ${tagName} (ids ${rels.map((r) => `${r.id}${r.draft ? " draft" : ""}`).join(", ")}) — delete the extras by hand`);
+		row.issues.push(
+			`${rels.length} releases share ${tagName} (ids ${rels.map((r) => `${r.id}${r.draft ? " draft" : ""}`).join(", ")}) — delete the extras by hand`
+		);
 	}
 
 	// Prefer the file as it reads on the default branch now — it carries later
@@ -171,7 +173,12 @@ for (const version of [...versions].sort(cmpVersion)) {
 				row.actions.push("would create release");
 			} else {
 				try {
-					const created = await api("POST", "/releases", { tag_name: tagName, name: tagName, body, draft: false, make_latest: "legacy" }, ctx);
+					const created = await api(
+						"POST",
+						"/releases",
+						{ tag_name: tagName, name: tagName, body, draft: false, make_latest: "legacy" },
+						ctx
+					);
 					row.release = `created ${created.html_url}`;
 					row.actions.push("created release");
 					changed++;
@@ -186,7 +193,12 @@ for (const version of [...versions].sort(cmpVersion)) {
 		row.release = primary.draft ? "draft" : "published";
 		const patch = {};
 		if (file || normalizeAll) {
-			const desired = buildReleaseBody({ changelog: file?.content || "", baseBody: primary.body || "", name: primary.name || tagName, version });
+			const desired = buildReleaseBody({
+				changelog: file?.content || "",
+				baseBody: primary.body || "",
+				name: primary.name || tagName,
+				version
+			});
 			if (!sameBody(desired, primary.body)) patch.body = desired;
 		}
 		if (primary.draft) {

@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 // Ad-hoc checks for release-notes.mjs. Run: node .github/actions/github/utilities/release-notes.test.mjs
 import assert from "node:assert/strict";
-import { escapeTableCell, buildReleaseBody, neutralizeMentions, stripReleaseSubject, stripCommitTrailers, changelogCandidates, sameBody } from "./release-notes.mjs";
+import {
+	escapeTableCell,
+	buildReleaseBody,
+	neutralizeMentions,
+	stripReleaseSubject,
+	stripCommitTrailers,
+	changelogCandidates,
+	sameBody
+} from "./release-notes.mjs";
 
 const contributors = "<details>\n<summary>👥 Contributors</summary>\n\n- @Shinrai\n\n</details>";
 const coverage = "<!-- coverage-start -->\ncov\n<!-- coverage-end -->";
@@ -19,7 +27,10 @@ assert.ok(fromFile.startsWith("# v1.2.2 Changelog"));
 assert.equal(fromFile.split("coverage-start").length, 2);
 assert.equal(fromFile.split("👥 Contributors").length, 2);
 assert.ok(!fromFile.includes("What's Changed"));
-assert.ok(sameBody(fromFile, buildReleaseBody({ changelog: fromFile, baseBody: fromFile, name: "v1.2.2", version: "1.2.2" })), "idempotent");
+assert.ok(
+	sameBody(fromFile, buildReleaseBody({ changelog: fromFile, baseBody: fromFile, name: "v1.2.2", version: "1.2.2" })),
+	"idempotent"
+);
 
 // Mentions: prose wrapped, contributors / code / emails / URLs untouched.
 const allowed = ["Shinrai"];

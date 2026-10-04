@@ -153,7 +153,7 @@ async function fixUnsignedTag(tagObj) {
 
 		console.log(`🔐 Converting tag ${tagName} to signed/annotated tag...`);
 
-		if (!/^[\w.@+\/-]+$/.test(tagName) || tagName.startsWith("-")) {
+		if (!/^[\w.@+/-]+$/.test(tagName) || tagName.startsWith("-")) {
 			console.warn(`::warning::Skipping tag with an unexpected name: ${JSON.stringify(tagName)}`);
 			return null;
 		}
@@ -208,7 +208,9 @@ async function fixUnsignedTag(tagObj) {
 		// rejection leaves the original tag exactly where it was.
 		const pushed = git(["push", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`]);
 		if (!pushed.ok) {
-			console.warn(`::warning::Could not replace ${tagName} with a signed tag; the existing tag was left unchanged. git said: ${pushed.output}`);
+			console.warn(
+				`::warning::Could not replace ${tagName} with a signed tag; the existing tag was left unchanged. git said: ${pushed.output}`
+			);
 			failedTags.push({ tagName, reason: pushed.output.split("\n").find((l) => /rejected|error|fatal/i.test(l)) || pushed.output });
 			return null;
 		}
@@ -369,7 +371,8 @@ if (!DRY_RUN && touched.length > 0) {
 				} catch {
 					// fall through with the previous read
 				}
-				if (current?.draft === true) brokenReleases.push(`${t.tagName}: release ${t.release.html_url || t.release.id} was published and is now a draft`);
+				if (current?.draft === true)
+					brokenReleases.push(`${t.tagName}: release ${t.release.html_url || t.release.id} was published and is now a draft`);
 			}
 		}
 	}
@@ -407,7 +410,11 @@ for (const tagName of fixedTagsArray) {
 }
 
 for (const f of failedTags) {
-	summaryData.lines.push(`- ⚠️ **${f.tagName}** left unchanged (signing push rejected: ${String(f.reason).replace(/[\r\n]+/g, " ").slice(0, 200)})`);
+	summaryData.lines.push(
+		`- ⚠️ **${f.tagName}** left unchanged (signing push rejected: ${String(f.reason)
+			.replace(/[\r\n]+/g, " ")
+			.slice(0, 200)})`
+	);
 }
 for (const b of brokenReleases) {
 	summaryData.lines.push(`- ❌ **${b}**`);
@@ -451,7 +458,9 @@ if (githubOutput) {
 
 if (brokenReleases.length > 0) {
 	for (const b of brokenReleases) console.error(`::error::${b}`);
-	console.error("::error::Tag health left a release unpublished or a tag missing — see CLDMV/.github#362 and repair with the sync-release-notes workflow.");
+	console.error(
+		"::error::Tag health left a release unpublished or a tag missing — see CLDMV/.github#362 and repair with the sync-release-notes workflow."
+	);
 	process.exitCode = 1;
 } else {
 	console.log("🔍 DEBUG: Unsigned tags action completed successfully");
