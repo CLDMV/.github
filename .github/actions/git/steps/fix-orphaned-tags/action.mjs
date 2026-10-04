@@ -6,6 +6,7 @@
  */
 
 import { writeFileSync, unlinkSync } from "fs";
+import { execFileSync } from "node:child_process";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
@@ -204,18 +205,18 @@ function fixOrphanedTag(tagObj) {
 		// the original tag is untouched.
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
 		writeFileSync(msgFile, tagMessage, "utf8");
-		let tagCommand;
+		let tagArgs;
 		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
 			// Always create signed annotated tags when GPG is enabled
-			tagCommand = `git tag -f -s -a -F "${msgFile}" ${tagName} ${equivalentCommit}`;
+			tagArgs = ["tag", "-f", "-s", "-a", "-F", msgFile, tagName, equivalentCommit];
 		} else if (tagObj.isAnnotated) {
-			tagCommand = `git tag -f -a -F "${msgFile}" ${tagName} ${equivalentCommit}`;
+			tagArgs = ["tag", "-f", "-a", "-F", msgFile, tagName, equivalentCommit];
 		} else {
-			tagCommand = `git tag -f ${tagName} ${equivalentCommit}`;
+			tagArgs = ["tag", "-f", tagName, equivalentCommit];
 		}
 
 		try {
-			gitCommand(tagCommand);
+			execFileSync("git", tagArgs, { stdio: ["ignore", "inherit", "inherit"] });
 		} finally {
 			try {
 				unlinkSync(msgFile);
@@ -225,7 +226,7 @@ function fixOrphanedTag(tagObj) {
 		}
 
 		// Force-update the remote ref to the re-pointed tag.
-		gitCommand(`git push origin +refs/tags/${tagName}:refs/tags/${tagName}`);
+		execFileSync("git", ["push", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`], { stdio: ["ignore", "inherit", "inherit"] });
 
 		console.log(`✅ Successfully re-pointed tag ${tagName} to ${equivalentCommit}`);
 

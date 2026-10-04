@@ -6,6 +6,7 @@
  */
 
 import { writeFileSync, unlinkSync } from "fs";
+import { execFileSync } from "node:child_process";
 import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
@@ -89,7 +90,7 @@ function fixNonBotTag(tagObj) {
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
 		writeFileSync(msgFile, tagMessage, "utf8");
 		try {
-			gitCommand(`git tag -f -a ${willSign ? "-s " : ""}-F "${msgFile}" ${tagObj.name} ${tagObj.commitSha}`);
+			execFileSync("git", ["tag", "-f", "-a", ...(willSign ? ["-s"] : []), "-F", msgFile, tagObj.name, tagObj.commitSha], { stdio: ["ignore", "inherit", "inherit"] });
 		} finally {
 			try {
 				unlinkSync(msgFile);
@@ -99,7 +100,7 @@ function fixNonBotTag(tagObj) {
 		}
 
 		// Force-update the remote ref to the new tag object.
-		gitCommand(`git push origin +refs/tags/${tagObj.name}:refs/tags/${tagObj.name}`);
+		execFileSync("git", ["push", "origin", `+refs/tags/${tagObj.name}:refs/tags/${tagObj.name}`], { stdio: ["ignore", "inherit", "inherit"] });
 
 		console.log(`✅ Successfully recreated tag ${tagObj.name} with bot signature`);
 
