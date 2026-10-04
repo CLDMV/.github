@@ -1,0 +1,66 @@
+name: "Reset Branch After Release"
+description: "Bring an integration branch (next / hotfixes) back onto the release commit after a release squash-merges into master, WITHOUT dropping work that merged into the branch after the release PR was cut (#360). When the branch is exactly the release PR's head (or already contains the release), it is reset (or left alone). When it moved, every first-parent commit not contained in the release is replayed onto the release commit (a cherry-pick computed locally with git merge-tree, published through the Git Data API so GitHub signs it for the bot App) and the branch is pointed at the result. Every ref update is a compare-and-swap against the SHA the plan was built from: GraphQL updateRefs with beforeOid first, then `git push --force-with-lease=<branch>:<sha>`; a branch that moved meanwhile is re-planned instead of overwritten. A carry-forward conflict leaves the branch untouched, fails the step, opens an issue and comments on every affected PR. Carried commits are listed in the run summary and commented on their PRs. Needs a full-history checkout in the workspace."
+
+inputs:
+  target-branch:
+    description: "Branch to bring onto the release (e.g. 'next', 'hotfixes')."
+    required: true
+  release-sha:
+    description: "The release commit on master the branch is moved onto. Defaults to the triggering commit (github.sha)."
+    required: false
+    default: ${{ github.sha }}
+  release-head-sha:
+    description: "Head SHA of the release PR that was squash-merged (the tip the release was built from). Commits reachable from it shipped in the release and are never carried. When empty, carry candidates are every first-parent commit not reachable from the release commit; ones whose change is already in the release replay as empty and are skipped."
+    required: false
+    default: ""
+  release-pr-number:
+    description: "Number of the release PR (used in comments and the summary). Optional."
+    required: false
+    default: ""
+  release-merged-at:
+    description: "ISO timestamp the release PR merged. Bounds the post-update audit of PRs merged into the branch. Optional (defaults to 30 minutes ago)."
+    required: false
+    default: ""
+  release-label:
+    description: "Human label for the release in messages, e.g. 'v1.2.3'. Optional (parsed from the release commit subject when empty)."
+    required: false
+    default: ""
+  github-token:
+    description: "Bot App token: contents + workflows write (ref updates, Git Data API), pull-requests + issues write (comments, conflict issue)."
+    required: true
+  repository:
+    description: "owner/repo. Defaults to the current repository."
+    required: false
+    default: ${{ github.repository }}
+  max-attempts:
+    description: "How many times to re-plan when the branch moves between planning and the compare-and-swap update."
+    required: false
+    default: "3"
+  allow-unleased-fallback:
+    description: "When both compare-and-swap paths are refused for a reason OTHER than the branch moving (e.g. a ruleset that rejects them), fall back to a REST force update guarded by a re-read immediately before it, followed by an audit of PRs merged into the branch. 'false' fails instead."
+    required: false
+    default: "true"
+  open-issue-on-failure:
+    description: "Open (or update) an issue when a carry-forward cannot be completed."
+    required: false
+    default: "true"
+  dry-run:
+    description: "When 'true', plan and report but do not create commits, update refs, comment or open issues."
+    required: false
+    default: "false"
+
+outputs:
+  result:
+    description: "'reset' (branch was the release head; moved onto the release), 'carried' (late commits replayed onto the release), 'noop' (branch already contains the release), 'created' (branch was missing; created at the release), 'conflict' (carry failed; branch untouched), or 'dry-run'."
+  reset-sha:
+    description: "SHA the branch points to after the step."
+  update-method:
+    description: "'graphql-cas', 'git-lease', 'rest-unleased', or '' when no ref update was made."
+  carried-count:
+    description: "Number of commits replayed onto the release (empty replays excluded)."
+  carried:
+    description: "JSON array of { original, carried, subject, pr } for the replayed commits."
+
+runs:
+  using: "node24"
+  main: "action.mjs"

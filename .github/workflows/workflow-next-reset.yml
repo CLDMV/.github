@@ -10,22 +10,39 @@
 # Reusable: after a release lands on master, re-sync the integration branches
 # (docs/conventions/release-flow-v4.md §6.3, §7).
 #
-#   - `hotfixes` is ALWAYS force-reset to master HEAD after any release.
+#   - `hotfixes` is ALWAYS moved onto the release commit after any release.
 #   - `next` depends on which lane released:
 #       * normal release (next → master, or a v3-style feat → master):
-#         force-reset `next` to master HEAD (§7.1).
+#         move `next` onto the release commit (§7.1).
 #       * hotfix release (hotfixes → master): MERGE master into `next` instead,
 #         so next's accumulated feature work is preserved (§7.2, option B). The
 #         merge is a no-op (204) when next has no extra work.
 #
-# The released lane is detected from the PR head ref behind the squash commit's
-# trailing "(#N)".
+# "Move onto the release" is reset-branch-after-release, not a blind force
+# reset (#360): when the branch is exactly the release PR's head it is reset;
+# when PRs merged into it after the release PR was cut (typically bot /
+# Dependabot auto-merges landing seconds after a release), those commits are
+# replayed onto the release commit instead of being dropped, and each affected
+# PR gets a comment. Every ref update is a compare-and-swap against the tip the
+# plan was built from (GraphQL updateRefs beforeOid, then git push
+# --force-with-lease), so a merge landing mid-step makes the update fail and
+# re-plan rather than be overwritten. A replay conflict leaves the branch
+# untouched, fails the job, and opens an issue.
 #
-# wait-for-tags gate: a release also fires `update-major-version-tags`, which
-# rolls the major tags. Jobs resolve `uses: ...@vN` at job start, so without
-# this gate the sync job can run the PREVIOUS release's action code. The gate
-# polls the RELEASED major's tag — parsed from the `release: vX.Y.Z` commit —
-# until it matches the release commit.
+# The released lane and the release PR's head SHA are read from the PR
+# associated with the release commit.
+#
+# wait-for-tags gate (CLDMV/.github ONLY): a release of CLDMV/.github also
+# fires `update-major-version-tags`, which rolls the @vN tags that this
+# workflow's own `uses: CLDMV/.github/...@v4` actions resolve to. Jobs resolve
+# `uses:` at job start, so without the gate the sync job could run the
+# PREVIOUS release's action code. The gate polls the released major's tag —
+# parsed from the `release: vX.Y.Z` commit — until it matches the release
+# commit. In a consumer repo its own tags have nothing to do with the @v4
+# actions it runs (some consumers have no vN tag at all, so the gate always
+# timed out at the full 2 minutes), and that 2-minute delay was exactly the
+# window in which the #360 merges landed and were lost. So the gate runs only
+# in the repo that self-hosts the actions, and consumers sync immediately.
 #
 # Self-healing: no-ops pre-cutover (neither integration branch exists), but
 # post-cutover it RECREATES a branch that went missing (e.g. branch-retention
@@ -57,8 +74,10 @@ permissions:
 
 jobs:
     wait-for-tags:
-        # Only fire on a release commit (the squash-merge of a release PR).
-        if: startsWith(github.event.head_commit.message, 'release:')
+        # Only fire on a release commit (the squash-merge of a release PR), and
+        # only in CLDMV/.github — the one repo whose release rolls the @v4 tags
+        # the sync job's actions resolve to (see the header). Consumers skip it.
+        if: startsWith(github.event.head_commit.message, 'release:') && github.repository == 'CLDMV/.github'
         name: "⏳ Wait for the released major tag to roll forward"
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         timeout-minutes: 5
@@ -111,7 +130,10 @@ jobs:
     sync-branches:
         name: "♻️ Sync next + hotfixes to master"
         needs: wait-for-tags
-        if: startsWith(github.event.head_commit.message, 'release:')
+        # Runs right away when the gate was skipped (every consumer repo), after
+        # it otherwise. `!cancelled()` is required: a job whose `needs` was
+        # skipped is itself skipped unless its `if` uses a status function.
+        if: ${{ !cancelled() && startsWith(github.event.head_commit.message, 'release:') && (needs.wait-for-tags.result == 'success' || needs.wait-for-tags.result == 'skipped') }}
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Create App token
@@ -124,15 +146,17 @@ jobs:
                   # .github/workflows/**) requires contents + workflows write.
                   permission_contents: "true"
                   permission_workflows: "true"
-                  # Reading the released PR's head ref (the lane detection below)
-                  # needs pull-requests READ. create-app-token enters fine-grained
-                  # mode as soon as ANY permission flag is set — granting ONLY the
-                  # flags requested — so without this the token has no pull-requests
-                  # scope, `gh pr view` is silently denied, the lane resolves to
-                  # "other" for EVERY hotfix release, and next is force-reset instead
-                  # of merged, dropping its queued work. Read (not write) is enough —
-                  # this workflow only reads the PR, it never mutates one. (#278)
-                  permission_pull_requests_read: "true"
+                  # create-app-token enters fine-grained mode as soon as ANY
+                  # permission flag is set — granting ONLY the flags requested.
+                  # Pull requests: the lane detection below reads the released PR
+                  # (without the scope the read is silently denied and every hotfix
+                  # release fell through to a reset, #278), and
+                  # reset-branch-after-release comments on PRs whose merge it
+                  # carried forward (#360) — so WRITE, not read.
+                  permission_pull_requests: "true"
+                  # Issues: reset-branch-after-release opens an issue when it cannot
+                  # carry late commits forward (it never drops them silently).
+                  permission_issues: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -169,14 +193,29 @@ jobs:
                   # unreadable / unknown head falls through to the hotfix/preserve (merge)
                   # path, never the reset. The API error is surfaced, not swallowed (a hidden
                   # failure here is exactly what mis-fired every hotfix reset before). (#278)
-                  head=""; err=""
-                  if ! head=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls" \
-                              --jq '([.[] | select(.merged_at != null)] | sort_by(.merged_at) | last) // .[0] | .head.ref // empty' \
+                  #
+                  # The same PR also yields the release PR's head SHA (the tip the
+                  # release squash was built from), its number and merge time, which
+                  # reset-branch-after-release uses to tell what shipped from what
+                  # merged into the branch afterwards (#360).
+                  head=""; head_sha=""; pr_number=""; merged_at=""; err=""; pr_fields=""
+                  if ! pr_fields=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls" \
+                              --jq '([.[] | select(.merged_at != null)] | sort_by(.merged_at) | last) // .[0] | select(. != null) | [.head.ref // "", .head.sha // "", (.number // "" | tostring), .merged_at // ""] | join("\u001f")' \
                               2>"$RUNNER_TEMP/gh_err"); then
                       err=$(cat "$RUNNER_TEMP/gh_err" 2>/dev/null || true)
-                      head=""
+                      pr_fields=""
                   fi
-                  echo "released commit $RELEASE_SHA → PR head ref: ${head:-<unknown>}"
+                  # Fields are joined with the ASCII unit separator: a non-whitespace
+                  # IFS keeps an empty field in place (tabs would collapse).
+                  if [ -n "$pr_fields" ]; then
+                      IFS=$'\x1f' read -r head head_sha pr_number merged_at <<< "$pr_fields"
+                  fi
+                  {
+                      echo "head-sha=$head_sha"
+                      echo "pr-number=$pr_number"
+                      echo "merged-at=$merged_at"
+                  } >> "$GITHUB_OUTPUT"
+                  echo "released commit $RELEASE_SHA → PR #${pr_number:-?} head ref: ${head:-<unknown>} head sha: ${head_sha:-<unknown>}"
                   [ -n "$err" ] && echo "⚠️ commit→PR lookup failed: $err"
                   if [ "$head" = "hotfixes" ]; then
                       echo "✅ hotfix lane → MERGE master into next (preserve queued work)"
@@ -216,22 +255,34 @@ jobs:
                   echo "ℹ️ next=$next_exists hotfixes=$hotfixes_exists v4-adopted=$v4_adopted lane=${{ steps.lane.outputs.lane }}"
 
             # hotfixes always tracks master after a release — created if missing.
-            - name: Ensure hotfixes = master HEAD (reset; create if missing)
+            # Hotfix PRs that merged into hotfixes after the release PR was cut
+            # (or, on a normal release, hotfixes work not yet released) are
+            # carried onto the release commit, not dropped (#360).
+            - name: Move hotfixes onto the release (carry late merges; create if missing)
               if: steps.guard.outputs.v4-adopted == 'true'
-              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
+              uses: CLDMV/.github/.github/actions/git/steps/reset-branch-after-release@v4
               with:
                   target-branch: hotfixes
-                  source-ref: master
+                  release-sha: ${{ github.sha }}
+                  release-head-sha: ${{ steps.lane.outputs.head-sha }}
+                  release-pr-number: ${{ steps.lane.outputs.pr-number }}
+                  release-merged-at: ${{ steps.lane.outputs.merged-at }}
                   github-token: ${{ steps.app-token.outputs.token }}
 
-            # Normal release → next is force-reset (its work just shipped), and
-            # recreated if it was deleted on merge.
-            - name: Ensure next = master HEAD (normal release; create if missing)
-              if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane != 'hotfix'
-              uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
+            # Normal release → next's shipped work is replaced by the release
+            # commit; anything that merged into next after the release PR was cut
+            # is replayed on top instead of being dropped (#360). Recreated if it
+            # was deleted on merge. !cancelled(): runs even if the hotfixes step
+            # failed — the two branches are independent.
+            - name: Move next onto the release (normal release; carry late merges; create if missing)
+              if: ${{ !cancelled() && steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane != 'hotfix' }}
+              uses: CLDMV/.github/.github/actions/git/steps/reset-branch-after-release@v4
               with:
                   target-branch: next
-                  source-ref: master
+                  release-sha: ${{ github.sha }}
+                  release-head-sha: ${{ steps.lane.outputs.head-sha }}
+                  release-pr-number: ${{ steps.lane.outputs.pr-number }}
+                  release-merged-at: ${{ steps.lane.outputs.merged-at }}
                   github-token: ${{ steps.app-token.outputs.token }}
 
             # Hotfix release + next still exists → merge master into next to
@@ -242,7 +293,9 @@ jobs:
             # version when those version fields are the ONLY conflicts, and
             # publishes the merge commit via the API. Any other conflict fails. (#334)
             - name: Merge master into next (hotfix release; next exists)
-              if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'true'
+              # !cancelled(): runs even if the hotfixes step above failed — the two
+              # branches are independent, and next must not be left behind.
+              if: ${{ !cancelled() && steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'true' }}
               uses: CLDMV/.github/.github/actions/github/steps/merge-master-into-branch@v4
               with:
                   target-branch: next
@@ -252,7 +305,7 @@ jobs:
             # Hotfix release but next is MISSING (deleted) → recreate it at master
             # HEAD; there's no accumulated work to preserve.
             - name: Recreate next at master HEAD (hotfix release; next missing)
-              if: steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'false'
+              if: ${{ !cancelled() && steps.guard.outputs.v4-adopted == 'true' && steps.lane.outputs.lane == 'hotfix' && steps.guard.outputs.next-exists == 'false' }}
               uses: CLDMV/.github/.github/actions/git/steps/force-reset-branch@v4
               with:
                   target-branch: next

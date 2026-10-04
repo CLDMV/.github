@@ -12,14 +12,15 @@
 # v4 core: after a release lands on master, re-sync the integration branches
 # (CLDMV/.github docs/conventions/release-flow-v4.md §6.3, §7).
 #
-#   - `hotfixes` is ALWAYS force-reset to master HEAD after any release.
+#   - `hotfixes` is ALWAYS moved onto the release commit after any release.
 #   - `next` depends on which lane released:
 #       * normal release (next → master, or a v3-style feat → master):
-#         force-reset `next` to master HEAD (§7.1).
+#         move `next` onto the release commit (§7.1). Anything merged into it
+#         after the release PR was cut is carried forward, never dropped.
 #       * hotfix release (hotfixes → master): MERGE master into `next` instead,
 #         so next's accumulated feature work is preserved (§7.2, option B).
 #
-# Thin caller: all job logic (the wait-for-tags gate + the branch sync) lives in
+# Thin caller: all job logic (the branch sync) lives in
 # the reusable, pinned at @v4. Bumping the pin carries fixes without editing
 # this file.
 name: ♻️ Next/Hotfixes Reset (v4)
