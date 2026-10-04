@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
@@ -185,7 +185,7 @@ async function fixUnsignedTag(tagObj) {
 		// spliced into a shell command line.
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`;
 		writeFileSync(msgFile, tagMessage, "utf8");
-		const tagArgs = ["tag", "-f", "-a", ...(GPG_ENABLED && GPG_PRIVATE_KEY ? ["-s"] : []), "-F", msgFile, tagName, commitSha];
+		const tagArgs = annotatedTagArgs({ tagName, target: commitSha, messageFile: msgFile, sign: !!(GPG_ENABLED && GPG_PRIVATE_KEY) });
 		const made = git(tagArgs);
 		try {
 			unlinkSync(msgFile);

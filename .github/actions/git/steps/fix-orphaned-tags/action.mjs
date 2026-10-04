@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 console.log("🔍 DEBUG: Orphaned tags action starting...");
@@ -208,9 +208,9 @@ function fixOrphanedTag(tagObj) {
 		let tagArgs;
 		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
 			// Always create signed annotated tags when GPG is enabled
-			tagArgs = ["tag", "-f", "-s", "-a", "-F", msgFile, tagName, equivalentCommit];
+			tagArgs = annotatedTagArgs({ tagName, target: equivalentCommit, messageFile: msgFile, sign: true });
 		} else if (tagObj.isAnnotated) {
-			tagArgs = ["tag", "-f", "-a", "-F", msgFile, tagName, equivalentCommit];
+			tagArgs = annotatedTagArgs({ tagName, target: equivalentCommit, messageFile: msgFile });
 		} else {
 			tagArgs = ["tag", "-f", tagName, equivalentCommit];
 		}
