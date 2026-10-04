@@ -2,6 +2,10 @@ name: "Checkout Code"
 description: "Checkout repository code with configurable fetch depth and ref"
 
 inputs:
+  token:
+    description: "Token to check out with and (when persist-credentials is true) to persist for later git pushes. Empty (default) = the workflow GITHUB_TOKEN. Pass a GitHub App token when a later step pushes tags or branches: the persisted GITHUB_TOKEN can never hold the `workflows` scope, so GitHub refuses a push whose commit's .github/workflows differ from the tip (CLDMV/.github#362)."
+    required: false
+    default: ""
   fetch-depth:
     description: "Number of commits to fetch. 0 indicates all history for all branches and tags"
     required: false
@@ -24,3 +28,4 @@ runs:
         fetch-depth: ${{ inputs.fetch-depth }}
         ref: ${{ inputs.ref }}
         persist-credentials: ${{ inputs.persist-credentials }}
+        token: ${{ inputs.token || github.token }}

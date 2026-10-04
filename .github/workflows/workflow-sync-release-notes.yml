@@ -38,6 +38,11 @@ on:
                 required: false
                 type: boolean
                 default: false
+            max_new_tags:
+                description: "Cap on tags created in one run; the rest are reported and created by the next run."
+                required: false
+                type: number
+                default: 20
             create_missing_releases:
                 description: "Create a missing GitHub Release for a version that has a tag."
                 required: false
@@ -92,6 +97,12 @@ jobs:
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # checkout, release reads/edits/creation, tag push; workflows =
+                  # pushing a tag whose commit's .github/workflows differ from
+                  # the branch tip. No PR/issue access is needed.
+                  permission_contents: "true"
+                  permission_workflows: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -110,6 +121,7 @@ jobs:
                   dry-run: ${{ inputs.dry_run }}
                   versions: ${{ inputs.versions }}
                   create-missing-tags: ${{ inputs.create_missing_tags }}
+                  max-new-tags: ${{ inputs.max_new_tags }}
                   create-missing-releases: ${{ inputs.create_missing_releases }}
                   publish-drafts: ${{ inputs.publish_drafts }}
                   normalize-all: ${{ inputs.normalize_all }}

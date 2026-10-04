@@ -108,6 +108,9 @@ runs:
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
       with:
         fetch-depth: 0
+        # Persist the App token, not GITHUB_TOKEN, so the tag push carries the
+        # `workflows` scope (CLDMV/.github#362).
+        token: ${{ inputs.github-token }}
 
     - name: Prepare release metadata
       id: prepare

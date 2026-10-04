@@ -23,7 +23,14 @@ import { execFileSync } from "node:child_process";
 import { getInput, getBooleanInput, setOutputs, appendSummary } from "../../../common/common/core.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { run as createTag } from "../../api/tag/create/_impl.mjs";
-import { buildReleaseBody, escapeTableCell, readChangelogAtRef, sameBody } from "../../utilities/release-notes.mjs";
+import {
+	buildReleaseBody,
+	escapeTableCell,
+	readChangelogAtRef,
+	sameBody,
+	stripCommitTrailers,
+	stripReleaseSubject
+} from "../../utilities/release-notes.mjs";
 
 const token = getInput("github-token", { required: true });
 const repoFull = process.env.GITHUB_REPOSITORY || "";
@@ -34,6 +41,11 @@ const createTags = getBooleanInput("create-missing-tags", false);
 const createReleases = getBooleanInput("create-missing-releases", false);
 const publishDrafts = getBooleanInput("publish-drafts", false);
 const normalizeAll = getBooleanInput("normalize-all", false);
+// Batch cap on tags created in one run: a backlog (e.g. eight untagged release
+// commits) is fine, a runaway isn't. The rest are reported and picked up by the
+// next run.
+const maxNewTags = Math.max(0, Number.parseInt(getInput("max-new-tags", { default: "20" }), 10) || 0);
+let tagsCreated = 0;
 const versionFilter = getInput("versions")
 	.split(/[\s,]+/)
 	.map((v) => v.trim().replace(/^v/i, ""))
@@ -149,18 +161,25 @@ for (const version of [...versions].sort(cmpVersion)) {
 		// Release tags must be bot-signed; never create an unsigned one.
 		row.tag = `missing (release commit ${relCommit.slice(0, 7)})`;
 		row.failures.push("tag not created: no bot GPG key provided (release tags must be signed)");
+	} else if (createTags && !dryRun && tagsCreated >= maxNewTags) {
+		row.tag = `missing (release commit ${relCommit.slice(0, 7)})`;
+		row.issues.push(`tag not created: per-run cap of ${maxNewTags} reached — the next run continues`);
 	} else if (createTags && !dryRun) {
 		try {
-			await createTag({ token, repo: repoFull, tag: tagName, sha: relCommit, message: tagName, push: true, ...gpg });
+			// Signed tag at the release commit; the message is the changelog file
+			// (else the release commit message), kept verbatim incl. headings.
+			const commitMsg = git(["log", "-1", "--format=%B", relCommit]);
+			const tagMessage = file?.content || stripCommitTrailers(stripReleaseSubject(commitMsg, { name: tagName, version })).trim() || tagName;
+			tagsCreated++;
+			await createTag({ token, repo: repoFull, tag: tagName, sha: relCommit, message: tagMessage, push: true, ...gpg });
 			tagSha = relCommit;
 			row.tag = `created at ${relCommit.slice(0, 7)}`;
 			row.actions.push("created tag");
 			changed++;
-			// tag/create falls back to the REST API (annotated, NOT signed) when
-			// GitHub refuses an App push of a tag on an older commit. Say so loudly.
+			// tag/create has no unsigned fallback; assert the pushed tag is signed anyway.
 			git(["fetch", "--force", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`]);
-			if (!/BEGIN PGP SIGNATURE/.test(git(["cat-file", "-p", `refs/tags/${tagName}`]))) {
-				row.failures.push("tag was created WITHOUT a signature (GitHub refused the signed push; REST fallback used) — re-sign it by hand");
+			if (!/BEGIN (PGP|SSH) SIGNATURE/.test(git(["cat-file", "-p", `refs/tags/${tagName}`]))) {
+				row.failures.push(`tag ${tagName} on the remote is not signed — investigate`);
 			}
 		} catch (e) {
 			row.tag = "missing";
@@ -265,6 +284,7 @@ setOutputs({ "changed-count": String(changed), "problems-count": String(problems
 // is reported as a warning, so the automatic runs don't stay red forever.
 if (problems > 0) console.warn(`::warning::${problems} release/tag item(s) need a manual decision — see the job summary.`);
 if (failures > 0) {
+	for (const r of rows) for (const f of r.failures) console.error(`::error::v${r.version}: ${f}`);
 	console.error(`::error::${failures} attempted repair(s) failed — see the job summary.`);
 	process.exitCode = 1;
 }

@@ -260,21 +260,31 @@ jobs:
             fixed_count: ${{ steps.fix-orphaned-releases.outputs.fixed-count }}
             summary-json: ${{ steps.fix-orphaned-releases.outputs.summary-json }}
         steps:
-            - name: Checkout repository
-              uses: actions/checkout@v6
-              with:
-                  ref: ${{ github.sha }}
-                  fetch-depth: 0
-
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
             - name: Create App token
               id: app-token
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
                   private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
               env:
                   BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Checkout repository
+              uses: actions/checkout@v6
+              with:
+                  token: ${{ steps.app-token.outputs.token }}
+                  ref: ${{ github.sha }}
+                  fetch-depth: 0
 
             - name: Fix orphaned releases
               id: fix-orphaned-releases
@@ -309,9 +319,29 @@ jobs:
             orphans-found: ${{ steps.update-major-tags.outputs.orphans-found }}
             summary-json: ${{ steps.generate-summary.outputs.summary-json }}
         steps:
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
+                  token: ${{ steps.app-token.outputs.token }}
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
@@ -332,16 +362,6 @@ jobs:
               uses: CLDMV/.github/.github/actions/git/steps/find-latest-semver-tag@v4
               with:
                   tags-json: ${{ steps.get-tags.outputs.tags_detailed }}
-
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Update major/minor version tags
               id: update-major-tags
@@ -377,9 +397,29 @@ jobs:
             fixed_count: ${{ steps.fix-bot-sigs.outputs.fixed-count }}
             summary-json: ${{ steps.fix-bot-sigs.outputs.summary-json }}
         steps:
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
+                  token: ${{ steps.app-token.outputs.token }}
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
@@ -394,16 +434,6 @@ jobs:
                   bot_patterns: ${{ inputs.bot_patterns }}
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
-
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Fix non-bot signatures
               id: fix-bot-sigs
@@ -434,9 +464,29 @@ jobs:
             - name: Debug job start
               run: echo "🔍 DEBUG - Unsigned tags job is starting..."
 
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
+                  token: ${{ steps.app-token.outputs.token }}
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
@@ -451,16 +501,6 @@ jobs:
                   bot_patterns: ${{ inputs.bot_patterns }}
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
-
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Fix unsigned tags
               id: fix-unsigned
@@ -491,9 +531,29 @@ jobs:
             - name: Debug job start
               run: echo "🔍 DEBUG - Misaligned major/minor tags job is starting..."
 
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
+                  token: ${{ steps.app-token.outputs.token }}
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
@@ -508,16 +568,6 @@ jobs:
                   bot_patterns: ${{ inputs.bot_patterns }}
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
-
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Fix misaligned major/minor version tags
               id: fix-misaligned
@@ -548,9 +598,29 @@ jobs:
             - name: Debug job start
               run: echo "🔍 DEBUG - Orphaned tags job is starting..."
 
+            # App token BEFORE checkout: tag pushes use the credential checkout
+            # persists. With the default GITHUB_TOKEN (which can never hold the
+            # `workflows` scope) GitHub refuses tags on commits whose workflows
+            # differ from the tip — the refusal behind CLDMV/.github#362.
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Fine-grained mode: every scope this job uses. contents =
+                  # tags + release reads/edits; workflows = pushing a tag whose
+                  # commit's .github/workflows differ from the branch tip.
+                  permission_contents: "true"
+                  permission_workflows: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
+                  token: ${{ steps.app-token.outputs.token }}
                   ref: ${{ github.sha }}
                   fetch-depth: 0
 
@@ -565,16 +635,6 @@ jobs:
                   bot_patterns: ${{ inputs.bot_patterns }}
                   include_patterns: ${{ inputs.include_patterns }}
                   exclude_patterns: ${{ inputs.exclude_patterns }}
-
-            - name: Create App token
-              id: app-token
-              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
-              with:
-                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-              env:
-                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
-                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Fix orphaned tags
               id: fix-orphaned

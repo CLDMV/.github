@@ -10,7 +10,6 @@ import { execSync } from "node:child_process";
 import { gitCommand } from "../../../git/utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote } from "../../api/_api/gpg.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
-import { createAnnotatedTag, createRefForTagObject, forceMoveRefToTagObject } from "../../api/_api/tag.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const GITHUB_TOKEN = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
@@ -299,64 +298,16 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		console.error(`❌ Git command failed: git push origin +refs/tags/${tagName}`);
 		console.error(pushErrorText);
 
-		// GitHub's git-protocol push path has a known, still-unresolved bug (see
-		// https://github.com/orgs/community/discussions/151442) where it rejects a
-		// GitHub-App-authored push with "refusing to allow a GitHub App to create or
-		// update workflow `<path>` without `workflows` permission" whenever the target
-		// commit's .github/workflows/** content differs from the CURRENT default
-		// branch tip — even when the App installation genuinely has Workflows: write.
-		// It reproduces reliably for exactly the case this action exists to handle:
-		// recreating an old, historical tag whose commit predates later workflow
-		// edits. It does NOT reproduce for a ref move onto the branch tip itself
-		// (e.g. update-major-version-tags), which is why that path never hit it.
-		//
-		// The fix isn't more App permission — it's avoiding the git-protocol
-		// pre-receive hook entirely: github/api/tag/create/_impl.mjs already carries
-		// this same git-push -> REST Git Data API fallback for this exact reason.
-		// Mirror it here rather than giving up on the git push error.
-		if (/refusing to allow .* without .*workflow.* permission/i.test(pushErrorText)) {
-			console.warn(
-				`⚠️ Git push rejected by GitHub's workflow-permission check (known platform bug for tags off the branch tip): ${pushErrorText}`
-			);
-			console.log(`🔁 Falling back to the REST Git Data API to create the tag (bypasses the git-protocol check)...`);
-
-			try {
-				gitCommand(`git tag -d ${tagName}`, true);
-			} catch {
-				// Ignore cleanup errors — the local tag may not exist.
-			}
-
-			try {
-				const tagger = { name: TAGGER_NAME, email: TAGGER_EMAIL };
-				const tagObj = await createAnnotatedTag({
-					token: GITHUB_TOKEN,
-					repo,
-					tag: tagName,
-					message: tagMessage,
-					objectSha: targetCommit,
-					tagger
-				});
-				try {
-					await createRefForTagObject({ token: GITHUB_TOKEN, repo, tag: tagName, tagObjectSha: tagObj.sha });
-				} catch {
-					await forceMoveRefToTagObject({ token: GITHUB_TOKEN, repo, tag: tagName, tagObjectSha: tagObj.sha });
-				}
-				if (willSign) {
-					console.warn(
-						`⚠️ Tag ${tagName} was created via the REST API, so it is annotated but NOT GPG-signed (the API has no signing path).`
-					);
-				}
-				console.log(`✅ Successfully created tag ${tagName} via REST API fallback`);
-				return true;
-			} catch (apiError) {
-				console.error(`❌ REST API fallback also failed for tag ${tagName}: ${apiError.message}`);
-				return false;
-			}
-		}
-
+		// No REST fallback: it created an annotated but UNSIGNED tag, and release
+		// tags must be bot-signed. The refusal it worked around ("refusing to allow
+		// a GitHub App to create or update workflow … without workflows permission")
+		// came from pushing with the workflow GITHUB_TOKEN that actions/checkout
+		// persisted — that token can never hold the `workflows` scope. The job now
+		// checks out with the bot App token, which requests contents + workflows,
+		// so a refusal here is a real error and fails the job, naming the tag.
 		throw new Error(pushErrorText || pushError.message);
 	} catch (error) {
-		console.error(`❌ Failed to create tag ${tagName}: ${error.message}`);
+		console.error(`::error::Failed to create tag ${tagName}: ${error.message}`);
 
 		// Clean up local tag if remote push failed
 		try {
@@ -487,9 +438,7 @@ async function main() {
 	if (failedReleases.length > 0) {
 		console.log(`\n❌ Failed to create tags:`);
 		failedReleases.forEach((tag) => console.log(`   ${tag}`));
-		console.log(
-			`\n💡 See the per-tag logs above for the specific failure reason (missing target commit, git push rejection, or REST API fallback error).`
-		);
+		console.log(`\n💡 See the per-tag logs above for the specific failure reason (missing target commit or git push rejection).`);
 	}
 
 	// Generate summary
