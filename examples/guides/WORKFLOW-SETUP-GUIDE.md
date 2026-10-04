@@ -161,11 +161,11 @@ Mirror of `next-release.yml` but for the `hotfixes` integration branch. Patches 
 
 ### ♻️ Next/Hotfixes Reset (v4)
 
-**File:** `release-flow-v4/next-reset.yml` &nbsp;·&nbsp; **Calls:** `force-reset-branch@v4` / `merge-master-into-branch@v4`
+**File:** `release-flow-v4/next-reset.yml` &nbsp;·&nbsp; **Calls:** `reset-branch-after-release@v4` / `merge-master-into-branch@v4`
 
-After a release lands on master, re-syncs the integration branches. `hotfixes` is always force-reset to master HEAD; `next` is force-reset on a normal release, or master-merged-into-`next` on a hotfix release (preserves in-flight feature work). Uses the **REST API** because a bot-App `git push` is rejected by the ruleset even with bypass. Self-healing — recreates a branch that went missing.
+After a release lands on master, re-syncs the integration branches. `hotfixes` is always moved onto the release commit; `next` is moved onto it on a normal release, or master-merged-into-`next` on a hotfix release (preserves in-flight feature work). Moving never drops commits: anything merged into the branch after the release PR was cut is replayed onto the release commit, and every ref update is a compare-and-swap against the tip the plan was built from. Self-healing — recreates a branch that went missing.
 
-A `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling forward, so the sync job can't run the previous release's action code.
+In CLDMV/.github itself, a `wait-for-tags` job gates the reset on the released major tag (`@vN`) rolling forward, so the sync job can't run the previous release's action code. Consumer repos skip the gate and sync immediately.
 
 **Required `package.json` scripts** — none.
 
