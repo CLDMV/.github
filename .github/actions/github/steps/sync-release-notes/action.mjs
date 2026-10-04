@@ -117,11 +117,12 @@ for (const r of releases) {
 const rows = [];
 let changed = 0;
 let problems = 0;
+let failures = 0;
 
 for (const version of [...versions].sort(cmpVersion)) {
 	if (versionFilter.length && !versionFilter.includes(version)) continue;
 	const tagName = `v${version}`;
-	const row = { version, tag: "", release: "", changelog: "", actions: [], issues: [] };
+	const row = { version, tag: "", release: "", changelog: "", actions: [], issues: [], failures: [] };
 	let tagSha = tags.get(version) || "";
 	const relCommit = releaseCommits.get(version) || "";
 	const rels = releases.filter((r) => r.tag_name === tagName);
@@ -144,6 +145,10 @@ for (const version of [...versions].sort(cmpVersion)) {
 	} else if (!relCommit) {
 		row.tag = "missing";
 		row.issues.push("no tag and no release commit on the default branch");
+	} else if (createTags && !dryRun && !gpg.gpg_private_key) {
+		// Release tags must be bot-signed; never create an unsigned one.
+		row.tag = `missing (release commit ${relCommit.slice(0, 7)})`;
+		row.failures.push("tag not created: no bot GPG key provided (release tags must be signed)");
 	} else if (createTags && !dryRun) {
 		try {
 			await createTag({ token, repo: repoFull, tag: tagName, sha: relCommit, message: tagName, push: true, ...gpg });
@@ -151,9 +156,15 @@ for (const version of [...versions].sort(cmpVersion)) {
 			row.tag = `created at ${relCommit.slice(0, 7)}`;
 			row.actions.push("created tag");
 			changed++;
+			// tag/create falls back to the REST API (annotated, NOT signed) when
+			// GitHub refuses an App push of a tag on an older commit. Say so loudly.
+			git(["fetch", "--force", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`]);
+			if (!/BEGIN PGP SIGNATURE/.test(git(["cat-file", "-p", `refs/tags/${tagName}`]))) {
+				row.failures.push("tag was created WITHOUT a signature (GitHub refused the signed push; REST fallback used) — re-sign it by hand");
+			}
 		} catch (e) {
 			row.tag = "missing";
-			row.issues.push(`tag creation failed: ${e.message}`);
+			row.failures.push(`tag creation failed: ${e.message}`);
 		}
 	} else {
 		row.tag = `missing (release commit ${relCommit.slice(0, 7)})`;
@@ -183,7 +194,7 @@ for (const version of [...versions].sort(cmpVersion)) {
 					row.actions.push("created release");
 					changed++;
 				} catch (e) {
-					row.issues.push(`release creation failed: ${e.message}`);
+					row.failures.push(`release creation failed: ${e.message}`);
 				}
 			}
 		} else {
@@ -215,15 +226,16 @@ for (const version of [...versions].sort(cmpVersion)) {
 					row.release = updated.draft ? "draft" : "published";
 					row.actions.push(`updated ${what}`);
 					changed++;
-					if (patch.draft === false && updated.draft) row.issues.push("still a draft after publishing");
+					if (patch.draft === false && updated.draft) row.failures.push("still a draft after publishing");
 				} catch (e) {
-					row.issues.push(`update failed: ${e.message}`);
+					row.failures.push(`update failed: ${e.message}`);
 				}
 			}
 		}
 	}
 
 	problems += row.issues.length;
+	failures += row.failures.length;
 	rows.push(row);
 }
 
@@ -231,14 +243,28 @@ const esc = escapeTableCell;
 let md = `## 📝 Release notes sync — ${repoFull}${dryRun ? " (dry run)" : ""}\n\n`;
 md += "| Version | Tag | Release | Changelog | Actions | Problems |\n|---|---|---|---|---|---|\n";
 for (const r of rows) {
-	md += `| ${r.version} | ${esc(r.tag)} | ${esc(r.release)} | ${esc(r.changelog || "—")} | ${esc(r.actions.join("; ") || "—")} | ${esc(r.issues.join("; ") || "—")} |\n`;
+	md += `| ${r.version} | ${esc(r.tag)} | ${esc(r.release)} | ${esc(r.changelog || "—")} | ${esc(r.actions.join("; ") || "—")} | ${esc([...r.failures.map((f) => `❌ ${f}`), ...r.issues].join("; ") || "—")} |\n`;
 }
-md += `\n${changed} change(s) applied, ${problems} problem(s) left.\n`;
+const planned = rows.reduce((n, r) => n + r.actions.filter((a) => a.startsWith("would ")).length, 0);
+if (changed === 0 && planned === 0 && failures === 0) {
+	md += "\n✅ Nothing to change — every release already matches its changelog file.\n";
+} else if (dryRun) {
+	md += `\n${planned} change(s) would be made (dry run).\n`;
+} else {
+	md += `\n${changed} change(s) applied.\n`;
+}
+if (problems > 0)
+	md += `\n${problems} item(s) need a manual decision (see Problems; the dispatch switches can repair missing tags/releases).\n`;
+if (failures > 0) md += `\n❌ ${failures} attempted repair(s) failed.\n`;
 console.log(md);
 appendSummary(md);
-setOutputs({ "changed-count": String(changed), "problems-count": String(problems) });
+setOutputs({ "changed-count": String(changed), "problems-count": String(problems), "failures-count": String(failures) });
 
-if (!dryRun && problems > 0) {
-	console.error(`::error::${problems} release/tag problem(s) remain — see the job summary.`);
+// Fail only when something this run attempted did not work. Pre-existing drift
+// that needs a decision (old tags with no release, release commits with no tag)
+// is reported as a warning, so the automatic runs don't stay red forever.
+if (problems > 0) console.warn(`::warning::${problems} release/tag item(s) need a manual decision — see the job summary.`);
+if (failures > 0) {
+	console.error(`::error::${failures} attempted repair(s) failed — see the job summary.`);
 	process.exitCode = 1;
 }

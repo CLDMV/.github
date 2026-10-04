@@ -252,7 +252,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			// Use temp file for message to handle multiline content properly
 			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
 			writeFileSync(tempFile, tagMessage, "utf8");
-			gitCommand(`git tag -s -f -F "${tempFile}" ${tagName} ${targetCommit}`);
+			gitCommand(`git tag -s -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);
 			} catch {
@@ -263,7 +263,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			// Use temp file for message to handle multiline content properly
 			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
 			writeFileSync(tempFile, tagMessage, "utf8");
-			gitCommand(`git tag -a -f -F "${tempFile}" ${tagName} ${targetCommit}`);
+			gitCommand(`git tag -a -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);
 			} catch {

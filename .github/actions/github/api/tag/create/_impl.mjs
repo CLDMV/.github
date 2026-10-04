@@ -34,18 +34,18 @@ function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_na
 	debugLog(`runGitSmartTag: final tagMessage="${tagMessage}"`);
 
 	if (willSign) {
-		debugLog(`runGitSmartTag: Creating signed tag: git tag -s -f -F tempfile ${tag} ${sha}`);
+		debugLog(`runGitSmartTag: Creating signed tag: git tag -s -f --cleanup=verbatim -F tempfile ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
 		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
 		fs.writeFileSync(tmpFile, tagMessage, "utf8");
-		sh(`git tag -s -f -F "${tmpFile}" ${tag} ${sha}`);
+		sh(`git tag -s -f --cleanup=verbatim -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else if (willAnnotate) {
-		debugLog(`runGitSmartTag: Creating annotated tag: git tag -a -f -F tempfile ${tag} ${sha}`);
+		debugLog(`runGitSmartTag: Creating annotated tag: git tag -a -f --cleanup=verbatim -F tempfile ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
 		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
 		fs.writeFileSync(tmpFile, tagMessage, "utf8");
-		sh(`git tag -a -f -F "${tmpFile}" ${tag} ${sha}`);
+		sh(`git tag -a -f --cleanup=verbatim -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else {
 		debugLog(`runGitSmartTag: Creating lightweight tag: git tag -f ${tag} ${sha}`);
