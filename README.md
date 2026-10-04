@@ -2,6 +2,21 @@
 
 Shared GitHub Actions workflows for the CLDMV organization.
 
+## ✨ What's New
+
+### Latest: v4.30.7 (October 2026)
+
+- **Late merges survive a release** — after a release squash-merges, `next-reset` now carries any PR that merged into `next` or `hotfixes` after the release PR was cut onto the release commit instead of dropping it, with every branch update guarded by a compare-and-swap. A conflict leaves the branch alone, opens an issue and comments on the affected PRs. Consumer repos also stop waiting up to two minutes for their own major tag before syncing.
+- **Releases stay published** — `tag-health` re-signs tags in place instead of deleting and recreating them, which had been turning published releases into drafts and sometimes losing the tag. Release tags are signed at creation, and publishing fails if a release is left a draft or untagged. The committed changelog file becomes the release body, and a new manual `sync-release-notes` workflow rewrites existing releases from their changelog files.
+- [View full v4.30.7 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md)
+
+### Recent Releases
+
+- **v4.30.6** (October 2026) — Bundle size falls back to an empty baseline when the base branch's build fails ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.6.md))
+- **v4.30.5** (October 2026) — The CLA bot never records a bot as a signer, and ledger commits are signed again ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.5.md))
+- **v4.30.4** (October 2026) — The in-repo PR mirror job runs as a no-op instead of skipping, so its check name renders ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.4.md))
+- **v4.30.3** (October 2026) — A skipped PR-run mirror no longer satisfies `✅ Required PR Check` mid-test ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.3.md))
+
 ## 📋 Quick Start
 
 These workflows ship a complete CI / release / publish pipeline tuned for the **v4 staging-branch release flow** — feature PRs land on `next`, urgent work on `hotfixes`, and `master` is a clean release-only history. New repos should adopt v4 directly; existing v3 repos have a [migration guide](docs/migration/v3-to-v4.md).
