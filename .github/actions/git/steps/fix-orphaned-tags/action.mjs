@@ -5,7 +5,7 @@
  * Fixes tags pointing to orphaned commits by re-pointing to equivalent commits
  */
 
-import { writeFileSync } from "fs";
+import { writeFileSync, unlinkSync } from "fs";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
@@ -197,25 +197,35 @@ function fixOrphanedTag(tagObj) {
 			enableSign: GPG_ENABLED && GPG_PRIVATE_KEY
 		});
 
-		// Delete the existing tag locally and remotely
-		gitCommand(`git tag -d ${tagName}`, true);
-		gitCommand(`git push origin :refs/tags/${tagName}`, true);
-
-		// Create new tag pointing to equivalent commit
+		// Re-point the tag in place — never delete it first. Deleting the tag
+		// behind a published release turns the release back into a draft, and a
+		// rejected re-push then leaves the tag gone (CLDMV/.github#362). A local
+		// `tag -f` plus a force-updating push is atomic on the remote: on failure
+		// the original tag is untouched.
+		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
+		writeFileSync(msgFile, tagMessage, "utf8");
 		let tagCommand;
 		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
 			// Always create signed annotated tags when GPG is enabled
-			tagCommand = `git tag -s -a ${tagName} ${equivalentCommit} -m "${tagMessage}"`;
+			tagCommand = `git tag -f -s -a -F "${msgFile}" ${tagName} ${equivalentCommit}`;
 		} else if (tagObj.isAnnotated) {
-			tagCommand = `git tag -a ${tagName} ${equivalentCommit} -m "${tagMessage}"`;
+			tagCommand = `git tag -f -a -F "${msgFile}" ${tagName} ${equivalentCommit}`;
 		} else {
-			tagCommand = `git tag ${tagName} ${equivalentCommit}`;
+			tagCommand = `git tag -f ${tagName} ${equivalentCommit}`;
 		}
 
-		gitCommand(tagCommand);
+		try {
+			gitCommand(tagCommand);
+		} finally {
+			try {
+				unlinkSync(msgFile);
+			} catch {
+				// best-effort temp cleanup
+			}
+		}
 
-		// Push the new tag
-		gitCommand(`git push origin ${tagName}`);
+		// Force-update the remote ref to the re-pointed tag.
+		gitCommand(`git push origin +refs/tags/${tagName}:refs/tags/${tagName}`);
 
 		console.log(`✅ Successfully re-pointed tag ${tagName} to ${equivalentCommit}`);
 

@@ -5,7 +5,7 @@
  * Analyzes detailed tags list, fixes tags not created by bot, returns updated list
  */
 
-import { writeFileSync } from "fs";
+import { writeFileSync, unlinkSync } from "fs";
 import { gitCommand, getTagInfo } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
@@ -80,21 +80,26 @@ function fixNonBotTag(tagObj) {
 		// Use original message or tag name as fallback
 		const tagMessage = tagObj.message || tagObj.name;
 
-		// Delete the existing tag
-		gitCommand(`git tag -d ${tagObj.name}`, true);
-		gitCommand(`git push origin :refs/tags/${tagObj.name}`, true);
-
-		// Create new annotated tag with bot signature
-		let tagCommand = `git tag -a ${tagObj.name} ${tagObj.commitSha} -m "${tagMessage}"`;
-
-		if (willSign) {
-			tagCommand = `git tag -a -s ${tagObj.name} ${tagObj.commitSha} -m "${tagMessage}"`;
+		// Replace the tag in place — never delete it first. Deleting the tag
+		// behind a published release turns the release back into a draft, and a
+		// rejected re-push then leaves the tag gone (CLDMV/.github#362). A local
+		// `tag -f` plus a force-updating push is atomic on the remote: on failure
+		// the original tag is untouched. The message goes through a file so free
+		// text never reaches a shell command line.
+		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
+		writeFileSync(msgFile, tagMessage, "utf8");
+		try {
+			gitCommand(`git tag -f -a ${willSign ? "-s " : ""}-F "${msgFile}" ${tagObj.name} ${tagObj.commitSha}`);
+		} finally {
+			try {
+				unlinkSync(msgFile);
+			} catch {
+				// best-effort temp cleanup
+			}
 		}
 
-		gitCommand(tagCommand);
-
-		// Push the new tag
-		gitCommand(`git push origin ${tagObj.name}`);
+		// Force-update the remote ref to the new tag object.
+		gitCommand(`git push origin +refs/tags/${tagObj.name}:refs/tags/${tagObj.name}`);
 
 		console.log(`✅ Successfully recreated tag ${tagObj.name} with bot signature`);
 
