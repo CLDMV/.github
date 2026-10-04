@@ -132,6 +132,22 @@ runs:
         commits-file: ${{ steps.get-commits.outputs.commits-file }}
         use-single-commit-message: "true"
 
+    # Release body: the committed per-version changelog file at the release
+    # commit when there is one (docs/changelog[s]/v<major>/v<version>.md), else
+    # the commit-derived body. Either way the duplicated "release: vX.Y.Z - …"
+    # subject line and squash trailers are dropped and the Contributors /
+    # coverage blocks are kept. An explicit release-notes input wins.
+    - name: Resolve release notes
+      if: inputs.release-notes == ''
+      id: resolve-notes
+      shell: bash
+      run: node "${{ github.action_path }}/resolve-notes.mjs"
+      env:
+        VERSION: ${{ steps.prepare.outputs.version }}
+        COMMIT_SHA: ${{ steps.prepare.outputs.commit-sha }}
+        TAG_NAME: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
+        GENERATED_BODY: ${{ steps.release-notes.outputs.changelog-content }}
+
     - name: Calculate artifact and release names
       id: names
       uses: CLDMV/.github/.github/actions/common/steps/calculate-names@v4
@@ -149,7 +165,7 @@ runs:
       with:
         tag: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
         sha: ${{ steps.prepare.outputs.commit-sha }}
-        message: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
+        message: ${{ inputs.release-notes || steps.resolve-notes.outputs.body || steps.release-notes.outputs.changelog-content }}
         gpg_enabled: ${{ inputs.gpg_enabled }}
         tagger_name: ${{ inputs.tagger_name }}
         tagger_email: ${{ inputs.tagger_email }}
@@ -201,7 +217,7 @@ runs:
       with:
         tag_name: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
         name: ${{ steps.names.outputs.release-name }}
-        body: ${{ inputs.release-notes || steps.release-notes.outputs.changelog-content }}
+        body: ${{ inputs.release-notes || steps.resolve-notes.outputs.body || steps.release-notes.outputs.changelog-content }}
         is_prerelease: ${{ inputs.is-prerelease }}
         is_draft: ${{ inputs.is-draft }}
         make_latest: ${{ inputs.make-latest }}
@@ -290,6 +306,19 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         tag: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
+
+    # Fail loudly when the release did not end up published with its tag in
+    # place. Before this gate a draft or tagless release still reported success.
+    - name: Verify release is published and tagged
+      if: inputs.dry-run != 'true'
+      shell: bash
+      run: node "${{ github.action_path }}/verify-published.mjs"
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ github.repository }}
+        RELEASE_ID: ${{ steps.create-release.outputs.release_id }}
+        TAG_NAME: ${{ inputs.tag-name || format('v{0}', steps.prepare.outputs.version) }}
+        WANT_DRAFT: ${{ inputs.is-draft }}
 
     - name: Dry run validation
       if: inputs.dry-run == 'true'

@@ -1,0 +1,112 @@
+# .github/workflows/workflow-sync-release-notes.yml
+#
+# Org-level entry point: re-sync a repository's GitHub Release bodies from its
+# committed per-version changelog files (docs/changelog[s]/v<major>/v<version>.md)
+# and report — optionally repair — release/tag drift: draft releases, versions
+# with no tag, tags with no release, duplicate releases.
+#
+# Consumers call it from a workflow_dispatch wrapper
+# (examples/individual-repo-workflows/release-companions/sync-release-notes.yml).
+# Runs against the CALLING repository with the bot App token. Dry run by
+# default; every repair is a separate opt-in. See CLDMV/.github#362.
+name: 📝 Sync Release Notes (Org-Level)
+
+on:
+    workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label. Empty = auto: the caller's RUNS_ON_DEFAULT Actions variable; else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+            dry_run:
+                description: "Report only; change nothing."
+                required: false
+                type: boolean
+                default: true
+            versions:
+                description: "Comma/space-separated versions to limit the run to. Empty = every version."
+                required: false
+                type: string
+                default: ""
+            create_missing_tags:
+                description: "Create a missing vX.Y.Z tag at its `release: vX.Y.Z` commit (signed with the bot key)."
+                required: false
+                type: boolean
+                default: false
+            create_missing_releases:
+                description: "Create a missing GitHub Release for a version that has a tag."
+                required: false
+                type: boolean
+                default: false
+            publish_drafts:
+                description: "Publish draft releases whose tag exists."
+                required: false
+                type: boolean
+                default: false
+            normalize_all:
+                description: "Also normalize bodies of releases with no changelog file."
+                required: false
+                type: boolean
+                default: false
+        secrets:
+            BOT_APP_CLIENT_ID:
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                required: true
+            TAGGER_NAME:
+                required: false
+            TAGGER_EMAIL:
+                required: false
+            GPG_PRIVATE_KEY:
+                required: false
+            GPG_PASSPHRASE:
+                required: false
+
+permissions:
+    contents: read
+
+jobs:
+    sync:
+        name: "📝 Sync release notes"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: write
+        concurrency:
+            group: sync-release-notes-${{ github.repository }}
+            cancel-in-progress: false
+        steps:
+            # App token: creating a tag on a release commit that touches
+            # .github/workflows/ needs the `workflows` scope the Actions
+            # GITHUB_TOKEN can never hold.
+            - name: Create App token (auto-detect)
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            - name: Checkout (full history + tags)
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+                  fetch-tags: true
+                  token: ${{ steps.app-token.outputs.token }}
+
+            - name: Sync release notes
+              uses: CLDMV/.github/.github/actions/github/steps/sync-release-notes@v4
+              with:
+                  github-token: ${{ steps.app-token.outputs.token }}
+                  dry-run: ${{ inputs.dry_run }}
+                  versions: ${{ inputs.versions }}
+                  create-missing-tags: ${{ inputs.create_missing_tags }}
+                  create-missing-releases: ${{ inputs.create_missing_releases }}
+                  publish-drafts: ${{ inputs.publish_drafts }}
+                  normalize-all: ${{ inputs.normalize_all }}
+                  tagger_name: ${{ secrets.TAGGER_NAME }}
+                  tagger_email: ${{ secrets.TAGGER_EMAIL }}
+                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+                  gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}

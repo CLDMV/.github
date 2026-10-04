@@ -1,0 +1,66 @@
+#
+# @Project: sync-release-notes
+# @Filename: /action.yml
+# @Date: 2026-10-04 00:00:00 -07:00 (1791097200)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+name: "Sync Release Notes"
+description: "Roll-our-own implementation. Rewrites GitHub Release bodies from the repository's committed per-version changelog files (docs/changelog[s]/v<major>/v<version>.md, read at the default-branch tip — which carries later corrections and backfills — else at the release tag/commit), keeping the Contributors and coverage blocks, dropping the duplicated `release: vX.Y.Z - …` subject line and neutralizing accidental @word mentions. Reports missing tags, missing releases, draft releases and duplicate releases; repairs them only when the matching opt-in input is set. Needs a full-history checkout (fetch-depth: 0)."
+
+inputs:
+  github-token:
+    description: "App installation token with contents: write (and workflows: write when tags must be created on commits that touch .github/workflows)."
+    required: true
+  dry-run:
+    description: "Report only; change nothing. Default true."
+    required: false
+    default: "true"
+  versions:
+    description: "Comma/space-separated versions to limit the run to (e.g. `1.2.0, 1.2.2`). Empty = every version."
+    required: false
+    default: ""
+  create-missing-tags:
+    description: "Create a missing vX.Y.Z tag at its `release: vX.Y.Z` commit on the default branch (signed when the GPG key is provided)."
+    required: false
+    default: "false"
+  create-missing-releases:
+    description: "Create a missing GitHub Release for a version that has a tag."
+    required: false
+    default: "false"
+  publish-drafts:
+    description: "Publish a draft release whose tag exists (the state tag-health left behind in CLDMV/.github#362)."
+    required: false
+    default: "false"
+  normalize-all:
+    description: "Also normalize bodies of releases with no changelog file (drop the duplicated subject line and squash trailers, neutralize mentions)."
+    required: false
+    default: "false"
+  gpg_enabled:
+    description: "Sign created tags. Also on automatically when gpg_private_key is set."
+    required: false
+    default: "false"
+  tagger_name:
+    description: "Tagger name for created tags."
+    required: false
+  tagger_email:
+    description: "Tagger email for created tags."
+    required: false
+  gpg_private_key:
+    description: "ASCII-armored private key for signing created tags."
+    required: false
+  gpg_passphrase:
+    description: "Passphrase for the private key."
+    required: false
+
+outputs:
+  changed-count:
+    description: "Number of tags/releases created or updated."
+  problems-count:
+    description: "Number of problems left (drafts, missing tags/releases, duplicates, failures)."
+
+runs:
+  using: node24
+  main: action.mjs

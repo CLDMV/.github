@@ -5,7 +5,8 @@
  * Fixes all unsigned and lightweight tags by recreating them as signed annotated tags
  */
 
-import { writeFileSync } from "fs";
+import { writeFileSync, unlinkSync } from "fs";
+import { execFileSync } from "node:child_process";
 import { gitCommand } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
@@ -92,6 +93,28 @@ async function reassertPublished(releaseId) {
 
 console.log(`🔍 DEBUG: Processing ${TAGS_DETAILED.length} tags for unsigned analysis`);
 
+// Tags whose signing push was rejected. The remote tag is untouched in that case
+// (we never delete it), so these are warnings, not breakage.
+const failedTags = [];
+// Releases this run touched, so the end-state check can confirm none was left
+// as a draft and no tag went missing.
+const touched = [];
+
+/**
+ * Run git with an argument vector (no shell) and capture stdout+stderr, so a
+ * push rejection carries git's actual reason instead of "Command failed".
+ * @param {string[]} args - git arguments.
+ * @returns {{ok: boolean, output: string}} Result.
+ */
+function git(args) {
+	try {
+		const out = execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+		return { ok: true, output: out.trim() };
+	} catch (error) {
+		return { ok: false, output: `${error.stdout || ""}${error.stderr || ""}`.trim() || error.message };
+	}
+}
+
 /**
  * Check if a tag needs signing/annotation fixes
  * @param {object} tagObj - Tag object from detailed analysis
@@ -130,6 +153,11 @@ async function fixUnsignedTag(tagObj) {
 
 		console.log(`🔐 Converting tag ${tagName} to signed/annotated tag...`);
 
+		if (!/^[\w.@+/-]+$/.test(tagName) || tagName.startsWith("-")) {
+			console.warn(`::warning::Skipping tag with an unexpected name: ${JSON.stringify(tagName)}`);
+			return null;
+		}
+
 		// Get the commit this tag points to
 		const commitSha = tagObj.commitSha || gitCommand(`git rev-list -n 1 ${tagName}`, true);
 		if (!commitSha) {
@@ -150,21 +178,42 @@ async function fixUnsignedTag(tagObj) {
 			debugLog(`Tag ${tagName} is bound to release ${existingRelease.id} (draft: ${existingRelease.draft})`);
 		}
 
-		// Delete the existing tag locally and remotely
-		gitCommand(`git tag -d ${tagName}`, true);
-		gitCommand(`git push origin :refs/tags/${tagName}`, true);
+		touched.push({ tagName, release: existingRelease, wasPublished });
 
-		// Create new annotated and potentially signed tag
-		let tagCommand = `git tag -a ${tagName} ${commitSha} -m "${tagMessage}"`;
-
-		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
-			tagCommand = `git tag -a -s ${tagName} ${commitSha} -m "${tagMessage}"`;
+		// Build the replacement tag object locally (replacing only the LOCAL ref).
+		// The message goes through a file: it is free text and must never be
+		// spliced into a shell command line.
+		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`;
+		writeFileSync(msgFile, tagMessage, "utf8");
+		const tagArgs = ["tag", "-f", "-a", ...(GPG_ENABLED && GPG_PRIVATE_KEY ? ["-s"] : []), "-F", msgFile, tagName, commitSha];
+		const made = git(tagArgs);
+		try {
+			unlinkSync(msgFile);
+		} catch {
+			// best-effort temp cleanup
+		}
+		if (!made.ok) {
+			console.warn(`::warning::Could not create the signed replacement for ${tagName}: ${made.output}`);
+			failedTags.push({ tagName, reason: made.output });
+			return null;
 		}
 
-		gitCommand(tagCommand);
-
-		// Push the new tag
-		gitCommand(`git push origin ${tagName}`);
+		// Replace the remote ref ATOMICALLY with a force-update. Never delete it
+		// first: deleting the tag behind a published release makes GitHub turn the
+		// release back into a draft, and if the follow-up push is then rejected
+		// (ref-lock race "reference already exists", or GitHub's App push check
+		// "refusing to allow a GitHub App to create or update workflow … without
+		// workflows permission" for a tag off the branch tip) the tag stays gone and
+		// the release stays a draft — CLDMV/.github#362. With a force-update a
+		// rejection leaves the original tag exactly where it was.
+		const pushed = git(["push", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`]);
+		if (!pushed.ok) {
+			console.warn(
+				`::warning::Could not replace ${tagName} with a signed tag; the existing tag was left unchanged. git said: ${pushed.output}`
+			);
+			failedTags.push({ tagName, reason: pushed.output.split("\n").find((l) => /rejected|error|fatal/i.test(l)) || pushed.output });
+			return null;
+		}
 
 		console.log(`✅ Successfully converted tag ${tagName} to signed/annotated`);
 
@@ -293,6 +342,42 @@ if (TAGS_DETAILED.length === 0) {
 	}
 }
 
+// End-state check: every tag this run touched must still exist on the remote,
+// and every release that was published before must still be published. This is
+// the loud failure the old delete-and-recreate path never had — it logged
+// "Fixed 0" and exited 0 while leaving a draft release with no tag behind.
+const brokenReleases = [];
+if (!DRY_RUN && touched.length > 0) {
+	for (const t of touched) {
+		const remote = git(["ls-remote", "--tags", "origin", `refs/tags/${t.tagName}`]);
+		if (!remote.ok || !remote.output) {
+			brokenReleases.push(`${t.tagName}: tag is missing on the remote`);
+			continue;
+		}
+		if (t.wasPublished && t.release?.id) {
+			let current = null;
+			try {
+				const { owner, repo } = parseRepo(REPOSITORY);
+				current = await api("GET", `/releases/${t.release.id}`, null, { token: GITHUB_TOKEN, owner, repo });
+			} catch (error) {
+				debugLog(`end-state read of release ${t.release.id} failed: ${error.message}`);
+			}
+			if (current?.draft === true) {
+				console.log(`🔁 Release for ${t.tagName} reads draft after the tag update — re-publishing...`);
+				await reassertPublished(t.release.id);
+				try {
+					const { owner, repo } = parseRepo(REPOSITORY);
+					current = await api("GET", `/releases/${t.release.id}`, null, { token: GITHUB_TOKEN, owner, repo });
+				} catch {
+					// fall through with the previous read
+				}
+				if (current?.draft === true)
+					brokenReleases.push(`${t.tagName}: release ${t.release.html_url || t.release.id} was published and is now a draft`);
+			}
+		}
+	}
+}
+
 // Set outputs
 const updatedTagsJson = JSON.stringify(updatedTagsDetailed);
 const fixedTagsJson = JSON.stringify(fixedTagsArray);
@@ -324,8 +409,21 @@ for (const tagName of fixedTagsArray) {
 	}
 }
 
+for (const f of failedTags) {
+	summaryData.lines.push(
+		`- ⚠️ **${f.tagName}** left unchanged (signing push rejected: ${String(f.reason)
+			.replace(/[\r\n]+/g, " ")
+			.slice(0, 200)})`
+	);
+}
+for (const b of brokenReleases) {
+	summaryData.lines.push(`- ❌ **${b}**`);
+}
+
 // Add appropriate notes
-if (fixedTagsArray.length > 0) {
+if (failedTags.length > 0 || brokenReleases.length > 0) {
+	summaryData.notes.push(`${failedTags.length} tag(s) could not be signed; ${brokenReleases.length} release/tag problem(s) need attention`);
+} else if (fixedTagsArray.length > 0) {
 	summaryData.notes.push(`Successfully fixed ${fixedTagsArray.length} unsigned tag(s)`);
 } else {
 	summaryData.lines.push("- ✅ **No issues found**: All version tags are properly signed");
@@ -358,4 +456,12 @@ if (githubOutput) {
 	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
 
-console.log("🔍 DEBUG: Unsigned tags action completed successfully");
+if (brokenReleases.length > 0) {
+	for (const b of brokenReleases) console.error(`::error::${b}`);
+	console.error(
+		"::error::Tag health left a release unpublished or a tag missing — see CLDMV/.github#362 and repair with the sync-release-notes workflow."
+	);
+	process.exitCode = 1;
+} else {
+	console.log("🔍 DEBUG: Unsigned tags action completed successfully");
+}
