@@ -25,6 +25,7 @@ import {
 	classifyCasRefusal,
 	compareAndSwapRef,
 	decideAction,
+	escapeCell,
 	listLateCommits,
 	parsePrNumberFromSubject,
 	parseReleaseLabel,
@@ -232,6 +233,13 @@ console.log("\ncompareAndSwapRef:");
 }
 
 // ---- end-to-end against real git repositories -----------------------------------
+
+console.log("\nescapeCell (Markdown table cells):");
+eq(escapeCell("fix: a | b"), "fix: a \\| b", "pipe is escaped");
+eq(escapeCell("path C:\\dir\\"), "path C:\\\\dir\\\\", "backslashes are doubled");
+eq(escapeCell("ends with \\|"), "ends with \\\\\\|", "backslash before a pipe cannot swallow the pipe's escape");
+eq(escapeCell("line one\nline two\r\nthree"), "line one line two three", "line breaks are flattened");
+eq(escapeCell(undefined), "", "empty input");
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "reset-branch-test-"));
 

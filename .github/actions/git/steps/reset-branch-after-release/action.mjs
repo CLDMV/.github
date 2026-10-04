@@ -306,8 +306,18 @@ export function buildSummary({ targetBranch, result, releaseSha, targetSha, rese
 	return lines.join("\n");
 }
 
-function escapeCell(s) {
-	return String(s || "").replace(/\|/g, "\\|");
+/**
+ * Make text safe for a Markdown table cell: backslashes first (so an existing `\` can't
+ * swallow the escape added for `|`), then pipes, and line breaks flattened to spaces.
+ *
+ * @param {unknown} s
+ * @returns {string}
+ */
+export function escapeCell(s) {
+	return String(s || "")
+		.replace(/\\/g, "\\\\")
+		.replace(/\|/g, "\\|")
+		.replace(/\r?\n/g, " ");
 }
 
 // ---- local git ------------------------------------------------------------------
