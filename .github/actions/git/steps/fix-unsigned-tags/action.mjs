@@ -456,6 +456,11 @@ if (githubOutput) {
 	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
 
+// A refused signing push is a real error now: the job pushes with the bot App
+// token, which requests the `workflows` scope (the old refusals came from the
+// persisted GITHUB_TOKEN). The original tag is left untouched in that case.
+for (const f of failedTags) console.error(`::error::Could not replace ${f.tagName} with a signed tag: ${f.reason}`);
+if (failedTags.length > 0) process.exitCode = 1;
 if (brokenReleases.length > 0) {
 	for (const b of brokenReleases) console.error(`::error::${b}`);
 	console.error(

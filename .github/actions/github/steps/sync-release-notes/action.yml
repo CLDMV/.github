@@ -23,9 +23,13 @@ inputs:
     required: false
     default: ""
   create-missing-tags:
-    description: "Create a missing vX.Y.Z tag at its `release: vX.Y.Z` commit on the default branch (signed when the GPG key is provided)."
+    description: "Create a missing vX.Y.Z tag at its `release: vX.Y.Z` commit on the default branch: bot-signed (refused without the GPG key), message = the changelog file kept verbatim. A refused push fails the step; there is no unsigned fallback."
     required: false
     default: "false"
+  max-new-tags:
+    description: "Cap on tags created in one run; the rest are reported and created by the next run."
+    required: false
+    default: "20"
   create-missing-releases:
     description: "Create a missing GitHub Release for a version that has a tag."
     required: false
