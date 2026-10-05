@@ -2,12 +2,27 @@
 
 Shared GitHub Actions workflows for the CLDMV organization.
 
+## ✨ What's New
+
+### Latest: v4.30.7 (October 2026)
+
+- **Late merges survive a release** — after a release squash-merges, `next-reset` now carries any PR that merged into `next` or `hotfixes` after the release PR was cut onto the release commit instead of dropping it, with every branch update guarded by a compare-and-swap. A conflict leaves the branch alone, opens an issue and comments on the affected PRs. Consumer repos also stop waiting up to two minutes for their own major tag before syncing.
+- **Releases stay published** — `tag-health` re-signs tags in place instead of deleting and recreating them, which had been turning published releases into drafts and sometimes losing the tag. Release tags are signed at creation, and publishing fails if a release is left a draft or untagged. The committed changelog file becomes the release body, and a new manual `sync-release-notes` workflow rewrites existing releases from their changelog files.
+- [View full v4.30.7 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md)
+
+### Recent Releases
+
+- **v4.30.6** (October 2026) — Bundle size falls back to an empty baseline when the base branch's build fails ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.6.md))
+- **v4.30.5** (October 2026) — The CLA bot never records a bot as a signer, and ledger commits are signed again ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.5.md))
+- **v4.30.4** (October 2026) — The in-repo PR mirror job runs as a no-op instead of skipping, so its check name renders ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.4.md))
+- **v4.30.3** (October 2026) — A skipped PR-run mirror no longer satisfies `✅ Required PR Check` mid-test ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.3.md))
+
 ## 📋 Quick Start
 
 These workflows ship a complete CI / release / publish pipeline tuned for the **v4 staging-branch release flow** — feature PRs land on `next`, urgent work on `hotfixes`, and `master` is a clean release-only history. New repos should adopt v4 directly; existing v3 repos have a [migration guide](docs/migration/v3-to-v4.md).
 
 1. **Adopt the v4 release-flow workflows** — copy the set from [`examples/individual-repo-workflows/release-flow-v4/`](examples/individual-repo-workflows/release-flow-v4/) into your repo's `.github/workflows/`. These are adopted as a set (they depend on each other).
-2. **Copy the core CI / publish / tag / bundle-size templates** from [`examples/individual-repo-workflows/core-cicd/`](examples/individual-repo-workflows/core-cicd/) (every v4 repo carries all of them except the v3-only `release.yml`), update `package_name` to your NPM package name, and set `bundle-size.yml`'s `build_command` + `dist_paths` to the repo's real build and published files. Add the security / automation templates you want from the other subfolders.
+2. **Copy the core CI / publish / tag / bundle-size templates** from [`examples/individual-repo-workflows/core-cicd/`](examples/individual-repo-workflows/core-cicd/) (every v4 repo carries all of them except the v3-only `release.yml`), update `package_name` to your NPM package name, and set `bundle-size.yml`'s `build_command` + `dist_paths` to the repo's real build and published files. Also copy the standard release companions from [`examples/individual-repo-workflows/release-companions/`](examples/individual-repo-workflows/release-companions/): `tag-health.yml`, `master-commit-audit.yml` and `sync-release-notes.yml`. Add the security / automation templates you want from the other subfolders.
 3. **Bootstrap the repo** — applies branches + rulesets + security toggles + repo settings in one shot. Two ways:
    - **Org-wide fanout (recommended for ≥3 repos)** — dispatch `org-onboarding.yml` from the org's **private** org-admin repo (template: [`examples/individual-repo-workflows/packaging-docs/org-onboarding.yml`](examples/individual-repo-workflows/packaging-docs/org-onboarding.yml)), with the targets inline or in a batch file kept in that private repo. Never run it from a public repo: its job names and run summary list every target, so an auto-discovery run would publish the names of the org's private repos. Runs against N repos in parallel; idempotent. Repos the baseline would break, such as the CLA signatures ledger, go in `data/onboarding-exclude.txt` in that private repo and are skipped in every mode.
    - **Per-repo dispatch (one-offs)** — dispatch `v4-bootstrap.yml` from the target repo's Actions tab. Same baseline, scoped to the one repo.

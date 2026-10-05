@@ -175,3 +175,23 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
 		return null;
 	}
 }
+
+/**
+ * argv for creating (or replacing) an annotated tag from a message file.
+ *
+ * `--cleanup=verbatim` is required: git's default message cleanup treats every
+ * line starting with `#` as a comment and drops it, which stripped all the
+ * Markdown headings (`# … Changelog`, `## Overview`, …) from release tag
+ * messages built from changelog files.
+ * @public
+ * @param {object} opts
+ * @param {string} opts.tagName - Tag to create.
+ * @param {string} opts.target - Commit (or object) the tag points at.
+ * @param {string} opts.messageFile - Path of the file holding the tag message.
+ * @param {boolean} [opts.sign=false] - GPG-sign the tag (`-s`).
+ * @param {boolean} [opts.force=true] - Replace an existing local tag (`-f`).
+ * @returns {string[]} Arguments for `git` (pass to execFileSync, no shell).
+ */
+export function annotatedTagArgs({ tagName, target, messageFile, sign = false, force = true }) {
+	return ["tag", ...(force ? ["-f"] : []), "-a", ...(sign ? ["-s"] : []), "--cleanup=verbatim", "-F", messageFile, tagName, target];
+}

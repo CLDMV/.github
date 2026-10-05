@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
@@ -185,7 +185,7 @@ async function fixUnsignedTag(tagObj) {
 		// spliced into a shell command line.
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`;
 		writeFileSync(msgFile, tagMessage, "utf8");
-		const tagArgs = ["tag", "-f", "-a", ...(GPG_ENABLED && GPG_PRIVATE_KEY ? ["-s"] : []), "-F", msgFile, tagName, commitSha];
+		const tagArgs = annotatedTagArgs({ tagName, target: commitSha, messageFile: msgFile, sign: !!(GPG_ENABLED && GPG_PRIVATE_KEY) });
 		const made = git(tagArgs);
 		try {
 			unlinkSync(msgFile);
@@ -456,6 +456,11 @@ if (githubOutput) {
 	console.log("🔍 DEBUG: No GITHUB_OUTPUT file available");
 }
 
+// A refused signing push is a real error now: the job pushes with the bot App
+// token, which requests the `workflows` scope (the old refusals came from the
+// persisted GITHUB_TOKEN). The original tag is left untouched in that case.
+for (const f of failedTags) console.error(`::error::Could not replace ${f.tagName} with a signed tag: ${f.reason}`);
+if (failedTags.length > 0) process.exitCode = 1;
 if (brokenReleases.length > 0) {
 	for (const b of brokenReleases) console.error(`::error::${b}`);
 	console.error(

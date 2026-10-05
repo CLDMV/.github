@@ -13,7 +13,7 @@ Example workflow configurations for consuming the CLDMV org-level workflows. Cop
 
 ## Template Catalog
 
-Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into six subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them — except `release-flow-v4/`, which is adopted as a set, and the standard `core-cicd/` files every v4 repo carries.
+Templates live in [`individual-repo-workflows/`](individual-repo-workflows/), grouped by purpose into six subfolders. Each one references the matching org workflow via `@v4`. Copy what you need; you don't need to adopt all of them — except `release-flow-v4/`, which is adopted as a set, and the standard `core-cicd/` and `release-companions/` files every v4 repo carries.
 
 ### 🧪 [`core-cicd/`](individual-repo-workflows/core-cicd/) — Core CI/CD
 
@@ -45,12 +45,14 @@ After installing these, complete the cutover via the [v3→v4 migration guide](.
 
 ### 📋 [`release-companions/`](individual-repo-workflows/release-companions/) — Release-flow companions
 
-| Template                  | Triggers                      | What it does                                                                                                                                                |
-| ------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tag-health.yml`          | weekly Sunday cron + dispatch | Validates tags, fixes bot-signature drift, recreates orphaned tags.                                                                                         |
-| `release-notify.yml`      | `release: published`          | Posts to configured Discord/Slack/generic webhook channels.                                                                                                 |
-| `master-commit-audit.yml` | push to default               | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern.                                                            |
-| `sync-release-notes.yml`  | manual dispatch               | Rewrites release bodies from `docs/changelog[s]/v<major>/v<version>.md`; reports (and on opt-in repairs) draft releases, missing tags and missing releases. |
+Every v4 repo carries `tag-health.yml`, `master-commit-audit.yml`, and `sync-release-notes.yml` (standard set, not optional). `release-notify.yml` and `pr-notify.yml` are opt-in.
+
+| Template                  | Triggers                                                                        | What it does                                                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tag-health.yml`          | weekly Sunday cron + dispatch                                                   | Validates tags, fixes bot-signature drift, recreates orphaned tags.                                                                                                                                                                                             |
+| `release-notify.yml`      | `release: published`                                                            | Posts to configured Discord/Slack/generic webhook channels.                                                                                                                                                                                                     |
+| `master-commit-audit.yml` | push to default                                                                 | Files a GitHub Issue if a master commit doesn't match the expected release-flow subject pattern.                                                                                                                                                                |
+| `sync-release-notes.yml`  | `release: published`, push to default touching `docs/changelog[s]/**`, dispatch | **Standard.** Rewrites release bodies from `docs/changelog[s]/v<major>/v<version>.md` creates missing version tags at their release commits (bot-signed, ≤20 per run) and re-publishes CI-drafted releases; missing releases are created via a dispatch switch. |
 
 ### 🔒 [`security/`](individual-repo-workflows/security/) — Security baseline (recommended for OSS repos)
 

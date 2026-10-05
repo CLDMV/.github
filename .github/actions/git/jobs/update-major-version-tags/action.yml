@@ -74,6 +74,9 @@ runs:
       uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
       with:
         fetch-depth: 0
+        # Persist the App token, not GITHUB_TOKEN, so tag pushes carry the
+        # `workflows` scope (CLDMV/.github#362).
+        token: ${{ inputs.github_token }}
 
     # - name: Sanity - create/move a temp tag in this repo
     #   env:
