@@ -4,18 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.0 (October 2026)
+### Latest: v4.33.1 (October 2026)
 
-- **Dev-dependency-only releases are held** — a pending range that changes only `devDependencies`, lockfiles and CI configuration is classified as deps-only. Its release PR gets the `release: deps-only` label and `release-merge` skips it, so dev-tool bumps no longer publish a no-op version or demand a changelog. The bumps keep landing on `next`, and the PR becomes a normal release when a real change joins the range.
-- **`@cldmv-bot rebase`** — a maintainer comment on a PR rebases its branch onto the current base, re-signs the commits with the bot key and force-pushes with a lease, replying with the result or the conflicting files. `from=<sha>` drops already-released commits from a branch cut before a release. Copilot reviews also no longer leave `Release Merge` runs waiting for approval.
-- [View full v4.33.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md)
+- **Publish stops reporting `cancelled` for `local-` tag workflows** — the inline major-version-tag job now steps aside when the repository carries the standalone tag workflow as `local-update-major-version-tags.yml`, so it no longer loses the `tags-*` concurrency race on every release. Releases and tags were never affected.
+- [View full v4.33.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md)
 
 ### Recent Releases
 
+- **v4.33.0** (October 2026) — Dev-dependency-only releases are held, and `@cldmv-bot rebase` comment command ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md))
 - **v4.32.0** (October 2026) — Release PRs require the per-version changelog on the source branch, with a `CLDMV_SKIP_CHANGELOG_CHECK` opt-out ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.32.0.md))
 - **v4.31.0** (October 2026) — `sync-release-notes` joins the standard v4 set and missing tags are created automatically with a scoped App token ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.31.0.md))
 - **v4.30.7** (October 2026) — Late merges survive a release, and `tag-health` stops deleting and recreating tags ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md))
-- **v4.30.6** (October 2026) — Bundle size falls back to an empty baseline when the base branch's build fails ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.6.md))
 
 ## 📋 Quick Start
 
