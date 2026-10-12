@@ -34,6 +34,8 @@
 # and wasn't listed). `branches:` limits re-fires to runs on the integration
 # branches, so feature-branch CI doesn't wake this up.
 #
+# The "📝 Release Changelog" required check (CLDMV/.github#359) is a job inside the
+# Next / Hotfixes Release workflows already listed below, so it needs no entry of its own.
 # Concurrency below keeps one run + one pending; a newer arrival replaces the
 # pending run (even with cancel-in-progress: false). That's harmless — every
 # run re-reads the approval and check state from the API, so the newest

@@ -114,6 +114,27 @@ hotfixes ───────────────────────�
 - Always patch bump (or explicit `release: vX.Y.Z` commit for emergency major/minor — escape hatch).
 - On merge: master gets `release: vX.Y.Z - <hotfix subject>`. Tag + publish. `hotfixes` is moved onto the release commit and master is merged into `next` (§7) so both pick up the patched master.
 
+### 5.5 Release changelog check (`📝 Release Changelog`)
+
+Both persistent release-PR workflows (`workflow-next-release.yml`, `workflow-hotfixes-release.yml`) carry a `changelog-check` job, reported as the check **📝 Release Changelog**. It fails until the per-version changelog for the version the release PR ships exists on the PR's source branch (`next` or `hotfixes`), so a release can't squash to the release branch with commit-dump notes in place of the curated changelog.
+
+- **Version.** Read from the release PR title (`release: vX.Y.Z …`) written by create/update-release-pr, not recomputed; `package.json` on the source branch is the fallback when the title carries no version.
+- **File lookup.** Identical to the release-PR body generator: the `changelog_file` input / `CLDMV_CHANGELOG_FILE` template, then `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md` under `changelog_dir` / `CLDMV_CHANGELOG_DIR`, or `docs/changelog` and `docs/changelogs` when unset. A missing file fails the check with the expected path and the branch to commit it to.
+- **Re-runs.** Runs on every push to the source branch, including the `chore: bump version` push that becomes the PR head, so landing the changelog (via a docs PR into `next` / `hotfixes`) turns it green.
+- **README advisory.** When the README has a "What's New" section that doesn't name the version, the job emits a warning annotation; this never fails the check.
+- **Gate.** The check runs inside the Next / Hotfixes Release workflows, which `release-merge.yml` already lists in its `workflow_run` `workflows:`, so no extra entry is needed there.
+
+#### Opting out: `CLDMV_SKIP_CHANGELOG_CHECK`
+
+Set the repository (or organization) **Actions variable** `CLDMV_SKIP_CHANGELOG_CHECK` to `1` (or `true`) to keep the check running but report success with a notice instead of failing on a missing changelog:
+
+```text
+# repo Settings → Secrets and variables → Actions → Variables
+CLDMV_SKIP_CHANGELOG_CHECK = 1
+```
+
+Unset (the default) enforces the check. Like the other `CLDMV_SKIP_*` variables it is read through the `vars` context, so no consumer workflow edits are needed.
+
 ## 6. Workflows
 
 ### 6.1 `local-next-release.yml` (new)
