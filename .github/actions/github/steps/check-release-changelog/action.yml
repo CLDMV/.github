@@ -1,0 +1,39 @@
+name: "Check Release Changelog"
+description: "Require the per-version changelog file for the version a persistent release PR ships to exist on the PR's source branch (next / hotfixes). Resolves the version from the release PR title (set by create/update-release-pr), looks the file up with the same resolution order the release-PR body generator uses, and fails with the expected path when it is missing. Warns (never fails) when the README What's New block does not name the version."
+inputs:
+  branch:
+    description: "The release PR's source branch (`next` or `hotfixes`). The workspace must already be checked out at this branch."
+    required: true
+  base:
+    description: "The release PR's base branch (the resolved release base, e.g. `master`)."
+    required: true
+  changelog-dir:
+    description: "Base directory for the changelog file. Empty searches both `docs/changelog` and `docs/changelogs`."
+    required: false
+    default: ""
+  changelog-file:
+    description: "Explicit path-template override (supports `{version}`/`{major}`); wins over changelog-dir."
+    required: false
+    default: ""
+  skip:
+    description: "Pass the CLDMV_SKIP_CHANGELOG_CHECK Actions variable. `1` / `true` keeps the check running but reports success with a notice instead of failing."
+    required: false
+    default: ""
+  readme-path:
+    description: "README inspected for the advisory What's New check."
+    required: false
+    default: "README.md"
+  github-token:
+    description: "Token for reading the release PR (defaults to github.token)."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  version:
+    description: "The version the release PR ships (empty when there is no release PR)."
+  found:
+    description: "`true` when the changelog file exists, `false` when missing, empty when the check did not apply."
+  path:
+    description: "Repo-relative path of the changelog file that was found, or the preferred expected path when missing."
+runs:
+  using: "node24"
+  main: "action.mjs"
