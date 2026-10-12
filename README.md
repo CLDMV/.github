@@ -4,18 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.30.7 (October 2026)
+### Latest: v4.33.0 (October 2026)
 
-- **Late merges survive a release** — after a release squash-merges, `next-reset` now carries any PR that merged into `next` or `hotfixes` after the release PR was cut onto the release commit instead of dropping it, with every branch update guarded by a compare-and-swap. A conflict leaves the branch alone, opens an issue and comments on the affected PRs. Consumer repos also stop waiting up to two minutes for their own major tag before syncing.
-- **Releases stay published** — `tag-health` re-signs tags in place instead of deleting and recreating them, which had been turning published releases into drafts and sometimes losing the tag. Release tags are signed at creation, and publishing fails if a release is left a draft or untagged. The committed changelog file becomes the release body, and a new manual `sync-release-notes` workflow rewrites existing releases from their changelog files.
-- [View full v4.30.7 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md)
+- **Dev-dependency-only releases are held** — a pending range that changes only `devDependencies`, lockfiles and CI configuration is classified as deps-only. Its release PR gets the `release: deps-only` label and `release-merge` skips it, so dev-tool bumps no longer publish a no-op version or demand a changelog. The bumps keep landing on `next`, and the PR becomes a normal release when a real change joins the range.
+- **`@cldmv-bot rebase`** — a maintainer comment on a PR rebases its branch onto the current base, re-signs the commits with the bot key and force-pushes with a lease, replying with the result or the conflicting files. `from=<sha>` drops already-released commits from a branch cut before a release. Copilot reviews also no longer leave `Release Merge` runs waiting for approval.
+- [View full v4.33.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md)
 
 ### Recent Releases
 
+- **v4.32.0** (October 2026) — Release PRs require the per-version changelog on the source branch, with a `CLDMV_SKIP_CHANGELOG_CHECK` opt-out ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.32.0.md))
+- **v4.31.0** (October 2026) — `sync-release-notes` joins the standard v4 set and missing tags are created automatically with a scoped App token ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.31.0.md))
+- **v4.30.7** (October 2026) — Late merges survive a release, and `tag-health` stops deleting and recreating tags ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md))
 - **v4.30.6** (October 2026) — Bundle size falls back to an empty baseline when the base branch's build fails ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.6.md))
-- **v4.30.5** (October 2026) — The CLA bot never records a bot as a signer, and ledger commits are signed again ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.5.md))
-- **v4.30.4** (October 2026) — The in-repo PR mirror job runs as a no-op instead of skipping, so its check name renders ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.4.md))
-- **v4.30.3** (October 2026) — A skipped PR-run mirror no longer satisfies `✅ Required PR Check` mid-test ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.3.md))
 
 ## 📋 Quick Start
 
