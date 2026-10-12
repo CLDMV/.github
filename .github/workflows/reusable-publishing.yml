@@ -455,15 +455,20 @@ jobs:
                   REPO: ${{ github.repository }}
               run: |
                   present=false
-                  resp=$(curl -sS \
-                    -H "Authorization: Bearer $GH_TOKEN" \
-                    -H "Accept: application/vnd.github+json" \
-                    "https://api.github.com/repos/$REPO/contents/.github/workflows/update-major-version-tags.yml?ref=$GITHUB_SHA" || true)
-                  if printf '%s' "$resp" | jq -e '.content' > /dev/null 2>&1; then
-                      if printf '%s' "$resp" | jq -r '.content' | base64 -d 2>/dev/null | grep -q "workflow-update-major-version-tags"; then
-                          present=true
+                  # Accept the template name and the `local-` prefixed copy
+                  # used by repos that dogfood their own reusables.
+                  for f in update-major-version-tags.yml local-update-major-version-tags.yml; do
+                      resp=$(curl -sS \
+                        -H "Authorization: Bearer $GH_TOKEN" \
+                        -H "Accept: application/vnd.github+json" \
+                        "https://api.github.com/repos/$REPO/contents/.github/workflows/$f?ref=$GITHUB_SHA" || true)
+                      if printf '%s' "$resp" | jq -e '.content' > /dev/null 2>&1; then
+                          if printf '%s' "$resp" | jq -r '.content' | base64 -d 2>/dev/null | grep -q "workflow-update-major-version-tags"; then
+                              present=true
+                              break
+                          fi
                       fi
-                  fi
+                  done
                   echo "present=$present" >> "$GITHUB_OUTPUT"
                   echo "📌 Standalone update-major-version-tags workflow present: $present"
 
