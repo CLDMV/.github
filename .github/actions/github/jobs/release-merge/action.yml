@@ -29,6 +29,10 @@ inputs:
     description: "Comma-separated check-run names / status contexts that are allowed to conclude non-success without blocking the merge (rare — for a deliberately-optional check). Default none."
     required: false
     default: ""
+  hold_label:
+    description: "A release PR carrying this label is never merged (the deps-only hold: devDependencies/lockfile/CI-only ranges are not offered as releases). Empty disables the hold. Default `release: deps-only`."
+    required: false
+    default: "release: deps-only"
   self_check_pattern:
     description: "Substring identifying THIS merge workflow's own check-run(s), excluded from the gate so it never waits on itself. Default: the workflow name ($GITHUB_WORKFLOW)."
     required: false

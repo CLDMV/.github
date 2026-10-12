@@ -46,6 +46,19 @@ export function isReleasePr(pr, { integrationBranches, releaseBaseBranches }) {
 }
 
 /**
+ * Whether a PR carries the hold label (case-insensitive). An empty label
+ * disables the hold.
+ * @param {{labels?: Array<{name?: string}|string>}} pr
+ * @param {string} holdLabel
+ * @returns {boolean}
+ */
+export function hasHoldLabel(pr, holdLabel) {
+	const want = (holdLabel || "").trim().toLowerCase();
+	if (!want) return false;
+	return (pr?.labels || []).some((l) => (typeof l === "string" ? l : l?.name || "").trim().toLowerCase() === want);
+}
+
+/**
  * Reduce a PR's reviews to whether an un-superseded approval is present. The
  * latest non-COMMENTED/PENDING review per reviewer is that reviewer's standing;
  * any CHANGES_REQUESTED still standing blocks. When `requireAssociation` is on,
@@ -168,6 +181,8 @@ async function main() {
 	const requireApproval = (getInput("require_approval") || "true").toLowerCase() === "true";
 	const mergeMethod = (getInput("merge_method") || "squash").toLowerCase();
 	const allowFailing = csvSet(getInput("allow_failing_checks"), "");
+	// getInput returns "" for an unset input; only an explicit empty override disables the hold.
+	const holdLabel = process.env.INPUT_HOLD_LABEL === undefined ? "release: deps-only" : getInput("hold_label");
 	const selfPattern = getInput("self_check_pattern") || process.env.GITHUB_WORKFLOW || "";
 	// Event fields, passed by the workflow from its `github` context — never read
 	// from GITHUB_EVENT_PATH (that flows file data into the API calls → CodeQL
@@ -201,6 +216,19 @@ async function main() {
 	}
 	if (pr.draft) {
 		console.log(`ℹ️ PR #${prNumber} is a draft; skipping.`);
+		setOutputs({ merged: "false", "pr-number": String(prNumber) });
+		return;
+	}
+
+	// Gate 0 — a deps-only range (devDependencies/lockfiles/CI only) is held: it is
+	// not a release a consumer could notice, so it is never offered as one. It
+	// becomes a normal release the moment a real change joins the range (the
+	// opener workflows drop the label on the next refresh).
+	if (hasHoldLabel(pr, holdLabel)) {
+		console.log(`⏸️ PR #${prNumber} carries "${holdLabel}" — holding (deps-only range, no consumer-visible change).`);
+		appendSummary(
+			`⏸️ Release PR #${prNumber} held — deps-only range (label "${holdLabel}"). It merges once a real change joins the release.`
+		);
 		setOutputs({ merged: "false", "pr-number": String(prNumber) });
 		return;
 	}
