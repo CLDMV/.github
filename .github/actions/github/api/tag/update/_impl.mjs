@@ -1,8 +1,36 @@
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { sh } from "../../../../common/common/core.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
 import { getRefTag, createRefToCommit, forceMoveRefToCommit, createAnnotatedTag, createRefForTagObject } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
+
+/**
+ * Whether `tag` already resolves to commit `sha` in the checkout.
+ *
+ * Re-creating a tag always writes a new tag object (new tagger date) and the
+ * push of it fires the `push: tags` trigger of update-major-version-tags, whose
+ * run re-creates the rolling tags again, so an update that changes nothing must
+ * not touch the tag. An unreadable or missing tag is "not at sha", which falls
+ * through to the normal update.
+ * @param {string} tag - Tag name.
+ * @param {string} sha - Commit the tag should point at.
+ * @param {string} [cwd] - Repository directory (defaults to the current one).
+ * @returns {boolean} True when the tag already points at `sha`.
+ */
+export function tagPointsAt(tag, sha, cwd = process.cwd()) {
+	try {
+		const out = execFileSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/${tag}^{commit}`], {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"]
+		});
+		return out.trim() === sha;
+	} catch {
+		// git exits non-zero when the tag is absent or not fetched here; treat it as "needs updating".
+		return false;
+	}
+}
 
 function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_name, tagger_email, gpg_private_key, gpg_passphrase, push }) {
 	debugLog(`runGitSmartTag: repo=${repo}, tag=${tag}, sha=${sha}`);
@@ -62,6 +90,10 @@ export async function run({
 	push = true
 }) {
 	debugLog(`update/_impl.run: Called with message="${message}"`);
+	if (tagPointsAt(tag, sha)) {
+		console.log(`Tag ${tag} already points at ${sha}; leaving it untouched.`);
+		return { tag_obj_sha: "", ref_sha: sha };
+	}
 	// Fallback to API lightweight tag if push via git isn't possible
 	try {
 		debugLog(`update/_impl: About to call runGitSmartTag with message="${message}"`);
