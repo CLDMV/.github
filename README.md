@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.2 (October 2026)
+### Latest: v4.33.3 (October 2026)
 
-- **Tag-health jobs run again on changelog-sized tag messages** — the detailed-tags JSON no longer carries each tag's full message, which had grown past the kernel's per-argument limit and failed every Update Major Version Tags job with `Argument list too long`. The fix actions read the single message they rewrite straight from git, and re-signed tags keep their blank lines.
-- [View full v4.33.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md)
+- **Rolling tag updates no longer re-trigger themselves** — updating `v4` and `v4.33` re-created and force-pushed the tags even when they already pointed at the right commit, and each push fired the Update Major Version Tags workflow again, queuing a new run about every two minutes. A tag that already resolves to the target commit is now left untouched.
+- [View full v4.33.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md)
 
 ### Recent Releases
 
+- **v4.33.2** (October 2026) — Tag-health jobs run again on changelog-sized tag messages ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md))
 - **v4.33.1** (October 2026) — Publish stops reporting `cancelled` when the standalone tag workflow carries the `local-` prefix ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md))
 - **v4.33.0** (October 2026) — Dev-dependency-only releases are held, and `@cldmv-bot rebase` comment command ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md))
 - **v4.32.0** (October 2026) — Release PRs require the per-version changelog on the source branch, with a `CLDMV_SKIP_CHANGELOG_CHECK` opt-out ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.32.0.md))
-- **v4.31.0** (October 2026) — `sync-release-notes` joins the standard v4 set and missing tags are created automatically with a scoped App token ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.31.0.md))
 
 ## 📋 Quick Start
 
