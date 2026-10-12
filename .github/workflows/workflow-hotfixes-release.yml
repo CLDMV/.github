@@ -292,3 +292,41 @@ jobs:
                   after: ${{ github.event.after }}
                   base-branch: ${{ needs.plan.outputs.default-branch }}
                   branch: hotfixes
+
+    # Required check: the per-version changelog must exist on `hotfixes` before the
+    # release PR can merge (#359). The version is read from the release PR title
+    # the create/refresh jobs wrote (not recomputed). Deliberately NOT gated on the
+    # plan job: the chore-bump push that becomes the PR head skips plan, and this
+    # check must still report on that head commit. `!cancelled()` lets it run when
+    # plan/create/refresh were skipped; it no-ops when there is no open release PR.
+    # Repo Actions variable CLDMV_SKIP_CHANGELOG_CHECK=1 keeps it running but
+    # reports success with a notice. No secrets: the default GITHUB_TOKEN reads PRs.
+    changelog-check:
+        name: "📝 Release Changelog"
+        needs: [plan, create, refresh]
+        if: ${{ !cancelled() }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read
+            pull-requests: read
+        steps:
+            - name: Checkout hotfixes
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+              with:
+                  ref: hotfixes
+
+            - name: Resolve release base
+              id: base
+              uses: CLDMV/.github/.github/actions/git/utilities/resolve-release-base@v4
+              with:
+                  override: ${{ vars.CLDMV_RELEASE_BASE }}
+                  configured: ${{ inputs.default_branch }}
+
+            - name: Require the per-version changelog
+              uses: CLDMV/.github/.github/actions/github/steps/check-release-changelog@v4
+              with:
+                  branch: hotfixes
+                  base: ${{ steps.base.outputs.default-branch }}
+                  changelog-dir: ${{ inputs.changelog_dir != '' && inputs.changelog_dir || (vars.CLDMV_CHANGELOG_DIR != '' && vars.CLDMV_CHANGELOG_DIR || '') }}
+                  changelog-file: ${{ inputs.changelog_file != '' && inputs.changelog_file || vars.CLDMV_CHANGELOG_FILE }}
+                  skip: ${{ vars.CLDMV_SKIP_CHANGELOG_CHECK }}
