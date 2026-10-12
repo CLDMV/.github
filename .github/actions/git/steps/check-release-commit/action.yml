@@ -38,6 +38,9 @@ outputs:
   title-suffix:
     description: "Suffix to append after 'release: vX.Y.Z - ' so PRs sharing the same target version are visually distinct. Derived from an explicit release: commit, else the first feat/fix/breaking commit per the calculated bump type."
     value: ${{ steps.check.outputs.title-suffix }}
+  deps-only:
+    description: "'true' when every change in the range is a devDependencies-only package.json edit, a lockfile, or CI configuration (nothing a consumer installs or runs), and no explicit release: commit is present. Tooling holds such release PRs instead of offering them as releases."
+    value: ${{ steps.check.outputs.deps-only }}
   commits:
     description: "JSON array of categorized commits"
     value: ${{ steps.commit-range.outputs.commits }}
@@ -67,6 +70,7 @@ runs:
         HAS_COMMITS: ${{ steps.commit-range.outputs.has-commits }}
         BASE_VERSION: ${{ inputs.base-version }}
         ALLOW_ALREADY_BUMPED: ${{ inputs.allow-already-bumped }}
+        BASE_REF: ${{ inputs.base-ref }}
       run: |
         # Run the Node.js script
         node "${{ github.action_path }}/action.mjs"
