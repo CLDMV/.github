@@ -33,6 +33,7 @@ Per-template setup reference for every example workflow under [`../individual-re
 | Automation         | [Labeler](#%EF%B8%8F-labeler)                                     | `automation/labeler.yml`                     | pull_request_target                           | Path-based PR labels                                                                                               |
 | Automation         | [Welcome](#-welcome)                                              | `automation/welcome.yml`                     | first issue / PR                              | Welcome comments                                                                                                   |
 | Automation         | [Stale](#-stale)                                                  | `automation/stale.yml`                       | daily cron                                    | Marks/closes inactive issues + PRs                                                                                 |
+| Automation         | [Bot Commands](#-bot-commands)                                    | `automation/bot-commands.yml`                | PR comment `@cldmv-bot <command>`             | `@cldmv-bot rebase` re-signed rebase of a PR branch onto its base tip; write-access users only                     |
 | Automation         | [Branch Retention](#-branch-retention)                            | `automation/branch-retention.yml`            | PR merged                                     | Prunes head branches with retention                                                                                |
 | Packaging/docs     | [Docker Publish](#-docker-publish)                                | `packaging-docs/docker-publish.yml`          | push to default + dispatch                    | Builds + pushes image to GHCR                                                                                      |
 | Packaging/docs     | [Docs Publish](#-docs-publish)                                    | `packaging-docs/docs.yml`                    | push to default (filtered)                    | Publishes docs to `gh-pages`                                                                                       |
@@ -531,6 +532,18 @@ Daily 05:13 UTC sweep that marks inactive issues / PRs as stale and closes them 
 **Required secrets** — bot App credentials.
 
 **Key inputs** — `dry_run` (preview mode for first run on a backlog), `days_before_issue_stale` (default `60`), `days_before_issue_close` (default `14`), `days_before_pr_stale` (default `30`), `days_before_pr_close` (default `7`).
+
+---
+
+### 🤖 Bot Commands
+
+**File:** `automation/bot-commands.yml` &nbsp;·&nbsp; **Calls:** `workflow-bot-commands.yml@v4`
+
+Runs `@cldmv-bot <command>` PR comments as the bot. The first command, `@cldmv-bot rebase`, rebases the PR's branch onto the current tip of its base (`next` / `hotfixes`), keeping only the branch's own commits, re-signs them with the bot key and pushes with `--force-with-lease`; the bot replies on the PR and reacts to the comment. Only users with write access act; fork PRs, `next` / `hotfixes` / `master` / `main` heads and PRs into `master` / `main` are skipped. `issue_comment` workflows run from the default branch's copy of the file, so the command works once the caller reaches `master` through the release PR. Commands, arguments and guard rails: [docs/conventions/bot-commands.md](../../docs/conventions/bot-commands.md).
+
+**Required `package.json` scripts** — none.
+
+**Required secrets** — `CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`, and the `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` / `CLDMV_BOT_GPG_*` secrets (a rebase is refused without the signing key).
 
 ---
 

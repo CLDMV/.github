@@ -1,0 +1,54 @@
+#
+# @Project: workflows
+# @Filename: /local-bot-commands.yml
+# @Date: 2026-10-11 00:00:00 -07:00 (1791702000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Local dogfood caller (this repo): same as examples/individual-repo-workflows/automation/bot-commands.yml but calls the local reusable.
+#
+# `@cldmv-bot <command>` pull-request comment commands. A comment whose first
+# line is `@cldmv-bot <word> [args]` runs a command as the bot. First command:
+# `@cldmv-bot rebase` — rebase the PR's branch onto the current tip of its base
+# (next / hotfixes), keep only the branch's own commits, re-sign them with the
+# bot key and push with --force-with-lease. Only users with write access act;
+# fork PRs and the persistent release PRs are skipped. Commands and guard rails:
+# docs/conventions/bot-commands.md in CLDMV/.github.
+#
+# NOTE: issue_comment workflows run from the DEFAULT branch's copy of this file,
+# not from the PR's branch. The command works once this file is on the default
+# branch (master/main) — in the v4 flow that means after the next -> master
+# release PR carries it over.
+#
+# Thin caller: all logic lives in workflow-bot-commands.yml@v4. Keep the `if:`
+# filter, the trigger and the concurrency group here (GitHub requires the
+# trigger local). Do NOT add `paths:` filters.
+name: 🤖 Local Bot Commands
+
+on:
+    issue_comment:
+        types: [created]
+
+# One command at a time per PR; a second comment queues behind the first.
+concurrency:
+    group: bot-commands-${{ github.event.issue.number }}
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    command:
+        if: ${{ github.event.issue.pull_request && github.event.comment.user.type != 'Bot' && startsWith(github.event.comment.body, '@cldmv-bot') }}
+        permissions:
+            contents: read
+        uses: ./.github/workflows/workflow-bot-commands.yml
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            BOT_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            BOT_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+            BOT_GPG_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_GPG_PRIVATE_KEY }}
+            BOT_GPG_PASSPHRASE: ${{ secrets.CLDMV_BOT_GPG_PASSPHRASE }}
