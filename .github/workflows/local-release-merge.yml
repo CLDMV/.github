@@ -73,6 +73,10 @@ permissions:
 
 jobs:
     merge:
+        # Only a human approval can arm the merge. A bot's review (Copilot) or a
+        # comment/changes-requested review is skipped, as a Copilot review leaves
+        # a run held for maintainer approval. See CLDMV/.github#372.
+        if: ${{ github.event_name != 'pull_request_review' || (github.event.review.state == 'approved' && github.event.review.user.type != 'Bot') }}
         permissions:
             contents: write
             pull-requests: write
