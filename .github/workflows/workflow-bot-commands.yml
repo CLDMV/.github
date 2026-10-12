@@ -327,6 +327,7 @@ jobs:
                   own_before=$(git rev-list --count "${from}..HEAD")
                   err="$RUNNER_TEMP/rebase.err"
                   if ! git rebase --onto "$base_sha" "$from" -S >"$RUNNER_TEMP/rebase.out" 2>"$err"; then
+                    # shellcheck disable=SC2016 # literal backticks for markdown, not an expansion
                     conflicts=$(git diff --name-only --diff-filter=U | head -20 | sed 's/.*/- `&`/')
                     git rebase --abort >/dev/null 2>&1 || true
                     {
