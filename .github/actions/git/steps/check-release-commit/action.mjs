@@ -12,6 +12,7 @@
  */
 
 import { appendFileSync, readFileSync } from "fs";
+import { classifyRange } from "./deps-only.mjs";
 
 // Get inputs from environment.
 // COMMITS_FILE is preferred over COMMITS to avoid shell "Argument list too long" errors
@@ -339,6 +340,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		process.exit(0);
 	}
 
+	// An explicit `release:` commit is a maintainer asking for a release, so it is never held.
+	const depsOnly = !releaseAnalysis.hasRelease && classifyRange(process.env.BASE_REF);
+	console.log(`📦 deps-only range: ${depsOnly}`);
+
 	let versionAnalysis;
 	let commitMessage;
 
@@ -390,7 +395,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				`commit-message=${commitMessage}`,
 				`version-bump=${versionAnalysis.versionBump}`,
 				`has-breaking=${versionAnalysis.hasBreaking || false}`,
-				`title-suffix=${titleSuffix}`
+				`title-suffix=${titleSuffix}`,
+				`deps-only=${depsOnly}`
 			];
 			if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
 				outputs.push(`explicit-version=${versionAnalysis.explicitVersion}`);
@@ -410,7 +416,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		`commit-message=${commitMessage}`,
 		`version-bump=${versionAnalysis.versionBump}`,
 		`has-breaking=${versionAnalysis.hasBreaking || false}`,
-		`title-suffix=${titleSuffix}`
+		`title-suffix=${titleSuffix}`,
+		`deps-only=${depsOnly}`
 	];
 
 	if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {

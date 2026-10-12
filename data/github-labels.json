@@ -228,6 +228,12 @@
 		"aliases": ["question", "inquiry", "how to", "howto", "support", "ask"]
 	},
 	{
+		"name": "release: deps-only",
+		"color": "bfdadc",
+		"description": "Release PR whose pending range only touches devDependencies, lockfiles and CI configuration — held, not offered as a release",
+		"aliases": []
+	},
+	{
 		"name": "release",
 		"color": "0075ca",
 		"description": "Marks a pull request as a pending release — merge to publish a new version",

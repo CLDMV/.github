@@ -60,6 +60,11 @@ on:
                 required: false
                 type: string
                 default: ""
+            hold_label:
+                description: "Label that holds a release PR from merging (default `release: deps-only`, set by the opener workflows when the pending range only touches devDependencies, lockfiles and CI configuration). See docs/conventions/deps-only-releases.md."
+                required: false
+                type: string
+                default: "release: deps-only"
         secrets:
             BOT_APP_CLIENT_ID:
                 required: true
@@ -98,6 +103,7 @@ jobs:
                   require_approval: ${{ inputs.require_approval }}
                   merge_method: ${{ inputs.merge_method }}
                   allow_failing_checks: ${{ inputs.allow_failing_checks }}
+                  hold_label: ${{ inputs.hold_label }}
                   # Exclude this workflow's own check-run from the gate so it
                   # never waits on itself. Matches the job name above.
                   self_check_pattern: "Release Merge"

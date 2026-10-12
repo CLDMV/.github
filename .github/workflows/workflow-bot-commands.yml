@@ -1,0 +1,392 @@
+#
+# @Project: workflows
+# @Filename: /workflow-bot-commands.yml
+# @Date: 2026-10-11 00:00:00 -07:00 (1791702000)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Reusable: `@cldmv-bot <command>` pull-request comment commands
+# (docs/conventions/bot-commands.md). A comment whose first line is
+# `@cldmv-bot <word> [args]` runs the matching command as the bot. The first
+# command is `rebase`: rebase the PR's head branch onto the current tip of its
+# base branch (next / hotfixes), keeping only the branch's own commits, re-sign
+# the rewritten commits with the bot GPG key and push with --force-with-lease.
+#
+# The trigger (`issue_comment`) and the concurrency group live in the CALLER.
+# issue_comment workflows always run from the DEFAULT branch's copy of the
+# caller, so a repo gets the command only once the caller is on its default
+# branch (it reaches master through the next -> master release PR).
+#
+# SECURITY NOTE: the comment body and every PR field are untrusted. Nothing
+# from them is interpolated into a script: they arrive through `env:` only, the
+# command is matched against a fixed word table, args are matched against a
+# strict character set, and branch names are validated before use. The branch
+# checkout never executes anything from the PR (git hooks disabled, no scripts).
+# Only commenters with write+ permission on the repo act.
+name: 🤖 Bot Commands (v4 reusable)
+
+on:
+    workflow_call:
+        inputs:
+            runs_on:
+                required: false
+                type: string
+                default: ""
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+            protected_branches:
+                required: false
+                type: string
+                default: "next,hotfixes,master,main"
+                description: "Comma-separated branches commands never rewrite (head side) and never accept as a release-PR base (master/main). Never touched by rebase."
+        secrets:
+            BOT_APP_CLIENT_ID:
+                description: "GitHub App client id for the bot (comments, reactions, force-push of the rebased branch)."
+                required: true
+            BOT_APP_PRIVATE_KEY:
+                description: "GitHub App private key for the bot."
+                required: true
+            BOT_NAME:
+                description: "Git user.name of the GPG key's account (e.g. secrets.CLDMV_BOT_NAME)."
+                required: false
+            BOT_EMAIL:
+                description: "Git user.email of the GPG key's account (e.g. secrets.CLDMV_BOT_EMAIL)."
+                required: false
+            BOT_GPG_PRIVATE_KEY:
+                description: "Armored GPG private key used to sign rebased commits (e.g. secrets.CLDMV_BOT_GPG_PRIVATE_KEY). Required by `rebase`."
+                required: false
+            BOT_GPG_PASSPHRASE:
+                description: "Passphrase for BOT_GPG_PRIVATE_KEY (e.g. secrets.CLDMV_BOT_GPG_PASSPHRASE)."
+                required: false
+
+permissions:
+    contents: read
+
+jobs:
+    command:
+        name: "🤖 @cldmv-bot"
+        # Defense in depth: the caller filters too. Bots never trigger commands
+        # (the bot's own replies must not re-enter this workflow).
+        if: ${{ github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.pull_request && github.event.comment.user.type != 'Bot' && startsWith(github.event.comment.body, '@cldmv-bot') }}
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        env:
+            REPO: ${{ github.repository }}
+            PR_NUMBER: ${{ github.event.issue.number }}
+            COMMENT_ID: ${{ github.event.comment.id }}
+            COMMENTER: ${{ github.event.comment.user.login }}
+            COMMENT_BODY: ${{ github.event.comment.body }}
+            PROTECTED_BRANCHES: ${{ inputs.protected_branches }}
+            RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        steps:
+            - name: Create App token
+              id: app-token
+              uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
+              with:
+                  client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  private_key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+                  # Force-push the rebased branch (and workflow files it carries).
+                  permission_contents: "true"
+                  permission_workflows: "true"
+                  # Read the PR, reply on it, and react to the trigger comment
+                  # (comments + reactions go through the issues API).
+                  permission_pull_requests: "true"
+                  permission_issues: "true"
+              env:
+                  BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID }}
+                  BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+            # Command table: add a row here (name + one-line help) and a matching
+            # `case` arm in the "Run command" steps to add a command. The comment
+            # body is only ever read from the environment; the first line must be
+            # `@cldmv-bot <word> [args]` and the word must be [a-z-]. Args are
+            # restricted to a conservative character set and are only ever passed on
+            # as plain data (never evaluated).
+            - name: Parse command
+              id: parse
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  first=${COMMENT_BODY%%$'\n'*}
+                  first=${first%$'\r'}
+                  command=""
+                  args=""
+                  valid="false"
+                  re='^@cldmv-bot[[:space:]]+([A-Za-z-]{1,32})([[:space:]]+([A-Za-z0-9._=/ -]{0,100}))?[[:space:]]*$'
+                  if [[ "$first" =~ $re ]]; then
+                    command=${BASH_REMATCH[1],,}
+                    args=${BASH_REMATCH[3]:-}
+                    valid="true"
+                  fi
+                  known="false"
+                  case "$command" in
+                    rebase) known="true" ;;
+                  esac
+                  {
+                    echo "valid=$valid"
+                    echo "known=$known"
+                    echo "command=$command"
+                    echo "args=$args"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Acknowledge (eyes)
+              id: ack
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  set -euo pipefail
+                  id=$(gh api -X POST "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content=eyes --jq .id) || id=""
+                  echo "reaction_id=$id" >> "$GITHUB_OUTPUT"
+
+            # Only users with write+ permission on this repo act. Everyone else gets
+            # a one-line refusal and no further step runs.
+            - name: Check commenter permission
+              id: authz
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  set -euo pipefail
+                  perm=$(gh api "repos/${REPO}/collaborators/${COMMENTER}/permission" --jq .permission 2>/dev/null) || perm="none"
+                  case "$perm" in
+                    admin|maintain|write) echo "allowed=true" >> "$GITHUB_OUTPUT" ;;
+                    *)
+                      echo "allowed=false" >> "$GITHUB_OUTPUT"
+                      printf '%s\n' "outcome=refused" > "$RUNNER_TEMP/bot-outcome"
+                      printf '%s\n' "Only collaborators with write access can run bot commands on this repository." > "$RUNNER_TEMP/bot-reply.md"
+                      ;;
+                  esac
+
+            - name: Help or unknown command
+              id: help
+              if: steps.authz.outputs.allowed == 'true' && (steps.parse.outputs.valid != 'true' || steps.parse.outputs.known != 'true')
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  {
+                    echo "Unknown or malformed command. Usage: \`@cldmv-bot <command> [args]\` (first line of the comment)."
+                    echo
+                    echo "Supported commands:"
+                    echo
+                    echo "- \`@cldmv-bot rebase [from=<sha>]\` - rebase this PR's branch onto the current tip of its base branch, keeping only its own commits (\`from=<sha>\` is the branch's old merge-base, for a branch cut before a release)."
+                  } > "$RUNNER_TEMP/bot-reply.md"
+                  echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"
+
+            # Load the PR and apply the guard rails. Untrusted fields are validated
+            # with strict patterns before any later step uses them.
+            - name: Load PR and check guard rails
+              id: pr
+              if: steps.authz.outputs.allowed == 'true' && steps.parse.outputs.valid == 'true' && steps.parse.outputs.known == 'true'
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: |
+                  set -euo pipefail
+                  refuse() {
+                    echo "proceed=false" >> "$GITHUB_OUTPUT"
+                    printf '%s\n' "$1" > "$RUNNER_TEMP/bot-reply.md"
+                    echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"
+                    exit 0
+                  }
+                  pr=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")
+                  state=$(jq -r .state <<<"$pr")
+                  head_ref=$(jq -r .head.ref <<<"$pr")
+                  head_sha=$(jq -r .head.sha <<<"$pr")
+                  head_repo=$(jq -r '.head.repo.full_name // ""' <<<"$pr")
+                  base_ref=$(jq -r .base.ref <<<"$pr")
+                  [ "$state" = "open" ] || refuse "This pull request is not open."
+                  [ "$head_repo" = "$REPO" ] || refuse "Fork pull requests are skipped: the bot cannot push to a fork's branch. Rebase locally instead."
+                  re='^[A-Za-z0-9._/-]+$'
+                  [[ "$head_ref" =~ $re && "$base_ref" =~ $re && "$head_sha" =~ ^[0-9a-f]{40}$ ]] || refuse "Branch name contains unsupported characters; nothing was changed."
+                  IFS=',' read -r -a protected <<<"$PROTECTED_BRANCHES"
+                  for b in "${protected[@]}"; do
+                    b=${b// /}
+                    [ -n "$b" ] || continue
+                    [ "$head_ref" != "$b" ] || refuse "Refusing to run commands on \`$b\`: persistent release/integration branches are never rewritten by the bot."
+                  done
+                  case "$base_ref" in
+                    master|main) refuse "Refusing to run commands on a pull request into \`$base_ref\` (release PRs are managed by the release flow)." ;;
+                  esac
+                  {
+                    echo "proceed=true"
+                    echo "head_ref=$head_ref"
+                    echo "head_sha=$head_sha"
+                    echo "base_ref=$base_ref"
+                  } >> "$GITHUB_OUTPUT"
+
+            # ---- command: rebase -------------------------------------------------
+            - name: Validate rebase arguments
+              id: rebase-args
+              if: steps.pr.outputs.proceed == 'true' && steps.parse.outputs.command == 'rebase'
+              shell: bash
+              env:
+                  ARGS: ${{ steps.parse.outputs.args }}
+              run: |
+                  set -euo pipefail
+                  from=""
+                  ok="true"
+                  if [ -n "${ARGS// /}" ]; then
+                    re='^[[:space:]]*from=([0-9a-fA-F]{7,40})[[:space:]]*$'
+                    if [[ "$ARGS" =~ $re ]]; then
+                      from=${BASH_REMATCH[1],,}
+                    else
+                      ok="false"
+                      printf '%s\n' "Unsupported arguments for \`rebase\`. Usage: \`@cldmv-bot rebase [from=<sha>]\`." > "$RUNNER_TEMP/bot-reply.md"
+                      echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"
+                    fi
+                  fi
+                  {
+                    echo "ok=$ok"
+                    echo "from=$from"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Check out PR head
+              id: checkout
+              if: steps.rebase-args.outputs.ok == 'true'
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+              with:
+                  ref: ${{ steps.pr.outputs.head_sha }}
+                  fetch-depth: 0
+                  # The push below authenticates with the App token via URL; a
+                  # persisted GITHUB_TOKEN header would override it (#269).
+                  persist-credentials: false
+
+            - name: Setup bot git identity
+              if: steps.rebase-args.outputs.ok == 'true'
+              uses: CLDMV/.github/.github/actions/github/steps/setup-git-identity@v4
+              with:
+                  app-slug: ${{ steps.app-token.outputs.app-slug }}
+                  github-token: ${{ steps.app-token.outputs.token }}
+
+            - name: Detect GPG signing availability
+              id: gpg
+              if: steps.rebase-args.outputs.ok == 'true'
+              shell: bash
+              env:
+                  GPG_KEY: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+              run: |
+                  if [ -n "$GPG_KEY" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+
+            - name: Import bot GPG signing key
+              if: steps.rebase-args.outputs.ok == 'true' && steps.gpg.outputs.present == 'true'
+              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+              with:
+                  gpg_private_key: ${{ secrets.BOT_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.BOT_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+
+            - name: Rebase and push
+              id: rebase
+              if: steps.rebase-args.outputs.ok == 'true'
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+                  HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+                  BASE_REF: ${{ steps.pr.outputs.base_ref }}
+                  FROM_SHA: ${{ steps.rebase-args.outputs.from }}
+                  GPG_PRESENT: ${{ steps.gpg.outputs.present }}
+                  BOT_NAME: ${{ secrets.BOT_NAME }}
+                  BOT_EMAIL: ${{ secrets.BOT_EMAIL }}
+              run: |
+                  set -uo pipefail
+                  reply="$RUNNER_TEMP/bot-reply.md"
+                  fail() { printf '%s\n' "$1" > "$reply"; echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"; exit 0; }
+
+                  [ "$GPG_PRESENT" = "true" ] || fail "The bot signing key is not configured for this repository (\`CLDMV_BOT_GPG_*\` secrets), so a signed rebase is not possible. Nothing was changed."
+
+                  # Rebased commits keep their original author; the bot signs as committer.
+                  if [ -n "$BOT_NAME" ]; then git config --global user.name "$BOT_NAME"; fi
+                  if [ -n "$BOT_EMAIL" ]; then git config --global user.email "$BOT_EMAIL"; fi
+                  # Never run anything from the checked-out branch.
+                  git config --global core.hooksPath /dev/null
+
+                  remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+                  git fetch --quiet "$remote" "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" || fail "Could not fetch \`${BASE_REF}\`. Nothing was changed."
+                  base_sha=$(git rev-parse "refs/remotes/origin/${BASE_REF}")
+                  [ "$(git rev-parse HEAD)" = "$HEAD_SHA" ] || fail "The checkout does not match the PR head. Nothing was changed."
+
+                  if [ -n "$FROM_SHA" ]; then
+                    git cat-file -e "${FROM_SHA}^{commit}" 2>/dev/null || fail "\`from=${FROM_SHA}\` is not a commit in this repository. Nothing was changed."
+                    from=$(git rev-parse "${FROM_SHA}^{commit}")
+                    git merge-base --is-ancestor "$from" HEAD || fail "\`from=${FROM_SHA}\` is not an ancestor of the branch. Nothing was changed."
+                  else
+                    from="$base_sha"
+                  fi
+
+                  # Already up to date: the base tip is an ancestor of the head and the
+                  # branch holds no extra commits to drop.
+                  if [ -z "$FROM_SHA" ] && git merge-base --is-ancestor "$base_sha" HEAD; then
+                    printf '%s\n' "\`${HEAD_REF}\` is already up to date with \`${BASE_REF}\` (\`${base_sha:0:9}\`). Nothing to do." > "$reply"
+                    echo "outcome=ok" > "$RUNNER_TEMP/bot-outcome"
+                    exit 0
+                  fi
+
+                  own_before=$(git rev-list --count "${from}..HEAD")
+                  err="$RUNNER_TEMP/rebase.err"
+                  if ! git rebase --onto "$base_sha" "$from" -S >"$RUNNER_TEMP/rebase.out" 2>"$err"; then
+                    # shellcheck disable=SC2016 # literal backticks for markdown, not an expansion
+                    conflicts=$(git diff --name-only --diff-filter=U | head -20 | sed 's/.*/- `&`/')
+                    git rebase --abort >/dev/null 2>&1 || true
+                    {
+                      echo "Rebase of \`${HEAD_REF}\` onto \`${BASE_REF}\` (\`${base_sha:0:9}\`) hit conflicts; nothing was pushed."
+                      echo
+                      if [ -n "$conflicts" ]; then echo "Conflicting files:"; echo; echo "$conflicts"; else echo "git reported an error without conflicting files; see the [workflow run](${RUN_URL})."; fi
+                      echo
+                      echo "Resolve locally: \`git rebase --onto origin/${BASE_REF} ${from:0:9} ${HEAD_REF}\`."
+                    } > "$reply"
+                    echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"
+                    exit 0
+                  fi
+
+                  new_sha=$(git rev-parse HEAD)
+                  new_count=$(git rev-list --count "${base_sha}..HEAD")
+                  if [ "$new_sha" = "$HEAD_SHA" ]; then
+                    printf '%s\n' "\`${HEAD_REF}\` is already up to date with \`${BASE_REF}\` (\`${base_sha:0:9}\`). Nothing to do." > "$reply"
+                    echo "outcome=ok" > "$RUNNER_TEMP/bot-outcome"
+                    exit 0
+                  fi
+                  # Verify the rewritten commits are signed before publishing them.
+                  unsigned=$(git log --format='%G?' "${base_sha}..HEAD" | grep -vc '^[GU]$' || true)
+                  [ "${unsigned:-0}" = "0" ] || fail "Rebased commits did not come out signed; nothing was pushed."
+
+                  # Lease on the exact head the rebase started from: a push made to the
+                  # branch meanwhile makes this fail, and it is reported, not retried.
+                  if ! git push --force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}" "$remote" "HEAD:refs/heads/${HEAD_REF}" >"$RUNNER_TEMP/push.out" 2>&1; then
+                    {
+                      echo "Rebase succeeded locally but the push was rejected (the branch changed after the command started, or the push was refused). Nothing was pushed; run the command again."
+                      echo
+                      echo "See the [workflow run](${RUN_URL}) for the git output."
+                    } > "$reply"
+                    echo "outcome=fail" > "$RUNNER_TEMP/bot-outcome"
+                    exit 0
+                  fi
+                  printf '%s\n' "Rebased \`${HEAD_REF}\` onto \`${BASE_REF}\` (\`${base_sha:0:9}\`): new head \`${new_sha:0:9}\`, ${new_count} commit(s) on top of the base (${own_before} before the rebase), re-signed by the bot." > "$reply"
+                  echo "outcome=ok" > "$RUNNER_TEMP/bot-outcome"
+
+            # Always: post the reply (or a generic failure note), then replace the
+            # eyes reaction with the result.
+            - name: Reply and react
+              if: always() && steps.app-token.outcome == 'success'
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  EYES_ID: ${{ steps.ack.outputs.reaction_id }}
+                  JOB_STATUS: ${{ job.status }}
+              run: |
+                  set -uo pipefail
+                  outcome=fail
+                  [ -f "$RUNNER_TEMP/bot-outcome" ] && outcome=$(sed -n 's/^outcome=//p' "$RUNNER_TEMP/bot-outcome" | head -1)
+                  if [ ! -f "$RUNNER_TEMP/bot-reply.md" ]; then
+                    printf '%s\n' "The command failed unexpectedly; see the [workflow run](${RUN_URL})." > "$RUNNER_TEMP/bot-reply.md"
+                    outcome=fail
+                  fi
+                  gh api -X POST "repos/${REPO}/issues/${PR_NUMBER}/comments" -F "body=@$RUNNER_TEMP/bot-reply.md" >/dev/null || echo "::warning::Could not post the reply comment."
+                  [ -z "${EYES_ID:-}" ] || gh api -X DELETE "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions/${EYES_ID}" >/dev/null 2>&1 || true
+                  case "$outcome" in
+                    ok) content="+1" ;;
+                    *) content="confused" ;;
+                  esac
+                  gh api -X POST "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f "content=$content" >/dev/null || echo "::warning::Could not set the result reaction."

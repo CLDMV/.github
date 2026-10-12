@@ -76,6 +76,9 @@ outputs:
   new-version:
     description: "The new version that was set"
     value: ${{ steps.version.outputs.new-version }}
+  deps-only:
+    description: "'true' when the range is deps-only (devDependencies/lockfiles/CI configuration only) and the PR carries the `release: deps-only` hold label."
+    value: ${{ steps.commit-check.outputs.deps-only }}
 
 runs:
   using: composite
@@ -238,6 +241,7 @@ runs:
         # Resolved release base (matches the PR's actual base). Empty inputs
         # (legacy direct callers) keep the historical `master` label.
         BASE: ${{ inputs.default-branch != '' && inputs.default-branch || 'master' }}
+        DEPS_ONLY: ${{ steps.commit-check.outputs.deps-only }}
       run: |
         case "$HEAD_REF" in
             next)      flow_label="! release → ${BASE}" ;;
@@ -252,11 +256,18 @@ runs:
                 labels="$flow_label"
             fi
         fi
+        # Deps-only range (devDependencies/lockfiles/CI only): flag it so
+        # release-merge holds the PR and tooling can tell it apart from a real
+        # release. The label is in managed-labels, so it is removed again the
+        # moment a real change joins the range.
+        if [ "$DEPS_ONLY" = "true" ]; then
+            labels="${labels:+${labels},}release: deps-only"
+        fi
         echo "labels=$labels" >> "$GITHUB_OUTPUT"
         # managed-labels allowlist: base set + the flow-label variants for
         # master/main (so a stale lane label prunes across a default-branch
         # rename) plus the resolved base's own variant when it's neither.
-        managed="release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! release → main,! hotfix release → master,! hotfix release → main"
+        managed="release,semver: patch,semver: minor,semver: major,semver: explicit,type: bug,type: feature,type: feature request,! release → master,! release → main,! hotfix release → master,! hotfix release → main,release: deps-only"
         case "$BASE" in
             master|main) ;;
             *) managed="${managed},! release → ${BASE},! hotfix release → ${BASE}" ;;
