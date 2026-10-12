@@ -71,7 +71,6 @@ function getTagMetadata(tag) {
 		commitDate: null,
 		tagger: null,
 		taggerDate: null,
-		message: null,
 		isAnnotated: false,
 		isSigned: false,
 		isBot: false,
@@ -112,28 +111,13 @@ function getTagMetadata(tag) {
 				metadata.isBot = BOT_PATTERNS.some((pattern) => metadata.tagger.toLowerCase().includes(pattern.toLowerCase()));
 			}
 
-			// Extract message
-			const lines = tagContent.split("\n");
-			let messageStarted = false;
-			let messageLines = [];
-
-			for (const line of lines) {
-				if (line.startsWith("-----BEGIN PGP SIGNATURE-----")) {
-					metadata.isSigned = true;
-					break;
-				}
-				if (messageStarted && line.trim()) {
-					messageLines.push(line);
-				} else if (line.startsWith("tagger ")) {
-					messageStarted = true;
-				}
-			}
-
-			metadata.message = messageLines.join("\n").trim() || tag;
+			// The message is deliberately not part of this metadata: tag messages are
+			// whole changelogs, and this JSON is handed to other actions as an input.
+			// Fix actions read the one message they need with readTagMessage().
+			metadata.isSigned = tagContent.includes("-----BEGIN PGP SIGNATURE-----");
 		} else {
 			// Lightweight tag
 			metadata.isAnnotated = false;
-			metadata.message = tag;
 
 			// For lightweight tags, check commit author as "tagger"
 			if (metadata.commitSha) {
