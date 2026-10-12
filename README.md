@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.1 (October 2026)
+### Latest: v4.33.2 (October 2026)
 
-- **Publish stops reporting `cancelled` for `local-` tag workflows** — the inline major-version-tag job now steps aside when the repository carries the standalone tag workflow as `local-update-major-version-tags.yml`, so it no longer loses the `tags-*` concurrency race on every release. Releases and tags were never affected.
-- [View full v4.33.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md)
+- **Tag-health jobs run again on changelog-sized tag messages** — the detailed-tags JSON no longer carries each tag's full message, which had grown past the kernel's per-argument limit and failed every Update Major Version Tags job with `Argument list too long`. The fix actions read the single message they rewrite straight from git, and re-signed tags keep their blank lines.
+- [View full v4.33.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md)
 
 ### Recent Releases
 
+- **v4.33.1** (October 2026) — Publish stops reporting `cancelled` when the standalone tag workflow carries the `local-` prefix ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md))
 - **v4.33.0** (October 2026) — Dev-dependency-only releases are held, and `@cldmv-bot rebase` comment command ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md))
 - **v4.32.0** (October 2026) — Release PRs require the per-version changelog on the source branch, with a `CLDMV_SKIP_CHANGELOG_CHECK` opt-out ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.32.0.md))
 - **v4.31.0** (October 2026) — `sync-release-notes` joins the standard v4 set and missing tags are created automatically with a scoped App token ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.31.0.md))
-- **v4.30.7** (October 2026) — Late merges survive a release, and `tag-health` stops deleting and recreating tags ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.30.7.md))
 
 ## 📋 Quick Start
 

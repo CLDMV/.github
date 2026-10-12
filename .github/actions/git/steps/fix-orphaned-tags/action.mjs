@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand, annotatedTagArgs } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs, readTagMessage } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 console.log("🔍 DEBUG: Orphaned tags action starting...");
@@ -183,7 +183,7 @@ function fixOrphanedTag(tagObj) {
 		}
 
 		// Use existing message or tag name as fallback
-		const tagMessage = tagObj.message || tagName;
+		const tagMessage = tagObj.message || readTagMessage(tagName);
 
 		// Set up bot identity and GPG if provided
 		let keyid = "";

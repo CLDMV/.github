@@ -14,6 +14,7 @@
  * - shouldSign()
  */
 
+import { execFileSync } from "node:child_process";
 import { sh, debugLog } from "../../common/common/core.mjs";
 
 /**
@@ -194,4 +195,36 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
  */
 export function annotatedTagArgs({ tagName, target, messageFile, sign = false, force = true }) {
 	return ["tag", ...(force ? ["-f"] : []), "-a", ...(sign ? ["-s"] : []), "--cleanup=verbatim", "-F", messageFile, tagName, target];
+}
+
+/**
+ * Read a tag's message straight from the repository.
+ *
+ * Tag messages are whole changelogs, so the detailed-tags JSON that is passed
+ * between actions as an input no longer carries them: 100 changelog-sized
+ * messages overran the kernel's per-argument limit (`Argument list too long`)
+ * and failed every tag-health job. The fix-* actions call this for the few
+ * tags they actually rewrite. The PGP signature block is excluded, blank lines
+ * and `#` headings are kept, and a lightweight tag (or an empty message)
+ * falls back to the tag name.
+ * @public
+ * @param {string} tagName - Tag to read.
+ * @param {string} [cwd] - Repository directory (defaults to the current one).
+ * @returns {string} The tag message, or the tag name when there is none.
+ */
+export function readTagMessage(tagName, cwd = process.cwd()) {
+	try {
+		const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+		if (git("cat-file", "-t", tagName).trim() !== "tag") return tagName;
+		const raw = git("cat-file", "-p", tagName);
+		const headerEnd = raw.indexOf("\n\n");
+		if (headerEnd === -1) return tagName;
+		let body = raw.slice(headerEnd + 2);
+		const sig = body.indexOf("-----BEGIN PGP SIGNATURE-----");
+		if (sig !== -1) body = body.slice(0, sig);
+		return body.trim() || tagName;
+	} catch {
+		// git could not read the tag (missing, or not fetched); the tag name is the same fallback an empty message gets.
+		return tagName;
+	}
 }
