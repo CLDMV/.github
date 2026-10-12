@@ -102,7 +102,7 @@ examples/
     │                       pr-title-normalizer, feature-pr, v4-bootstrap)
     ├── release-companions/(tag-health, release-notify, master-commit-audit)
     ├── security/          (codeql, dependency-review, scorecard, cla)
-    ├── automation/        (dependabot, dependabot-auto-merge, labeler, welcome, stale, branch-retention)
+    ├── automation/        (dependabot, dependabot-auto-merge, labeler, welcome, stale, branch-retention, bot-commands)
     └── packaging-docs/    (docker-publish, docs, sync-org-labels, org-onboarding)
 ```
 
@@ -136,7 +136,7 @@ These `local-*.yml` workflows run the v4 flow **on this repo itself** — the en
 | `local-pending-release-reminder.yml`  | daily cron                        | Files an issue when a release PR has sat unshipped past a threshold.                                                                                                                                                                                                                              |
 | `local-v4-bootstrap.yml`              | manual dispatch                   | One-time: creates `next` + `hotfixes`, enables auto-merge, disables auto-delete-head-branches.                                                                                                                                                                                                    |
 
-The other `local-*.yml` (`local-ci`, `local-codeql`, `local-labeler`, `local-welcome`, `local-stale`, `local-branch-retention`, `local-master-commit-audit`, `local-tag-health`) dogfood the reusable building blocks below, calling the matching `reusable-*.yml` (or an inline equivalent) on this repo's own events.
+The other `local-*.yml` (`local-ci`, `local-codeql`, `local-labeler`, `local-welcome`, `local-stale`, `local-branch-retention`, `local-bot-commands`, `local-master-commit-audit`, `local-tag-health`) dogfood the reusable building blocks below, calling the matching `reusable-*.yml` (or an inline equivalent) on this repo's own events.
 
 ## 🔧 Org entry-point workflows
 
@@ -216,6 +216,7 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[examples/guides/WORKFLOW-SETUP-GUIDE.md](examples/guides/WORKFLOW-SETUP-GUIDE.md)** — per-template setup reference for humans: what each workflow does, required scripts, required secrets, prerequisites.
 - **[docs/conventions/release-flow-v4.md](docs/conventions/release-flow-v4.md)** — the full v4 staging-branch release-flow design.
 - **[docs/conventions/branch-naming.md](docs/conventions/branch-naming.md)** — branch-prefix conventions enforced by the org ruleset.
+- **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
 - **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.
 - **[.github/actions/README.md](.github/actions/README.md)** — how the actions are structured.

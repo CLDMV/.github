@@ -117,6 +117,7 @@ Map Phase 1 answers to the template set you'll copy. **Always include** the v4 r
 | `labeler.yml`          | `automation/labeler.yml`                                                                                              |
 | `welcome.yml`          | `automation/welcome.yml`                                                                                              |
 | `stale.yml`            | `automation/stale.yml`                                                                                                |
+| `bot-commands.yml`     | `automation/bot-commands.yml` (no customization; `@cldmv-bot rebase` PR comment command)                              |
 | `branch-retention.yml` | `automation/branch-retention.yml` (set `exempt_patterns` from Phase 1 Q9 — `next`/`hotfixes` are added automatically) |
 
 ---
