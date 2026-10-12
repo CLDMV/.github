@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { getTagInfo, annotatedTagArgs } from "../../utilities/git-utils.mjs";
+import { getTagInfo, annotatedTagArgs, readTagMessage } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
@@ -79,7 +79,7 @@ function fixNonBotTag(tagObj) {
 		console.log(`🔄 Recreating tag ${tagObj.name} with bot signature...`);
 
 		// Use original message or tag name as fallback
-		const tagMessage = tagObj.message || tagObj.name;
+		const tagMessage = tagObj.message || readTagMessage(tagObj.name);
 
 		// Replace the tag in place — never delete it first. Deleting the tag
 		// behind a published release turns the release back into a draft, and a

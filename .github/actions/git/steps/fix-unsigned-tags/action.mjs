@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand, annotatedTagArgs } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs, readTagMessage } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 import { api, parseRepo } from "../../../github/api/_api/core.mjs";
@@ -166,7 +166,7 @@ async function fixUnsignedTag(tagObj) {
 		}
 
 		// Use existing message or tag name as fallback
-		const tagMessage = tagObj.message || tagName;
+		const tagMessage = tagObj.message || readTagMessage(tagName);
 
 		// A release bound to this tag is about to have its tag object replaced
 		// (new SHA, same commit). Capture whether it's currently published
