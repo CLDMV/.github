@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.3 (October 2026)
+### Latest: v4.33.4 (October 2026)
 
-- **Rolling tag updates no longer re-trigger themselves** — updating `v4` and `v4.33` re-created and force-pushed the tags even when they already pointed at the right commit, and each push fired the Update Major Version Tags workflow again, queuing a new run about every two minutes. A tag that already resolves to the target commit is now left untouched.
-- [View full v4.33.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md)
+- **Library package layout convention** — a new convention doc sets the layout every published CLDMV JavaScript library follows: `src/index.mjs` + `src/index.cjs` as the only entry points, a tsup build into `dist/`, a namespaced `<pkg>-dev` condition for running from source, and an unpublished `devcheck.mjs` that catches a checkout running the build by mistake. It includes a migration table for each layout currently in the fleet.
+- [View full v4.33.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.4.md)
 
 ### Recent Releases
 
+- **v4.33.3** (October 2026) — Rolling `vX` / `vX.Y` tag updates no longer re-trigger themselves ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md))
 - **v4.33.2** (October 2026) — Tag-health jobs run again on changelog-sized tag messages ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md))
 - **v4.33.1** (October 2026) — Publish stops reporting `cancelled` when the standalone tag workflow carries the `local-` prefix ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md))
 - **v4.33.0** (October 2026) — Dev-dependency-only releases are held, and `@cldmv-bot rebase` comment command ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.0.md))
-- **v4.32.0** (October 2026) — Release PRs require the per-version changelog on the source branch, with a `CLDMV_SKIP_CHANGELOG_CHECK` opt-out ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.32.0.md))
 
 ## 📋 Quick Start
 
