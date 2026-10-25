@@ -181,6 +181,19 @@ export default defineConfig({
 - A CLI gets a second entry (e.g. `{ "<name>": "src/bin/<name>.mjs" }` into `bin/`); if it imports the library entry, it needs the same `external`. Runtime dependencies stay external (tsup's default for `dependencies` / `peerDependencies`).
 - Code that discovers modules at runtime (`readdir` + `import()` of computed paths) doesn't survive bundling; use static imports.
 
+## Libraries built on slothlet
+
+A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <dir>/api, … })`) keeps the layout above but publishes a different `dist/`. [`CLDMV/llm-translator`](https://github.com/CLDMV/llm-translator) is the reference implementation. This is not the host-loaded api folder case from [Scope](#scope): here the package itself owns the `api/` folder and boots slothlet from its entry point.
+
+- **`dist/` mirrors `src/` file by file.** Slothlet scans the `api/` folder at runtime and derives endpoint names from the file tree, so a single bundle leaves nothing to discover. The tsup config uses `entry: ["src/**/*.mjs"]` with `bundle: false` (keep `minify`, `keepNames`, `removeNodeProtocol: false`, `outExtension` → `.mjs`, `clean`). The result is `dist/index.mjs`, `dist/api/**`, `dist/lib/**` and, for a CLI, `dist/bin/**`, with the same relative paths as in `src/`. `index.mjs` resolves the folder with `new URL("./api", import.meta.url)`, which then works unchanged from `src/` and from `dist/`.
+- **Internals stay outside `api/`.** Helpers live in `src/lib/` and are imported by relative path, so they never show up as endpoints. Because the build keeps every file, those relative imports keep working in `dist/`.
+- **`src/index.cjs` is still copied verbatim** to `dist/index.cjs` in `onSuccess`; with `bundle: false` it is not part of the `entry` glob, so nothing else produces it.
+- **The devcheck import still works.** `external: ["../devcheck.mjs"]` is unnecessary without bundling, but the specifier in `src/index.mjs` is kept as written and resolves to the repo root from both `src/` and `dist/`, so `tests/cjs/entry.test.cjs` can keep asserting that `dist/index.mjs` imports it.
+- **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too. Wrap any `await import("../devcheck.mjs")` in an async function.
+- **`test:dist` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
+- **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
+- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.15.0` for slothlet 3.x). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml` (the template default is lower, and the lowest matrix job fails on a Node that slothlet itself does not support).
+
 ## The `<pkg>-dev` condition
 
 The condition is named after the package (`uuid-dev`, `llm-translator-dev`), never the generic `development`, so a consumer's own `--conditions=development` can't switch this package to a source tree it doesn't ship. In a checkout:
