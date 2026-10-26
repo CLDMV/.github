@@ -509,6 +509,8 @@ for (const repoData of allRepos) {
 	if (hasErrors) {
 		summary(`\n**Errors:**`);
 		for (const err of report.errors) {
+			// Also print to the job log: the step summary alone hides per-repo failures.
+			console.error(`  ❌ ${repo}: ${err}`);
 			summary(`- ⚠️ ${err}`);
 		}
 		reposErrored++;
