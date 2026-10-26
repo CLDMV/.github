@@ -230,7 +230,7 @@
 	{
 		"name": "release: deps-only",
 		"color": "bfdadc",
-		"description": "Release PR whose pending range only touches devDependencies, lockfiles and CI configuration — held, not offered as a release",
+		"description": "Release PR that only touches devDependencies, lockfiles and CI config — held, not released",
 		"aliases": []
 	},
 	{
