@@ -164,6 +164,8 @@ Use the tool best suited to your environment — `curl` + `Write` works; `git cl
 ### 3.4 — Create orphan support branches if needed
 
 ```bash
+# v4-bootstrap's `branches` step now creates this orphan branch automatically (opt out with
+# create_badges_branch=false). Only do it by hand if bootstrap has not run yet.
 # Required if ci.yml's `enable_coverage_badge` stays at the default (true)
 git checkout --orphan badges
 git rm -rf .

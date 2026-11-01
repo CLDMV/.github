@@ -58,7 +58,7 @@ Only the settings actually needed by the workflows you adopt.
 1. **Settings → Actions → "Fork pull request workflows from outside collaborators"** → set to **"Require approval for all outside collaborators"**. Required for safe fork-PR CI on every workflow.
 2. **Settings → Pull Requests → "Allow auto-merge"** → ON. Required if you adopt `dependabot-auto-merge.yml`.
 3. **Settings → Branches → Branch protection rule** on `master` / `main` with at least one required status check. Required for `dependabot-auto-merge.yml` to function safely.
-4. **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` if you keep coverage badging enabled (it's on by default).
+4. **`badges` branch** (orphan, empty initial commit; created by the v4 bootstrap `branches` step) — required by `ci.yml` if you keep coverage badging enabled (it's on by default).
 5. **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
 
 ### Org-level bot App permissions

@@ -1,6 +1,6 @@
-# Package layout: entry points, build, dev condition and devcheck
+# Package layout: entry points, build and dev condition
 
-Every CLDMV JavaScript library published to npm uses one source layout: the code lives in `src/`, tsup bundles it into `dist/`, the package has exactly two entry points (`index.mjs` for ESM and `index.cjs` for CommonJS), and a namespaced `<pkg>-dev` export condition switches a source checkout between `src/` and `dist/`. A small, unpublished `devcheck.mjs` warns when a checkout runs without that condition.
+Every CLDMV JavaScript library published to npm uses one source layout: the code lives in `src/`, tsup bundles it into `dist/`, the package has exactly two entry points (`index.mjs` for ESM and `index.cjs` for CommonJS), and a namespaced `<pkg>-dev` export condition switches a source checkout between `src/` and `dist/`. There is no development check: the condition is how a developer picks `src/` or `dist/`, and both are legitimate (see [No devcheck](#no-devcheck)).
 
 The reference implementation is [`CLDMV/llm-translator`](https://github.com/CLDMV/llm-translator).
 
@@ -18,14 +18,13 @@ This applies to published JavaScript **libraries**: packages whose consumers `im
 ```text
 package.json      "." → { "<pkg>-dev": { import: ./src/index.mjs, require: ./src/index.cjs },
                           import: ./dist/index.mjs, require: ./dist/index.cjs }
-devcheck.mjs      repo root, never published
 tsup.config.mjs
 src/
-  index.mjs       ESM entry: devcheck import first, then the public exports
+  index.mjs       ESM entry: the public exports
   index.cjs       CJS entry: require(esm) guard + require("./index.mjs")
   …               the rest of the source
 dist/             build output (gitignored, rebuilt by prepack)
-  index.mjs       tsup bundle of src/index.mjs; still imports "../devcheck.mjs"
+  index.mjs       tsup bundle of src/index.mjs
   index.cjs       verbatim copy of src/index.cjs
 types/            generated declarations
 ```
@@ -41,24 +40,10 @@ Rules that follow from it:
 ### `src/index.mjs`
 
 ```js
-// Development environment check. devcheck.mjs lives at the repo root and exists only in
-// a source checkout; it is never published, so the import is allowed to fail. tsup keeps
-// the specifier external, so dist/index.mjs imports the same root file. It runs inside an
-// async function rather than as a top-level await: index.cjs loads this module through
-// Node's synchronous require(esm), which rejects any module graph containing top-level
-// await (ERR_REQUIRE_ASYNC_MODULE).
-(async () => {
-	try {
-		await import("../devcheck.mjs");
-	} catch {
-		// ignore - devcheck.mjs is not published
-	}
-})();
-
 export { … } from "./<module>.mjs";
 ```
 
-The module graph reachable from `src/index.mjs` must not use top-level `await` anywhere, or `require()` of the package fails with `ERR_REQUIRE_ASYNC_MODULE`. The devcheck import is deliberately fire-and-forget: static imports are hoisted and evaluated first, so it is a warning, not a gate.
+The module graph reachable from `src/index.mjs` must not use top-level `await` anywhere, or `require()` of the package fails with `ERR_REQUIRE_ASYNC_MODULE`.
 
 ### `src/index.cjs`
 
@@ -67,7 +52,7 @@ The module graph reachable from `src/index.mjs` must not use top-level `await` a
 
 if (!process.features?.require_module) {
 	const error = new Error(
-		`@cldmv/<pkg>: require() needs Node.js ^20.19.0 or >=22.12.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
+		`@cldmv/<pkg>: require() needs Node.js >=22.22.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
 	);
 	error.code = "ERR_REQUIRE_ESM";
 	throw error;
@@ -125,8 +110,8 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 		},
 		"./package.json": "./package.json"
 	},
-	"files": ["dist/", "!dist/**/*.map", "types/", "!types/devcheck.d.mts"],
-	"engines": { "node": ">=20.19.0" },
+	"files": ["dist/", "!dist/**/*.map", "types/"],
+	"engines": { "node": ">=22.22.0" },
 	"scripts": {
 		"build": "tsup",
 		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build",
@@ -140,8 +125,8 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 }
 ```
 
-- **`engines.node` is `>=20.19.0`** because the CJS entry needs `require(esm)` (Node ^20.19 / ≥22.12). Any lower floor is wrong: the guard in `index.cjs` already rejects older versions at runtime.
-- **`files` ships `dist/` and `types/`, never `src/`** or the root `devcheck.mjs`. `tsc` follows the dynamic devcheck import and emits `types/devcheck.d.mts`, so it is excluded explicitly.
+- **`engines.node` is `>=22.22.0`**, the fleet floor. The dev toolchain needs it (chokidar 6 requires Node 22.22, tsup 9 requires 22.18), so CI can't test anything older, and the package doesn't claim support it can't test. Set `min_node_version` to `22.22.0` in `ci.yml` and `publish.yml` to match. The CJS entry also needs `require(esm)` without Node 22.12's `ExperimentalWarning`, which this floor covers; the guard in `index.cjs` still rejects a Node without `require(esm)` with a clear message.
+- **`files` ships `dist/` and `types/`, never `src/`.**
 - **`dist/` is gitignored** and rebuilt by `prepack`.
 
 ## Build
@@ -162,9 +147,6 @@ export default defineConfig({
 	minify: true,
 	keepNames: true,
 	removeNodeProtocol: false,
-	// devcheck.mjs stays at the repo root and is never published; keep the import as-is
-	// so dist/index.mjs loads the same root file instead of bundling it.
-	external: ["../devcheck.mjs"],
 	clean: true,
 	outExtension() {
 		return { js: ".mjs" };
@@ -175,10 +157,9 @@ export default defineConfig({
 });
 ```
 
-- **`external: ["../devcheck.mjs"]`** is what keeps devcheck out of the bundle. The specifier is relative to the file importing it, and `../devcheck.mjs` points at the repo root from both `src/` and `dist/`, so the same root file runs in both modes and the import fails silently once published.
 - **`keepNames: true`** keeps function and class names through minification (stack traces, `fn.name`).
 - **`removeNodeProtocol: false`** keeps `node:` specifiers on built-in imports.
-- A CLI gets a second entry (e.g. `{ "<name>": "src/bin/<name>.mjs" }` into `bin/`); if it imports the library entry, it needs the same `external`. Runtime dependencies stay external (tsup's default for `dependencies` / `peerDependencies`).
+- A CLI gets a second entry (e.g. `{ "<name>": "src/bin/<name>.mjs" }` into `bin/`); if it imports the library entry, mark that entry `external` so the CLI doesn't carry a second copy. Runtime dependencies stay external (tsup's default for `dependencies` / `peerDependencies`).
 - Code that discovers modules at runtime (`readdir` + `import()` of computed paths) doesn't survive bundling; use static imports.
 
 ## Libraries built on slothlet
@@ -188,51 +169,43 @@ A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <d
 - **`dist/` mirrors `src/` file by file.** Slothlet scans the `api/` folder at runtime and derives endpoint names from the file tree, so a single bundle leaves nothing to discover. The tsup config uses `entry: ["src/**/*.mjs"]` with `bundle: false` (keep `minify`, `keepNames`, `removeNodeProtocol: false`, `outExtension` → `.mjs`, `clean`). The result is `dist/index.mjs`, `dist/api/**`, `dist/lib/**` and, for a CLI, `dist/bin/**`, with the same relative paths as in `src/`. `index.mjs` resolves the folder with `new URL("./api", import.meta.url)`, which then works unchanged from `src/` and from `dist/`.
 - **Internals stay outside `api/`.** Helpers live in `src/lib/` and are imported by relative path, so they never show up as endpoints. Because the build keeps every file, those relative imports keep working in `dist/`.
 - **`src/index.cjs` is still copied verbatim** to `dist/index.cjs` in `onSuccess`; with `bundle: false` it is not part of the `entry` glob, so nothing else produces it.
-- **The devcheck import still works.** `external: ["../devcheck.mjs"]` is unnecessary without bundling, but the specifier in `src/index.mjs` is kept as written and resolves to the repo root from both `src/` and `dist/`, so `tests/cjs/entry.test.cjs` can keep asserting that `dist/index.mjs` imports it.
-- **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too. Wrap any `await import("../devcheck.mjs")` in an async function.
+- **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too.
 - **`test:dist` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
 - **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
-- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.15.0` for slothlet 3.x). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml` (the template default is lower, and the lowest matrix job fails on a Node that slothlet itself does not support).
+- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.22.0`, the same as the fleet floor). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml`.
 
 ## The `<pkg>-dev` condition
 
 The condition is named after the package (`uuid-dev`, `llm-translator-dev`), never the generic `development`, so a consumer's own `--conditions=development` can't switch this package to a source tree it doesn't ship. In a checkout:
 
-| Run                                                | Resolves to                                                    |
-| -------------------------------------------------- | -------------------------------------------------------------- |
-| `node app.mjs`                                     | `dist/index.mjs` (or fails if not built), and devcheck exits 1 |
-| `node --conditions=<pkg>-dev app.mjs`              | `src/index.mjs`                                                |
-| `NODE_OPTIONS=--conditions=<pkg>-dev node app.mjs` | `src/index.mjs`                                                |
-| `require("@cldmv/<pkg>")` with the condition       | `src/index.cjs` → `src/index.mjs`                              |
-| installed from npm                                 | `dist/`; devcheck isn't published                              |
+| Run                                                | Resolves to                                            |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `node app.mjs`                                     | `dist/index.mjs` (`ERR_MODULE_NOT_FOUND` if not built) |
+| `node --conditions=<pkg>-dev app.mjs`              | `src/index.mjs`                                        |
+| `NODE_OPTIONS=--conditions=<pkg>-dev node app.mjs` | `src/index.mjs`                                        |
+| `require("@cldmv/<pkg>")` with the condition       | `src/index.cjs` → `src/index.mjs`                      |
+| installed from npm                                 | `dist/`                                                |
 
-Contributors set it once per shell (`export NODE_OPTIONS=--conditions=<pkg>-dev`) or pass it per command.
+Contributors set it once per shell (`export NODE_OPTIONS=--conditions=<pkg>-dev`) or pass it per command. The README documents it for anyone running a checkout.
 
-## devcheck
+## No devcheck
 
-`devcheck.mjs` sits at the repo root and is never published. Its job is to stop a source checkout from silently running the built `dist/` (or failing because it isn't built) when the developer meant to run `src/`. The canonical copy is [`@cldmv/uuid`'s `devcheck.mjs`](https://github.com/CLDMV/uuid/blob/master/devcheck.mjs); copy it and replace the package name.
-
-It runs only when all of these hold:
-
-- a `src/` directory sits next to it (a source checkout);
-- it isn't running in CI (`CI`, `GITHUB_ACTIONS`, `TRAVIS`, `CIRCLECI`, `GITLAB_CI`, `BUILDKITE`, `JENKINS_URL`, `TF_BUILD`);
-- its path has no `node_modules` segment (a git or tarball install inside a consumer's app must never exit).
-
-It then collects every `--conditions` value from both `process.execArgv` (the node CLI, which is how vitest passes conditions to its workers) and `NODE_OPTIONS`, in all three valid forms (`--conditions=x`, `--conditions x`, `-C x`), and requires an **exact** `<pkg>-dev` match. Node doesn't split a condition value on `,` or `|`, so `<pkg>-dev,x`, `not-<pkg>-dev` and `<pkg>-dev|production` all correctly fail. `NODE_ENV` is ignored because it doesn't affect resolution. A built checkout still nags: with both `src/` and `dist/` present, only the condition selects `src/`. On failure it prints how to set the condition (cmd, PowerShell, POSIX, or directly on the node CLI) and calls `process.exit(1)`.
+Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a check would never run for them. In a checkout, the `<pkg>-dev` condition already chooses: with it the code runs from `src/`, without it from `dist/`, and both are legitimate (for example, trying the build before a release). A check that exits without the condition blocks the second case, and one that only fires when `dist/` is missing never runs, because resolving the package name to a missing `dist/` fails with `ERR_MODULE_NOT_FOUND` before any code loads. A package that still has one removes it (see [Migrating an existing package](#migrating-an-existing-package)).
 
 ## Tests
 
-- **Vitest** runs with the condition, so Node's resolver inside workers and devcheck both see it. `resolve.conditions` replaces Vite's defaults, so keep them:
+- **Tests run against `src/` by default.** Vitest runs with the condition, both in Vite's resolvers and in the worker processes, so Node's own resolver sees it too. `devCondition()` from `@cldmv/configs` builds the settings from `package.json`:
 
   ```js
-  resolve: { conditions: ["<pkg>-dev", "module", "browser", "development|production"] },
-  ssr: { resolve: { conditions: ["<pkg>-dev", "node", "development|production"] } },
-  test: { nodeOptions: ["--conditions=<pkg>-dev"], … }
+  import base, { devCondition } from "@cldmv/configs/vitest.config.mjs";
+
+  export default mergeConfig(mergeConfig(base, devCondition({ root: new URL("..", import.meta.url) })), defineConfig({ … }));
   ```
 
-- **`tests/devcheck.test.vitest.mjs`** is uuid's 15-case suite with the name swapped. Each case copies `devcheck.mjs` into a purpose-built fixture directory and runs it in a subprocess with a from-scratch environment, covering every flag form, the substring/comma/pipe traps, `NODE_ENV`, a built checkout, CI, a scoped `node_modules` install and a published layout with no `src/`.
+  It sets `resolve.conditions` and `ssr.resolve.conditions` to the condition followed by Vite's defaults (setting them replaces the defaults), and `test.execArgv: ["--conditions=<pkg>-dev"]` for the workers. `test.nodeOptions` is not a Vitest option and passes nothing to the workers; replace it where a config still has it.
+
 - **A source-level CJS test** loads `src/index.cjs` through `createRequire` and checks it exports the same keys and values as `src/index.mjs`.
-- **`tests/cjs/entry.test.cjs`** (run by `test:dist` through `node --test`, after a build) checks that `dist/index.cjs` re-exports `dist/index.mjs`, and that `dist/index.mjs` still contains `import("../devcheck.mjs")` and none of devcheck's code, which catches a missing `external`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too.
+- **`tests/cjs/entry.test.cjs`** (run by `test:dist` through `node --test`, after a build) checks the build itself: that `dist/index.cjs` re-exports `dist/index.mjs`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too.
 
 ## CI wiring
 
@@ -241,10 +214,10 @@ It then collects every `--conditions` value from both `process.execArgv` (the no
 
 ## Migrating an existing package
 
-| Starting point                                                                            | Change                                                                                                                                                                                                             |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hand-written root `index.mjs` / `index.cjs` reaching the code through `@cldmv/<pkg>/main` | `git mv` both into `src/`, import the code by relative path, move `<pkg>-dev` onto `"."`, keep `./main` as a deprecated alias, replace the custom build with tsup, keep devcheck (moved import: `../devcheck.mjs`) |
-| `src/cjs-shim.cjs` or `src/cjs/index.cjs`                                                 | `git mv` to `src/index.cjs` beside `src/index.mjs`; rename a differently named ESM entry (`runner.mjs`, `fix-header.mjs`) to `src/index.mjs`; copy with `onSuccess`, not `publicDir`                               |
-| No build (`echo` stub) shipping `src/`                                                    | add tsup, ship `dist/`, add the entries, condition and devcheck                                                                                                                                                    |
-| CommonJS source                                                                           | convert to ESM, keep the CJS shape in `src/index.cjs`; ship as a major when the new `exports` map closes deep imports                                                                                              |
-| Older or substring-matching devcheck                                                      | replace with uuid's version and add its test suite                                                                                                                                                                 |
+| Starting point                                                                            | Change                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hand-written root `index.mjs` / `index.cjs` reaching the code through `@cldmv/<pkg>/main` | `git mv` both into `src/`, import the code by relative path, move `<pkg>-dev` onto `"."`, keep `./main` as a deprecated alias, replace the custom build with tsup                    |
+| `src/cjs-shim.cjs` or `src/cjs/index.cjs`                                                 | `git mv` to `src/index.cjs` beside `src/index.mjs`; rename a differently named ESM entry (`runner.mjs`, `fix-header.mjs`) to `src/index.mjs`; copy with `onSuccess`, not `publicDir` |
+| No build (`echo` stub) shipping `src/`                                                    | add tsup, ship `dist/`, add the entries and condition                                                                                                                                |
+| CommonJS source                                                                           | convert to ESM, keep the CJS shape in `src/index.cjs`; ship as a major when the new `exports` map closes deep imports                                                                |
+| Has a `devcheck.mjs`                                                                      | remove it with the loader in the entry, its test, the tsup `external` and the `files` exclude                                                                                        |

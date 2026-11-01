@@ -4,18 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.34.0 (October 2026)
+### Latest: v4.35.0 (November 2026)
 
-- **`status: implemented - dev` label** — a new lifecycle status for work built and pushed to a `dev` working branch but not yet merged into `next` or `hotfixes`. It moves to `status: implemented` automatically when the PR merges.
-- **Org label sync works again** — the `release: deps-only` label description was over GitHub's 100-character cap, which made the sync error for every repo since v4.33.0. The description is shortened, per-repo sync errors are now printed to the job log, and a new label-length test fails when any label name or description exceeds GitHub's limits.
-- [View full v4.34.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md)
+- **Org bootstrap creates the `badges` branch** — the `branches` step now creates the orphan `badges` branch the coverage-badge job pushes to, and never resets an existing one. The pre-commit hook can also check only staged files through optional `lint:staged` / `format:check:staged` scripts, and a new README template and format convention cover CLDMV packages.
+- **Safer org automation** — the label sync validates the whole catalog before it touches any repo, routine Dependabot bumps whose bodies quote a GHSA id stay on `next` instead of being redirected to `hotfixes`, and the CI test matrix starts at Node.js 22.22.0.
+- [View full v4.35.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md)
 
 ### Recent Releases
 
+- **v4.34.0** (October 2026) — `status: implemented - dev` label and a fix for the org label sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md))
 - **v4.33.5** (October 2026) — Per-file dist layout for slothlet-based libraries added to the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.5.md))
 - **v4.33.4** (October 2026) — Library package layout convention for published CLDMV JavaScript libraries ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.4.md))
 - **v4.33.3** (October 2026) — Rolling `vX` / `vX.Y` tag updates no longer re-trigger themselves ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md))
-- **v4.33.2** (October 2026) — Tag-health jobs run again on changelog-sized tag messages ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md))
 
 ## 📋 Quick Start
 
@@ -90,7 +90,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
     ├── common/  git/  github/  npm/  node/  docker/  coverage/  workflows/
     └── community/                               # CLA, release notifier
 data/github-labels.json                          # org label catalog
-docs/conventions/                                # branch-naming, embedded-tests-ci, package-layout, release-flow-v4
+docs/conventions/                                # branch-naming, embedded-tests-ci, package-layout, readme-format, release-flow-v4
 docs/tools/ruleset-generator/                   # browser tool — emits master/next/hotfixes ruleset JSON
 scripts/setup-org-rulesets.mjs                  # one-shot installer for the org-wide branch-naming ruleset
 examples/
@@ -218,7 +218,8 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[docs/conventions/branch-naming.md](docs/conventions/branch-naming.md)** — branch-prefix conventions enforced by the org ruleset.
 - **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
-- **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build, the `<pkg>-dev` condition and devcheck.
+- **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build and the `<pkg>-dev` condition.
+- **[docs/conventions/readme-format.md](docs/conventions/readme-format.md)** — the shared package README format, with a fill-in skeleton at [`examples/readme/README.template.md`](examples/readme/README.template.md).
 - **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.
 - **[.github/actions/README.md](.github/actions/README.md)** — how the actions are structured.
 - **[.github/instructions/repo-conventions.instructions.md](.github/instructions/repo-conventions.instructions.md)** — tag, signing, API-version, and secret-naming rules.

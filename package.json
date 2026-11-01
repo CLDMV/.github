@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/.github",
-	"version": "4.34.0",
+	"version": "4.35.0",
 	"description": "Shared GitHub Actions, reusable workflows, and org-wide tooling for the CLDMV organization.",
 	"author": {
 		"name": "Shinrai",
@@ -38,18 +38,22 @@
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
 		"prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"",
-		"test": "node data/github-labels.test.mjs && node .github/actions/common/utilities/bot-detection.test.mjs && node .github/actions/npm/jobs/bundle-size/action.test.mjs && node .github/actions/common/steps/paths-gate/action.test.mjs && node .github/actions/github/steps/merge-master-into-branch/test.mjs && node .github/actions/github/steps/mark-implemented-issues/action.test.mjs && node .github/actions/git/steps/reset-branch-after-release/test.mjs && node .github/actions/github/utilities/release-notes.test.mjs && node .github/actions/git/utilities/tag-message.test.mjs && node .github/actions/git/utilities/read-tag-message.test.mjs && node .github/actions/github/api/tag/create/test.mjs && node .github/actions/github/api/tag/update/test.mjs && node .github/actions/github/steps/check-release-changelog/test.mjs && node .github/actions/git/steps/check-release-commit/deps-only.test.mjs && node .github/actions/github/jobs/release-merge/hold.test.mjs"
+		"test": "node data/github-labels.test.mjs && node .github/actions/common/utilities/bot-detection.test.mjs && node .github/actions/npm/jobs/bundle-size/action.test.mjs && node .github/actions/common/steps/paths-gate/action.test.mjs && node .github/actions/github/steps/merge-master-into-branch/test.mjs && node .github/actions/github/steps/mark-implemented-issues/action.test.mjs && node .github/actions/git/steps/reset-branch-after-release/test.mjs && node .github/actions/github/utilities/release-notes.test.mjs && node .github/actions/git/utilities/tag-message.test.mjs && node .github/actions/git/utilities/read-tag-message.test.mjs && node .github/actions/github/api/tag/create/test.mjs && node .github/actions/github/api/tag/update/test.mjs && node .github/actions/github/steps/check-release-changelog/test.mjs && node .github/actions/git/steps/check-release-commit/deps-only.test.mjs && node .github/actions/github/jobs/release-merge/hold.test.mjs && node .github/actions/github/steps/redirect-hotfix-pr/test.mjs && node .github/actions/github/jobs/org-bootstrap-repo/badges-branch.test.mjs"
 	},
 	"devDependencies": {
-		"@cldmv/eslint-plugin-jsonv": "^1.0.3",
-		"@cldmv/jsonv": "^1.0.2",
-		"@cldmv/prettier-plugin-jsonv": "^1.0.1",
-		"@eslint/css": "^1.4.0",
+		"@cldmv/eslint-plugin-jsonv": "^1.0.17",
+		"@cldmv/jsonv": "^1.1.5",
+		"@cldmv/prettier-plugin-jsonv": "^1.1.4",
+		"@eslint/css": "^2.0.1",
 		"@eslint/js": "^10.0.1",
-		"@eslint/json": "^2.0.1",
+		"@eslint/json": "^2.1.1",
 		"@eslint/markdown": "^8.0.3",
-		"eslint": "^10.8.1",
-		"globals": "^17.11.0",
-		"prettier": "^3.9.6"
+		"eslint": "^10.14.0",
+		"globals": "^17.14.0",
+		"prettier": "^3.9.10"
+	},
+	"overrides": {
+		"katex": ">=0.19.1 <1.0.0",
+		"minimatch": "^11.0.3"
 	}
 }
