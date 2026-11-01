@@ -71,10 +71,11 @@ export function compilePattern(source) {
  * current Dependabot security-update PR bodies do NOT embed a literal GHSA
  * id or advisory URL, so body-text sniffing alone silently never fires.
  *
- * Secondary signal (OR'd in): a literal GHSA-id token or
- * `github.com/advisories/GHSA-…` link in the body, kept for repos that don't
- * set `target-branch` (so base-mismatch can never fire) or in case
- * Dependabot's template later reintroduces the id.
+ * Fallback signal, only when the routine target or the base is unknown: a
+ * literal GHSA-id token or `github.com/advisories/GHSA-…` link in the body.
+ * It is not consulted when the base matches the routine target, because
+ * Dependabot quotes upstream release notes, and those often name advisories
+ * (CLDMV/.github#409: a routine vitest-runner bump got redirected that way).
  *
  * @public
  * @param {object} opts
@@ -86,7 +87,10 @@ export function compilePattern(source) {
  */
 export function isDependabotSecurityPR({ userLogin, prBody, baseRef, dependabotBase }) {
 	if (userLogin !== "dependabot[bot]") return false;
-	if (dependabotBase && baseRef && baseRef !== dependabotBase) return true;
+	// With a known routine target, the base alone decides: security updates land
+	// elsewhere, and a GHSA id on a routine-target PR usually comes from upstream
+	// release notes Dependabot copied into the body, not from an advisory fix.
+	if (dependabotBase && baseRef) return baseRef !== dependabotBase;
 	if (!prBody) return false;
 	// A GHSA advisory URL always embeds the GHSA id, so this bare-id check already
 	// covers the URL form — a separate (unanchored) URL regex adds nothing.
