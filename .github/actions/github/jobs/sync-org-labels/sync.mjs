@@ -11,9 +11,13 @@
  *	                - Delete labels with no match in the JSON
  *	                - Create missing canonical labels
  *	              Writes a full per-repo report to $GITHUB_STEP_SUMMARY.
+ *
+ *	              The catalog is validated against GitHub's label limits first;
+ *	              any bad entry fails the run before a single repo is touched.
  */
 
 import { appendFileSync, readFileSync } from "fs";
+import { validateLabelCatalog } from "./validate-catalog.mjs";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -120,6 +124,17 @@ async function validateToken() {
 	}
 
 	console.log("::endgroup::");
+}
+
+// Validate the catalog before any API call: one bad entry would otherwise be
+// rejected (HTTP 422) in every repo and leave the whole sweep red.
+const catalogProblems = validateLabelCatalog(JSON.parse(readFileSync(LABELS_JSON_PATH, "utf8")));
+if (catalogProblems.length > 0) {
+	for (const problem of catalogProblems) console.error(`::error title=Invalid label catalog::${problem}`);
+	console.error(
+		`❌ ${LABELS_JSON_PATH} has ${catalogProblems.length} invalid entr${catalogProblems.length === 1 ? "y" : "ies"}; no repo was touched.`
+	);
+	process.exit(1);
 }
 
 await validateToken();
