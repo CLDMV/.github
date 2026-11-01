@@ -34,6 +34,14 @@ inputs:
     description: "Integration branch name for hotfixes."
     required: false
     default: "hotfixes"
+  badges_branch:
+    description: "Orphan branch the coverage badge job pushes to. Created by the `branches` step if missing; never reset if it exists."
+    required: false
+    default: "badges"
+  create_badges_branch:
+    description: "Set to `false` to skip creating the badges branch (repos that do not use the coverage badge)."
+    required: false
+    default: "true"
   bot_app_id:
     description: "Numeric GitHub App ID to pre-add to next/hotfixes ruleset bypass_actors. Defaults to CLDMV's bot App."
     required: false

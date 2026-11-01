@@ -62,7 +62,7 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 
 **Required secrets** — see [Secrets Summary](#secrets-summary). `NPM_TOKEN` for private deps; bot credentials optional but enable proper attribution; coverage-badge secrets required only when `enable_coverage_badge: true`.
 
-**Prereqs** — A `badges` branch must exist for coverage publishing (orphan: `git checkout --orphan badges && git commit --allow-empty -m "init" && git push origin badges`).
+**Prereqs** — A `badges` branch must exist for coverage publishing (created by `v4-bootstrap.yml`'s `branches` step; to create it by hand: `git checkout --orphan badges && git commit --allow-empty -m "init" && git push origin badges`).
 
 **Optional: embedded private tests.** `ci.yml` supports running a private test suite from a separate repo, linked via an anonymous gitlink in the parent's tree at `tests/` (or any path). Set `enable_embedded_tests: true` on the workflow call and the CI fetches the matching private repo (per the URL-mapping convention) and runs its suite alongside the parent's. Fork PRs silently skip the fetch since they have no secret access. See [`docs/conventions/embedded-tests-ci.md`](../../docs/conventions/embedded-tests-ci.md) for the URL-mapping rules, the threat model, and how it interacts with `@cldmv/git-embedded` on the developer side.
 
@@ -652,7 +652,7 @@ These come up across multiple workflows — set them once per repo:
 - **Settings → Actions → "Require approval for outside collaborators"** to control fork-PR runs.
 - **Settings → Pull Requests → "Allow auto-merge"** if adopting `dependabot-auto-merge.yml` (auto-enabled by `v4-bootstrap.yml`).
 - **`.github/dependabot.yml`** at repo root — required by Dependabot itself. Copy from [`examples/individual-repo-workflows/automation/dependabot.yml`](../individual-repo-workflows/automation/dependabot.yml); customize ecosystems for your stack.
-- **`badges` branch** (orphan, empty initial commit) — required by `ci.yml` coverage publishing.
+- **`badges` branch** (orphan) — required by `ci.yml` coverage publishing. `v4-bootstrap.yml` creates it in its `branches` step (opt out with `create_badges_branch: false`).
 - **`gh-pages` branch** (orphan, empty initial commit) — required by `docs.yml`.
 - **`CLA.md`** at repo root — **optional**, and **only** if you want the override scope (a CLA different from the org-wide default; see [CLA Bot](#%EF%B8%8F-cla-bot)). Most consumers should leave this out; the bot uses the default CLA from the ledger. If you do override, copy from the public sample at [`examples/repo-seeds/.cla-signatures/cla-versions/v1.0.md`](../repo-seeds/.cla-signatures/cla-versions/v1.0.md) and edit. The `cla_path:` input changes where the bot looks for the override.
 - **`CLDMV/.cla-signatures`** repository (private) seeded from [`examples/repo-seeds/.cla-signatures/`](../repo-seeds/.cla-signatures/) — required by `cla.yml`. Each consumer repo doesn't need its own ledger; one ledger covers the whole org.
