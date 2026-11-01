@@ -318,6 +318,12 @@
 		"aliases": ["in-progress", "wip", "partial"]
 	},
 	{
+		"name": "status: implemented - dev",
+		"color": "c5def5",
+		"description": "Built and pushed to a dev working branch, not yet merged into next or hotfixes",
+		"aliases": ["implemented-dev", "on dev"]
+	},
+	{
 		"name": "status: implemented",
 		"color": "1d76db",
 		"description": "Built and deployed, but not yet fully tested/verified",
