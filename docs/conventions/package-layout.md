@@ -194,13 +194,15 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
 
 ## Tests
 
-- **Tests run against `src/` by default.** Vitest runs with the condition, so Node's resolver inside workers sees it too. `resolve.conditions` replaces Vite's defaults, so keep them:
+- **Tests run against `src/` by default.** Vitest runs with the condition, both in Vite's resolvers and in the worker processes, so Node's own resolver sees it too. `devCondition()` from `@cldmv/configs` builds the settings from `package.json`:
 
   ```js
-  resolve: { conditions: ["<pkg>-dev", "module", "browser", "development|production"] },
-  ssr: { resolve: { conditions: ["<pkg>-dev", "node", "development|production"] } },
-  test: { nodeOptions: ["--conditions=<pkg>-dev"], … }
+  import base, { devCondition } from "@cldmv/configs/vitest.config.mjs";
+
+  export default mergeConfig(mergeConfig(base, devCondition({ root: new URL("..", import.meta.url) })), defineConfig({ … }));
   ```
+
+  It sets `resolve.conditions` and `ssr.resolve.conditions` to the condition followed by Vite's defaults (setting them replaces the defaults), and `test.execArgv: ["--conditions=<pkg>-dev"]` for the workers. `test.nodeOptions` is not a Vitest option and passes nothing to the workers; replace it where a config still has it.
 
 - **A source-level CJS test** loads `src/index.cjs` through `createRequire` and checks it exports the same keys and values as `src/index.mjs`.
 - **`tests/cjs/entry.test.cjs`** (run by `test:dist` through `node --test`, after a build) checks the build itself: that `dist/index.cjs` re-exports `dist/index.mjs`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too.
