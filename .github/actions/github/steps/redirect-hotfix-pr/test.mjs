@@ -101,12 +101,21 @@ eq(
 eq(
 	isDependabotSecurityPR({
 		userLogin: "dependabot[bot]",
-		prBody: "Bumps lodash to fix GHSA-aaaa-bbbb-cccc",
+		prBody: "Bumps @cldmv/vitest-runner. Release notes: esbuild (GHSA-g7r4-m6w7-qqqr, low).",
 		baseRef: "next",
 		dependabotBase: "next"
 	}),
+	false,
+	"base matches routine target, GHSA quoted from upstream release notes → false (#409)"
+);
+eq(
+	isDependabotSecurityPR({
+		userLogin: "dependabot[bot]",
+		prBody: "Bumps lodash to fix GHSA-aaaa-bbbb-cccc",
+		baseRef: "next"
+	}),
 	true,
-	"base matches routine target but GHSA text present → true (secondary signal still fires)"
+	"dependabotBase omitted, GHSA text present → true (body fallback)"
 );
 eq(
 	isDependabotSecurityPR({ userLogin: "dependabot[bot]", prBody: "Bumps postcss from 8.5.15 to 8.5.23.", baseRef: "master" }),
