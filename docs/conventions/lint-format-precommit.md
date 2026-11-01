@@ -23,7 +23,7 @@ Per repo you can: **opt in** by adding `format` / `lint:fix` / `lint` / `format:
 
 ## Precommit hook (reports and fails — does not write)
 
-`examples/git-hooks/pre-commit` runs `lint` + `format:check` (check-only) before a commit and **rejects the commit** on any issue — it never modifies your tree. Install it by copying `examples/git-hooks/` into the repo's `.githooks/` and adding a `prepare` script:
+`examples/git-hooks/pre-commit` runs `lint` + `format:check` (check-only) before a commit (scoped to the staged files when the optional `lint:staged` / `format:check:staged` scripts exist, see below) and **rejects the commit** on any issue — it never modifies your tree. Install it by copying `examples/git-hooks/` into the repo's `.githooks/` and adding a `prepare` script:
 
 ```jsonc
 { "scripts": { "prepare": "node -e \"import('./.githooks/install.mjs').catch(()=>{})\"" } }
@@ -33,7 +33,20 @@ Per repo you can: **opt in** by adding `format` / `lint:fix` / `lint` / `format:
 
 **Why `.git/hooks` and not `core.hooksPath`:** a per-repo `core.hooksPath` shadows a global `core.hooksPath` dispatcher, silently disabling any global commit policy (no-coauthor / no-unsigned-push) for that repo. A global dispatcher chains to `.git/hooks/<name>`, so installing there composes with global policy. The installer no-ops on CI, inside `node_modules`, and when there's no `.git` directory.
 
-**Project-specific checks — `precommit:local`:** the shared hook runs `lint` + `format:check`, then `npm run precommit:local --if-present`. To add repo-specific pre-commit checks — a type-check, a custom audit, an inventory gate — define a `precommit:local` script and the fleet hook runs it **last, after lint/format**. Don't fork `.githooks/pre-commit` to add checks: that drops the repo off the shared hook and it drifts out of sync. Example (a type-check gate):
+**Scoping to staged files — `lint:staged` / `format:check:staged` (optional):** whole-repo `lint` and `format:check` get slow in a workspace. If `package.json` defines `lint:staged` and/or `format:check:staged`, the hook computes the staged paths (`git diff --cached --name-only --diff-filter=ACMR -z`, NUL-delimited so names with spaces are safe) and calls the script with them as arguments, `npm run lint:staged -- <paths>`, instead of the whole-repo script. Each is chosen independently: `lint:staged` replaces `lint`, `format:check:staged` replaces `format:check`, and a missing one falls back to the whole-repo script exactly as before. When nothing is staged the staged scripts are skipped. The hook stays check-only: it never writes and never re-stages. A single-package repo can point them at its own tools:
+
+```jsonc
+{
+	"scripts": {
+		"lint:staged": "eslint --config .configs/eslint.config.mjs",
+		"format:check:staged": "prettier --config .configs/.prettierrc --check --ignore-unknown"
+	}
+}
+```
+
+A workspace repo can make each script a small wrapper that maps the incoming paths to their owning package and runs that package's checks. The post-merge CI autofix still runs the full `format` / `lint:fix` / check sweep on `next` / `hotfixes`, so this only narrows the local commit gate.
+
+**Project-specific checks — `precommit:local`:** the shared hook runs `lint` + `format:check` (or their `:staged` variants), then `npm run precommit:local --if-present`. To add repo-specific pre-commit checks — a type-check, a custom audit, an inventory gate — define a `precommit:local` script and the fleet hook runs it **last, after lint/format**. Don't fork `.githooks/pre-commit` to add checks: that drops the repo off the shared hook and it drifts out of sync. Example (a type-check gate):
 
 ```jsonc
 { "scripts": { "precommit:local": "npm run test:types" } }
