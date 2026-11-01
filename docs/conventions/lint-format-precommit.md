@@ -33,12 +33,12 @@ Per repo you can: **opt in** by adding `format` / `lint:fix` / `lint` / `format:
 
 **Why `.git/hooks` and not `core.hooksPath`:** a per-repo `core.hooksPath` shadows a global `core.hooksPath` dispatcher, silently disabling any global commit policy (no-coauthor / no-unsigned-push) for that repo. A global dispatcher chains to `.git/hooks/<name>`, so installing there composes with global policy. The installer no-ops on CI, inside `node_modules`, and when there's no `.git` directory.
 
-**Scoping to staged files — `lint:staged` / `format:check:staged` (optional):** whole-repo `lint` and `format:check` get slow in a workspace. If `package.json` defines `lint:staged` and/or `format:check:staged`, the hook computes the staged paths (`git diff --cached --name-only --diff-filter=ACMR -z`, NUL-delimited so names with spaces are safe) and calls the script with them as arguments, `npm run lint:staged -- <paths>`, instead of the whole-repo script. Each is chosen independently: `lint:staged` replaces `lint`, `format:check:staged` replaces `format:check`, and a missing one falls back to the whole-repo script exactly as before. When nothing is staged the staged scripts are skipped. The hook stays check-only: it never writes and never re-stages. A single-package repo can point them at its own tools:
+**Scoping to staged files — `lint:staged` / `format:check:staged` (optional):** whole-repo `lint` and `format:check` get slow in a workspace. If `package.json` defines `lint:staged` and/or `format:check:staged`, the hook computes the staged paths (`git diff --cached --name-only --diff-filter=ACMR -z`, NUL-delimited so names with spaces are safe) and calls the script with them as arguments, `npm run lint:staged -- <paths>`, instead of the whole-repo script. Each is chosen independently: `lint:staged` replaces `lint`, `format:check:staged` replaces `format:check`, and a missing one falls back to the whole-repo script exactly as before. When nothing is staged the staged scripts are skipped. The paths reach the script through `xargs`, so a very large staged list can be split across more than one call; each call must pass, so the script shouldn't rely on seeing every path at once. The hook stays check-only: it never writes and never re-stages. A single-package repo can point them at its own tools:
 
 ```jsonc
 {
 	"scripts": {
-		"lint:staged": "eslint --config .configs/eslint.config.mjs",
+		"lint:staged": "eslint --config .configs/eslint.config.mjs --no-warn-ignored",
 		"format:check:staged": "prettier --config .configs/.prettierrc --check --ignore-unknown"
 	}
 }
