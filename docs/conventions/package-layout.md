@@ -52,7 +52,7 @@ The module graph reachable from `src/index.mjs` must not use top-level `await` a
 
 if (!process.features?.require_module) {
 	const error = new Error(
-		`@cldmv/<pkg>: require() needs Node.js ^20.19.0 or >=22.13.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
+		`@cldmv/<pkg>: require() needs Node.js >=22.22.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
 	);
 	error.code = "ERR_REQUIRE_ESM";
 	throw error;
@@ -111,7 +111,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 		"./package.json": "./package.json"
 	},
 	"files": ["dist/", "!dist/**/*.map", "types/"],
-	"engines": { "node": "^20.19.0 || >=22.13.0" },
+	"engines": { "node": ">=22.22.0" },
 	"scripts": {
 		"build": "tsup",
 		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build",
@@ -125,7 +125,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 }
 ```
 
-- **`engines.node` is `^20.19.0 || >=22.13.0`** because the CJS entry needs `require(esm)` (Node ^20.19 / ≥22.12), and Node 22.12.x prints an `ExperimentalWarning` when `require()` loads an ES module. Any lower floor is wrong: the guard in `index.cjs` already rejects versions without `require(esm)` at runtime.
+- **`engines.node` is `>=22.22.0`**, the fleet floor. The dev toolchain needs it (chokidar 6 requires Node 22.22, tsup 9 requires 22.18), so CI can't test anything older, and the package doesn't claim support it can't test. Set `min_node_version` to `22.22.0` in `ci.yml` and `publish.yml` to match. The CJS entry also needs `require(esm)` without Node 22.12's `ExperimentalWarning`, which this floor covers; the guard in `index.cjs` still rejects a Node without `require(esm)` with a clear message.
 - **`files` ships `dist/` and `types/`, never `src/`.**
 - **`dist/` is gitignored** and rebuilt by `prepack`.
 
@@ -172,7 +172,7 @@ A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <d
 - **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too.
 - **`test:dist` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
 - **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
-- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.15.0` for slothlet 3.x). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml` (the template default is lower, and the lowest matrix job fails on a Node that slothlet itself does not support).
+- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.22.0`, the same as the fleet floor). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml`.
 
 ## The `<pkg>-dev` condition
 
