@@ -79,6 +79,11 @@ eq(
 );
 eq(planLabelChange(L("Status: Implemented"), "status: implemented").skip, true, "case-insensitive match");
 eq(planLabelChange(L("status: verified"), "status: implemented").skip, true, "never downgrades verified");
+eq(
+	planLabelChange(L("status: implemented - dev"), "status: implemented"),
+	{ skip: false, remove: ["status: implemented - dev"] },
+	"promotes implemented - dev"
+);
 eq(planLabelChange(["status: in progress"], "status: implemented"), { skip: false, remove: ["status: in progress"] }, "string labels");
 eq(planLabelChange(null, "status: implemented"), { skip: false, remove: [] }, "null labels");
 
