@@ -1,6 +1,8 @@
 /**
  * @fileoverview Per-repo bootstrap. Applies the v4 org baseline to ONE repo:
- *   - create next/hotfixes if missing
+ *   - create next/hotfixes if missing, plus the orphan badges branch the
+ *     coverage badge job pushes to (never reset if it exists; opt out with
+ *     create_badges_branch=false)
  *   - flip repo settings (auto-merge, delete-branch-on-merge, merge methods,
  *     and PR-merge dialog defaults: title=PR title, body=PR description for
  *     both merge and squash — the per-branch ruleset picks which method runs)
@@ -42,6 +44,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getInput, setOutput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
+import { createOrphanBadgesBranch } from "./badges-branch.mjs";
 import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-generator/builders.mjs";
 
 const warnings = [];
@@ -110,6 +113,8 @@ async function main() {
 	);
 	const nextBranch = getInput("next_branch") || "next";
 	const hotfixesBranch = getInput("hotfixes_branch") || "hotfixes";
+	const badgesBranch = getInput("badges_branch") || "badges";
+	const createBadgesBranch = getInput("create_badges_branch") !== "false";
 	const botAppId = parseInt(getInput("bot_app_id") || "1910694", 10);
 	// Security feature policies are 3-way: "off" | "public-only" | "all".
 	// public-only resolves per-repo against the visibility check below.
@@ -196,6 +201,27 @@ async function main() {
 			}
 			await mutate("POST", "/git/refs", { ref: `refs/heads/${branch}`, sha: defaultBranchSha }, `create ${branch}`);
 			ok(`created ${branch} at ${defaultBranchSha.slice(0, 7)}`, `branch.${branch}.created`);
+		}
+	}
+
+	if (steps.has("branches") && createBadgesBranch) {
+		let exists = false;
+		try {
+			await api("GET", `/git/ref/heads/${badgesBranch}`, null, ctx);
+			exists = true;
+		} catch (err) {
+			if (!err.message.includes("404")) throw err;
+		}
+		if (exists) {
+			// Holds badge history — never reset.
+			note(`${badgesBranch} already exists — leaving alone`);
+			applied.push(`branch.${badgesBranch}.existed`);
+		} else if (dryRun) {
+			console.log(`🔸 [dry-run] would create orphan ${badgesBranch} branch (tree + commit + ref)`);
+			applied.push(`branch.${badgesBranch}.created`);
+		} else {
+			await createOrphanBadgesBranch((method, path, body) => api(method, path, body, ctx), badgesBranch);
+			ok(`created orphan ${badgesBranch} branch`, `branch.${badgesBranch}.created`);
 		}
 	}
 
