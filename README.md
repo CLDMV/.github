@@ -90,7 +90,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
     ├── common/  git/  github/  npm/  node/  docker/  coverage/  workflows/
     └── community/                               # CLA, release notifier
 data/github-labels.json                          # org label catalog
-docs/conventions/                                # branch-naming, embedded-tests-ci, package-layout, release-flow-v4
+docs/conventions/                                # branch-naming, embedded-tests-ci, package-layout, readme-format, release-flow-v4
 docs/tools/ruleset-generator/                   # browser tool — emits master/next/hotfixes ruleset JSON
 scripts/setup-org-rulesets.mjs                  # one-shot installer for the org-wide branch-naming ruleset
 examples/
@@ -219,6 +219,7 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
 - **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build and the `<pkg>-dev` condition.
+- **[docs/conventions/readme-format.md](docs/conventions/readme-format.md)** — the shared package README format, with a fill-in skeleton at [`examples/readme/README.template.md`](examples/readme/README.template.md).
 - **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.
 - **[.github/actions/README.md](.github/actions/README.md)** — how the actions are structured.
 - **[.github/instructions/repo-conventions.instructions.md](.github/instructions/repo-conventions.instructions.md)** — tag, signing, API-version, and secret-naming rules.

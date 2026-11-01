@@ -121,7 +121,7 @@ Both persistent release-PR workflows (`workflow-next-release.yml`, `workflow-hot
 - **Version.** Read from the release PR title (`release: vX.Y.Z …`) written by create/update-release-pr, not recomputed; `package.json` on the source branch is the fallback when the title carries no version.
 - **File lookup.** Identical to the release-PR body generator: the `changelog_file` input / `CLDMV_CHANGELOG_FILE` template, then `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md` under `changelog_dir` / `CLDMV_CHANGELOG_DIR`, or `docs/changelog` and `docs/changelogs` when unset. A missing file fails the check with the expected path and the branch to commit it to.
 - **Re-runs.** Runs on every push to the source branch, including the `chore: bump version` push that becomes the PR head, so landing the changelog (via a docs PR into `next` / `hotfixes`) turns it green.
-- **README advisory.** When the README has a "What's New" section that doesn't name the version, the job emits a warning annotation; this never fails the check.
+- **README advisory.** When the README has a "What's New" section that doesn't name the version, the job emits a warning annotation; this never fails the check. The expected README shape (Latest plus exactly four Recent Releases) is in [readme-format.md](readme-format.md).
 - **Gate.** The check runs inside the Next / Hotfixes Release workflows, which `release-merge.yml` already lists in its `workflow_run` `workflows:`, so no extra entry is needed there.
 
 #### Opting out: `CLDMV_SKIP_CHANGELOG_CHECK`
