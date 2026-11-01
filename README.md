@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.5 (October 2026)
+### Latest: v4.33.6 (October 2026)
 
-- **Per-file dist layout for slothlet-based libraries** — the library package layout convention now covers packages that compose their own API with slothlet. Because slothlet scans the `api/` folder at runtime, these libraries publish a `dist/` that mirrors `src/` file by file (`bundle: false`) instead of a single bundle, and the section spells out the related rules: the verbatim `index.cjs` copy, the devcheck import, no top-level `await`, a `test:dist` that composes the built api, and an engines floor that follows slothlet's in `package.json`, `ci.yml` and `publish.yml`.
-- [View full v4.33.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.5.md)
+- **Org label sync works again** — the `release: deps-only` label description was over GitHub's 100-character cap, which made the sync error for every repo since v4.33.0. The description is shortened, per-repo sync errors are now printed to the job log, and a new label-length test fails when any label name or description exceeds GitHub's limits.
+- [View full v4.33.6 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.6.md)
 
 ### Recent Releases
 
+- **v4.33.5** (October 2026) — Per-file dist layout for slothlet-based libraries added to the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.5.md))
 - **v4.33.4** (October 2026) — Library package layout convention for published CLDMV JavaScript libraries ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.4.md))
 - **v4.33.3** (October 2026) — Rolling `vX` / `vX.Y` tag updates no longer re-trigger themselves ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md))
 - **v4.33.2** (October 2026) — Tag-health jobs run again on changelog-sized tag messages ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.2.md))
-- **v4.33.1** (October 2026) — Publish stops reporting `cancelled` when the standalone tag workflow carries the `local-` prefix ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.1.md))
 
 ## 📋 Quick Start
 
