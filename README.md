@@ -4,10 +4,11 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.33.6 (October 2026)
+### Latest: v4.34.0 (October 2026)
 
+- **`status: implemented - dev` label** — a new lifecycle status for work built and pushed to a `dev` working branch but not yet merged into `next` or `hotfixes`. It moves to `status: implemented` automatically when the PR merges.
 - **Org label sync works again** — the `release: deps-only` label description was over GitHub's 100-character cap, which made the sync error for every repo since v4.33.0. The description is shortened, per-repo sync errors are now printed to the job log, and a new label-length test fails when any label name or description exceeds GitHub's limits.
-- [View full v4.33.6 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.6.md)
+- [View full v4.34.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md)
 
 ### Recent Releases
 
