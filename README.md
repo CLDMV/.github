@@ -4,18 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.0 (November 2026)
+### Latest: v4.35.1 (November 2026)
 
-- **Org bootstrap creates the `badges` branch** — the `branches` step now creates the orphan `badges` branch the coverage-badge job pushes to, and never resets an existing one. The pre-commit hook can also check only staged files through optional `lint:staged` / `format:check:staged` scripts, and a new README template and format convention cover CLDMV packages.
-- **Safer org automation** — the label sync validates the whole catalog before it touches any repo, routine Dependabot bumps whose bodies quote a GHSA id stay on `next` instead of being redirected to `hotfixes`, and the CI test matrix starts at Node.js 22.22.0.
-- [View full v4.35.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md)
+- **Runtime floor and dev floor are separate** — the package layout convention now sets `engines.node` to the Node.js the published package actually runs on, and puts the toolchain's `>=22.22.0` in `devEngines`. CI's `min_node_version` is documented as following `devEngines`; its default doesn't change.
+- [View full v4.35.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md)
 
 ### Recent Releases
 
+- **v4.35.0** (November 2026) — Orphan `badges` branch in org bootstrap, staged-only pre-commit checks and a README template ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md))
 - **v4.34.0** (October 2026) — `status: implemented - dev` label and a fix for the org label sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md))
 - **v4.33.5** (October 2026) — Per-file dist layout for slothlet-based libraries added to the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.5.md))
 - **v4.33.4** (October 2026) — Library package layout convention for published CLDMV JavaScript libraries ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.4.md))
-- **v4.33.3** (October 2026) — Rolling `vX` / `vX.Y` tag updates no longer re-trigger themselves ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.3.md))
 
 ## 📋 Quick Start
 
