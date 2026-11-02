@@ -64,7 +64,7 @@ on:
                 required: false
                 default: "lts/*"
             min_node_version:
-                description: "Minimum Node.js version for matrix testing (default: 22.22.0, the CLDMV fleet floor)"
+                description: "Minimum Node.js version for matrix testing (default: 22.22.0, the dev toolchain floor; keep it equal to package.json devEngines, not engines)"
                 type: string
                 required: false
                 default: "22.22.0"
@@ -134,6 +134,7 @@ jobs:
             debug: ${{ github.event.inputs.debug == 'true' }}
             dry_run: ${{ github.event.inputs.dry_run == 'true' }}
             node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
+            # Dev toolchain floor (package.json devEngines), not the package runtime floor (engines).
             min_node_version: ${{ github.event.inputs.min_node_version || '22.22.0' }}
             max_node_major: ${{ github.event.inputs.max_node_major || '' }} # blank ⇒ inherit the CLDMV/.github reusable default
             package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
