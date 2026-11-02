@@ -52,7 +52,7 @@ The module graph reachable from `src/index.mjs` must not use top-level `await` a
 
 if (!process.features?.require_module) {
 	const error = new Error(
-		`@cldmv/<pkg>: require() needs Node.js >=22.22.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
+		`@cldmv/<pkg>: require() needs Node.js ^20.19.0 or >=22.13.0 (this is ${process.version}). On older Node.js, load the package with import() instead.`
 	);
 	error.code = "ERR_REQUIRE_ESM";
 	throw error;
@@ -111,7 +111,8 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 		"./package.json": "./package.json"
 	},
 	"files": ["dist/", "!dist/**/*.map", "types/"],
-	"engines": { "node": ">=22.22.0" },
+	"engines": { "node": "<runtime floor, e.g. >=18.0.0>" },
+	"devEngines": { "runtime": { "name": "node", "version": ">=22.22.0", "onFail": "error" } },
 	"scripts": {
 		"build": "tsup",
 		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build",
@@ -125,7 +126,9 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 }
 ```
 
-- **`engines.node` is `>=22.22.0`**, the fleet floor. The dev toolchain needs it (chokidar 6 requires Node 22.22, tsup 9 requires 22.18), so CI can't test anything older, and the package doesn't claim support it can't test. Set `min_node_version` to `22.22.0` in `ci.yml` and `publish.yml` to match. The CJS entry also needs `require(esm)` without Node 22.12's `ExperimentalWarning`, which this floor covers; the guard in `index.cjs` still rejects a Node without `require(esm)` with a clear message.
+- **`engines.node` is the runtime floor**: the oldest Node.js the published package actually runs on, for consumers. It is the highest of the runtime and peer dependencies' own `engines`, what the shipped code's syntax and APIs need, and the floor the package has always promised. Don't raise it to the dev toolchain's floor: a library built to run on older Node.js (wisp, for example) keeps its low floor. tsup's `target` matches it (`node<major>`).
+- **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5, tsup 9 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
+- **`require()` needs `require(esm)`.** The guard in `index.cjs` rejects a Node.js without it and says `^20.19.0 or >=22.13.0` (22.12 prints an `ExperimentalWarning`), or the runtime floor if that is higher. `import` works down to the runtime floor.
 - **`files` ships `dist/` and `types/`, never `src/`.**
 - **`dist/` is gitignored** and rebuilt by `prepack`.
 
@@ -172,7 +175,7 @@ A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <d
 - **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too.
 - **`test:dist` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
 - **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
-- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on (`>=22.22.0`, the same as the fleet floor). The CI matrix must test that floor: set `min_node_version` to the same version in both `ci.yml` and `publish.yml`.
+- **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on, since slothlet runs at import time.
 
 ## The `<pkg>-dev` condition
 
