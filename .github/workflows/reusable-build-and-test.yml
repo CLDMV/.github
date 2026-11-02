@@ -50,7 +50,7 @@ on:
                 type: string
                 default: "lts/*"
             min_node_version:
-                description: "Minimum Node.js version to test (default: 22.22.0, the CLDMV fleet floor)"
+                description: "Minimum Node.js version to test (default: 22.22.0, the dev toolchain floor; callers keep it equal to package.json devEngines, not engines)"
                 required: false
                 type: string
                 default: "22.22.0"
