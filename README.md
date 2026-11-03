@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.1 (November 2026)
+### Latest: v4.35.2 (November 2026)
 
-- **Runtime floor and dev floor are separate** — the package layout convention now sets `engines.node` to the Node.js the published package actually runs on, and puts the toolchain's `>=22.22.0` in `devEngines`. CI's `min_node_version` is documented as following `devEngines`; its default doesn't change.
-- [View full v4.35.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md)
+- **Docs-only PRs skip the test matrix, and private repos publish to npm again** — the paths gate now diffs a feature-branch push against its PR base instead of a zero `before` SHA, so a docs-only PR skips the matrix from its first push. The npm publish jobs default to GitHub-hosted runners, because npm trusted publishing (OIDC) doesn't work from `cldmv-runners`.
+- [View full v4.35.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.2.md)
 
 ### Recent Releases
 
+- **v4.35.1** (November 2026) — `engines.node` as the runtime floor and `devEngines` as the dev toolchain floor in the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md))
 - **v4.35.0** (November 2026) — Orphan `badges` branch in org bootstrap, staged-only pre-commit checks and a README template ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md))
 - **v4.34.0** (October 2026) — `status: implemented - dev` label and a fix for the org label sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md))
 - **v4.33.5** (October 2026) — Per-file dist layout for slothlet-based libraries added to the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.5.md))
-- **v4.33.4** (October 2026) — Library package layout convention for published CLDMV JavaScript libraries ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.33.4.md))
 
 ## 📋 Quick Start
 
