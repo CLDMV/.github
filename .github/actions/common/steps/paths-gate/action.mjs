@@ -11,14 +11,28 @@
  *
  * Event handling:
  *   - pull_request / pull_request_target → GET /pulls/{n}/files (paginated)
- *   - push                               → GET /compare/{before}...{after}
+ *   - push to a feature branch           → GET /compare/{base}...{after}, where
+ *     {base} is the branch its PR targets, routed like feature-pr.yml:
+ *     `hotfix/**` → hotfixes, the captured prefixes → next, anything else →
+ *     the default branch. That is the PR's own diff, so it is right on the
+ *     first push (zero `before`) and on every later push. `before..after`
+ *     only sees the latest push and would call a branch docs-only after a
+ *     docs commit lands on top of a code commit. A base that doesn't exist
+ *     (a repo with no `next`) falls back to the default branch.
+ *   - push to an integration branch      → GET /compare/{before}...{after}
+ *     (next, hotfixes, master/main or the default branch, where the push
+ *     itself is the change set)
  *   - workflow_dispatch / schedule       → no diff context; output is empty
  *     (callers should treat empty as "not docs_only" — i.e. run normally)
  *
  * Fallback: whenever the diff can't be trusted, the gate emits
  * `docs_only=false` plus a `::notice::` naming the reason, so the full CI runs.
  * It never fails the run because of the comparison. That covers:
- *   - a push whose `before` is missing or the zero SHA (new branch / new ref);
+ *   - a push to an integration branch whose `before` is missing or the zero
+ *     SHA (new branch / new ref);
+ *   - a feature-branch push whose compare fails against both the PR base and
+ *     the default branch;
+ *   - a compare that lists 300 files, the API's cap (the list may be cut short);
  *   - a compare API failure — `404 No common ancestor` when the pushed ref's
  *     history was rewritten (e.g. a new root commit force-pushed over the old
  *     tip), `404 Not Found` when `before` no longer exists, or any other error;
@@ -67,6 +81,47 @@ function globMatch(name, pattern) {
 	return new RegExp(re + "$").test(name);
 }
 
+/** Prefixes feature-pr.yml routes into `next`. Keep in step with its case arms. */
+const NEXT_PREFIXES = ["feat", "feature", "fix", "docs", "chore", "deps", "refactor", "ci", "perf", "test", "style", "release"];
+
+/**
+ * The compare API lists at most 300 files. A diff that reaches the cap may be
+ * truncated, so it can't prove the change is docs-only.
+ */
+const COMPARE_FILE_CAP = 300;
+
+/**
+ * Pick the branch a pushed branch's PR will target, mirroring feature-pr.yml.
+ * Returns null for integration branches, whose push is diffed against `before`.
+ *
+ * @param {string} branch - Pushed branch name (without refs/heads/).
+ * @param {string} defaultBranch - Repository default branch.
+ * @returns {string|null}
+ */
+function resolvePrBase(branch, defaultBranch) {
+	if (!branch) return null;
+	const integration = new Set(["next", "hotfixes", "master", "main", defaultBranch].filter(Boolean));
+	if (integration.has(branch)) return null;
+	if (branch.startsWith("hotfix/")) return "hotfixes";
+	if (NEXT_PREFIXES.some((p) => branch.startsWith(`${p}/`))) return "next";
+	return defaultBranch || null;
+}
+
+/**
+ * Turn a compare response into a file list, refusing one the API may have cut short.
+ *
+ * @param {object} compare - GET /compare response.
+ * @param {string} label - Range description for the log.
+ * @returns {{files: string[] | null, reason: string, fallback?: boolean}}
+ */
+function compareFiles(compare, label) {
+	const files = (compare?.files || []).map((f) => f.filename);
+	if (files.length >= COMPARE_FILE_CAP) {
+		return { files: null, fallback: true, reason: `${label} lists ${files.length} files, the API's cap, so the list may be truncated` };
+	}
+	return { files, reason: label };
+}
+
 /**
  * Collect changed-file paths for the current event from the GitHub REST API.
  *
@@ -97,6 +152,25 @@ async function collectChangedFiles({ token, owner, repo }) {
 	if (eventName === "push") {
 		const before = event.before || "";
 		const after = event.after || process.env.GITHUB_SHA || "";
+		const ref = event.ref || process.env.GITHUB_REF || "";
+		const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : "";
+		const defaultBranch = event.repository?.default_branch || "";
+		const prBase = resolvePrBase(branch, defaultBranch);
+
+		if (prBase) {
+			const bases = [...new Set([prBase, defaultBranch].filter(Boolean))];
+			const failures = [];
+			for (const base of bases) {
+				try {
+					const compare = await api("GET", `/compare/${encodeURIComponent(base)}...${after}`, null, { token, owner, repo });
+					return compareFiles(compare, `compare ${base}...${branch} (PR base)`);
+				} catch (error) {
+					failures.push(`${base}: ${error.message}`);
+				}
+			}
+			return { files: null, fallback: true, reason: `compare against the PR base failed (${failures.join("; ")})` };
+		}
+
 		if (!before || /^0+$/.test(before)) {
 			return {
 				files: null,
@@ -124,7 +198,7 @@ async function collectChangedFiles({ token, owner, repo }) {
 				reason: `compare ${before}...${after} status=${status} — \`before\` is not an ancestor of \`after\` (force-push)`
 			};
 		}
-		return { files: (compare?.files || []).map((f) => f.filename), reason: `compare ${before}...${after}` };
+		return compareFiles(compare, `compare ${before}...${after}`);
 	}
 
 	return { files: null, reason: `event=${eventName} has no diff context` };
