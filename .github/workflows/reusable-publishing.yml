@@ -34,7 +34,7 @@ on:
                 required: false
                 type: string
                 default: ""
-                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+                description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest. The npm publish jobs skip the cldmv-runners step and use ubuntu-latest, because npm trusted publishing needs a GitHub-hosted runner."
             # Package information
             package_name:
                 description: "NPM package name (e.g., @cldmv/slothlet)"
@@ -337,7 +337,11 @@ jobs:
               inputs.dry_run == true ||
               needs.detect-version.outputs.version != needs.detect-version.outputs.npm-latest-version
             )
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        # npm trusted publishing (OIDC) only works from GitHub-hosted runners, so
+        # this job skips the private-repo cldmv-runners default (#425). It only
+        # publishes the artifact the build job uploaded. The runs_on input and
+        # RUNS_ON_DEFAULT still override it.
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         needs: [ detect-version, detect-repo-config ]
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
@@ -688,7 +692,9 @@ jobs:
             && needs.publish-npm.result != 'failure'
             && needs.publish-github-packages.result != 'failure'
             && needs.create-release.result != 'failure'
-        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        # Publishes to npm over OIDC like publish-npm, so it runs GitHub-hosted
+        # for the same reason (#425).
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || 'ubuntu-latest') }}
         permissions:
             id-token: write # NPM trusted publishers (OIDC) — provenance parity with core
             contents: write # Create the satellite's tag + GitHub Release
