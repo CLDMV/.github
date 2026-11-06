@@ -8,6 +8,7 @@
 
 import { getInput, exec } from "../../../common/common/core.mjs";
 import { resolvePackageManager, pmCommand } from "../../../npm/utilities/detect-package-manager/resolve.mjs";
+import { enableCorepack } from "../../../npm/utilities/corepack/enable.mjs";
 
 try {
 	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
@@ -15,14 +16,8 @@ try {
 	const testCommand = pmCommand(pm, rawTestCommand);
 	const environment = getInput("environment", { default: "development" });
 
-	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
-	if (pm !== "npm") {
-		try {
-			exec("corepack enable");
-		} catch {
-			// Best-effort; assume pnpm/yarn is already on PATH.
-		}
-	}
+	// Provision pnpm/yarn via corepack (installed from npm on Node 25+, where it isn't bundled).
+	if (pm !== "npm") enableCorepack();
 
 	// Log the raw input AND the package-manager-resolved command separately — the
 	// two differ once pmCommand() rewrites a leading npm/npx token (e.g.

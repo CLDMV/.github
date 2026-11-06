@@ -149,10 +149,6 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   cache: ${{ steps.pm.outputs.cache }}
 
-            - name: Enable corepack
-              if: steps.pm.outputs.package-manager != 'npm'
-              shell: bash
-              run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies

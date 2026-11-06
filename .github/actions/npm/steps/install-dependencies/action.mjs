@@ -12,6 +12,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { getInput, exec } from "../../../common/common/core.mjs";
 import { resolvePackageManager, hasLockfile, installCommand } from "../../utilities/detect-package-manager/resolve.mjs";
+import { enableCorepack } from "../../utilities/corepack/enable.mjs";
 
 try {
 	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
@@ -47,16 +48,11 @@ try {
 		process.exit(0);
 	}
 
-	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action,
-	// which keeps the scorecard Pinned-Dependencies check green). The version comes
-	// from package.json's packageManager field when present. npm needs no shim.
-	if (pm !== "npm") {
-		try {
-			exec("corepack enable");
-		} catch (error) {
-			console.log(`::warning::corepack enable failed (${error.message}); assuming ${pm} is already on PATH.`);
-		}
-	}
+	// Provision pnpm/yarn via corepack (no third-party action, which keeps the
+	// scorecard Pinned-Dependencies check green). Node 25+ doesn't bundle corepack,
+	// so enableCorepack() installs it from npm first. The version comes from
+	// package.json's packageManager field when present. npm needs no shim.
+	if (pm !== "npm") enableCorepack();
 
 	const cmd = installCommand(pm, frozen);
 	console.log(`📦 Installing dependencies with: ${cmd}`);
