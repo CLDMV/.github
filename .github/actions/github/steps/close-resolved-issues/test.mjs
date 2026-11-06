@@ -76,6 +76,37 @@ eq(extractCloseKeywords("just a normal message, no keyword"), new Set(), "no key
 eq(extractCloseKeywords(""), new Set(), "empty string");
 eq(extractCloseKeywords(null), new Set(), "null input");
 
+const self = { owner: "CLDMV", repo: "llm-translator" };
+eq(
+	extractCloseKeywords("Resolves [#109](https://github.com/CLDMV/llm-translator/issues/109)", self),
+	new Set([109]),
+	"markdown link label [#N](url)"
+);
+eq(extractCloseKeywords("Resolves [#109](https://example.com)"), new Set([109]), "markdown link label without repo context");
+eq(extractCloseKeywords("fixes CLDMV/llm-translator#12", self), new Set([12]), "owner/repo#N for this repo");
+eq(extractCloseKeywords("fixes cldmv/LLM-Translator#12", self), new Set([12]), "owner/repo#N matches case-insensitively");
+eq(extractCloseKeywords("fixes [CLDMV/llm-translator#12](https://x)", self), new Set([12]), "[owner/repo#N](url)");
+eq(extractCloseKeywords("fixes CLDMV/slothlet#12", self), new Set(), "owner/repo#N for another repo is ignored");
+eq(extractCloseKeywords("fixes CLDMV/llm-translator#12"), new Set(), "owner/repo#N ignored without repo context");
+eq(extractCloseKeywords("Closes https://github.com/CLDMV/llm-translator/issues/77", self), new Set([77]), "full issue URL for this repo");
+eq(
+	extractCloseKeywords("Closes https://github.com/CLDMV/llm-translator/issues/77#issuecomment-1", self),
+	new Set([77]),
+	"issue URL with a fragment"
+);
+eq(extractCloseKeywords("Closes https://github.com/CLDMV/slothlet/issues/77", self), new Set(), "issue URL for another repo is ignored");
+eq(extractCloseKeywords("Closes https://github.com/CLDMV/llm-translator/pull/77", self), new Set(), "a PR URL is not an issue reference");
+eq(
+	extractCloseKeywords("Fixes #1, resolves [#2](u) and closes https://github.com/CLDMV/llm-translator/issues/3", self),
+	new Set([1, 2, 3]),
+	"mixed forms in one blob"
+);
+eq(
+	extractCloseKeywords("fixes [the docs](https://github.com/CLDMV/llm-translator/issues/4)", self),
+	new Set(),
+	"link with non-ref label is not counted"
+);
+
 console.log("\nsourcePRTexts:");
 eq(
 	sourcePRTexts({ body: "desc", comments: [{ body: "a comment" }], commits: [{ commit: { message: "fix: x\n\nFixes #5" } }] }),
