@@ -164,8 +164,8 @@ on:
             type_check_command:
                 required: false
                 type: string
-                default: "npm run test:types"
-                description: "Command to run type checking (e.g. npm run test:types)"
+                default: "npm run types:check"
+                description: "Command to run type checking (e.g. npm run types:check)"
             skip_type_check:
                 required: false
                 type: boolean
@@ -357,7 +357,7 @@ jobs:
     # check — catches type errors before the PR merges into next. The coverage
     # jobs also type-check, but they only run on integration-branch pushes and
     # release PRs. Builds first with `coverage_build_command` (the
-    # src-preserving build) because `test:types` often resolves against
+    # src-preserving build) because the type check often resolves against
     # `dist/`. A command that names an npm script the repo doesn't have is
     # skipped with a notice, so repos without a type-check script keep passing;
     # set `skip_type_check: true` to drop the job entirely.
@@ -521,7 +521,7 @@ jobs:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
             # Coverage runs on a fresh runner — pass the src-PRESERVING build
-            # (`coverage_build_command`) so `dist/` exists for `test:types` AND
+            # (`coverage_build_command`) so `dist/` exists for the type check AND
             # `src/` survives for the coverage run. `build_command` is threaded
             # only as the explicit-empty fallback. Set `skip_build: true`
             # upstream for repos with no build.
@@ -613,7 +613,7 @@ jobs:
             node_version: ${{ inputs.node_version }}
             package_manager: ${{ inputs.package_manager }}
             # Coverage runs on a fresh runner — pass the src-PRESERVING build
-            # (`coverage_build_command`) so `dist/` exists for `test:types` AND
+            # (`coverage_build_command`) so `dist/` exists for the type check AND
             # `src/` survives for the coverage run. `build_command` is threaded
             # only as the explicit-empty fallback.
             build_command: ${{ inputs.build_command }}
