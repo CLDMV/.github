@@ -45,7 +45,12 @@ import { getInput, setOutput } from "../../../common/common/core.mjs";
 
 const PR_REF_RE = /\(#(\d+)\)/g;
 const RESOLVES_MARKER_RE = /<!--\s*gh-broker:resolves:\s*([\d,\s#]+?)\s*-->/gi;
-const CLOSE_KW_RE = /\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+#(\d+)\b/gi;
+// Keyword, then one issue reference in any form GitHub accepts as a closing
+// reference: `#N`, `owner/repo#N`, a full issue URL, or either of the first two
+// wrapped as a markdown link label (`[#N](url)`). Groups: 1/2 = owner/repo of a
+// qualified ref, 3 = its number; 4/5/6 = owner/repo/number of an issue URL.
+const CLOSE_KW_RE =
+	/\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+\[?(?:(?:([\w.-]+)\/([\w.-]+))?#(\d+)\b|https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/issues\/(\d+)\b)/gi;
 
 /**
  * Extract every `(#N)` PR reference from a commit subject. Conservative —
@@ -99,16 +104,28 @@ export function extractResolvesMarkers(text) {
 
 /**
  * Pull every issue number off a block of text via the
- * `(fix(es|ed)?|close[sd]?|resolve[sd]?) #N` keyword regex — the same forms
- * GitHub's own native auto-close recognizes.
+ * `(fix(es|ed)?|close[sd]?|resolve[sd]?) <ref>` keyword regex — the same forms
+ * GitHub's own native auto-close recognizes. `<ref>` is `#N`, `[#N](url)`,
+ * `owner/repo#N`, `[owner/repo#N](url)` or
+ * `https://github.com/owner/repo/issues/N`. Qualified refs and URLs only count
+ * when they name the repo passed in `owner`/`repo` (case-insensitive); without
+ * a repo they're ignored, since they may point anywhere.
  * @public
  */
-export function extractCloseKeywords(text) {
+export function extractCloseKeywords(text, { owner, repo } = {}) {
 	const found = new Set();
 	if (typeof text !== "string" || !text) return found;
+	const self = owner && repo ? `${owner}/${repo}`.toLowerCase() : null;
 	let m;
 	const re = new RegExp(CLOSE_KW_RE.source, CLOSE_KW_RE.flags);
-	while ((m = re.exec(text)) !== null) found.add(Number(m[1]));
+	while ((m = re.exec(text)) !== null) {
+		const [, refOwner, refRepo, refNum, urlOwner, urlRepo, urlNum] = m;
+		if (refNum !== undefined) {
+			if (refOwner === undefined || `${refOwner}/${refRepo}`.toLowerCase() === self) found.add(Number(refNum));
+		} else if (`${urlOwner}/${urlRepo}`.toLowerCase() === self) {
+			found.add(Number(urlNum));
+		}
+	}
 	return found;
 }
 
@@ -201,6 +218,8 @@ async function main() {
 	const sha = getInput("commit-sha") || process.env.GITHUB_SHA;
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 
+	const closeKeywords = (text) => extractCloseKeywords(text, { owner, repo });
+
 	if (!sha) throw new Error("No commit SHA available — pass commit-sha or run this action where GITHUB_SHA is set.");
 
 	console.log(`🔍 Resolving the release PR for ${sha.slice(0, 7)}...`);
@@ -247,7 +266,7 @@ async function main() {
 
 		const attributedPR = prRefs[prRefs.length - 1];
 		if (attributedPR == null) continue;
-		collectInto(issueSources, extractCloseKeywords, fullMessage, attributedPR);
+		collectInto(issueSources, closeKeywords, fullMessage, attributedPR);
 	}
 	console.log(
 		`🔗 Source PR(s) bundled in this release: ${
@@ -284,7 +303,7 @@ async function main() {
 			const texts = sourcePRTexts({ body: sourcePRData?.body, comments: comments.items, commits: prCommits.items });
 			for (const text of texts) {
 				collectInto(issueSources, extractResolvesMarkers, text, sourcePR);
-				collectInto(issueSources, extractCloseKeywords, text, sourcePR);
+				collectInto(issueSources, closeKeywords, text, sourcePR);
 			}
 		} catch (err) {
 			console.log(`⚠️ Could not read PR #${sourcePR} (description/comments/commits): ${err.message}`);

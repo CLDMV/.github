@@ -133,6 +133,7 @@ async function main() {
 	const branch = getInput("branch") || process.env.GITHUB_REF_NAME || "next";
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
 	const ctx = { token, owner, repo };
+	const closeKeywords = (text) => extractCloseKeywords(text, { owner, repo });
 
 	if (!after) throw new Error("No head SHA — pass `after` or run where GITHUB_SHA is set.");
 
@@ -172,7 +173,7 @@ async function main() {
 			]);
 			for (const text of sourcePRTexts({ body: prData?.body, comments: comments.items, commits: prCommits.items })) {
 				collectInto(issueSources, extractResolvesMarkers, text, sourcePR);
-				collectInto(issueSources, extractCloseKeywords, text, sourcePR);
+				collectInto(issueSources, closeKeywords, text, sourcePR);
 			}
 		} catch (err) {
 			console.log(`⚠️ Could not read PR #${sourcePR} (description/comments/commits): ${err.message}`);
@@ -184,7 +185,7 @@ async function main() {
 		const message = c?.commit?.message || "";
 		const subjectPRs = [...extractMergedPRRefs(message.split("\n", 1)[0])];
 		const source = subjectPRs.length ? subjectPRs[subjectPRs.length - 1] : sourcePRs.length === 1 ? sourcePRs[0] : c.sha;
-		collectInto(issueSources, extractCloseKeywords, message, source);
+		collectInto(issueSources, closeKeywords, message, source);
 		collectInto(issueSources, extractResolvesMarkers, message, source);
 	}
 	console.log(`🎯 Candidate issue(s): ${[...issueSources.keys()].map((n) => `#${n}`).join(", ") || "<none>"}`);
