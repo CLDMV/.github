@@ -55,10 +55,10 @@ on:
                 default: "npm run build"
 
             type_check_command:
-                description: "Command to run type checking (e.g. npm run types:check)"
+                description: "Command to run type checking (e.g. npm run test:types)"
                 required: false
                 type: string
-                default: "npm run types:check"
+                default: "npm run test:types"
 
             coverage_command:
                 description: "Command to run tests and generate coverage (e.g. npm run ci:coverage)"

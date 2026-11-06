@@ -170,7 +170,8 @@ on:
                 required: false
                 type: boolean
                 default: false
-                description: "Skip the type-check step in the coverage-badge job"
+                description: "Skip the type check (the type-check job on feature
+                    pushes and PRs, and the type-check step in both coverage jobs)"
 
             # ── Coverage badge ─────────────────────────────────────────────────
             enable_coverage_badge:
@@ -350,6 +351,100 @@ jobs:
         secrets:
             BOT_APP_CLIENT_ID: ${{ secrets.BOT_APP_CLIENT_ID || secrets.BOT_APP_ID }}
             BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+    # Type check, once per run (not per matrix leg). Runs wherever `ci` runs,
+    # so a feature branch's push run — the one that reports the PR's required
+    # check — catches type errors before the PR merges into next. The coverage
+    # jobs also type-check, but they only run on integration-branch pushes and
+    # release PRs. Builds first with `coverage_build_command` (the
+    # src-preserving build) because `test:types` often resolves against
+    # `dist/`. A command that names an npm script the repo doesn't have is
+    # skipped with a notice, so repos without a type-check script keep passing;
+    # set `skip_type_check: true` to drop the job entirely.
+    type-check:
+        name: "🔎 Type Check"
+        needs: [sync-gate, paths-gate, commit-gate]
+        if: |
+            !cancelled() &&
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.sync-gate.outputs.is_master_sync != 'true' &&
+            !(inputs.skip_type_check == true || inputs.skip_type_check == 'true')
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  cache: ${{ steps.pm.outputs.cache }}
+
+            - name: Enable corepack
+              if: steps.pm.outputs.package-manager != 'npm'
+              shell: bash
+              run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
+
+            - name: Install dependencies
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              env:
+                  CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+              with:
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
+
+            - name: Build
+              if: ${{ !(inputs.skip_build == true || inputs.skip_build == 'true') }}
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
+              run: |
+                  cmd="$CMD"
+                  script=$(printf '%s' "$cmd" | sed -nE 's/^(npm|pnpm|yarn) run ([^ ]+).*/\2/p')
+                  if [ -n "$script" ] && ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script"; then
+                    echo "::notice::No \"$script\" script in package.json; skipping the build."
+                    exit 0
+                  fi
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
+
+            - name: Type check
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.type_check_command }}
+              run: |
+                  cmd="$CMD"
+                  script=$(printf '%s' "$cmd" | sed -nE 's/^(npm|pnpm|yarn) run ([^ ]+).*/\2/p')
+                  if [ -n "$script" ] && ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script"; then
+                    echo "::notice::No \"$script\" script in package.json; skipping the type check. Set skip_type_check: true to drop this job."
+                    exit 0
+                  fi
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
 
     # Lint + format autofix, POST-MERGE only. Runs on a push to next / hotfixes
     # (i.e. after a feature PR squash-merges in), applies safe fixes, and commits
