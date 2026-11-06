@@ -217,6 +217,11 @@ jobs:
                   CMD: ${{ inputs.type_check_command }}
               run: |
                   cmd="$CMD"
+                  script=$(printf '%s' "$cmd" | sed -nE 's/^(npm|pnpm|yarn) run ([^ ]+).*/\2/p')
+                  if [ -n "$script" ] && ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script"; then
+                    echo "::notice::No \"$script\" script in package.json; skipping the type check. Set skip_type_check: true to drop this step."
+                    exit 0
+                  fi
                   if [ "$PM" != "npm" ]; then
                     case "$cmd" in
                       "npm "*) cmd="$PM ${cmd#npm }" ;;
