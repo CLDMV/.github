@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import { getInput, exec } from "../../../common/common/core.mjs";
 import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
+import { enableCorepack } from "../../utilities/corepack/enable.mjs";
 
 try {
 	const newVersion = getInput("new-version", { required: true });
@@ -19,14 +20,8 @@ try {
 		console.log(`📝 Package.json already at version ${newVersion} - no update needed`);
 	} else {
 		console.log(`📝 Updating package.json from ${currentVersion} to ${newVersion}`);
-		// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
-		if (pm !== "npm") {
-			try {
-				exec("corepack enable");
-			} catch (error) {
-				console.log(`::warning::corepack enable failed (${error.message}); assuming ${pm} is already on PATH.`);
-			}
-		}
+		// Provision pnpm/yarn via corepack (installed from npm on Node 25+, where it isn't bundled).
+		if (pm !== "npm") enableCorepack();
 		if (pm === "yarn") {
 			exec(`yarn version --new-version "${newVersion}" --no-git-tag-version`);
 		} else if (pm === "pnpm") {

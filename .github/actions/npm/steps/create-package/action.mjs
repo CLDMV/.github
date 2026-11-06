@@ -9,20 +9,15 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { getInput, setOutput } from "../../../common/common/core.mjs";
 import { resolvePackageManager } from "../../utilities/detect-package-manager/resolve.mjs";
+import { enableCorepack } from "../../utilities/corepack/enable.mjs";
 
 try {
 	const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 	const packageName = getInput("package-name");
 
 	console.log(`📦 Creating package with ${pm}...`);
-	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
-	if (pm !== "npm") {
-		try {
-			execSync("corepack enable", { stdio: "inherit" });
-		} catch {
-			console.log(`::warning::corepack enable failed; assuming ${pm} is already on PATH.`);
-		}
-	}
+	// Provision pnpm/yarn via corepack (installed from npm on Node 25+, where it isn't bundled).
+	if (pm !== "npm") enableCorepack();
 	execSync(pm === "yarn" ? "yarn pack" : pm === "pnpm" ? "pnpm pack" : "npm pack", { stdio: "inherit" });
 
 	// `ls *.tgz | head -1` — first .tgz in lexical order.
