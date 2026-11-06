@@ -56,7 +56,7 @@ Runs your test suite and build across a Node.js version matrix. On a push that l
 | `test`        | Always                                                                                      | `npm test`            |
 | `build:ci`    | Always                                                                                      | `npm run build:ci`    |
 | `ci:coverage` | When `enable_coverage_badge` / `enable_coverage_pr_comment` is `true` (both default `true`) | `npm run ci:coverage` |
-| `test:types`  | When `skip_type_check` is `false` (default)                                                 | `npm run test:types`  |
+| `types:check` | When `skip_type_check` is `false` (default)                                                 | `npm run types:check` |
 
 `ci:coverage` must produce a `coverage/coverage-summary.json` (Istanbul / c8 / Vitest reporter format). Path is configurable via `coverage_summary_path`.
 

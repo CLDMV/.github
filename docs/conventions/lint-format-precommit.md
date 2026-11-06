@@ -49,7 +49,7 @@ A workspace repo can make each script a small wrapper that maps the incoming pat
 **Project-specific checks — `precommit:local`:** the shared hook runs `lint` + `format:check` (or their `:staged` variants), then `npm run precommit:local --if-present`. To add repo-specific pre-commit checks — a type-check, a custom audit, an inventory gate — define a `precommit:local` script and the fleet hook runs it **last, after lint/format**. Don't fork `.githooks/pre-commit` to add checks: that drops the repo off the shared hook and it drifts out of sync. Example (a type-check gate):
 
 ```jsonc
-{ "scripts": { "precommit:local": "npm run test:types" } }
+{ "scripts": { "precommit:local": "npm run types:check" } }
 ```
 
 ## Debugging a precommit failure
