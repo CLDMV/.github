@@ -11,6 +11,7 @@
 
 import { getInput, exec, appendSummary } from "../../../common/common/core.mjs";
 import { resolvePackageManager, pmCommand } from "../../../npm/utilities/detect-package-manager/resolve.mjs";
+import { enableCorepack } from "../../../npm/utilities/corepack/enable.mjs";
 
 const pm = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 const buildCommand = pmCommand(pm, getInput("build-command", { required: true }));
@@ -22,14 +23,8 @@ appendSummary(`- Started: ${new Date().toString()}`);
 appendSummary("");
 
 try {
-	// Provision pnpm/yarn via corepack (bundled with Node — no third-party action).
-	if (pm !== "npm") {
-		try {
-			exec("corepack enable");
-		} catch {
-			// Best-effort; assume pnpm/yarn is already on PATH.
-		}
-	}
+	// Provision pnpm/yarn via corepack (installed from npm on Node 25+, where it isn't bundled).
+	if (pm !== "npm") enableCorepack();
 	exec(buildCommand, { NODE_ENV: environment });
 	appendSummary("✅ **Build completed successfully**");
 	appendSummary(`- Finished: ${new Date().toString()}`);

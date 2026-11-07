@@ -118,6 +118,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build",
 		"prepack": "npm run build",
 		"types:build": "tsc -p .configs/tsconfig.json",
+		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"test": "node tests/run-vitest.mjs && npm run test:dist",
 		"test:dist": "npm run build && node --conditions=<pkg>-dev --test tests/cjs/entry.test.cjs",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
@@ -129,6 +130,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 - **`engines.node` is the runtime floor**: the oldest Node.js the published package actually runs on, for consumers. It is the highest of the runtime and peer dependencies' own `engines`, what the shipped code's syntax and APIs need, and the floor the package has always promised. Don't raise it to the dev toolchain's floor: a library built to run on older Node.js (wisp, for example) keeps its low floor. tsup's `target` matches it (`node<major>`).
 - **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5, tsup 9 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
 - **`require()` needs `require(esm)`.** The guard in `index.cjs` rejects a Node.js without it and says `^20.19.0 or >=22.13.0` (22.12 prints an `ExperimentalWarning`), or the runtime floor if that is higher. `import` works down to the runtime floor.
+- **Type scripts use three fixed names.** `types:check` type-checks the source without emitting (`tsc --noEmit`), and it's the script CI runs: `ci.yml` passes `type_check_command: "npm run types:check"`. `types:build` emits the declarations into `types/` and is part of `build:ci`. `test:types` is only for a test of the published types from a consumer's side (for example, compiling a consumer file against the built `.d.mts`), and it runs as part of `test`. Don't use `typecheck`, `build:types` or `test:types` for the plain source check. A repo with nothing to type-check sets `skip_type_check: true` in `ci.yml` and says why.
 - **`files` ships `dist/` and `types/`, never `src/`.**
 - **`dist/` is gitignored** and rebuilt by `prepack`.
 

@@ -55,10 +55,10 @@ on:
                 default: "npm run build"
 
             type_check_command:
-                description: "Command to run type checking (e.g. npm run test:types)"
+                description: "Command to run type checking (e.g. npm run types:check)"
                 required: false
                 type: string
-                default: "npm run test:types"
+                default: "npm run types:check"
 
             coverage_command:
                 description: "Command to run tests and generate coverage (e.g. npm run ci:coverage)"
@@ -69,7 +69,7 @@ on:
             # ── Build / type-check control ──────────────────────────────────────
             skip_build:
                 description: "Set to true to skip the build step (for repos that don't
-                    need `dist/` for `test:types` or coverage)."
+                    need `dist/` for the type check or coverage)."
                 required: false
                 type: boolean
                 default: false
@@ -169,10 +169,6 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   cache: ${{ steps.pm.outputs.cache }}
 
-            - name: Enable corepack
-              if: steps.pm.outputs.package-manager != 'npm'
-              shell: bash
-              run: corepack enable || echo "::warning::corepack enable failed; pnpm/yarn may be unavailable on PATH"
 
             # ── 3. Dependencies ─────────────────────────────────────────────────
             - name: Install dependencies
@@ -186,7 +182,7 @@ jobs:
             # The matrix `Build` step in reusable-build-and-test.yml runs on a
             # sibling runner with no shared filesystem, so its `dist/` is
             # invisible here. Build locally before type-check / coverage so
-            # consumers whose `test:types` resolves against compiled output
+            # consumers whose type check resolves against compiled output
             # (e.g. via a `./typegen` package export pointing at `dist/`)
             # don't fail with TS2307. Uses `coverage_build_command` (default
             # `npm run build`) — NOT the matrix `build_command`, which for
@@ -221,6 +217,11 @@ jobs:
                   CMD: ${{ inputs.type_check_command }}
               run: |
                   cmd="$CMD"
+                  script=$(printf '%s' "$cmd" | sed -nE 's/^(npm|pnpm|yarn) run ([^ ]+).*/\2/p')
+                  if [ -n "$script" ] && ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script"; then
+                    echo "::notice::No \"$script\" script in package.json; skipping the type check. Set skip_type_check: true to drop this step."
+                    exit 0
+                  fi
                   if [ "$PM" != "npm" ]; then
                     case "$cmd" in
                       "npm "*) cmd="$PM ${cmd#npm }" ;;

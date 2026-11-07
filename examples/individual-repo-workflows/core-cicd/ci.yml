@@ -135,9 +135,9 @@ on:
                 description: "Command to run type checking"
                 type: string
                 required: false
-                default: "npm run test:types"
+                default: "npm run types:check"
             skip_type_check:
-                description: "Skip the type-check step in the coverage-badge job"
+                description: "Skip the type check (the Type Check job and the coverage jobs' type-check step)"
                 type: boolean
                 required: false
                 default: false
@@ -265,8 +265,12 @@ jobs:
             badge_filename: ${{ github.event.inputs.badge_filename || 'coverage.json' }}
             upload_coverage_artifact: ${{ github.event.inputs.upload_coverage_artifact != 'false' }}
 
-            # ── Type check (runs inside the coverage-badge job) ────────────────────
-            type_check_command: ${{ github.event.inputs.type_check_command || 'npm run test:types' }}
+            # ── Type check ─────────────────────────────────────────────────────────
+            # Runs once per CI run in the Type Check job, and inside the coverage jobs.
+            # `types:check` is the fleet script name (tsc --noEmit on the source); see
+            # docs/conventions/package-layout.md. Repos with nothing to type-check set
+            # skip_type_check: true and say why.
+            type_check_command: ${{ github.event.inputs.type_check_command || 'npm run types:check' }}
             skip_type_check: ${{ github.event.inputs.skip_type_check == 'true' }}
 
             # ── PR coverage badge ─────────────────────────────────────────────────
