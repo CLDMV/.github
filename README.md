@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.3 (November 2026)
+### Latest: v4.35.4 (November 2026)
 
-- **Feature PRs get a type check, and more closing-keyword forms are recognized** — a new `🔎 Type Check` job in `workflow-ci.yml` runs once wherever the CI matrix runs, so a type error fails the feature PR instead of `next` (repos without a type-check script skip it). `close-resolved-issues` and `mark-implemented-issues` now pick up `Resolves [#N](url)`, `owner/repo#N` and full issue URLs for the same repo.
-- [View full v4.35.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.3.md)
+- **pnpm and yarn work again on Node 26, and one type-check script name** — Node 25+ no longer bundles corepack, so the actions now install it from npm when it's missing. The reusables default `type_check_command` to `npm run types:check`, and the package layout convention fixes `types:check` / `types:build` / `test:types` as the three type script names.
+- [View full v4.35.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.4.md)
 
 ### Recent Releases
 
+- **v4.35.3** (November 2026) — A type check job on feature PRs, and closing keywords written as markdown links, `owner/repo#N` or issue URLs ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.3.md))
 - **v4.35.2** (November 2026) — Docs-only PRs skip the test matrix from their first push, and npm publish jobs run on GitHub-hosted runners ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.2.md))
 - **v4.35.1** (November 2026) — `engines.node` as the runtime floor and `devEngines` as the dev toolchain floor in the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md))
 - **v4.35.0** (November 2026) — Orphan `badges` branch in org bootstrap, staged-only pre-commit checks and a README template ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md))
-- **v4.34.0** (October 2026) — `status: implemented - dev` label and a fix for the org label sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.34.0.md))
 
 ## 📋 Quick Start
 
