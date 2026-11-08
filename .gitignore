@@ -12,3 +12,7 @@ trash/
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# Local Jekyll builds of docs/
+docs/_site/
+docs/.jekyll-cache/
