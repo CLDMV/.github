@@ -44,19 +44,19 @@ OpenSSF Scorecard uses the default colour with `label=OpenSSF Scorecard`. Covera
 
 ## Rendering the template
 
-The template is plain Markdown with `{{placeholder}}` tokens. Replace every token with a global string substitution; there is no templating engine. The values that are derived rather than typed:
+The template is plain Markdown with `{placeholder}` tokens. Replace every token with a global string substitution; there is no templating engine. The values that are derived rather than typed:
 
-| Placeholder                                   | Value                                                           |
-| --------------------------------------------- | --------------------------------------------------------------- |
-| `{{repo}}`                                    | GitHub repo name, e.g. `slothlet`                               |
-| `{{package}}`                                 | npm name, e.g. `@cldmv/slothlet`                                |
-| `{{package_encoded}}`                         | `encodeURIComponent` of the package, e.g. `%40cldmv%2Fslothlet` |
-| `{{default_branch}}`                          | `master` or `main`                                              |
-| `{{node_min}}`                                | the `engines.node` floor without the operator, e.g. `22.22.0`   |
-| `{{license}}`                                 | SPDX id, e.g. `Apache-2.0`                                      |
-| `{{description}}`, `{{tagline}}`, `{{intro}}` | prose for the top of the file                                   |
+| Placeholder                             | Value                                                           |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `{repo}`                                | GitHub repo name, e.g. `slothlet`                               |
+| `{package}`                             | npm name, e.g. `@cldmv/slothlet`                                |
+| `{package_encoded}`                     | `encodeURIComponent` of the package, e.g. `%40cldmv%2Fslothlet` |
+| `{default_branch}`                      | `master` or `main`                                              |
+| `{node_min}`                            | the `engines.node` floor without the operator, e.g. `22.22.0`   |
+| `{license}`                             | SPDX id, e.g. `Apache-2.0`                                      |
+| `{description}`, `{tagline}`, `{intro}` | prose for the top of the file                                   |
 
-The remaining tokens (`{{latest_*}}`, `{{recent_N_*}}`, `{{feature_N_*}}`, `{{option_*}}`, `{{guide_*}}`, `{{quick_start_esm}}`, `{{import_name}}`) are content placeholders filled by hand or by the agent writing the README. After substituting, search the result for a leftover `{{`.
+The remaining tokens (`{latest_*}`, `{recent_N_*}`, `{feature_N_*}`, `{option_*}`, `{guide_*}`, `{quick_start_esm}`, `{import_name}`) are content placeholders filled by hand or by the agent writing the README. Tokens use single braces on purpose: double braces are Liquid syntax, and GitHub Pages builds `docs/` with Jekyll, so a doc that quoted them broke every Pages build. The template's code samples contain tokens too, so `.configs/.prettierrc` turns off code-block formatting for `README.template.md`; otherwise prettier would reformat `import {import_name}` into `import { import_name }` and break the token. After substituting, search the result for a leftover token (a `{` directly followed by a name, e.g. `grep -nE '\{[a-z_0-9]+\}' README.md`).
 
 ## Not yet automated
 

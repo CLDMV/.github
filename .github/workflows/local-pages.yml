@@ -1,0 +1,82 @@
+#
+# @Project: workflows
+# @Filename: /local-pages.yml
+# @Date: 2026-11-08 00:00:00 -08:00 (1794124800)
+# @Author: Nate Corcoran <CLDMV>
+# @Email: <Shinrai@users.noreply.github.com>
+# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#
+
+# Builds docs/ with Jekyll 4 and deploys it to GitHub Pages (the site that
+# hosts the ruleset generator). The classic "deploy from a branch" build is
+# pinned to Jekyll 3.10, which can't skip Liquid, so a doc that quotes
+# GitHub Actions expressions rendered them blank or failed the build.
+# docs/_config.yml sets render_with_liquid: false for every page.
+#
+# Requires the repo's Pages source to be "GitHub Actions"
+# (Settings → Pages → Build and deployment).
+name: 📄 Local Pages
+
+on:
+    push:
+        branches: [master]
+        paths:
+            - "docs/**"
+            - ".github/workflows/local-pages.yml"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: pages
+    cancel-in-progress: false
+
+jobs:
+    build:
+        name: 🏗️ Build docs/
+        runs-on: ubuntu-latest
+        # The official Ruby image has the compilers that native gems
+        # (json, bigdecimal, eventmachine) need, without a third-party setup action.
+        container: ruby:4.0
+        defaults:
+            run:
+                working-directory: docs
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Configure Pages
+              id: pages
+              uses: actions/configure-pages@v6
+
+            - name: Install gems
+              run: bundle install
+
+            - name: Build with Jekyll
+              env:
+                  JEKYLL_ENV: production
+                  JEKYLL_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PAGES_REPO_NWO: ${{ github.repository }}
+                  BASE_PATH: ${{ steps.pages.outputs.base_path }}
+              run: bundle exec jekyll build --baseurl "$BASE_PATH"
+
+            - name: Upload site
+              uses: actions/upload-pages-artifact@v5
+              with:
+                  path: docs/_site
+
+    deploy:
+        name: 🚀 Deploy to GitHub Pages
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy
+              id: deployment
+              uses: actions/deploy-pages@v5

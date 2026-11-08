@@ -1,0 +1,26 @@
+# GitHub Pages build of docs/ (Jekyll 4, built by .github/workflows/local-pages.yml).
+theme: jekyll-theme-primer
+
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  hard_wrap: false
+  gfm_quirks: paragraph_end
+  syntax_highlighter: rouge
+
+sass:
+  sourcemap: never
+
+# None of these pages use Liquid. Skipping it keeps GitHub Actions
+# expressions (${{ … }}) and other {{ … }} text exactly as written.
+defaults:
+  - scope:
+      path: ""
+    values:
+      render_with_liquid: false
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
