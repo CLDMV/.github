@@ -4,18 +4,19 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.5 (November 2026)
+### Latest: v4.36.0 (November 2026)
 
-- **Provenance attaches again for packages that build in `prepack`** — The provenance job re-packs the build artifact with `npm pack --ignore-scripts`, so a `prepack` build no longer fails it.
-- **`test:cjs` and `test:dist` script names** — The package layout convention names the CommonJS entry check `test:cjs`, and `test:dist` now runs the full vitest suite against `dist/`, either by importing the package by name or, for unbundled builds, by redirecting `src/` to `dist/`.
-- [View full v4.35.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md)
+- **Fleet Node `.gitignore` template** — One managed block for every Node repo: upstream Node.gitignore, the CLDMV build and scratch folders, editor files and root-anchored AI tool files, with `bin/` reserved for build output from `src/bin/`.
+- **GitHub Pages builds again** — The README template uses single-brace `{token}` placeholders instead of Liquid-style double braces, which had failed every Pages build since v4.35.0.
+- **Jekyll 4 for `docs/`** — A new `local-pages.yml` workflow builds the site with Jekyll 4 and `render_with_liquid: false`, so pages that quote `${{ … }}` expressions show them as written.
+- [View full v4.36.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.0.md)
 
 ### Recent Releases
 
+- **v4.35.5** (November 2026) — Provenance attaches again for packages that build in `prepack`, and `test:cjs` / `test:dist` script names ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md))
 - **v4.35.4** (November 2026) — pnpm and yarn work again on Node 26, and `types:check` is the one type-check script name ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.4.md))
 - **v4.35.3** (November 2026) — A type check job on feature PRs, and closing keywords written as markdown links, `owner/repo#N` or issue URLs ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.3.md))
 - **v4.35.2** (November 2026) — Docs-only PRs skip the test matrix from their first push, and npm publish jobs run on GitHub-hosted runners ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.2.md))
-- **v4.35.1** (November 2026) — `engines.node` as the runtime floor and `devEngines` as the dev toolchain floor in the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md))
 
 ## 📋 Quick Start
 
