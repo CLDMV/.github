@@ -19,6 +19,12 @@
 			}
 		},
 		{
+			"files": "README.template.md",
+			"options": {
+				"embeddedLanguageFormatting": "off"
+			}
+		},
+		{
 			"files": "*.jsonv",
 			"options": {
 				"parser": "jsonv"
