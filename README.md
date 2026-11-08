@@ -4,17 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.4 (November 2026)
+### Latest: v4.35.5 (November 2026)
 
-- **pnpm and yarn work again on Node 26, and one type-check script name** — Node 25+ no longer bundles corepack, so the actions now install it from npm when it's missing. The reusables default `type_check_command` to `npm run types:check`, and the package layout convention fixes `types:check` / `types:build` / `test:types` as the three type script names.
-- [View full v4.35.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.4.md)
+- **Provenance attaches again for packages that build in `prepack`** — The provenance job re-packs the build artifact with `npm pack --ignore-scripts`, so a `prepack` build no longer fails it.
+- **`test:cjs` and `test:dist` script names** — The package layout convention names the CommonJS entry check `test:cjs`, and `test:dist` now runs the full vitest suite against `dist/`, either by importing the package by name or, for unbundled builds, by redirecting `src/` to `dist/`.
+- [View full v4.35.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md)
 
 ### Recent Releases
 
+- **v4.35.4** (November 2026) — pnpm and yarn work again on Node 26, and `types:check` is the one type-check script name ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.4.md))
 - **v4.35.3** (November 2026) — A type check job on feature PRs, and closing keywords written as markdown links, `owner/repo#N` or issue URLs ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.3.md))
 - **v4.35.2** (November 2026) — Docs-only PRs skip the test matrix from their first push, and npm publish jobs run on GitHub-hosted runners ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.2.md))
 - **v4.35.1** (November 2026) — `engines.node` as the runtime floor and `devEngines` as the dev toolchain floor in the package layout convention ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.1.md))
-- **v4.35.0** (November 2026) — Orphan `badges` branch in org bootstrap, staged-only pre-commit checks and a README template ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.0.md))
 
 ## 📋 Quick Start
 

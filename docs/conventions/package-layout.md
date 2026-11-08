@@ -119,10 +119,11 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 		"prepack": "npm run build",
 		"types:build": "tsc -p .configs/tsconfig.json",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
-		"test": "node tests/run-vitest.mjs && npm run test:dist",
-		"test:dist": "npm run build && node --conditions=<pkg>-dev --test tests/cjs/entry.test.cjs",
+		"test": "node tests/run-vitest.mjs && npm run test:cjs && npm run test:dist",
+		"test:cjs": "npm run build && node --conditions=<pkg>-dev --test tests/cjs/entry.test.cjs",
+		"test:dist": "npm run build && node tests/run-vitest.mjs --mode=dist",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
-		"ci:coverage": "npm run coverage && npm run test:dist"
+		"ci:coverage": "npm run coverage && npm run test:cjs && npm run test:dist"
 	}
 }
 ```
@@ -131,6 +132,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 - **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5, tsup 9 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
 - **`require()` needs `require(esm)`.** The guard in `index.cjs` rejects a Node.js without it and says `^20.19.0 or >=22.13.0` (22.12 prints an `ExperimentalWarning`), or the runtime floor if that is higher. `import` works down to the runtime floor.
 - **Type scripts use three fixed names.** `types:check` type-checks the source without emitting (`tsc --noEmit`), and it's the script CI runs: `ci.yml` passes `type_check_command: "npm run types:check"`. `types:build` emits the declarations into `types/` and is part of `build:ci`. `test:types` is only for a test of the published types from a consumer's side (for example, compiling a consumer file against the built `.d.mts`), and it runs as part of `test`. Don't use `typecheck`, `build:types` or `test:types` for the plain source check. A repo with nothing to type-check sets `skip_type_check: true` in `ci.yml` and says why.
+- **`test:cjs` runs the CommonJS tests**: the entry check on the build (`tests/cjs/entry.test.cjs`) and any CommonJS-only tests the repo has (see [Tests](#tests)). **`test:dist` runs the full vitest suite against `dist/` instead of `src/`** (see [Tests](#tests)). Don't swap the two names.
 - **`files` ships `dist/` and `types/`, never `src/`.**
 - **`dist/` is gitignored** and rebuilt by `prepack`.
 
@@ -175,7 +177,7 @@ A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <d
 - **Internals stay outside `api/`.** Helpers live in `src/lib/` and are imported by relative path, so they never show up as endpoints. Because the build keeps every file, those relative imports keep working in `dist/`.
 - **`src/index.cjs` is still copied verbatim** to `dist/index.cjs` in `onSuccess`; with `bundle: false` it is not part of the `entry` glob, so nothing else produces it.
 - **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too.
-- **`test:dist` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
+- **`test:cjs` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
 - **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
 - **The engines floor follows slothlet's.** The package's `engines.node` is at least the floor of the slothlet version it depends on, since slothlet runs at import time.
 
@@ -209,8 +211,21 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
 
   It sets `resolve.conditions` and `ssr.resolve.conditions` to the condition followed by Vite's defaults (setting them replaces the defaults), and `test.execArgv: ["--conditions=<pkg>-dev"]` for the workers. `test.nodeOptions` is not a Vitest option and passes nothing to the workers; replace it where a config still has it.
 
+- **Tests import the package by name**, `import { … } from "@cldmv/<pkg>"`, never `../src/index.mjs`. The condition then decides what they run: `src/` by default, the build when the condition is off. A test of an internal module that isn't exported keeps its relative `src/` import; it runs from source only.
+- **`test:dist` runs the suite against `dist/`.** The vitest config is a function of Vite's `mode` and leaves `devCondition()` out for `--mode=dist`:
+
+  ```js
+  export default defineConfig(({ mode }) =>
+  	mergeConfig(mode === "dist" ? base : mergeConfig(base, devCondition({ root })), { … })
+  );
+  ```
+
+  `test:dist` builds, then runs `node tests/run-vitest.mjs --mode=dist` (one token: the runner treats a bare word as a test file pattern). Without a build it fails to resolve the package, it never falls back to `src/`.
+
+- **A resolve test guards the switch.** `tests/resolve.test.vitest.mjs` imports the package by name and checks its exports are the same objects as `../dist/index.mjs`'s when `import.meta.env.MODE === "dist"`, and as `../src/index.mjs`'s otherwise. Reference: [`CLDMV/gitmulti`](https://github.com/CLDMV/gitmulti).
+- **An unbundled build can redirect `src/` instead.** When tsup runs with `bundle: false`, `dist/` mirrors `src/` file by file, so in dist mode the vitest config can redirect every resolved `src/` path to the same path under `dist/`. That runs the tests of internal modules against the build too, and existing `../src/…` imports keep working unchanged. It only works when the file layout matches, so a bundled build uses the by-name imports above. Reference: [`CLDMV/llm-translator#126`](https://github.com/CLDMV/llm-translator/pull/126).
 - **A source-level CJS test** loads `src/index.cjs` through `createRequire` and checks it exports the same keys and values as `src/index.mjs`.
-- **`tests/cjs/entry.test.cjs`** (run by `test:dist` through `node --test`, after a build) checks the build itself: that `dist/index.cjs` re-exports `dist/index.mjs`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too.
+- **`tests/cjs/entry.test.cjs`** (run by `test:cjs` through `node --test`, after a build) checks the build itself: that `dist/index.cjs` re-exports `dist/index.mjs`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too. Other CommonJS-only tests go in `tests/cjs/` as well and are added to `test:cjs`.
 
 ## CI wiring
 
