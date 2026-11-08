@@ -159,13 +159,18 @@ jobs:
                   set -euo pipefail
                   dest="${RUNNER_TEMP}/provenance"
                   mkdir -p "$dest"
+                  # --ignore-scripts: the artifact is already built, and this job never
+                  # installs dependencies, so a `prepack` build (e.g. tsup) would die
+                  # with "not found". The publish side packs with --ignore-scripts too
+                  # (npm/utilities/publish-command/build.mjs), so skipping lifecycle
+                  # scripts here keeps the sha256 subjects matching what npm received.
                   # Core package (the artifact root is the built core package).
-                  npm pack . --pack-destination "$dest" --silent
+                  npm pack . --pack-destination "$dest" --silent --ignore-scripts
                   # Satellites ride the same build artifact under their staged dirs.
                   if [ -n "${MATRIX:-}" ] && [ "$MATRIX" != "[]" ]; then
                       while IFS= read -r dir; do
                           [ -n "$dir" ] || continue
-                          npm pack "./${dir}" --pack-destination "$dest" --silent
+                          npm pack "./${dir}" --pack-destination "$dest" --silent --ignore-scripts
                       done < <(printf '%s' "$MATRIX" | jq -r '.[].dir')
                   fi
                   cd "$dest"
