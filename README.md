@@ -6,6 +6,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ### Latest: v4.35.5 (November 2026)
 
+- **Provenance attaches again for packages that build in `prepack`** — The provenance job re-packs the build artifact with `npm pack --ignore-scripts`, so a `prepack` build no longer fails it.
 - **`test:cjs` and `test:dist` script names** — The package layout convention names the CommonJS entry check `test:cjs`, and `test:dist` now runs the full vitest suite against `dist/`, either by importing the package by name or, for unbundled builds, by redirecting `src/` to `dist/`.
 - [View full v4.35.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md)
 
