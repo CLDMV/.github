@@ -4,11 +4,12 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.35.6 (November 2026)
+### Latest: v4.36.0 (November 2026)
 
+- **Fleet Node `.gitignore` template** — One managed block for every Node repo: upstream Node.gitignore, the CLDMV build and scratch folders, editor files and root-anchored AI tool files, with `bin/` reserved for build output from `src/bin/`.
 - **GitHub Pages builds again** — The README template uses single-brace `{token}` placeholders instead of Liquid-style double braces, which had failed every Pages build since v4.35.0.
 - **Jekyll 4 for `docs/`** — A new `local-pages.yml` workflow builds the site with Jekyll 4 and `render_with_liquid: false`, so pages that quote `${{ … }}` expressions show them as written.
-- [View full v4.35.6 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.6.md)
+- [View full v4.36.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.0.md)
 
 ### Recent Releases
 
