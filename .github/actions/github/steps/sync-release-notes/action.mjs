@@ -31,11 +31,17 @@ import {
 	escapeTableCell,
 	pinRelativeLinks,
 	readChangelogAtRef,
+	releasePrCandidates,
 	repinBranchLinks,
 	sameBody,
 	stripCommitTrailers,
 	stripReleaseSubject
 } from "../../utilities/release-notes.mjs";
+
+// The shared api() helper logs every response body when debug is on, which is
+// its default; here that buries the summary under release and PR JSON. Keep it
+// for runs with Actions debug logging enabled.
+if (process.env.RUNNER_DEBUG !== "1" && process.env.CI_DEBUG !== "true") globalThis.CI_DEBUG_ENABLED = false;
 
 const token = getInput("github-token", { required: true });
 const repoFull = process.env.GITHUB_REPOSITORY || "";
@@ -155,7 +161,7 @@ let failures = 0;
 for (const version of [...versions].sort(cmpVersion)) {
 	if (versionFilter.length && !versionFilter.includes(version)) continue;
 	const tagName = `v${version}`;
-	const row = { version, tag: "", release: "", changelog: "", actions: [], issues: [], failures: [] };
+	const row = { version, tag: "", release: "", pr: "", changelog: "", actions: [], issues: [], failures: [] };
 	let tagSha = tags.get(version) || "";
 	const relCommit = releaseCommits.get(version) || "";
 	const rels = releases.filter((r) => r.tag_name === tagName);
@@ -290,19 +296,34 @@ for (const version of [...versions].sort(cmpVersion)) {
 	const releaseCommit = relCommit || tagSha;
 	if (tagSha && releaseCommit) {
 		try {
-			const prs = (await api("GET", `/commits/${releaseCommit}/pulls`, null, ctx)) || [];
-			const pr = prs.find((p) => p.merged_at && p.base?.ref === defaultBranch && p.merge_commit_sha === releaseCommit);
+			// The commit→pulls listing can leave out merge_commit_sha (it did for the
+			// bot token on llm-translator#149), so confirm each candidate on the
+			// full PR before trusting it.
+			const listed = (await api("GET", `/commits/${releaseCommit}/pulls`, null, ctx)) || [];
+			let pr = null;
+			for (const cand of releasePrCandidates(listed, { defaultBranch, releaseCommit })) {
+				const full = cand.merge_commit_sha ? cand : await api("GET", `/pulls/${cand.number}`, null, ctx);
+				if (full?.merge_commit_sha === releaseCommit) {
+					pr = full;
+					break;
+				}
+			}
+			row.pr = pr ? `#${pr.number}` : "not found";
 			if (pr && pr.body) {
 				let prBody = repinBranchLinks(pr.body, { repo: repoFull, from: pr.head?.ref || "", to: tagName });
 				if (file) prBody = pinRelativeLinks(prBody, { repo: repoFull, filePath: file.path, ref: linkRef });
 				if (!sameBody(prBody, pr.body)) {
 					if (dryRun) {
 						row.actions.push(`would update PR #${pr.number} links`);
+						row.pr = `#${pr.number}: would update links`;
 					} else {
 						await api("PATCH", `/pulls/${pr.number}`, { body: prBody }, ctx);
 						row.actions.push(`updated PR #${pr.number} links`);
+						row.pr = `#${pr.number}: updated links`;
 						changed++;
 					}
+				} else {
+					row.pr = `#${pr.number}: up to date`;
 				}
 			}
 		} catch (e) {
@@ -317,9 +338,9 @@ for (const version of [...versions].sort(cmpVersion)) {
 
 const esc = escapeTableCell;
 let md = `## 📝 Release notes sync — ${repoFull}${dryRun ? " (dry run)" : ""}\n\n`;
-md += "| Version | Tag | Release | Changelog | Actions | Problems |\n|---|---|---|---|---|---|\n";
+md += "| Version | Tag | Release | Release PR | Changelog | Actions | Problems |\n|---|---|---|---|---|---|---|\n";
 for (const r of rows) {
-	md += `| ${r.version} | ${esc(r.tag)} | ${esc(r.release)} | ${esc(r.changelog || "—")} | ${esc(r.actions.join("; ") || "—")} | ${esc([...r.failures.map((f) => `❌ ${f}`), ...r.issues].join("; ") || "—")} |\n`;
+	md += `| ${r.version} | ${esc(r.tag)} | ${esc(r.release)} | ${esc(r.pr || "—")} | ${esc(r.changelog || "—")} | ${esc(r.actions.join("; ") || "—")} | ${esc([...r.failures.map((f) => `❌ ${f}`), ...r.issues].join("; ") || "—")} |\n`;
 }
 const planned = rows.reduce((n, r) => n + r.actions.filter((a) => a.startsWith("would ")).length, 0);
 if (changed === 0 && planned === 0 && failures === 0) {

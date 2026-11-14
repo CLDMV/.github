@@ -9,6 +9,7 @@ import {
 	stripCommitTrailers,
 	changelogCandidates,
 	pinRelativeLinks,
+	releasePrCandidates,
 	releaseTitleVersion,
 	repinBranchLinks,
 	sameBody
@@ -119,5 +120,20 @@ assert.equal(releaseTitleVersion("release: v4.36.0 - fleet Node .gitignore templ
 assert.equal(releaseTitleVersion("release: 1.2.3-rc.1"), "1.2.3-rc.1");
 assert.equal(releaseTitleVersion("fix: release: v1.0.0"), "");
 assert.equal(releaseTitleVersion("release: v1.2"), "");
+
+// Release PR lookup: the listing may omit merge_commit_sha (llm-translator#149).
+const sha = "22a733668019e5558649ed309d162e3ba2bb639c";
+const listed = [
+	{ number: 1, merged_at: null, base: { ref: "master" } },
+	{ number: 2, merged_at: "x", base: { ref: "next" } },
+	{ number: 3, merged_at: "x", base: { ref: "master" }, merge_commit_sha: "other" },
+	{ number: 149, merged_at: "x", base: { ref: "master" } },
+	{ number: 150, merged_at: "x", base: { ref: "master" }, merge_commit_sha: sha }
+];
+assert.deepEqual(
+	releasePrCandidates(listed, { defaultBranch: "master", releaseCommit: sha }).map((p) => p.number),
+	[150, 149]
+);
+assert.deepEqual(releasePrCandidates(null, { defaultBranch: "master", releaseCommit: sha }), []);
 
 console.log("release-notes: all checks passed");

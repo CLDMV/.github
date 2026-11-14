@@ -178,6 +178,24 @@ export function repinBranchLinks(markdown, { repo = "", from = "", to = "" } = {
 }
 
 /**
+ * Release PR candidates for a release commit, from `GET /commits/{sha}/pulls`:
+ * PRs merged into the default branch whose `merge_commit_sha` is the release
+ * commit, or is missing from the listing (it can be; the caller then confirms
+ * on the full PR). Exact matches come first.
+ * @param {object[]} prs - Listed pull requests.
+ * @param {object} opts
+ * @param {string} opts.defaultBranch - Release branch name.
+ * @param {string} opts.releaseCommit - Release commit SHA.
+ * @returns {object[]} Candidates, best first.
+ */
+export function releasePrCandidates(prs, { defaultBranch = "", releaseCommit = "" } = {}) {
+	const merged = (Array.isArray(prs) ? prs : []).filter((p) => p && p.merged_at && p.base?.ref === defaultBranch);
+	const exact = merged.filter((p) => p.merge_commit_sha === releaseCommit);
+	const unknown = merged.filter((p) => !p.merge_commit_sha);
+	return [...exact, ...unknown];
+}
+
+/**
  * Release version named by a release PR or commit title (`release: v1.2.3 - …`).
  * @param {string} title - PR title or commit subject.
  * @returns {string} Bare version, or "" when the title names none.
