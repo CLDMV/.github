@@ -178,21 +178,25 @@ export function repinBranchLinks(markdown, { repo = "", from = "", to = "" } = {
 }
 
 /**
- * Release PR candidates for a release commit, from `GET /commits/{sha}/pulls`:
- * PRs merged into the default branch whose `merge_commit_sha` is the release
- * commit, or is missing from the listing (it can be; the caller then confirms
- * on the full PR). Exact matches come first.
- * @param {object[]} prs - Listed pull requests.
- * @param {object} opts
- * @param {string} opts.defaultBranch - Release branch name.
- * @param {string} opts.releaseCommit - Release commit SHA.
- * @returns {object[]} Candidates, best first.
+ * Index merged release PRs by the version in their title (`release: vX.Y.Z - …`).
+ * Only PRs merged into the default branch count; when two claim one version
+ * (a re-cut release), the most recently merged wins. The commit→pulls listing
+ * isn't used: for the bot token it returned PRs without `merge_commit_sha`, and
+ * then none at all (llm-translator#149).
+ * @param {object[]} prs - Closed pull requests (`GET /pulls?state=closed&base=<default>`).
+ * @param {string} defaultBranch - Release branch name.
+ * @returns {Map<string, object>} Bare version → pull request.
  */
-export function releasePrCandidates(prs, { defaultBranch = "", releaseCommit = "" } = {}) {
-	const merged = (Array.isArray(prs) ? prs : []).filter((p) => p && p.merged_at && p.base?.ref === defaultBranch);
-	const exact = merged.filter((p) => p.merge_commit_sha === releaseCommit);
-	const unknown = merged.filter((p) => !p.merge_commit_sha);
-	return [...exact, ...unknown];
+export function indexReleasePrs(prs, defaultBranch) {
+	const out = new Map();
+	for (const p of Array.isArray(prs) ? prs : []) {
+		if (!p || !p.merged_at || p.base?.ref !== defaultBranch) continue;
+		const v = releaseTitleVersion(p.title);
+		if (!v) continue;
+		const prev = out.get(v);
+		if (!prev || String(p.merged_at) > String(prev.merged_at)) out.set(v, p);
+	}
+	return out;
 }
 
 /**

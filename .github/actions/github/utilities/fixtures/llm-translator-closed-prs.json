@@ -1,0 +1,145 @@
+[
+	{
+		"number": 149,
+		"title": "release: v0.9.0 - add an Azure OpenAI driver",
+		"state": "closed",
+		"merged_at": "2026-11-14T00:50:35Z",
+		"merge_commit_sha": "22a733668019e5558649ed309d162e3ba2bb639c",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 143,
+		"title": "release: v0.8.0 - honour n > 1 by fanning out to parallel upstream…",
+		"state": "closed",
+		"merged_at": "2026-11-13T05:16:44Z",
+		"merge_commit_sha": "af0eb48fe3e1bb4da3f97d4fa299243b87512f6e",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 127,
+		"title": "release: v0.7.0 - detect Anthropic-protocol servers by probe (#134)",
+		"state": "closed",
+		"merged_at": "2026-11-08T22:13:36Z",
+		"merge_commit_sha": "ec6f2995388dc7ee6d75b724f416fabbe9abc6df",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 114,
+		"title": "release: v0.6.0 - pass POST /v1/embeddings through to OpenAI-protocol…",
+		"state": "closed",
+		"merged_at": "2026-11-08T05:09:36Z",
+		"merge_commit_sha": "e11cb044e34b711c0d6933471f7b8a35f1a31c79",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 110,
+		"title": "release: v0.5.0 - translate response_format json_object to Anthropic…",
+		"state": "closed",
+		"merged_at": "2026-11-06T13:57:38Z",
+		"merge_commit_sha": "a61b564cd7f944eaa905cc3a9a40261275ee52b6",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 101,
+		"title": "release: v0.4.0 - per-model effort levels and aliases that pin effort…",
+		"state": "closed",
+		"merged_at": "2026-11-05T14:10:14Z",
+		"merge_commit_sha": "e624e40907e1e6fd1c0bf4613e88d037d5adfa7d",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 96,
+		"title": "release: v0.3.1 - override katex and minimatch to patched versions in…",
+		"state": "closed",
+		"merged_at": "2026-11-02T03:20:49Z",
+		"merge_commit_sha": "053761a4691f16083f67b3331c04303cfd8b3da2",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 87,
+		"title": "release: v0.2.1 - bump the patch group with 2 updates",
+		"state": "closed",
+		"merged_at": null,
+		"merge_commit_sha": "a182e82c8d25b3e173c01c939660209b85aa22c0",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "hotfixes"
+		}
+	},
+	{
+		"number": 79,
+		"title": "release: v0.3.0 - report final usage from send() and add a route() leaf",
+		"state": "closed",
+		"merged_at": "2026-11-02T02:32:20Z",
+		"merge_commit_sha": "d28f28e9971260c039e90c7524d1a475e1362e1d",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 73,
+		"title": "release: v0.2.0 - Anthropic Messages ⇄ OpenAI Chat Completions…",
+		"state": "closed",
+		"merged_at": "2026-10-26T23:02:52Z",
+		"merge_commit_sha": "7d7d85037f987a506ed2a0fbb3081a7599383ff5",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	},
+	{
+		"number": 2,
+		"title": "release: v0.1.0 - add devcheck for the llm-translator-dev condition",
+		"state": "closed",
+		"merged_at": "2026-10-25T06:28:38Z",
+		"merge_commit_sha": "d47b4921f14e8abc743e7879cdd61bc9cf335208",
+		"base": {
+			"ref": "master"
+		},
+		"head": {
+			"ref": "next"
+		}
+	}
+]

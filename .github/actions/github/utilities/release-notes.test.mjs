@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Ad-hoc checks for release-notes.mjs. Run: node .github/actions/github/utilities/release-notes.test.mjs
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
 	escapeTableCell,
 	buildReleaseBody,
@@ -9,7 +10,7 @@ import {
 	stripCommitTrailers,
 	changelogCandidates,
 	pinRelativeLinks,
-	releasePrCandidates,
+	indexReleasePrs,
 	releaseTitleVersion,
 	repinBranchLinks,
 	sameBody
@@ -121,19 +122,26 @@ assert.equal(releaseTitleVersion("release: 1.2.3-rc.1"), "1.2.3-rc.1");
 assert.equal(releaseTitleVersion("fix: release: v1.0.0"), "");
 assert.equal(releaseTitleVersion("release: v1.2"), "");
 
-// Release PR lookup: the listing may omit merge_commit_sha (llm-translator#149).
-const sha = "22a733668019e5558649ed309d162e3ba2bb639c";
-const listed = [
-	{ number: 1, merged_at: null, base: { ref: "master" } },
-	{ number: 2, merged_at: "x", base: { ref: "next" } },
-	{ number: 3, merged_at: "x", base: { ref: "master" }, merge_commit_sha: "other" },
-	{ number: 149, merged_at: "x", base: { ref: "master" } },
-	{ number: 150, merged_at: "x", base: { ref: "master" }, merge_commit_sha: sha }
-];
-assert.deepEqual(
-	releasePrCandidates(listed, { defaultBranch: "master", releaseCommit: sha }).map((p) => p.number),
-	[150, 149]
+// Release PRs keyed by title version, from the real llm-translator listing shape.
+const closed = JSON.parse(readFileSync(new URL("./fixtures/llm-translator-closed-prs.json", import.meta.url), "utf8"));
+const byVersion = indexReleasePrs(closed, "master");
+assert.equal(byVersion.get("0.9.0")?.number, 149);
+assert.equal(byVersion.get("0.1.0")?.number, 2);
+assert.equal(byVersion.has("0.2.1"), false, "unmerged hotfix release PR #87 skipped");
+assert.equal(byVersion.size, 10);
+const recut = indexReleasePrs(
+	[
+		{ number: 5, title: "release: v1.0.0 - a", merged_at: "2026-01-01T00:00:00Z", base: { ref: "master" } },
+		{ number: 7, title: "release: v1.0.0 - b", merged_at: "2026-02-01T00:00:00Z", base: { ref: "master" } },
+		{ number: 8, title: "release: v1.1.0 - c", merged_at: "2026-02-01T00:00:00Z", base: { ref: "next" } },
+		{ number: 9, title: "fix: release: v1.2.0", merged_at: "2026-02-01T00:00:00Z", base: { ref: "master" } }
+	],
+	"master"
 );
-assert.deepEqual(releasePrCandidates(null, { defaultBranch: "master", releaseCommit: sha }), []);
+assert.deepEqual(
+	[...recut].map(([v, p]) => [v, p.number]),
+	[["1.0.0", 7]]
+);
+assert.equal(indexReleasePrs(null, "master").size, 0);
 
 console.log("release-notes: all checks passed");

@@ -31,7 +31,7 @@ import {
 	escapeTableCell,
 	pinRelativeLinks,
 	readChangelogAtRef,
-	releasePrCandidates,
+	indexReleasePrs,
 	repinBranchLinks,
 	sameBody,
 	stripCommitTrailers,
@@ -146,6 +146,16 @@ for (let page = 1; page <= 20; page++) {
 	releases.push(...(items || []));
 	if (!items || items.length < 100) break;
 }
+
+// Merged release PRs into the default branch, keyed by the version in their title.
+const closedPrs = [];
+for (let page = 1; page <= 20; page++) {
+	const items = await api("GET", `/pulls?state=closed&base=${encodeURIComponent(defaultBranch)}&per_page=100&page=${page}`, null, ctx);
+	closedPrs.push(...(items || []));
+	if (!items || items.length < 100) break;
+}
+const releasePrs = indexReleasePrs(closedPrs, defaultBranch);
+console.log(`🔎 ${releasePrs.size} merged release PR(s) into ${defaultBranch} out of ${closedPrs.length} closed PR(s).`);
 
 const versions = new Set([...tags.keys(), ...releaseCommits.keys()]);
 for (const r of releases) {
@@ -293,21 +303,9 @@ for (const version of [...versions].sort(cmpVersion)) {
 	// Release PR: its body pinned the changelog's links to the head branch (or,
 	// before that, left them relative). Once the tag exists, point them at the
 	// tag so the merged PR is a permanent record too. Unchanged bodies are skipped.
-	const releaseCommit = relCommit || tagSha;
-	if (tagSha && releaseCommit) {
+	if (tagSha) {
 		try {
-			// The commit→pulls listing can leave out merge_commit_sha (it did for the
-			// bot token on llm-translator#149), so confirm each candidate on the
-			// full PR before trusting it.
-			const listed = (await api("GET", `/commits/${releaseCommit}/pulls`, null, ctx)) || [];
-			let pr = null;
-			for (const cand of releasePrCandidates(listed, { defaultBranch, releaseCommit })) {
-				const full = cand.merge_commit_sha ? cand : await api("GET", `/pulls/${cand.number}`, null, ctx);
-				if (full?.merge_commit_sha === releaseCommit) {
-					pr = full;
-					break;
-				}
-			}
+			const pr = releasePrs.get(version) || null;
 			row.pr = pr ? `#${pr.number}` : "not found";
 			if (pr && pr.body) {
 				let prBody = repinBranchLinks(pr.body, { repo: repoFull, from: pr.head?.ref || "", to: tagName });
