@@ -156,6 +156,38 @@ export function pinRelativeLinks(markdown, { repo = "", filePath = "", ref = "" 
 }
 
 /**
+ * Move this repository's `blob/<from>/…`, `raw/<from>/…` and `tree/<from>/…`
+ * links to `<to>`. The open release PR body pins a changelog's relative links
+ * to its head branch (`next`/`hotfixes`) so they work during review; once the
+ * release is tagged, this turns them into tag links for the squash commit and
+ * the merged PR. Links to other repositories and other refs are untouched, and
+ * a body that already carries tag links is returned unchanged.
+ * @param {string} markdown - Body text.
+ * @param {object} opts
+ * @param {string} opts.repo - `owner/name`.
+ * @param {string} opts.from - Branch the links currently point at.
+ * @param {string} opts.to - Ref to point them at (normally the release tag).
+ * @returns {string} Body with the branch links moved.
+ */
+export function repinBranchLinks(markdown, { repo = "", from = "", to = "" } = {}) {
+	if (!markdown || !/^[\w.-]+\/[\w.-]+$/.test(String(repo)) || !from || !to || from === to) return markdown || "";
+	const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const enc = (s) => encodeURIComponent(s).replace(/%2F/g, "/");
+	const re = new RegExp(`(https://github\\.com/${esc(repo)}/(?:blob|raw|tree)/)${esc(enc(from))}(?=[/?#)\\s"'>]|$)`, "gi");
+	return String(markdown).replace(re, (_m, head) => `${head}${enc(to)}`);
+}
+
+/**
+ * Release version named by a release PR or commit title (`release: v1.2.3 - …`).
+ * @param {string} title - PR title or commit subject.
+ * @returns {string} Bare version, or "" when the title names none.
+ */
+export function releaseTitleVersion(title) {
+	const m = String(title || "").match(/^release:\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)(?=\s|$)/i);
+	return m ? m[1] : "";
+}
+
+/**
  * Candidate changelog paths for a version, first hit wins. Mirrors the
  * release-PR opener (generate-comprehensive-changelog readVersionChangelogFile)
  * so a file that became the release-PR body is also found here.

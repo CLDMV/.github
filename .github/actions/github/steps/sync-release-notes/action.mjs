@@ -10,7 +10,10 @@
  * which carries later corrections and backfills, else at the release tag/commit), rewrites the release
  * body from that file. The Contributors and coverage blocks already on the
  * release are kept, the duplicated `release: vX.Y.Z - …` subject line is
- * dropped, and accidental `@word` mentions in prose are neutralized.
+ * dropped, accidental `@word` mentions in prose are neutralized, and the
+ * file's relative links are pinned to the tag. Once a version is tagged, its
+ * merged release PR's body gets the same tag links (the open PR pointed them at
+ * `next`/`hotfixes`); a body that already has them is left alone.
  *
  * Repairs are opt-in: missing tags, missing releases and draft releases are
  * only reported unless `create-missing-tags`, `create-missing-releases` or
@@ -26,7 +29,9 @@ import { run as createTag } from "../../api/tag/create/_impl.mjs";
 import {
 	buildReleaseBody,
 	escapeTableCell,
+	pinRelativeLinks,
 	readChangelogAtRef,
+	repinBranchLinks,
 	sameBody,
 	stripCommitTrailers,
 	stripReleaseSubject
@@ -276,6 +281,32 @@ for (const version of [...versions].sort(cmpVersion)) {
 					row.failures.push(`update failed: ${e.message}`);
 				}
 			}
+		}
+	}
+
+	// Release PR: its body pinned the changelog's links to the head branch (or,
+	// before that, left them relative). Once the tag exists, point them at the
+	// tag so the merged PR is a permanent record too. Unchanged bodies are skipped.
+	const releaseCommit = relCommit || tagSha;
+	if (tagSha && releaseCommit) {
+		try {
+			const prs = (await api("GET", `/commits/${releaseCommit}/pulls`, null, ctx)) || [];
+			const pr = prs.find((p) => p.merged_at && p.base?.ref === defaultBranch && p.merge_commit_sha === releaseCommit);
+			if (pr && pr.body) {
+				let prBody = repinBranchLinks(pr.body, { repo: repoFull, from: pr.head?.ref || "", to: tagName });
+				if (file) prBody = pinRelativeLinks(prBody, { repo: repoFull, filePath: file.path, ref: linkRef });
+				if (!sameBody(prBody, pr.body)) {
+					if (dryRun) {
+						row.actions.push(`would update PR #${pr.number} links`);
+					} else {
+						await api("PATCH", `/pulls/${pr.number}`, { body: prBody }, ctx);
+						row.actions.push(`updated PR #${pr.number} links`);
+						changed++;
+					}
+				}
+			}
+		} catch (e) {
+			row.failures.push(`release PR update failed: ${e.message}`);
 		}
 	}
 

@@ -38,6 +38,11 @@ const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "";
 // Optional explicit path template overriding the default lookup order. Supports
 // `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
 const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
+// Ref the committed changelog's relative links are pinned to. The release-PR
+// callers pass the head branch (`next`/`hotfixes`) so the links work during
+// review; release-merge moves them to the tag in the squash commit. Empty =
+// the release tag `v<version>`.
+const CHANGELOG_LINK_REF = process.env.CHANGELOG_LINK_REF || "";
 // The caller's own commit-signing bot identity — the same BOT_NAME/BOT_EMAIL
 // used elsewhere (e.g. reusable-lint-format.yml) to author+GPG-sign a commit
 // locally. That identity is a real GitHub user account, not a GitHub App, so
@@ -1320,10 +1325,14 @@ async function generateComprehensiveChangelog(
 		// Strip any leading "v" so an explicit NEW_VERSION of "v4.21.2" doesn't log "vv4.21.2".
 		const displayVersion = String(NEW_VERSION).trim().replace(/^v/i, "");
 		console.log(`📄 Using committed changelog file as the release-PR body (v${displayVersion}).`);
-		// GitHub resolves relative links in a PR body against the PR URL, and the
-		// body becomes the squash commit and the first release body, so pin them
-		// to the release tag now. They resolve once the release is tagged.
-		const fileBody = pinRelativeLinks(found.content, { repo: GITHUB_REPOSITORY || "", filePath: found.path, ref: `v${displayVersion}` });
+		// GitHub resolves relative links in a PR body against the PR URL, so pin
+		// them: to the head branch for an open release PR (release-merge moves
+		// them to the tag in the squash commit), else to the release tag.
+		const fileBody = pinRelativeLinks(found.content, {
+			repo: GITHUB_REPOSITORY || "",
+			filePath: found.path,
+			ref: CHANGELOG_LINK_REF || `v${displayVersion}`
+		});
 		changelog = `${fileBody}\n\n`;
 	} else {
 		changelog = "## 🚀 What's Changed\n\n";

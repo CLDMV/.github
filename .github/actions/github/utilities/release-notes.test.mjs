@@ -9,6 +9,8 @@ import {
 	stripCommitTrailers,
 	changelogCandidates,
 	pinRelativeLinks,
+	releaseTitleVersion,
+	repinBranchLinks,
 	sameBody
 } from "./release-notes.mjs";
 
@@ -101,5 +103,21 @@ assert.ok(
 	}).includes(`${R}/blob/v1.0.0/docs/changelog/v1/a.md`)
 );
 assert.ok(buildReleaseBody({ baseBody: "[d](./a.md)", name: "v1.0.0", version: "1.0.0", repo: "CLDMV/x" }).includes("[d](./a.md)"));
+
+// Open release PR → head-branch links; release-merge / sync → tag links.
+const onNext = pin("[d](../../drivers.md) ![i](./a.png)", "next");
+assert.equal(onNext, `[d](${R}/blob/next/docs/drivers.md) ![i](${R}/raw/next/docs/changelog/v0/a.png)`);
+const onTag = repinBranchLinks(onNext, { repo: "CLDMV/x", from: "next", to: "v0.9.0" });
+assert.equal(onTag, pin("[d](../../drivers.md) ![i](./a.png)"), "next links become the same tag links");
+assert.equal(repinBranchLinks(onTag, { repo: "CLDMV/x", from: "next", to: "v0.9.0" }), onTag, "idempotent");
+assert.equal(repinBranchLinks(`${R}/tree/next/docs`, { repo: "CLDMV/x", from: "next", to: "v1.0.0" }), `${R}/tree/v1.0.0/docs`);
+for (const keep of ["https://github.com/CLDMV/other/blob/next/a.md", `${R}/blob/nextgen/a.md`, `${R}/blob/master/a.md`, `${R}/pull/12`]) {
+	assert.equal(repinBranchLinks(keep, { repo: "CLDMV/x", from: "next", to: "v1.0.0" }), keep, `unchanged: ${keep}`);
+}
+assert.equal(repinBranchLinks(`${R}/blob/hotfixes/a.md`, { repo: "CLDMV/x", from: "hotfixes", to: "v1.0.1" }), `${R}/blob/v1.0.1/a.md`);
+assert.equal(releaseTitleVersion("release: v4.36.0 - fleet Node .gitignore template"), "4.36.0");
+assert.equal(releaseTitleVersion("release: 1.2.3-rc.1"), "1.2.3-rc.1");
+assert.equal(releaseTitleVersion("fix: release: v1.0.0"), "");
+assert.equal(releaseTitleVersion("release: v1.2"), "");
 
 console.log("release-notes: all checks passed");
