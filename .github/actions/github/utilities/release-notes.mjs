@@ -180,9 +180,8 @@ export function repinBranchLinks(markdown, { repo = "", from = "", to = "" } = {
 /**
  * Index merged release PRs by the version in their title (`release: vX.Y.Z - …`).
  * Only PRs merged into the default branch count; when two claim one version
- * (a re-cut release), the most recently merged wins. The commit→pulls listing
- * isn't used: for the bot token it returned PRs without `merge_commit_sha`, and
- * then none at all (llm-translator#149).
+ * (a re-cut release), the most recently merged wins. This is the fallback for
+ * resolveReleasePr when the commit link finds nothing.
  * @param {object[]} prs - Closed pull requests (`GET /pulls?state=closed&base=<default>`).
  * @param {string} defaultBranch - Release branch name.
  * @returns {Map<string, object>} Bare version → pull request.
@@ -197,6 +196,50 @@ export function indexReleasePrs(prs, defaultBranch) {
 		if (!prev || String(p.merged_at) > String(prev.merged_at)) out.set(v, p);
 	}
 	return out;
+}
+
+/**
+ * Release PR candidates for a release commit, from `GET /commits/{sha}/pulls`:
+ * PRs merged into the default branch whose `merge_commit_sha` is the release
+ * commit, or is missing from the listing (the caller then confirms on the full
+ * PR). Exact matches come first.
+ * @param {object[]} prs - Listed pull requests.
+ * @param {object} opts
+ * @param {string} opts.defaultBranch - Release branch name.
+ * @param {string} opts.releaseCommit - Release commit SHA.
+ * @returns {object[]} Candidates, best first.
+ */
+export function releasePrCandidates(prs, { defaultBranch = "", releaseCommit = "" } = {}) {
+	const merged = (Array.isArray(prs) ? prs : []).filter((p) => p && p.merged_at && p.base?.ref === defaultBranch);
+	return [...merged.filter((p) => p.merge_commit_sha === releaseCommit), ...merged.filter((p) => !p.merge_commit_sha)];
+}
+
+/**
+ * Find a release's PR. The commit link is authoritative: a PR from
+ * `GET /commits/{sha}/pulls` merged into the default branch with the release
+ * commit as its merge commit, confirmed on the full PR when the listing leaves
+ * fields out. Only when that finds nothing does the title index (indexReleasePrs)
+ * answer, which is what the bot token gets on llm-translator.
+ * @param {object} opts
+ * @param {string} opts.version - Bare release version.
+ * @param {string} opts.releaseCommit - Release commit SHA ("" skips the commit lookup).
+ * @param {string} opts.defaultBranch - Release branch name.
+ * @param {(sha: string) => Promise<object[]>} opts.commitPulls - `GET /commits/{sha}/pulls`.
+ * @param {(n: number) => Promise<object>} opts.getPull - `GET /pulls/{n}`.
+ * @param {() => Promise<Map<string, object>>} opts.titleIndex - Lazily built title index.
+ * @returns {Promise<{pr: object|null, via: string}>} The PR and the path that found it (`commit`, `title` or "").
+ */
+export async function resolveReleasePr({ version, releaseCommit, defaultBranch, commitPulls, getPull, titleIndex }) {
+	if (releaseCommit) {
+		const listed = (await commitPulls(releaseCommit)) || [];
+		for (const cand of releasePrCandidates(listed, { defaultBranch, releaseCommit })) {
+			const full = cand.merge_commit_sha ? cand : await getPull(cand.number);
+			if (full?.merge_commit_sha === releaseCommit && full.merged_at && full.base?.ref === defaultBranch)
+				return { pr: full, via: "commit" };
+		}
+	}
+	const pr = (await titleIndex()).get(version) || null;
+	return { pr, via: pr ? "title" : "" };
 }
 
 /**

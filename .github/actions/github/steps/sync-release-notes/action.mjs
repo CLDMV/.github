@@ -32,6 +32,7 @@ import {
 	pinRelativeLinks,
 	readChangelogAtRef,
 	indexReleasePrs,
+	resolveReleasePr,
 	repinBranchLinks,
 	sameBody,
 	stripCommitTrailers,
@@ -147,15 +148,22 @@ for (let page = 1; page <= 20; page++) {
 	if (!items || items.length < 100) break;
 }
 
-// Merged release PRs into the default branch, keyed by the version in their title.
-const closedPrs = [];
-for (let page = 1; page <= 20; page++) {
-	const items = await api("GET", `/pulls?state=closed&base=${encodeURIComponent(defaultBranch)}&per_page=100&page=${page}`, null, ctx);
-	closedPrs.push(...(items || []));
-	if (!items || items.length < 100) break;
-}
-const releasePrs = indexReleasePrs(closedPrs, defaultBranch);
-console.log(`🔎 ${releasePrs.size} merged release PR(s) into ${defaultBranch} out of ${closedPrs.length} closed PR(s).`);
+// Fallback for release PRs the commit link can't find: merged PRs into the
+// default branch keyed by the version in their title. Built once, on first use.
+let titleIndexPromise = null;
+const titleIndex = () =>
+	(titleIndexPromise ||= (async () => {
+		const closedPrs = [];
+		for (let page = 1; page <= 20; page++) {
+			const items = await api("GET", `/pulls?state=closed&base=${encodeURIComponent(defaultBranch)}&per_page=100&page=${page}`, null, ctx);
+			closedPrs.push(...(items || []));
+			if (!items || items.length < 100) break;
+		}
+		const index = indexReleasePrs(closedPrs, defaultBranch);
+		console.log(`🔎 ${index.size} merged release PR(s) into ${defaultBranch} out of ${closedPrs.length} closed PR(s).`);
+		return index;
+	})());
+const resolvedVia = { commit: 0, title: 0, none: 0 };
 
 const versions = new Set([...tags.keys(), ...releaseCommits.keys()]);
 for (const r of releases) {
@@ -305,23 +313,32 @@ for (const version of [...versions].sort(cmpVersion)) {
 	// tag so the merged PR is a permanent record too. Unchanged bodies are skipped.
 	if (tagSha) {
 		try {
-			const pr = releasePrs.get(version) || null;
-			row.pr = pr ? `#${pr.number}` : "not found";
+			const { pr, via } = await resolveReleasePr({
+				version,
+				releaseCommit: relCommit || tagSha,
+				defaultBranch,
+				commitPulls: (sha) => api("GET", `/commits/${sha}/pulls`, null, ctx),
+				getPull: (n) => api("GET", `/pulls/${n}`, null, ctx),
+				titleIndex
+			});
+			resolvedVia[via || "none"]++;
+			const label = pr ? `#${pr.number} (${via})` : "";
+			row.pr = pr ? label : "not found";
 			if (pr && pr.body) {
 				let prBody = repinBranchLinks(pr.body, { repo: repoFull, from: pr.head?.ref || "", to: tagName });
 				if (file) prBody = pinRelativeLinks(prBody, { repo: repoFull, filePath: file.path, ref: linkRef });
 				if (!sameBody(prBody, pr.body)) {
 					if (dryRun) {
 						row.actions.push(`would update PR #${pr.number} links`);
-						row.pr = `#${pr.number}: would update links`;
+						row.pr = `${label}: would update links`;
 					} else {
 						await api("PATCH", `/pulls/${pr.number}`, { body: prBody }, ctx);
 						row.actions.push(`updated PR #${pr.number} links`);
-						row.pr = `#${pr.number}: updated links`;
+						row.pr = `${label}: updated links`;
 						changed++;
 					}
 				} else {
-					row.pr = `#${pr.number}: up to date`;
+					row.pr = `${label}: up to date`;
 				}
 			}
 		} catch (e) {
@@ -333,6 +350,8 @@ for (const version of [...versions].sort(cmpVersion)) {
 	failures += row.failures.length;
 	rows.push(row);
 }
+
+console.log(`🔗 Release PRs resolved: ${resolvedVia.commit} by commit, ${resolvedVia.title} by title, ${resolvedVia.none} not found.`);
 
 const esc = escapeTableCell;
 let md = `## 📝 Release notes sync — ${repoFull}${dryRun ? " (dry run)" : ""}\n\n`;

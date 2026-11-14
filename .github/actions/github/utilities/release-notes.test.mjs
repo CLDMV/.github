@@ -11,6 +11,8 @@ import {
 	changelogCandidates,
 	pinRelativeLinks,
 	indexReleasePrs,
+	releasePrCandidates,
+	resolveReleasePr,
 	releaseTitleVersion,
 	repinBranchLinks,
 	sameBody
@@ -143,5 +145,37 @@ assert.deepEqual(
 	[["1.0.0", 7]]
 );
 assert.equal(indexReleasePrs(null, "master").size, 0);
+
+// resolveReleasePr: commit link first, title index only as a fallback.
+const sha9 = "22a733668019e5558649ed309d162e3ba2bb639c";
+const pr149 = closed.find((p) => p.number === 149);
+const noTitles = async () => {
+	throw new Error("title index must not be used");
+};
+const getPull = async (n) => closed.find((p) => p.number === n);
+const base9 = { version: "0.9.0", releaseCommit: sha9, defaultBranch: "master", getPull };
+let r = await resolveReleasePr({ ...base9, commitPulls: async () => [pr149], titleIndex: noTitles });
+assert.deepEqual([r.pr?.number, r.via], [149, "commit"], "commit lookup wins, title list untouched");
+// Listing without merge_commit_sha: confirmed on the full PR.
+const stripped = { ...pr149, merge_commit_sha: undefined };
+r = await resolveReleasePr({ ...base9, commitPulls: async () => [stripped], titleIndex: noTitles });
+assert.deepEqual([r.pr?.number, r.via], [149, "commit"], "missing field confirmed via GET /pulls/{n}");
+// Empty listing (what the bot token got on llm-translator): title fallback.
+r = await resolveReleasePr({ ...base9, commitPulls: async () => [], titleIndex: async () => byVersion });
+assert.deepEqual([r.pr?.number, r.via], [149, "title"], "title fallback resolves it");
+r = await resolveReleasePr({ ...base9, version: "9.9.9", commitPulls: async () => [], titleIndex: async () => byVersion });
+assert.deepEqual([r.pr, r.via], [null, ""]);
+assert.deepEqual(
+	releasePrCandidates(
+		[
+			{ number: 1, merged_at: null, base: { ref: "master" } },
+			{ number: 3, merged_at: "x", base: { ref: "master" }, merge_commit_sha: "other" },
+			{ number: 4, merged_at: "x", base: { ref: "master" } },
+			{ number: 5, merged_at: "x", base: { ref: "master" }, merge_commit_sha: sha9 }
+		],
+		{ defaultBranch: "master", releaseCommit: sha9 }
+	).map((p) => p.number),
+	[5, 4]
+);
 
 console.log("release-notes: all checks passed");
