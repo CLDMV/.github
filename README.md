@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.36.1 (November 2026)
+### Latest: v4.36.2 (November 2026)
 
-- **Changelog links work on release pages** — Relative links in a changelog file are rewritten to absolute GitHub URLs where the file becomes a body: the head branch in the open release PR, and the release tag in the release commit, tag message, GitHub Release and the merged release PR. The files stay relative, and `sync-release-notes` fixes releases published before this one.
-- [View full v4.36.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.1.md)
+- **Release PR bodies get tag links** — `sync-release-notes` now finds merged release PRs even when GitHub's commit-to-PR listing leaves out `merge_commit_sha`, so the release PR rewrite added in v4.36.1 actually runs. The summary gains a Release PR column, and API response dumps only appear with debug logging on.
+- [View full v4.36.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.2.md)
 
 ### Recent Releases
 
+- **v4.36.1** (November 2026) — Relative changelog links pinned per surface: head branch in the open release PR, release tag everywhere permanent ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.1.md))
 - **v4.36.0** (November 2026) — Fleet Node `.gitignore` template, single-brace README template tokens, and GitHub Pages builds again with Jekyll 4 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.0.md))
 - **v4.35.5** (November 2026) — Provenance attaches again for packages that build in `prepack`, and `test:cjs` / `test:dist` script names ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md))
 - **v4.35.4** (November 2026) — pnpm and yarn work again on Node 26, and `types:check` is the one type-check script name ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.4.md))
-- **v4.35.3** (November 2026) — A type check job on feature PRs, and closing keywords written as markdown links, `owner/repo#N` or issue URLs ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.3.md))
 
 ## 📋 Quick Start
 
