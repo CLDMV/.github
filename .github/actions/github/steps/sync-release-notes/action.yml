@@ -14,6 +14,10 @@ inputs:
   github-token:
     description: "App installation token with contents: write (and workflows: write when tags must be created on commits that touch .github/workflows)."
     required: true
+  repository:
+    description: "Repository to sync, as `owner/name`. Empty (default) = the repository the workflow runs in. Set it when a central workflow syncs another repository: check that repository out into the workspace (full history + tags) and pass a token scoped to it."
+    required: false
+    default: ""
   dry-run:
     description: "Report only; change nothing. Default true."
     required: false
