@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.37.0 (November 2026)
+### Latest: v4.37.1 (November 2026)
 
-- **Sync release notes for another repo** — The `sync-release-notes` action takes a `repository` input, so a central workflow can check a repo out and re-sync its Release pages and release PR bodies without that repo carrying its own `sync-release-notes.yml`.
-- [View full v4.37.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md)
+- **First releases stop re-bumping** — A repo whose default branch `package.json` has no `version` field now starts from 0.0.0, so the release flow no longer adds a new version bump on every push to `next`. A drifted version is bumped back to the right one on the next refresh, so the release PR matches the committed changelog.
+- [View full v4.37.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.1.md)
 
 ### Recent Releases
 
+- **v4.37.0** (November 2026) — `sync-release-notes` takes a `repository` input so a central workflow can sync another repo ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md))
 - **v4.36.3** (November 2026) — `sync-release-notes` finds release PRs by their `release: vX.Y.Z` title when the commit-to-PR link finds nothing ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md))
 - **v4.36.2** (November 2026) — Release PR column in the sync summary and no API response dumps without debug logging ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.2.md))
 - **v4.36.1** (November 2026) — Relative changelog links pinned per surface: head branch in the open release PR, release tag everywhere permanent ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.1.md))
-- **v4.36.0** (November 2026) — Fleet Node `.gitignore` template, single-brace README template tokens, and GitHub Pages builds again with Jekyll 4 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.0.md))
 
 ## 📋 Quick Start
 
