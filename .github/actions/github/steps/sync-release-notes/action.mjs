@@ -45,7 +45,10 @@ import {
 if (process.env.RUNNER_DEBUG !== "1" && process.env.CI_DEBUG !== "true") globalThis.CI_DEBUG_ENABLED = false;
 
 const token = getInput("github-token", { required: true });
-const repoFull = process.env.GITHUB_REPOSITORY || "";
+// `repository` lets a central workflow sync another repo it has checked out
+// into the workspace; empty means the repo this run belongs to.
+const repoFull = getInput("repository").trim() || process.env.GITHUB_REPOSITORY || "";
+if (!/^[\w.-]+\/[\w.-]+$/.test(repoFull)) throw new Error(`repository must be owner/name, got "${repoFull}"`);
 const { owner, repo } = parseRepo(repoFull);
 const ctx = { token, owner, repo };
 const dryRun = getBooleanInput("dry-run", true);
