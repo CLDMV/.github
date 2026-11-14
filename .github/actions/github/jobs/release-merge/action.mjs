@@ -21,6 +21,7 @@
 
 import { getInput, appendSummary, setOutputs } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
+import { releaseTitleVersion, repinBranchLinks } from "../../utilities/release-notes.mjs";
 
 /** Parse a comma-separated input into a lowercased Set (values trimmed, blanks dropped). */
 function csvSet(input, fallback) {
@@ -266,11 +267,17 @@ async function main() {
 	// commit is exactly the curated PR body (no title-only drop, no UI co-author
 	// auto-append). `sha` pins the merge to the head we just gated.
 	console.log(`🚀 PR #${prNumber}: approved + all checks green — squash-merging with the PR body as the commit message.`);
+	// The open PR body pins changelog links to the head branch; the commit on
+	// the release branch is permanent, so point them at the tag created from it.
+	const version = releaseTitleVersion(pr.title);
+	const commitMessage = version
+		? repinBranchLinks(pr.body || "", { repo: `${owner}/${repo}`, from: pr.head.ref, to: `v${version}` })
+		: pr.body || "";
 	try {
 		await api(
 			"PUT",
 			`/pulls/${prNumber}/merge`,
-			{ merge_method: mergeMethod, sha: headSha, commit_title: pr.title, commit_message: pr.body || "" },
+			{ merge_method: mergeMethod, sha: headSha, commit_title: pr.title, commit_message: commitMessage },
 			{ token, owner, repo }
 		);
 	} catch (err) {

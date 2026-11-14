@@ -34,7 +34,17 @@ if (file) {
 	console.log(`ℹ️ No committed changelog file for v${version} at ${commitSha.slice(0, 7)} — using the commit-derived body.`);
 }
 
-const body = buildReleaseBody({ changelog: file?.content || "", baseBody: generated, name: tagName, version });
+// Relative links in the file are pinned to the release tag: GitHub resolves a
+// release body against the repo root, not the changelog's folder.
+const body = buildReleaseBody({
+	changelog: file?.content || "",
+	baseBody: generated,
+	name: tagName,
+	version,
+	repo: process.env.GITHUB_REPOSITORY || "",
+	changelogPath: file?.path || "",
+	linkRef: tagName
+});
 
 const out = process.env.GITHUB_OUTPUT;
 if (out) {

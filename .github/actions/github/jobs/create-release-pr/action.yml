@@ -178,6 +178,9 @@ runs:
         new-version: ${{ steps.version.outputs.new-version }}
         changelog-dir: ${{ inputs.changelog-dir }}
         changelog-file: ${{ inputs.changelog-file }}
+        # Pin the changelog's relative links to the head branch so they work
+        # while the PR is open; release-merge moves them to the tag on merge.
+        changelog-link-ref: ${{ github.ref_name }}
         bot-name: ${{ inputs.bot-name }}
         bot-email: ${{ inputs.bot-email }}
 
