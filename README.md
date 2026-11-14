@@ -6,7 +6,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ### Latest: v4.36.3 (November 2026)
 
-- **Release PR bodies get tag links** — `sync-release-notes` finds each release's PR by the `release: vX.Y.Z` title of the merged PRs into the default branch, instead of the commit-to-PR listing that never matched for the bot token. Re-running it rewrites the merged release PR bodies that v4.36.1 and v4.36.2 left relative.
+- **Release PR bodies get tag links** — `sync-release-notes` falls back to the `release: vX.Y.Z` title of the merged PRs into the default branch when the commit-to-PR link finds nothing, which it did for the bot token. Re-running it rewrites the merged release PR bodies that v4.36.1 and v4.36.2 left relative, and the summary shows which path found each PR.
 - [View full v4.36.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md)
 
 ### Recent Releases
