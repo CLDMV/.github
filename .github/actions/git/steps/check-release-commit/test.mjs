@@ -5,7 +5,7 @@
  * doubling on an explicit `release: vX.Y.Z - <desc>` commit. Run: `node test.mjs`.
  */
 
-import { stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix } from "./action.mjs";
+import { stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix, isAlreadyBumped } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -51,6 +51,13 @@ eq(
 	"add widgets",
 	"minor bump → feat subject (unaffected by the version strip)"
 );
+
+console.log("\nisAlreadyBumped:");
+eq(isAlreadyBumped(new Set(["0.0.1"]), "0.0.1", "0.0.1"), true, "bumped and package.json matches → applied");
+eq(isAlreadyBumped(new Set(["0.0.1", "0.0.2"]), "0.0.1", "0.0.2"), false, "bumped earlier but package.json moved on → bump again");
+eq(isAlreadyBumped(new Set(["0.0.1"]), "0.0.1", ""), true, "package.json unreadable → trust the bump commit");
+eq(isAlreadyBumped(new Set(), "0.0.1", "0.0.1"), false, "no bump commit for the target → not applied");
+eq(isAlreadyBumped(new Set(["0.0.2"]), "0.0.1", "0.0.2"), false, "only a different version bumped → not applied");
 
 if (failures > 0) {
 	console.error(`\n❌ ${failures} test(s) failed`);
