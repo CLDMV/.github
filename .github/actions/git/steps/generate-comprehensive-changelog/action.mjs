@@ -5,6 +5,7 @@ import { getHumanContributors, isBotAuthor } from "../../../common/utilities/bot
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { filterBotCommits, isDependencyUpdate } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
+import { pinRelativeLinks } from "../../../github/utilities/release-notes.mjs";
 
 // Get inputs from environment.
 // COMMITS_FILE is preferred over COMMITS_INPUT to avoid "Argument list too long" errors
@@ -37,6 +38,11 @@ const CHANGELOG_DIR = process.env.CHANGELOG_DIR || "";
 // Optional explicit path template overriding the default lookup order. Supports
 // `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`).
 const CHANGELOG_FILE = process.env.CHANGELOG_FILE || "";
+// Ref the committed changelog's relative links are pinned to. The release-PR
+// callers pass the head branch (`next`/`hotfixes`) so the links work during
+// review; release-merge moves them to the tag in the squash commit. Empty =
+// the release tag `v<version>`.
+const CHANGELOG_LINK_REF = process.env.CHANGELOG_LINK_REF || "";
 // The caller's own commit-signing bot identity — the same BOT_NAME/BOT_EMAIL
 // used elsewhere (e.g. reusable-lint-format.yml) to author+GPG-sign a commit
 // locally. That identity is a real GitHub user account, not a GitHub App, so
@@ -82,6 +88,19 @@ const oneLine = (s) => String(s).replace(/[\r\n]+/g, " ");
  * @returns {string|null} Trimmed file contents, or null when absent/empty.
  */
 function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
+	const found = findVersionChangelogFile(rawVersion, dir, fileTemplate);
+	return found ? found.content : null;
+}
+
+/**
+ * Same lookup as readVersionChangelogFile, also returning where the file was
+ * found (repo-relative, `/`-separated) so its relative links can be pinned.
+ * @param {string} rawVersion - Resolved release version, with or without a leading `v`.
+ * @param {string} dir - Changelog base directory; empty searches both defaults.
+ * @param {string} fileTemplate - Optional explicit path-template override.
+ * @returns {{path: string, content: string}|null} The first non-empty match, or null.
+ */
+function findVersionChangelogFile(rawVersion, dir, fileTemplate) {
 	const version = String(rawVersion || "")
 		.trim()
 		.replace(/^v/i, "");
@@ -132,7 +151,7 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 			const content = readFileSync(real, "utf8").trim();
 			if (content) {
 				console.log(`📄 Found committed changelog file for the release: ${oneLine(rel)}`);
-				return content;
+				return { path: path.relative(root, abs).split(path.sep).join("/"), content };
 			}
 			console.log(`⚠️ Changelog file '${oneLine(rel)}' exists but is empty — ignoring.`);
 		} catch (err) {
@@ -1300,12 +1319,20 @@ async function generateComprehensiveChangelog(
 	// no such file exists yet, fall back to the generated sections (unchanged
 	// behaviour). Either way, the contributor block below is still appended, so
 	// contributors are never dropped when the file omits them.
-	const fileBody = readVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
+	const found = findVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
 	let changelog;
-	if (fileBody) {
+	if (found) {
 		// Strip any leading "v" so an explicit NEW_VERSION of "v4.21.2" doesn't log "vv4.21.2".
 		const displayVersion = String(NEW_VERSION).trim().replace(/^v/i, "");
 		console.log(`📄 Using committed changelog file as the release-PR body (v${displayVersion}).`);
+		// GitHub resolves relative links in a PR body against the PR URL, so pin
+		// them: to the head branch for an open release PR (release-merge moves
+		// them to the tag in the squash commit), else to the release tag.
+		const fileBody = pinRelativeLinks(found.content, {
+			repo: GITHUB_REPOSITORY || "",
+			filePath: found.path,
+			ref: CHANGELOG_LINK_REF || `v${displayVersion}`
+		});
 		changelog = `${fileBody}\n\n`;
 	} else {
 		changelog = "## 🚀 What's Changed\n\n";
@@ -1436,4 +1463,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog, readVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber };
+export {
+	generateComprehensiveChangelog,
+	readVersionChangelogFile,
+	findVersionChangelogFile,
+	buildCoAuthorTrailers,
+	extractTrailingPrNumber
+};

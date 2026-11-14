@@ -34,6 +34,10 @@ inputs:
     description: "Base directory searched for a per-version changelog file. Lookup order (first hit wins): `<dir>/v<major>/v<version>.md`, `<dir>/v<version>.md`, `<dir>/<version>.md`. Matched by exact resolved version (never a different version's file). Empty (default) searches both `docs/changelog` and `docs/changelogs`."
     required: false
     default: ""
+  changelog-link-ref:
+    description: "Ref the committed changelog file's relative links are pinned to (`https://github.com/<repo>/blob/<ref>/…`, `raw/` for images). Release-PR callers pass the head branch (`next`/`hotfixes`) so the links work while the PR is open; release-merge moves them to the tag in the squash commit. Empty (default) = the release tag `v<new-version>`."
+    required: false
+    default: ""
   changelog-file:
     description: "Optional explicit path-template override that takes precedence over the default lookup. Supports `{version}` and `{major}` placeholders (e.g. `docs/notes/{version}.md`)."
     required: false
@@ -72,6 +76,7 @@ runs:
         NEW_VERSION: ${{ inputs.new-version }}
         CHANGELOG_DIR: ${{ inputs.changelog-dir }}
         CHANGELOG_FILE: ${{ inputs.changelog-file }}
+        CHANGELOG_LINK_REF: ${{ inputs.changelog-link-ref }}
         BOT_NAME: ${{ inputs.bot-name }}
         BOT_EMAIL: ${{ inputs.bot-email }}
         # Fall back to ${{ github.token }} so the augmentation can still

@@ -9,6 +9,8 @@
  *   Contributors blocks from the commit-derived body.
  * - Strip the duplicated `release: vX.Y.Z - …` subject line and the squash
  *   trailers (`Co-authored-by:` …) from commit-derived bodies.
+ * - Pin the changelog's relative links to the release tag (`pinRelativeLinks`),
+ *   since GitHub resolves a release body against the repo root.
  * - Neutralize accidental `@word` mentions in prose (wrap them in a code span)
  *   while keeping the intended Contributors handles live.
  *
@@ -16,6 +18,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 const CONTRIBUTORS_RE = /<details>\s*<summary>\s*👥 Contributors\s*<\/summary>[\s\S]*?<\/details>/i;
 const COVERAGE_RE = /<!-- coverage-start -->[\s\S]*?<!-- coverage-end -->/;
@@ -30,6 +33,158 @@ export function bareVersion(version) {
 	return String(version || "")
 		.trim()
 		.replace(/^v/i, "");
+}
+
+/**
+ * Resolve one link target from a changelog file to an absolute GitHub URL.
+ * Returns null when the target should stay as written: absolute URLs (any
+ * scheme, `//host`), `#anchors`, and paths that climb above the repo root.
+ * @param {string} target - Raw link target (no surrounding `<>`).
+ * @param {object} opts
+ * @param {string} opts.repo - `owner/name`.
+ * @param {string} opts.filePath - Repo-relative path of the changelog file.
+ * @param {(path: string) => string} opts.refFor - Ref to pin a resolved path to.
+ * @param {boolean} opts.image - True for an image source (`raw/` instead of `blob/`).
+ * @returns {string|null} Absolute URL, or null to leave the target alone.
+ */
+function resolveLinkTarget(target, { repo, filePath, refFor, image }) {
+	const t = String(target || "").trim();
+	if (!t || t.startsWith("#") || t.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(t)) return null;
+	const cut = t.search(/[?#]/);
+	const rawPath = cut === -1 ? t : t.slice(0, cut);
+	const suffix = cut === -1 ? "" : t.slice(cut);
+	if (!rawPath) return null;
+	const baseDir = rawPath.startsWith("/") ? "" : path.posix.dirname(String(filePath || ""));
+	const joined = path.posix.normalize(path.posix.join("/", baseDir === "." ? "" : baseDir, rawPath));
+	const resolved = joined.replace(/^\/+/, "");
+	// path.posix.join("/", …) clamps "..", so detect an escape on the unclamped form.
+	const unclamped = path.posix.normalize(path.posix.join(baseDir === "." ? "" : baseDir, rawPath.replace(/^\/+/, "")));
+	if (!rawPath.startsWith("/") && (unclamped === ".." || unclamped.startsWith("../"))) return null;
+	const ref = refFor(resolved);
+	if (!ref) return null;
+	const kind = image ? "raw" : "blob";
+	const encoded = resolved
+		.split("/")
+		.map((seg) => encodeURIComponent(decodeSafe(seg)))
+		.join("/");
+	return `https://github.com/${repo}/${kind}/${encodeURIComponent(ref).replace(/%2F/g, "/")}/${encoded}${suffix}`.replace(/\/$/, "");
+}
+
+/**
+ * decodeURIComponent that returns its input on malformed escapes.
+ * @param {string} s - Possibly percent-encoded text.
+ * @returns {string} Decoded text.
+ */
+function decodeSafe(s) {
+	try {
+		return decodeURIComponent(s);
+	} catch {
+		return s;
+	}
+}
+
+/**
+ * Rewrite the relative links and images of a changelog file into absolute
+ * GitHub URLs pinned to a ref (normally the release tag), so they work where
+ * GitHub renders the text against something other than the file's own folder:
+ * the Release page (resolved against the repo root) and the release PR body
+ * (resolved against the PR URL).
+ *
+ * Covers inline links and images (`[t](x)`, `![a](x)`), reference definitions
+ * (`[id]: x`) and HTML `href`/`src` attributes. Images become `raw/` URLs,
+ * everything else `blob/`. Left alone: absolute URLs, `//host`, `#anchors`,
+ * `mailto:` and other schemes, fenced code blocks, inline code spans, and
+ * paths that climb above the repository root. Idempotent: rewritten links are
+ * absolute and skipped next time.
+ *
+ * @param {string} markdown - Changelog content.
+ * @param {object} opts
+ * @param {string} opts.repo - `owner/name`; missing → content returned unchanged.
+ * @param {string} opts.filePath - Repo-relative path the content was read from.
+ * @param {string|((path: string) => string)} opts.ref - Ref (e.g. `v1.2.3`) or a function picking one per resolved path.
+ * @returns {string} Content with relative links pinned.
+ */
+export function pinRelativeLinks(markdown, { repo = "", filePath = "", ref = "" } = {}) {
+	if (!markdown || !/^[\w.-]+\/[\w.-]+$/.test(String(repo)) || !filePath || !ref) return markdown || "";
+	const refFor = typeof ref === "function" ? ref : () => ref;
+	const opts = (image) => ({ repo, filePath, refFor, image });
+	const inline = (text) =>
+		text
+			// Inline links and images: [text](target "title") / ![alt](<target>)
+			.replace(
+				/(!?)\[((?:[^[\]]|\[[^[\]]*\])*)\]\(\s*(<[^<>\n]*>|[^\s()<>]+)((?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\s*)\)/g,
+				(m, bang, label, rawTarget, title) => {
+					const angled = rawTarget.startsWith("<");
+					const target = angled ? rawTarget.slice(1, -1) : rawTarget;
+					const url = resolveLinkTarget(target, opts(bang === "!"));
+					return url ? `${bang}[${label}](${url}${title})` : m;
+				}
+			)
+			// HTML attributes: <a href="x">, <img src="x">
+			.replace(/(<(img|source)\b[^>]*?\s(?:src|srcset)=|<a\b[^>]*?\shref=)(["'])([^"'\n]*)\3/gi, (m, head, tag, q, target) => {
+				const url = resolveLinkTarget(target, opts(Boolean(tag)));
+				return url ? `${head}${q}${url}${q}` : m;
+			});
+	let fence = null;
+	return String(markdown)
+		.replace(/\r\n/g, "\n")
+		.split("\n")
+		.map((line) => {
+			const fm = line.match(/^\s{0,3}(`{3,}|~{3,})/);
+			if (fence) {
+				if (fm && fm[1][0] === fence[0] && fm[1].length >= fence.length && line.trim() === fm[1]) fence = null;
+				return line;
+			}
+			if (fm) {
+				fence = fm[1];
+				return line;
+			}
+			// Reference definition: [id]: target "title"
+			const def = line.match(/^(\s{0,3}\[[^\]\n]+\]:\s*)(<[^<>\n]*>|\S+)(.*)$/);
+			if (def) {
+				const angled = def[2].startsWith("<");
+				const url = resolveLinkTarget(angled ? def[2].slice(1, -1) : def[2], opts(false));
+				return url ? `${def[1]}${url}${def[3]}` : line;
+			}
+			// Leave inline code spans untouched: rewrite only the text between them.
+			return line
+				.split(/(`+[^`]*?`+)/)
+				.map((part, i) => (i % 2 ? part : inline(part)))
+				.join("");
+		})
+		.join("\n");
+}
+
+/**
+ * Move this repository's `blob/<from>/…`, `raw/<from>/…` and `tree/<from>/…`
+ * links to `<to>`. The open release PR body pins a changelog's relative links
+ * to its head branch (`next`/`hotfixes`) so they work during review; once the
+ * release is tagged, this turns them into tag links for the squash commit and
+ * the merged PR. Links to other repositories and other refs are untouched, and
+ * a body that already carries tag links is returned unchanged.
+ * @param {string} markdown - Body text.
+ * @param {object} opts
+ * @param {string} opts.repo - `owner/name`.
+ * @param {string} opts.from - Branch the links currently point at.
+ * @param {string} opts.to - Ref to point them at (normally the release tag).
+ * @returns {string} Body with the branch links moved.
+ */
+export function repinBranchLinks(markdown, { repo = "", from = "", to = "" } = {}) {
+	if (!markdown || !/^[\w.-]+\/[\w.-]+$/.test(String(repo)) || !from || !to || from === to) return markdown || "";
+	const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const enc = (s) => encodeURIComponent(s).replace(/%2F/g, "/");
+	const re = new RegExp(`(https://github\\.com/${esc(repo)}/(?:blob|raw|tree)/)${esc(enc(from))}(?=[/?#)\\s"'>]|$)`, "gi");
+	return String(markdown).replace(re, (_m, head) => `${head}${enc(to)}`);
+}
+
+/**
+ * Release version named by a release PR or commit title (`release: v1.2.3 - …`).
+ * @param {string} title - PR title or commit subject.
+ * @returns {string} Bare version, or "" when the title names none.
+ */
+export function releaseTitleVersion(title) {
+	const m = String(title || "").match(/^release:\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)(?=\s|$)/i);
+	return m ? m[1] : "";
 }
 
 /**
@@ -212,13 +367,25 @@ export function neutralizeMentions(body, allowed = []) {
  * @param {string} [opts.baseBody] - Commit-derived / existing body.
  * @param {string} [opts.name] - Release name (e.g. `v1.2.3`).
  * @param {string} [opts.version] - Release version.
+ * @param {string} [opts.repo] - `owner/name`, for pinning the changelog's relative links.
+ * @param {string} [opts.changelogPath] - Repo-relative path the changelog was read from.
+ * @param {string|((path: string) => string)} [opts.linkRef] - Ref the links are pinned to (default: `name`).
  * @returns {string} Final body.
  */
-export function buildReleaseBody({ changelog = "", baseBody = "", name = "", version = "" } = {}) {
+export function buildReleaseBody({
+	changelog = "",
+	baseBody = "",
+	name = "",
+	version = "",
+	repo = "",
+	changelogPath = "",
+	linkRef = ""
+} = {}) {
 	const base = stripCommitTrailers(stripReleaseSubject(baseBody, { name, version })).trim();
 	let out;
 	if (changelog && changelog.trim()) {
 		out = stripReleaseSubject(changelog, { name, version }).trim();
+		out = pinRelativeLinks(out, { repo, filePath: changelogPath, ref: linkRef || name });
 		const coverage = extractCoverageBlock(base);
 		if (coverage && !extractCoverageBlock(out)) out += `\n\n---\n\n${coverage}`;
 		const contributors = extractContributorsBlock(base);
