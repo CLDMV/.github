@@ -73,6 +73,22 @@ function git(args) {
 }
 
 /**
+ * @param {string} ref - Commit-ish.
+ * @param {string} p - Repo-relative path (file or directory).
+ * @returns {boolean} True when `p` exists at `ref`.
+ */
+function existsAt(ref, p) {
+	const clean = String(p).replace(/\/+$/, "");
+	if (!clean) return true;
+	try {
+		execFileSync("git", ["cat-file", "-e", `${ref}:${clean}`], { stdio: "ignore" });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Semver comparison (prerelease < release; prerelease ids compared as strings).
  * @param {string} a - Version.
  * @param {string} b - Version.
@@ -150,6 +166,15 @@ for (const version of [...versions].sort(cmpVersion)) {
 	const ref = tagSha || relCommit;
 	const file = readChangelogAtRef(version, tip) || (ref && readChangelogAtRef(version, ref));
 	row.changelog = file ? file.path : "";
+	// Pin the file's relative links to the release tag. A file read from the
+	// default branch can link to something added after the release (a backfilled
+	// changelog); those point at the default branch instead of a 404 at the tag.
+	// Read at call time: the tag block below may create the tag first.
+	const linkRef = (p) => {
+		const pinRef = tagSha ? tagName : relCommit;
+		return pinRef && existsAt(tagSha ? `refs/tags/${tagName}` : pinRef, p) ? pinRef : defaultBranch;
+	};
+	const linkOpts = { repo: repoFull, changelogPath: file ? file.path : "", linkRef };
 
 	// Tag
 	if (tagSha) {
@@ -198,7 +223,7 @@ for (const version of [...versions].sort(cmpVersion)) {
 			// Nothing to attach a release to.
 		} else if (createReleases) {
 			const base = git(["log", "-1", "--format=%B", relCommit || tagSha]);
-			const body = buildReleaseBody({ changelog: file?.content || "", baseBody: base, name: tagName, version });
+			const body = buildReleaseBody({ changelog: file?.content || "", baseBody: base, name: tagName, version, ...linkOpts });
 			if (dryRun) {
 				row.actions.push("would create release");
 			} else {
@@ -227,7 +252,8 @@ for (const version of [...versions].sort(cmpVersion)) {
 				changelog: file?.content || "",
 				baseBody: primary.body || "",
 				name: primary.name || tagName,
-				version
+				version,
+				...linkOpts
 			});
 			if (!sameBody(desired, primary.body)) patch.body = desired;
 		}

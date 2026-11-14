@@ -5,6 +5,7 @@ import { getHumanContributors, isBotAuthor } from "../../../common/utilities/bot
 import { categorizeCommits } from "../get-commit-range/action.mjs";
 import { filterBotCommits, isDependencyUpdate } from "../../../common/utilities/bot-detection.mjs";
 import { api } from "../../../github/api/_api/core.mjs";
+import { pinRelativeLinks } from "../../../github/utilities/release-notes.mjs";
 
 // Get inputs from environment.
 // COMMITS_FILE is preferred over COMMITS_INPUT to avoid "Argument list too long" errors
@@ -82,6 +83,19 @@ const oneLine = (s) => String(s).replace(/[\r\n]+/g, " ");
  * @returns {string|null} Trimmed file contents, or null when absent/empty.
  */
 function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
+	const found = findVersionChangelogFile(rawVersion, dir, fileTemplate);
+	return found ? found.content : null;
+}
+
+/**
+ * Same lookup as readVersionChangelogFile, also returning where the file was
+ * found (repo-relative, `/`-separated) so its relative links can be pinned.
+ * @param {string} rawVersion - Resolved release version, with or without a leading `v`.
+ * @param {string} dir - Changelog base directory; empty searches both defaults.
+ * @param {string} fileTemplate - Optional explicit path-template override.
+ * @returns {{path: string, content: string}|null} The first non-empty match, or null.
+ */
+function findVersionChangelogFile(rawVersion, dir, fileTemplate) {
 	const version = String(rawVersion || "")
 		.trim()
 		.replace(/^v/i, "");
@@ -132,7 +146,7 @@ function readVersionChangelogFile(rawVersion, dir, fileTemplate) {
 			const content = readFileSync(real, "utf8").trim();
 			if (content) {
 				console.log(`📄 Found committed changelog file for the release: ${oneLine(rel)}`);
-				return content;
+				return { path: path.relative(root, abs).split(path.sep).join("/"), content };
 			}
 			console.log(`⚠️ Changelog file '${oneLine(rel)}' exists but is empty — ignoring.`);
 		} catch (err) {
@@ -1300,12 +1314,16 @@ async function generateComprehensiveChangelog(
 	// no such file exists yet, fall back to the generated sections (unchanged
 	// behaviour). Either way, the contributor block below is still appended, so
 	// contributors are never dropped when the file omits them.
-	const fileBody = readVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
+	const found = findVersionChangelogFile(NEW_VERSION, CHANGELOG_DIR, CHANGELOG_FILE);
 	let changelog;
-	if (fileBody) {
+	if (found) {
 		// Strip any leading "v" so an explicit NEW_VERSION of "v4.21.2" doesn't log "vv4.21.2".
 		const displayVersion = String(NEW_VERSION).trim().replace(/^v/i, "");
 		console.log(`📄 Using committed changelog file as the release-PR body (v${displayVersion}).`);
+		// GitHub resolves relative links in a PR body against the PR URL, and the
+		// body becomes the squash commit and the first release body, so pin them
+		// to the release tag now. They resolve once the release is tagged.
+		const fileBody = pinRelativeLinks(found.content, { repo: GITHUB_REPOSITORY || "", filePath: found.path, ref: `v${displayVersion}` });
 		changelog = `${fileBody}\n\n`;
 	} else {
 		changelog = "## 🚀 What's Changed\n\n";
@@ -1436,4 +1454,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Export functions for testing
-export { generateComprehensiveChangelog, readVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber };
+export {
+	generateComprehensiveChangelog,
+	readVersionChangelogFile,
+	findVersionChangelogFile,
+	buildCoAuthorTrailers,
+	extractTrailingPrNumber
+};

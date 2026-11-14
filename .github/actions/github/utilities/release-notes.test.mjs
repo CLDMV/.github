@@ -8,6 +8,7 @@ import {
 	stripReleaseSubject,
 	stripCommitTrailers,
 	changelogCandidates,
+	pinRelativeLinks,
 	sameBody
 } from "./release-notes.mjs";
 
@@ -55,5 +56,50 @@ assert.equal(escapeTableCell("a\\|b"), "a\\\\\\|b");
 assert.equal(escapeTableCell("C:\\path\\x"), "C:\\\\path\\\\x");
 assert.equal(escapeTableCell("line1\r\nline2"), "line1 line2");
 assert.equal(escapeTableCell(null), "");
+
+// Relative links in a changelog are pinned to the release tag (CLDMV/.github#457).
+const R = "https://github.com/CLDMV/x";
+const pin = (md, ref = "v0.9.0") => pinRelativeLinks(md, { repo: "CLDMV/x", filePath: "docs/changelog/v0/v0.9.0.md", ref });
+assert.equal(pin("[d](../../drivers.md)"), `[d](${R}/blob/v0.9.0/docs/drivers.md)`);
+assert.equal(pin("[s](./v0.9.0.md)"), `[s](${R}/blob/v0.9.0/docs/changelog/v0/v0.9.0.md)`);
+assert.equal(pin("[p](../v0/v0.8.0.md#fixes)"), `[p](${R}/blob/v0.9.0/docs/changelog/v0/v0.8.0.md#fixes)`);
+assert.equal(pin("[l](/LICENSE)"), `[l](${R}/blob/v0.9.0/LICENSE)`);
+assert.equal(pin('![i](../../img/a.png "Title")'), `![i](${R}/raw/v0.9.0/docs/img/a.png "Title")`);
+assert.equal(
+	pin('<img src="./a.png"> <a href="../x.md">x</a>'),
+	`<img src="${R}/raw/v0.9.0/docs/changelog/v0/a.png"> <a href="${R}/blob/v0.9.0/docs/changelog/x.md">x</a>`
+);
+assert.equal(pin('[r]: ../../docs.md "T"'), `[r]: ${R}/blob/v0.9.0/docs/docs.md "T"`);
+assert.equal(pin("[sp](<../my file.md>)"), `[sp](${R}/blob/v0.9.0/docs/changelog/my%20file.md)`);
+for (const keep of [
+	"[a](https://e.com/x.md)",
+	"[a](//e.com/x)",
+	"[a](#top)",
+	"[a](mailto:a@b.c)",
+	"`[a](./x.md)`",
+	"[a](../../../../outside.md)",
+	"```md\n[a](./x.md)\n```",
+	"~~~\n![a](./x.png)\n~~~"
+]) {
+	assert.equal(pin(keep), keep, `unchanged: ${keep}`);
+}
+assert.equal(pin(pin("[d](../../drivers.md)")), pin("[d](../../drivers.md)"), "idempotent");
+assert.equal(
+	pin("[d](./a.md)", (p) => (p.endsWith("a.md") ? "master" : "v0.9.0")),
+	`[d](${R}/blob/master/docs/changelog/v0/a.md)`,
+	"per-path ref"
+);
+assert.equal(pinRelativeLinks("[d](./a.md)", { filePath: "docs/x.md", ref: "v1" }), "[d](./a.md)", "no repo → unchanged");
+// buildReleaseBody pins the file's links, the generated fallback is untouched.
+assert.ok(
+	buildReleaseBody({
+		changelog: "[d](./a.md)",
+		name: "v1.0.0",
+		version: "1.0.0",
+		repo: "CLDMV/x",
+		changelogPath: "docs/changelog/v1/v1.0.0.md"
+	}).includes(`${R}/blob/v1.0.0/docs/changelog/v1/a.md`)
+);
+assert.ok(buildReleaseBody({ baseBody: "[d](./a.md)", name: "v1.0.0", version: "1.0.0", repo: "CLDMV/x" }).includes("[d](./a.md)"));
 
 console.log("release-notes: all checks passed");

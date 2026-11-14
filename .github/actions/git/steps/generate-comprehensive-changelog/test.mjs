@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber } from "./action.mjs";
+import { readVersionChangelogFile, findVersionChangelogFile, buildCoAuthorTrailers, extractTrailingPrNumber } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -55,6 +55,8 @@ const D = "docs/changelog";
 
 console.log("readVersionChangelogFile — in-workspace discovery:");
 eq(readVersionChangelogFile("9.9.9", D, ""), "# Notes 9.9.9\n\nnested layout", "nested v<major>/v<version>.md");
+eq(findVersionChangelogFile("9.9.9", D, "")?.path, "docs/changelog/v9/v9.9.9.md", "find returns the repo-relative path");
+eq(findVersionChangelogFile("4.20.0", "", "")?.path, "docs/changelogs/v4.20.0.md", "find returns the plural-dir path");
 eq(readVersionChangelogFile("v8.0.0", D, ""), "# Notes 8.0.0\n\nflat layout", "flat v<version>.md (leading v stripped)");
 eq(readVersionChangelogFile("6.6.6", D, ""), null, "no matching file → null (falls back to generated changelog)");
 eq(readVersionChangelogFile("7.0.0", D, ""), null, "empty/whitespace-only file → null (falls back)");
