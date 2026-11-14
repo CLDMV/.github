@@ -298,6 +298,35 @@ function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis)
 	return truncateForTitle(stripConventionalPrefix(firstMatch.subject));
 }
 
+/**
+ * Whether the target version's bump is already in place on the branch.
+ *
+ * A `chore: bump version to X` commit in the range is not enough on its own:
+ * a later bump can move package.json past X (CLDMV/internal-github-tools went
+ * 0.0.1 → 0.0.2 while its base version was unreadable). Only treat X as
+ * applied when the branch's package.json still says X, so the next refresh
+ * writes X back instead of shipping a title and package.json that disagree.
+ *
+ * @param {Set<string>} alreadyBumpedVersions - Versions named by bot bump commits in the range.
+ * @param {string} targetVersion - Version the release should carry.
+ * @param {string} headVersion - package.json version on the branch ("" when unreadable).
+ * @returns {boolean}
+ */
+export function isAlreadyBumped(alreadyBumpedVersions, targetVersion, headVersion) {
+	if (!alreadyBumpedVersions.has(targetVersion)) return false;
+	return !headVersion || headVersion === targetVersion;
+}
+
+/** package.json version in the working tree, or "" when it can't be read. */
+function readHeadVersion() {
+	try {
+		const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+		return typeof version === "string" ? version.trim() : "";
+	} catch {
+		return "";
+	}
+}
+
 // Main logic - only run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
 	console.log(`🔍 DEBUG: HAS_COMMITS = ${HAS_COMMITS}`);
@@ -373,7 +402,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 		console.log(`🔍 Base version: ${baseVersion} → target: ${targetVersion}`);
 
-		if (alreadyBumpedVersions.has(targetVersion)) {
+		const headVersion = readHeadVersion();
+		if (alreadyBumpedVersions.has(targetVersion) && headVersion && headVersion !== targetVersion) {
+			console.log(`🔁 ${targetVersion} was bumped earlier, but package.json is now ${headVersion} — bumping back to ${targetVersion}`);
+		}
+
+		if (isAlreadyBumped(alreadyBumpedVersions, targetVersion, headVersion)) {
 			// Two paths here:
 			//   - Callers that *create* (create-release-pr, create-release) want
 			//     us to short-circuit — there's nothing new to do.
