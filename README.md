@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.36.3 (November 2026)
+### Latest: v4.37.0 (November 2026)
 
-- **Release PR bodies get tag links** — `sync-release-notes` falls back to the `release: vX.Y.Z` title of the merged PRs into the default branch when the commit-to-PR link finds nothing, which it did for the bot token. Re-running it rewrites the merged release PR bodies that v4.36.1 and v4.36.2 left relative, and the summary shows which path found each PR.
-- [View full v4.36.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md)
+- **Sync release notes for another repo** — The `sync-release-notes` action takes a `repository` input, so a central workflow can check a repo out and re-sync its Release pages and release PR bodies without that repo carrying its own `sync-release-notes.yml`.
+- [View full v4.37.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md)
 
 ### Recent Releases
 
+- **v4.36.3** (November 2026) — `sync-release-notes` finds release PRs by their `release: vX.Y.Z` title when the commit-to-PR link finds nothing ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md))
 - **v4.36.2** (November 2026) — Release PR column in the sync summary and no API response dumps without debug logging ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.2.md))
 - **v4.36.1** (November 2026) — Relative changelog links pinned per surface: head branch in the open release PR, release tag everywhere permanent ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.1.md))
 - **v4.36.0** (November 2026) — Fleet Node `.gitignore` template, single-brace README template tokens, and GitHub Pages builds again with Jekyll 4 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.0.md))
-- **v4.35.5** (November 2026) — Provenance attaches again for packages that build in `prepack`, and `test:cjs` / `test:dist` script names ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.35.5.md))
 
 ## 📋 Quick Start
 
