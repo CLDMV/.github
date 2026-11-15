@@ -41,6 +41,11 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
+            node_project:
+                description: "Set false for config/infra repos with no Node project. The release PR is still created/refreshed (version bump, changelog), but the build step is skipped and `build_command` is ignored."
+                required: false
+                type: boolean
+                default: true
             default_branch:
                 description: "Caller YAML override for the release base branch (the `hotfixes → <base>` target). Empty (default) = resolve via the CLDMV_RELEASE_BASE var, then the repo's API default_branch, then `master`."
                 required: false
@@ -193,7 +198,11 @@ jobs:
               uses: CLDMV/.github/.github/actions/github/jobs/create-release-pr@v4
               with:
                   package-name: ${{ inputs.package_name }}
-                  build-command: ${{ inputs.build_command }}
+                  # Empty build-command = skip the build step (node_project: false).
+                  # Written as `!no_node && cmd || ''` because `no_node && '' || cmd`
+                  # always falls through to cmd ('' is falsy). Both boolean and string
+                  # forms are checked: a boolean passed through `${{ }}` arrives as a string.
+                  build-command: ${{ !(inputs.node_project == false || inputs.node_project == 'false') && inputs.build_command || '' }}
                   default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR
@@ -228,7 +237,11 @@ jobs:
                   skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
                   pr-number: ${{ needs.plan.outputs.pr-number }}
                   package-name: ${{ inputs.package_name }}
-                  build-command: ${{ inputs.build_command }}
+                  # Empty build-command = skip the build step (node_project: false).
+                  # Written as `!no_node && cmd || ''` because `no_node && '' || cmd`
+                  # always falls through to cmd ('' is falsy). Both boolean and string
+                  # forms are checked: a boolean passed through `${{ }}` arrives as a string.
+                  build-command: ${{ !(inputs.node_project == false || inputs.node_project == 'false') && inputs.build_command || '' }}
                   default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR

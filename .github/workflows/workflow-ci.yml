@@ -23,7 +23,15 @@ on:
             is_master_sync:
                 description: "true if `next` / `hotfixes` was just force-synced to master (head SHA matches the default branch). Callers should green-light their Required PR Check when this is true — there's no diff to test, no PR to gate."
                 value: ${{ jobs.sync-gate.outputs.is_master_sync }}
+            no_node:
+                description: "true when the caller set `node_project: false`. The Node chain (ci, type-check, lint-format, coverage, summary) did not run. Callers should green-light their Required PR Check when this is true."
+                value: ${{ jobs.paths-gate.outputs.no_node }}
         inputs:
+            node_project:
+                required: false
+                type: boolean
+                default: true
+                description: "Set false for config/infra repos with no Node project (nothing to install, build or test). Skips the whole Node chain: ci, type-check, lint-format, coverage-badge, coverage-pr-comment and summary. The `no_node` output tells the caller's Required PR Check to pass."
             runs_on:
                 required: false
                 type: string
@@ -297,12 +305,20 @@ jobs:
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         outputs:
             docs_only: ${{ steps.gate.outputs.docs_only }}
+            # `node_project` is a boolean input, but a caller passing it through
+            # `${{ }}` hands it over as the STRING "false", so check both forms.
+            # Unset (the default, true) keeps no_node 'false' for every caller
+            # that predates the input.
+            no_node: ${{ (inputs.node_project == false || inputs.node_project == 'false') && 'true' || 'false' }}
         steps:
             - name: Decide docs-only
               id: gate
               uses: CLDMV/.github/.github/actions/common/steps/paths-gate@v4
               with:
                   paths_ignore: ${{ inputs.paths_ignore }}
+            - name: Note skipped Node chain
+              if: inputs.node_project == false || inputs.node_project == 'false'
+              run: echo "⏭️ Node chain skipped because \`node_project\` is false (no Node project in this repo)." >> "$GITHUB_STEP_SUMMARY"
 
     # Check if we should skip CI based on commit message
     commit-gate:
@@ -329,6 +345,7 @@ jobs:
             !cancelled() &&
             needs.commit-gate.outputs.should_skip != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
             needs.sync-gate.outputs.is_master_sync != 'true'
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
@@ -368,6 +385,7 @@ jobs:
             !cancelled() &&
             needs.commit-gate.outputs.should_skip != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
             needs.sync-gate.outputs.is_master_sync != 'true' &&
             !(inputs.skip_type_check == true || inputs.skip_type_check == 'true')
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
@@ -450,9 +468,10 @@ jobs:
     # bump commits. Runs once (no matrix).
     lint-format:
         name: "🎨 Lint & Format"
-        needs: [sync-gate, commit-gate]
+        needs: [sync-gate, paths-gate, commit-gate]
         if: |
             !cancelled() &&
+            needs.paths-gate.outputs.no_node != 'true' &&
             github.event_name == 'push' &&
             (github.ref_name == 'next' || github.ref_name == 'hotfixes') &&
             needs.commit-gate.outputs.should_skip != 'true' &&
@@ -505,6 +524,7 @@ jobs:
             !cancelled() &&
             needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' &&
             (inputs.enable_coverage_badge == true ||
             inputs.enable_coverage_badge == 'true') &&
@@ -596,6 +616,7 @@ jobs:
             !cancelled() &&
             needs.sync-gate.outputs.is_master_sync != 'true' &&
             needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
             needs.commit-gate.outputs.should_skip != 'true' &&
             (inputs.enable_coverage_pr_comment == true ||
             inputs.enable_coverage_pr_comment == 'true') &&
@@ -632,7 +653,7 @@ jobs:
         # `always()` is already there so skipped gates don't suppress the
         # summary; the sync-gate / paths-gate / commit-gate output checks
         # then decide whether the summary is meaningful enough to produce.
-        if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
+        if: always() && needs.commit-gate.outputs.should_skip != 'true' && needs.paths-gate.outputs.docs_only != 'true' && needs.paths-gate.outputs.no_node != 'true' && needs.sync-gate.outputs.is_master_sync != 'true'
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Generate CI Summary

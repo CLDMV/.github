@@ -27,7 +27,7 @@ inputs:
     required: false
     default: "auto"
   build-command:
-    description: "Command to build package"
+    description: "Command to build package. Empty = skip the build (repos with no Node project, node_project: false)."
     required: false
     default: "npm run build:ci"
   default-branch:
@@ -131,6 +131,7 @@ runs:
         base-version: ${{ steps.divergence.outputs.base-version }}
 
     - name: Build package
+      if: inputs.build-command != ''
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
       with:
         build-command: ${{ inputs.build-command }}
