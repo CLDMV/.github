@@ -16,6 +16,11 @@ name: 📊 Bundle Size Diff (Org-Level)
 on:
     workflow_call:
         inputs:
+            node_project:
+                required: false
+                type: boolean
+                default: true
+                description: "Set false for config/infra repos with no Node project. Skips the head/base builds and the compare (nothing to measure); the run passes with a one-line summary."
             runs_on:
                 required: false
                 type: string
@@ -63,8 +68,22 @@ permissions:
     pull-requests: write
 
 jobs:
+    # `node_project: false` → nothing to build or measure. The three jobs below
+    # skip (a skipped job is not a failure) and this one leaves a note in the
+    # run summary. Compare both boolean and string forms: a boolean input
+    # passed through `${{ }}` arrives as a string.
+    no-node:
+        name: "📊 No Node project"
+        if: inputs.node_project == false || inputs.node_project == 'false'
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions: {}
+        steps:
+            - name: Note skipped bundle-size diff
+              run: echo "⏭️ Bundle-size diff skipped because \`node_project\` is false (no Node project in this repo)." >> "$GITHUB_STEP_SUMMARY"
+
     build-head:
         name: "📊 Measure HEAD"
+        if: ${{ !(inputs.node_project == false || inputs.node_project == 'false') }}
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Checkout PR head
@@ -115,6 +134,7 @@ jobs:
 
     build-base:
         name: "📊 Measure BASE"
+        if: ${{ !(inputs.node_project == false || inputs.node_project == 'false') }}
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
             - name: Checkout PR base
@@ -197,6 +217,7 @@ jobs:
         name: "📊 Compare"
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         needs: [build-head, build-base]
+        if: ${{ !(inputs.node_project == false || inputs.node_project == 'false') }}
         steps:
             - name: Create App token (falls back to GITHUB_TOKEN)
               id: app-token

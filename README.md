@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.37.1 (November 2026)
+### Latest: v4.38.0 (November 2026)
 
-- **First releases stop re-bumping** — A repo whose default branch `package.json` has no `version` field now starts from 0.0.0, so the release flow no longer adds a new version bump on every push to `next`. A drifted version is bumped back to the right one on the next refresh, so the release PR matches the committed changelog.
-- [View full v4.37.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.1.md)
+- **Turn off the Node chain for repos with no Node code** — `node_project: false` on `ci.yml`, `bundle-size.yml`, the release workflows and `publish.yml` skips setup-node, install, tests, type check, lint/format, coverage and builds. The required check still passes, with its own "No Node project" message, so config-only and infra repos no longer need the `paths_ignore: "**"` workaround.
+- [View full v4.38.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md)
 
 ### Recent Releases
 
+- **v4.37.1** (November 2026) — First releases stop re-bumping when the default branch `package.json` has no `version` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.1.md))
 - **v4.37.0** (November 2026) — `sync-release-notes` takes a `repository` input so a central workflow can sync another repo ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md))
 - **v4.36.3** (November 2026) — `sync-release-notes` finds release PRs by their `release: vX.Y.Z` title when the commit-to-PR link finds nothing ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md))
 - **v4.36.2** (November 2026) — Release PR column in the sync summary and no API response dumps without debug logging ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.2.md))
-- **v4.36.1** (November 2026) — Relative changelog links pinned per surface: head branch in the open release PR, release tag everywhere permanent ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.1.md))
 
 ## 📋 Quick Start
 

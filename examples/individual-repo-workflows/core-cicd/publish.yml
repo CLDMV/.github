@@ -113,6 +113,9 @@ jobs:
             # test_command: "NODE_ENV=test NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override both
             test_environment: ${{ github.event.inputs.test_environment || 'development' }} # Alternative to setting in test_command
             build_command: "npm run build:ci"
+            # Config/infra repo with no Node project: skip build-and-test and still cut the
+            # tag + GitHub Release. Pair with publish_to_npm: false and release_source_only: true.
+            # node_project: false # default true
             # --- Satellite packages (optional) ----------------------------------------
             # Publish extra packages carved from this build's output (e.g. locale JSON,
             # generated types) at the SAME version/commit as the core, each with its own
