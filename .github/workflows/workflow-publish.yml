@@ -102,6 +102,11 @@ on:
                 type: string
                 default: "npm run build:ci"
                 description: "Command to build package"
+            node_project:
+                required: false
+                type: boolean
+                default: true
+                description: "Set false for config/infra repos with no Node project. Skips build-and-test; publish still runs to create the tag and GitHub Release. Pair it with publish_to_npm: false and release_source_only: true."
             build_subpackages_command:
                 required: false
                 type: string
@@ -263,6 +268,8 @@ permissions:
 jobs:
     build-and-test:
         name: "🏗️ Build and Test"
+        # Boolean input passed through `${{ }}` can arrive as a string: check both.
+        if: ${{ !(inputs.node_project == false || inputs.node_project == 'false') }}
         uses: CLDMV/.github/.github/workflows/reusable-build-and-test.yml@v4
         with:
             runs_on: ${{ inputs.runs_on }}
@@ -284,6 +291,10 @@ jobs:
     publish:
         name: "📦 Publish Package"
         needs: build-and-test
+        # Same as the implicit success() for Node repos. With node_project: false,
+        # build-and-test is skipped on purpose and publish still has to run so
+        # the tag and GitHub Release get created.
+        if: ${{ !cancelled() && (needs.build-and-test.result == 'success' || (needs.build-and-test.result == 'skipped' && (inputs.node_project == false || inputs.node_project == 'false'))) }}
         permissions:
             id-token: write # Required for NPM trusted publishers (OIDC)
             contents: write

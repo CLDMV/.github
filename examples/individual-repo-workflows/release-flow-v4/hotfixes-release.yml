@@ -43,6 +43,7 @@ jobs:
         with:
             package_name: "@your-org/your-package"
             build_command: "npm run build:ci"
+            # node_project: false # config/infra repo with no Node project: skip the release build (default true)
         secrets:
             # Map your repo/org secrets to the expected names.
             BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}

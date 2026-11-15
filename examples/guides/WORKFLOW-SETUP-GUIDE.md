@@ -615,6 +615,19 @@ Reads `data/github-labels.json` from the public org repo and applies the catalog
 
 ---
 
+## 🗂️ Config-only and infra repos (no Node project)
+
+Some v4 repos have no Node code at all: k3s manifests, shell scripts, org config. They still take the full workflow set (the rulesets need `✅ Required PR Check`, and the release flow still cuts tags and GitHub Releases), but there is nothing to install, build or test. Set `node_project: false` on each caller that would otherwise run the Node chain:
+
+- **`ci.yml`** — `node_project: false` in the `with:` block. The test matrix, type check, lint/format, coverage and CI summary jobs don't run, and the reusable's `no_node` output tells `required-check` to post a passing `✅ Required PR Check` with its own "No Node project" message. The release PR (`next` → `master`) still gets its required check this way. Drop any `paths_ignore: "**"` or empty lint/format commands you used to fake this.
+- **`bundle-size.yml`** — `node_project: false`. The head/base builds and the compare are skipped and the run passes with a one-line summary, so `📊 Bundle Size` stays in `release-merge.yml`'s `workflows:` list unchanged.
+- **`next-release.yml`** and **`hotfixes-release.yml`** — `node_project: false`. The release PR is still opened and refreshed with the version bump and changelog; only the build step is skipped (`build_command` is ignored).
+- **`publish.yml`** — `node_project: false`, `publish_to_npm: false` and `release_source_only: true`. Build-and-test is skipped, nothing goes to a registry, and publish still creates the tag and the source-only GitHub Release. Turn off `publish_to_github_packages` too.
+
+The repo still needs a `package.json` carrying `name` and `version`, because the release flow reads and bumps the version there. A metadata-only one (no scripts, no dependencies, no lockfile) is enough. The install step recognizes it and skips the install. Every input defaults to `true`, so existing callers don't change.
+
+---
+
 ## Secrets Summary
 
 The table below maps each template to the org/repo secrets it actually references. The bot App credentials (`CLDMV_BOT_APP_CLIENT_ID` / `CLDMV_BOT_APP_PRIVATE_KEY`) are mapped to `BOT_APP_CLIENT_ID` / `BOT_APP_PRIVATE_KEY` inside the reusable via `secrets:` inheritance — the consumer always references the `CLDMV_*` name in their workflow's `secrets:` block.
