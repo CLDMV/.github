@@ -172,14 +172,16 @@ jobs:
               if: steps.target.outputs.target != ''
               shell: bash
               env:
-                  COMMITS: ${{ steps.commits.outputs.commits }}
+                  COMMITS_FILE: ${{ steps.commits.outputs.commits-file }}
               run: |
                   # `type: feature` is applied when the range contains a feature,
                   # mirroring the changelog's own "Features" section: get-commit-
                   # range tags `feat:` (and content-categorized add/new) commits
-                  # as category "feature". Reuses the already-computed commits.
+                  # as category "feature". Reads the commits from the file
+                  # get-commit-range wrote: the JSON in an env var tops Linux's
+                  # 128 KB single-string limit on big PRs (#483).
                   has_feature=false
-                  if printf '%s' "$COMMITS" | jq -e 'any(.[]; .category == "feature")' >/dev/null 2>&1; then
+                  if jq -e 'any(.[]; .category == "feature")' "$COMMITS_FILE" >/dev/null 2>&1; then
                       has_feature=true
                   fi
                   echo "has_feature=$has_feature" >> "$GITHUB_OUTPUT"
@@ -190,7 +192,7 @@ jobs:
               if: steps.target.outputs.target != ''
               uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v4
               with:
-                  commits: ${{ steps.commits.outputs.commits }}
+                  commits-file: ${{ steps.commits.outputs.commits-file }}
                   commit-range: ${{ steps.commits.outputs.commit-range }}
                   bot-name: ${{ secrets.BOT_NAME }}
                   bot-email: ${{ secrets.BOT_EMAIL }}
