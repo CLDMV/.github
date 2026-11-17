@@ -106,7 +106,7 @@ export async function run({
 				}
 				if (targetCommit && targetCommit === sha) {
 					console.log(`✅ Tag ${tag} already points at ${sha} — skipping (immutable release tag already present).`);
-					return { tag_obj_sha: state.objectType === "tag" ? state.refSha : "", ref_sha: state.refSha };
+					return { tag_obj_sha: state.objectType === "tag" ? state.refSha : "", ref_sha: state.refSha, skipped: true };
 				}
 				debugLog(`create/_impl: tag ${tag} exists at ${targetCommit || "?"} but target is ${sha} — will (re)create.`);
 			}

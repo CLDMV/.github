@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.38.0 (November 2026)
+### Latest: v4.38.1 (November 2026)
 
-- **Turn off the Node chain for repos with no Node code** — `node_project: false` on `ci.yml`, `bundle-size.yml`, the release workflows and `publish.yml` skips setup-node, install, tests, type check, lint/format, coverage and builds. The required check still passes, with its own "No Node project" message, so config-only and infra repos no longer need the `paths_ignore: "**"` workaround.
-- [View full v4.38.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md)
+- **feature-pr works on large PRs** — the commit list is read from a file instead of an environment variable, so PRs with many commits no longer fail with "Argument list too long". `sync-release-notes` also stops reporting tags and releases that another workflow created mid-run as its own work or as failures.
+- [View full v4.38.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md)
 
 ### Recent Releases
 
+- **v4.38.0** (November 2026) — `node_project: false` turns off the Node chain for repos with no Node code ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md))
 - **v4.37.1** (November 2026) — First releases stop re-bumping when the default branch `package.json` has no `version` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.1.md))
 - **v4.37.0** (November 2026) — `sync-release-notes` takes a `repository` input so a central workflow can sync another repo ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md))
 - **v4.36.3** (November 2026) — `sync-release-notes` finds release PRs by their `release: vX.Y.Z` title when the commit-to-PR link finds nothing ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md))
-- **v4.36.2** (November 2026) — Release PR column in the sync summary and no API response dumps without debug logging ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.2.md))
 
 ## 📋 Quick Start
 
