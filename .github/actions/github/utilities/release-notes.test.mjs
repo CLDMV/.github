@@ -12,6 +12,7 @@ import {
 	pinRelativeLinks,
 	indexReleasePrs,
 	releasePrCandidates,
+	describeListedPulls,
 	resolveReleasePr,
 	releaseTitleVersion,
 	repinBranchLinks,
@@ -169,13 +170,30 @@ assert.deepEqual(
 	releasePrCandidates(
 		[
 			{ number: 1, merged_at: null, base: { ref: "master" } },
+			{ number: 2, merged_at: "x", base: { ref: "next" } },
 			{ number: 3, merged_at: "x", base: { ref: "master" }, merge_commit_sha: "other" },
 			{ number: 4, merged_at: "x", base: { ref: "master" } },
-			{ number: 5, merged_at: "x", base: { ref: "master" }, merge_commit_sha: sha9 }
+			{ number: 5, merged_at: "x", base: { ref: "master" }, merge_commit_sha: sha9 },
+			{ number: 6 }
 		],
 		{ defaultBranch: "master", releaseCommit: sha9 }
 	).map((p) => p.number),
-	[5, 4]
+	[5, 1, 4, 6],
+	"only a contradicting merge_commit_sha or base rules a PR out; the full PR decides the rest"
 );
+// A reduced listing (number only) is confirmed on the full PR.
+r = await resolveReleasePr({ ...base9, commitPulls: async () => [{ number: 149 }], titleIndex: noTitles });
+assert.deepEqual([r.pr?.number, r.via], [149, "commit"], "bare listing confirmed via GET /pulls/{n}");
+// A miss reports what was listed and why the candidate failed.
+r = await resolveReleasePr({
+	...base9,
+	commitPulls: async () => [{ number: 149 }],
+	getPull: async () => ({ ...pr149, merge_commit_sha: "deadbeef" }),
+	titleIndex: async () => byVersion
+});
+assert.equal(r.via, "title");
+assert.equal(describeListedPulls(r.listed), "1 listed: #149 merged_at=missing base=missing merge_commit_sha=missing");
+assert.match(r.checked[0], /^#149: full PR merged_at=set base=master merge_commit_sha=deadbee$/);
+assert.equal(describeListedPulls([]), "0 listed");
 
 console.log("release-notes: all checks passed");
