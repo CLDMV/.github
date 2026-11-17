@@ -31,6 +31,15 @@
 #     scanning + push protection, private vulnerability reporting
 #   - rulesets: replaces the three rulesets (Protect Master/Next/Hotfixes)
 #     with the org canonical defaults
+#   - the repo's `branch-model` org custom property, set to `branch_model`
+#     (default `v4`; pass `dev-trunk` for a dev-trunk onboarding). Needs
+#     the App's organization "Custom properties" permission and the
+#     property defined on the org; without either the run warns and carries
+#     on.
+#
+# Repos whose `branch-model` is `legacy` or `custom` are skipped entirely
+# (they run their own flow, which these rulesets and settings would break).
+# Set `force` to bootstrap one anyway.
 #
 # What is NOT applied (GitHub doesn't expose it via REST / GraphQL / gh CLI
 # — confirmed against community/community#188598; the bootstrap surfaces
@@ -79,6 +88,22 @@ on:
                 description: "Override for the variables-phase GHAS config (scan/skip lists): inline JSON or a workspace path. Empty = the data/code-scanning-skips.json bundled in CLDMV/.github — third-party orgs supply their own here."
                 required: false
                 default: ""
+            branch_model:
+                description: "Recorded in the repo's `branch-model` org custom property: v4 = next/hotfixes flow, dev-trunk = work on dev, legacy / custom = own flow (bootstrap skips these unless forced), none = no release flow."
+                type: choice
+                required: false
+                default: "v4"
+                options:
+                    - "v4"
+                    - "dev-trunk"
+                    - "legacy"
+                    - "custom"
+                    - "none"
+            force:
+                description: "Bootstrap even when the repo's branch-model is legacy or custom. Those repos run their own flow, which the v4 rulesets and settings would break."
+                type: boolean
+                required: false
+                default: false
 
 permissions:
     contents: read
@@ -111,3 +136,5 @@ jobs:
                   code_security: ${{ github.event.inputs.code_security }}
                   secret_protection: ${{ github.event.inputs.secret_protection }}
                   code_scanning_config: ${{ github.event.inputs.code_scanning_config }}
+                  branch_model: ${{ github.event.inputs.branch_model }}
+                  force: ${{ github.event.inputs.force }}

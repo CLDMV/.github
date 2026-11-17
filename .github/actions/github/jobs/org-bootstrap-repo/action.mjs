@@ -16,6 +16,9 @@
  *     the `scan` list; public repos never default-skip; explicit `skip`
  *     entries override (`variables` phase; needs the App's "Variables:
  *     Read and write" repository permission)
+ *   - record the repo's `branch-model` org custom property (`settings` phase,
+ *     only when `branch_model` is passed). Repos whose property is `legacy`
+ *     or `custom` are skipped entirely unless `force` is set.
  *
  * Opt-in paid-on-private security products (3-way: off | public-only | all,
  * default off; both are free on public, paid on private):
@@ -45,6 +48,7 @@ import { resolve } from "node:path";
 import { getInput, setOutput, appendSummary } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
 import { createOrphanBadgesBranch } from "./badges-branch.mjs";
+import { BRANCH_MODEL_PROPERTY, parseBranchModel, readBranchModel, branchModelSkipReason, branchModelPatchBody } from "./branch-model.mjs";
 import { buildAll, DEFAULT_OPTS } from "../../../../../docs/tools/ruleset-generator/builders.mjs";
 
 const warnings = [];
@@ -129,6 +133,9 @@ async function main() {
 	// (starts with `{`) or a workspace-relative path lets a third-party org
 	// supply its own list without forking this repo.
 	const codeScanningConfigInput = (getInput("code_scanning_config") || "").trim();
+	// Empty = leave the branch-model property alone (the org fanout default).
+	const branchModel = parseBranchModel(getInput("branch_model"));
+	const force = getInput("force") === "true";
 	for (const [name, val] of [
 		["code_security", codeSecurityPolicy],
 		["secret_protection", secretProtectionPolicy]
@@ -175,6 +182,24 @@ async function main() {
 		return finish("skipped", `no commits on default branch ${defaultBranch}`);
 	}
 	if (!defaultBranchSha) return finish("skipped", `default branch ${defaultBranch} has no HEAD`);
+
+	// ── BRANCH MODEL GUARD ────────────────────────────────────────────────
+	// Runs before any phase: `legacy` / `custom` repos keep their own flow,
+	// which the v4 rulesets and settings would break.
+	const orgCall = (method, path, body) => api(method, path, body, { token });
+	const branchModelRead = await readBranchModel(orgCall, owner, repo);
+	if (branchModelRead.error) {
+		warn(
+			`could not read the \`${BRANCH_MODEL_PROPERTY}\` custom property (${branchModelRead.error}) — the legacy/custom guard can't run; proceeding`
+		);
+	} else {
+		note(`${BRANCH_MODEL_PROPERTY} property: ${branchModelRead.value ?? "(unset)"}`);
+	}
+	const skipReason = branchModelSkipReason({ current: branchModelRead.value, requested: branchModel, force });
+	if (skipReason) return finish("skipped", skipReason);
+	if (force && (branchModelRead.value === "legacy" || branchModelRead.value === "custom")) {
+		warn(`branch-model is \`${branchModelRead.value}\` but force is set — applying the v4 baseline anyway`);
+	}
 
 	// ── BRANCHES ──────────────────────────────────────────────────────────
 	if (steps.has("branches")) {
@@ -262,6 +287,34 @@ async function main() {
 		} else {
 			note("repo settings already match baseline");
 			applied.push("settings.already-correct");
+		}
+
+		// Record the branch model as an org custom property. A missing
+		// property definition or App permission is a warning, never a failure.
+		if (branchModel) {
+			if (!branchModelRead.error && branchModelRead.value === branchModel) {
+				note(`${BRANCH_MODEL_PROPERTY} already \`${branchModel}\``);
+				applied.push("settings.branch-model.already-correct");
+			} else {
+				if (branchModelRead.value) {
+					warn(`${BRANCH_MODEL_PROPERTY} was \`${branchModelRead.value}\`, overwriting to \`${branchModel}\``);
+				}
+				if (dryRun) {
+					console.log(`🔸 [dry-run] would PATCH /orgs/${owner}/properties/values (${BRANCH_MODEL_PROPERTY}=${branchModel})`);
+					applied.push("settings.branch-model.set");
+				} else {
+					try {
+						await orgCall("PATCH", `/orgs/${owner}/properties/values`, branchModelPatchBody(repo, branchModel));
+						ok(`set ${BRANCH_MODEL_PROPERTY}=${branchModel}`, "settings.branch-model.set");
+					} catch (err) {
+						warn(
+							`could not set the \`${BRANCH_MODEL_PROPERTY}\` custom property (${err.message}). Check that the property is ` +
+								`defined at https://github.com/organizations/${owner}/settings/custom-properties and that the App has the ` +
+								`organization "Custom properties" read and write permission.`
+						);
+					}
+				}
+			}
 		}
 
 		// Surface the one PR-settings toggle GitHub doesn't expose via API.

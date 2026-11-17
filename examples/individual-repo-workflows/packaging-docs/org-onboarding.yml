@@ -18,6 +18,11 @@
 #     dependabot security updates, private vulnerability reporting)
 #   - the three rulesets replaced with the org canonical defaults
 #
+# The fanout leaves each repo's `branch-model` org custom property alone
+# (it doesn't pass `branch_model`), but the action still skips any target
+# whose property is `legacy` or `custom`. Record or change the property per
+# repo with v4-bootstrap.yml or the branch-model backfill instead.
+#
 # RUN THIS FROM A PRIVATE REPOSITORY ONLY. Every matrix job is named after
 # its target repo, and the plan step writes the full target list to the run
 # summary. In a public repo those job names and summaries are public, so an
