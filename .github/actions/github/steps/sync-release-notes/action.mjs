@@ -227,12 +227,18 @@ for (const version of [...versions].sort(cmpVersion)) {
 			// (else the release commit message), kept verbatim incl. headings.
 			const commitMsg = git(["log", "-1", "--format=%B", relCommit]);
 			const tagMessage = file?.content || stripCommitTrailers(stripReleaseSubject(commitMsg, { name: tagName, version })).trim() || tagName;
-			tagsCreated++;
-			await createTag({ token, repo: repoFull, tag: tagName, sha: relCommit, message: tagMessage, push: true, ...gpg });
+			const result = await createTag({ token, repo: repoFull, tag: tagName, sha: relCommit, message: tagMessage, push: true, ...gpg });
 			tagSha = relCommit;
-			row.tag = `created at ${relCommit.slice(0, 7)}`;
-			row.actions.push("created tag");
-			changed++;
+			if (result?.skipped) {
+				// Another workflow (usually the release's own publish) pushed the
+				// tag after this run listed the tags. Nothing was created here.
+				row.tag = `${relCommit.slice(0, 7)} (appeared during the run)`;
+			} else {
+				tagsCreated++;
+				row.tag = `created at ${relCommit.slice(0, 7)}`;
+				row.actions.push("created tag");
+				changed++;
+			}
 			// tag/create has no unsigned fallback; assert the pushed tag is signed anyway.
 			git(["fetch", "--force", "origin", `+refs/tags/${tagName}:refs/tags/${tagName}`]);
 			if (!/BEGIN (PGP|SSH) SIGNATURE/.test(git(["cat-file", "-p", `refs/tags/${tagName}`]))) {
@@ -270,7 +276,22 @@ for (const version of [...versions].sort(cmpVersion)) {
 					row.actions.push("created release");
 					changed++;
 				} catch (e) {
-					row.failures.push(`release creation failed: ${e.message}`);
+					// A release published while this run was going (the release's own
+					// publish job) makes the POST a 422 already_exists. Count it as there.
+					let existing = null;
+					if (/already_exists/.test(e.message)) {
+						try {
+							existing = await api("GET", `/releases/tags/${encodeURIComponent(tagName)}`, null, ctx);
+						} catch {
+							existing = null;
+						}
+					}
+					if (existing?.id) {
+						row.release = `${existing.draft ? "draft" : "published"} (appeared during the run)`;
+						if (existing.draft) row.issues.push("release is a draft");
+					} else {
+						row.failures.push(`release creation failed: ${e.message}`);
+					}
 				}
 			}
 		} else {
