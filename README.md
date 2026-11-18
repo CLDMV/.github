@@ -215,6 +215,7 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[examples/guides/WORKFLOW-SETUP-GUIDE.md](examples/guides/WORKFLOW-SETUP-GUIDE.md)** — per-template setup reference for humans: what each workflow does, required scripts, required secrets, prerequisites.
 - **[docs/conventions/release-flow-v4.md](docs/conventions/release-flow-v4.md)** — the full v4 staging-branch release-flow design.
 - **[docs/conventions/branch-naming.md](docs/conventions/branch-naming.md)** — branch-prefix conventions enforced by the org ruleset.
+- **[docs/conventions/branch-model.md](docs/conventions/branch-model.md)** — the `branch-model` org custom property: where each repo's work lands (`v4`, `dev-trunk`, `legacy`, `custom`, `none`).
 - **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
 - **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build and the `<pkg>-dev` condition.
