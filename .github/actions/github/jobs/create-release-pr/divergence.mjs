@@ -11,6 +11,7 @@
 
 import { execSync, execFileSync } from "node:child_process";
 import { appendSummary, setOutput } from "../../../common/common/core.mjs";
+import { baseVersionFromPackageJson, UNRELEASED_BASE_VERSION } from "../../../git/steps/find-divergence/action.mjs";
 
 /** Run a git command (via a shell), returning "" instead of throwing on failure. */
 function tryGit(cmd) {
@@ -82,13 +83,13 @@ try {
 	let baseVersion = "";
 	if (defaultBranch) {
 		console.log(`🔍 Branch divergence point: ${mergeBase.slice(0, 7)} (default branch: ${defaultBranch})`);
-		const basePackageJson = tryGitArgs(["show", `origin/${defaultBranch}:package.json`]);
-		if (basePackageJson) {
-			try {
-				baseVersion = JSON.parse(basePackageJson).version || "";
-			} catch {
-				baseVersion = "";
-			}
+		const pkgPath = `origin/${defaultBranch}:package.json`;
+		const hasPackageJson = tryGitArgs(["cat-file", "-t", pkgPath]) === "blob";
+		baseVersion = baseVersionFromPackageJson(hasPackageJson ? tryGitArgs(["show", pkgPath]) : null);
+		if (baseVersion === UNRELEASED_BASE_VERSION) {
+			console.log(
+				`📦 ${pkgPath} ${hasPackageJson ? "has no version field" : "does not exist"} — treating the base as ${UNRELEASED_BASE_VERSION} (never released)`
+			);
 		}
 	}
 
