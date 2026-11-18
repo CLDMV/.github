@@ -195,5 +195,25 @@ assert.equal(r.via, "title");
 assert.equal(describeListedPulls(r.listed), "1 listed: #149 merged_at=missing base=missing merge_commit_sha=missing");
 assert.match(r.checked[0], /^#149: full PR merged_at=set base=master merge_commit_sha=deadbee$/);
 assert.equal(describeListedPulls([]), "0 listed");
+// Bot App token (#468): listing and full PR both lack merge_commit_sha. The PR came from
+// the release commit's own listing, so merged + right base is enough.
+const noSha = { ...pr149, merge_commit_sha: undefined };
+r = await resolveReleasePr({ ...base9, commitPulls: async () => [noSha], getPull: async () => noSha, titleIndex: noTitles });
+assert.deepEqual([r.pr?.number, r.via], [149, "commit"], "no merge_commit_sha anywhere still resolves by commit");
+// Unmerged or wrong-base PRs without merge_commit_sha still fall back to the title.
+r = await resolveReleasePr({
+	...base9,
+	commitPulls: async () => [{ number: 149 }],
+	getPull: async () => ({ ...noSha, merged_at: null }),
+	titleIndex: async () => byVersion
+});
+assert.equal(r.via, "title", "unmerged PR is not accepted");
+r = await resolveReleasePr({
+	...base9,
+	commitPulls: async () => [{ number: 149 }],
+	getPull: async () => ({ ...noSha, base: { ref: "next" } }),
+	titleIndex: async () => byVersion
+});
+assert.equal(r.via, "title", "PR into another branch is not accepted");
 
 console.log("release-notes: all checks passed");
