@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.38.1 (November 2026)
+### Latest: v4.39.0 (November 2026)
 
-- **feature-pr works on large PRs** — the commit list is read from a file instead of an environment variable, so PRs with many commits no longer fail with "Argument list too long". `sync-release-notes` also stops reporting tags and releases that another workflow created mid-run as its own work or as failures.
-- [View full v4.38.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md)
+- **Branch model as a custom property** — `v4-bootstrap` takes a `branch_model` input and records it in the repo's `branch-model` org custom property. Repos marked `legacy` or `custom` are skipped unless `force` is set, so fleet bootstrap runs leave hand-tuned repos alone. `sync-release-notes` also confirms release PRs from a stripped-down commit listing instead of dropping them.
+- [View full v4.39.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.0.md)
 
 ### Recent Releases
 
+- **v4.38.1** (November 2026) — feature-pr reads the commit list from a file, so large PRs no longer fail with "Argument list too long" ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md))
 - **v4.38.0** (November 2026) — `node_project: false` turns off the Node chain for repos with no Node code ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md))
 - **v4.37.1** (November 2026) — First releases stop re-bumping when the default branch `package.json` has no `version` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.1.md))
 - **v4.37.0** (November 2026) — `sync-release-notes` takes a `repository` input so a central workflow can sync another repo ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md))
-- **v4.36.3** (November 2026) — `sync-release-notes` finds release PRs by their `release: vX.Y.Z` title when the commit-to-PR link finds nothing ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.36.3.md))
 
 ## 📋 Quick Start
 
