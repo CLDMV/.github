@@ -220,6 +220,9 @@ One-shot setup, run once per repo via the Actions tab. Thin wrapper around the s
 - Flips repo settings: `allow_auto_merge=true`, `delete_branch_on_merge=false`, `allow_squash_merge=true`, `allow_merge_commit=true`, `allow_rebase_merge=false`, `allow_update_branch=true`, `web_commit_signoff_required=false`. PR-merge dialog defaults: `merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY` — so whichever method the per-branch [ruleset](https://cldmv.github.io/.github/tools/ruleset-generator/) allows, the resulting commit carries the PR title + body verbatim. For release PRs (squashed to master), that puts the categorized changelog directly into the master commit message.
 - Enables security toggles: Dependabot alerts + security updates, secret scanning + push protection, private vulnerability reporting.
 - Replaces the three rulesets (`Protect Master/Next/Hotfixes`) with the org canonical defaults from `data/rulesets/*.json` (or, equivalently, what the [browser ruleset generator](https://cldmv.github.io/.github/tools/ruleset-generator/) emits with default options).
+- Records the repo's `branch-model` org custom property from the `branch_model` input (default `v4`; pass `dev-trunk` for a dev-trunk onboarding). See [branch-model.md](../../docs/conventions/branch-model.md).
+
+Repos whose `branch-model` is `legacy` or `custom` are skipped entirely, because their own flow would break under the v4 rulesets and settings. Set the `force` input to bootstrap one anyway.
 
 **Not managed — one manual UI toggle required:** Settings → General → Pull Requests → **"Auto-close issues with merged linked pull requests"** (recommended ON). GitHub doesn't expose this setting via REST, GraphQL, or `gh repo edit` ([community/community#188598](https://github.com/community/community/discussions/188598)), so the bootstrap prints it as a reminder line in the run summary's "Manual one-time toggles" section every run.
 
@@ -229,7 +232,9 @@ Idempotent — re-running is safe. Overwrite-with-warn policy: existing diverged
 
 **Required `package.json` scripts** — none.
 
-**Required secrets** — bot App credentials (App needs `administration: write` for security toggles + ruleset import).
+**Required secrets** — bot App credentials (App needs `administration: write` for security toggles + ruleset import, and the organization "Custom properties" read and write permission for the `branch-model` property; without the latter the run warns and carries on).
+
+**Key inputs** — `dry_run` (default `true`), `steps`, `code_security`, `secret_protection`, `code_scanning_config`, `branch_model` (default `v4`), `force` (default `false`).
 
 **Prereqs** — master branch with at least one commit. Doesn't apply branch protection — import the rulesets by hand after running; the run summary links them.
 

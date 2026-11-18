@@ -250,6 +250,7 @@ The CLDMV-bot App needs the following permissions added (request from org admin 
 - **Repository → Statuses: Write** — `cla.yml` (status check posting)
 - **Repository → Contents: Write** — `branch-retention.yml`, `docs.yml`, `next-reset.yml`. Also on `CLDMV/.cla-signatures` specifically for `cla.yml` (signature record writes).
 - **Repository → Administration: Write** — `v4-bootstrap.yml` (toggles auto-merge / auto-delete-branches)
+- **Organization → Custom properties: Read and write** — `v4-bootstrap.yml` (records the repo's `branch-model` property)
 - **Repository → Packages: Write** — `docker-publish.yml`
 
 ---

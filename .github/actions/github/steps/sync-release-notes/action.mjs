@@ -33,6 +33,7 @@ import {
 	readChangelogAtRef,
 	indexReleasePrs,
 	resolveReleasePr,
+	describeListedPulls,
 	repinBranchLinks,
 	sameBody,
 	stripCommitTrailers,
@@ -337,7 +338,7 @@ for (const version of [...versions].sort(cmpVersion)) {
 	// tag so the merged PR is a permanent record too. Unchanged bodies are skipped.
 	if (tagSha) {
 		try {
-			const { pr, via } = await resolveReleasePr({
+			const { pr, via, listed, checked } = await resolveReleasePr({
 				version,
 				releaseCommit: relCommit || tagSha,
 				defaultBranch,
@@ -346,6 +347,12 @@ for (const version of [...versions].sort(cmpVersion)) {
 				titleIndex
 			});
 			resolvedVia[via || "none"]++;
+			// #468: say what the commit lookup saw whenever it didn't find the PR.
+			if (via !== "commit") {
+				console.log(
+					`🔎 ${tagName}: commit lookup on ${(relCommit || tagSha).slice(0, 7)} — ${describeListedPulls(listed)}${checked?.length ? `; ${checked.join("; ")}` : ""}`
+				);
+			}
 			const label = pr ? `#${pr.number} (${via})` : "";
 			row.pr = pr ? label : "not found";
 			if (pr && pr.body) {

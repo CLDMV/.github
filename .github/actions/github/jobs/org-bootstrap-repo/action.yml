@@ -58,6 +58,14 @@ inputs:
     description: "Override for the GHAS-workflow config the `variables` phase applies. Empty (default) = the data/code-scanning-skips.json bundled at this action's ref. Otherwise inline JSON (starts with `{`) or a path to a JSON file in the runner workspace (the caller must check it out) — lets a third-party org supply its own scan/skip lists without forking this repo. Same shape as data/code-scanning-skips.json."
     required: false
     default: ""
+  branch_model:
+    description: "Value to record in the repo's `branch-model` org custom property during the `settings` phase: `v4`, `dev-trunk`, `legacy`, `custom` or `none`. Empty (default) leaves the property alone, so a fanout across mixed repos never relabels them; the per-repo v4-bootstrap dispatch passes `v4` unless told otherwise. Needs the App's organization \"Custom properties\" permission (read and write) and the property defined on the org; when either is missing the bootstrap warns and carries on."
+    required: false
+    default: ""
+  force:
+    description: "Run the bootstrap even when the repo's `branch-model` property (or the requested `branch_model`) is `legacy` or `custom`. Those repos keep their own flow, and the v4 rulesets and settings would break it, so they are skipped by default."
+    required: false
+    default: "false"
 
 outputs:
   # Node actions don't use the composite `value: ${{ steps.<id>.outputs.<name> }}`
@@ -67,7 +75,7 @@ outputs:
   status:
     description: "`succeeded`, `skipped`, or `failed`. Drives the org-fanout's summary table."
   skip_reason:
-    description: "Reason when status=skipped (e.g. `archived`, `no-master`)."
+    description: "Reason when status=skipped (e.g. `archived`, `no-master`, `branch-model is custom`)."
   applied:
     description: "Comma-separated list of step ids that actually mutated state (vs. were already correct)."
   warnings:
