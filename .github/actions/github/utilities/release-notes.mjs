@@ -199,10 +199,11 @@ export function indexReleasePrs(prs, defaultBranch) {
 }
 
 /**
- * Release PR candidates for a release commit, from `GET /commits/{sha}/pulls`:
- * PRs merged into the default branch whose `merge_commit_sha` is the release
- * commit, or is missing from the listing (the caller then confirms on the full
- * PR). Exact matches come first.
+ * Release PR candidates for a release commit, from `GET /commits/{sha}/pulls`.
+ * A listing can come back with fields left out (seen with the bot App token),
+ * so a PR is only dropped when a field it does carry rules it out: a different
+ * `merge_commit_sha` or another base branch. The caller confirms each one on the
+ * full PR. Exact `merge_commit_sha` matches come first; at most 5 are returned.
  * @param {object[]} prs - Listed pull requests.
  * @param {object} opts
  * @param {string} opts.defaultBranch - Release branch name.
@@ -210,8 +211,32 @@ export function indexReleasePrs(prs, defaultBranch) {
  * @returns {object[]} Candidates, best first.
  */
 export function releasePrCandidates(prs, { defaultBranch = "", releaseCommit = "" } = {}) {
-	const merged = (Array.isArray(prs) ? prs : []).filter((p) => p && p.merged_at && p.base?.ref === defaultBranch);
-	return [...merged.filter((p) => p.merge_commit_sha === releaseCommit), ...merged.filter((p) => !p.merge_commit_sha)];
+	const open = (Array.isArray(prs) ? prs : []).filter(
+		(p) => p && p.number && (!p.merge_commit_sha || p.merge_commit_sha === releaseCommit) && (!p.base?.ref || p.base.ref === defaultBranch)
+	);
+	return [...open.filter((p) => p.merge_commit_sha === releaseCommit), ...open.filter((p) => p.merge_commit_sha !== releaseCommit)].slice(
+		0,
+		5
+	);
+}
+
+/**
+ * One-line description of what a commit lookup returned, for the run log when
+ * it didn't resolve the release PR.
+ * @param {object[]} prs - Listed pull requests.
+ * @returns {string} e.g. `2 listed: #149 merged_at=set base=master merge_commit_sha=missing; …`.
+ */
+export function describeListedPulls(prs) {
+	const list = Array.isArray(prs) ? prs : [];
+	if (!list.length) return "0 listed";
+	const field = (v) => (v === undefined ? "missing" : v === null ? "null" : "set");
+	return `${list.length} listed: ${list
+		.slice(0, 5)
+		.map(
+			(p) =>
+				`#${p?.number} merged_at=${field(p?.merged_at)} base=${p?.base?.ref ?? "missing"} merge_commit_sha=${p?.merge_commit_sha ? String(p.merge_commit_sha).slice(0, 7) : field(p?.merge_commit_sha)}`
+		)
+		.join("; ")}`;
 }
 
 /**
@@ -227,19 +252,22 @@ export function releasePrCandidates(prs, { defaultBranch = "", releaseCommit = "
  * @param {(sha: string) => Promise<object[]>} opts.commitPulls - `GET /commits/{sha}/pulls`.
  * @param {(n: number) => Promise<object>} opts.getPull - `GET /pulls/{n}`.
  * @param {() => Promise<Map<string, object>>} opts.titleIndex - Lazily built title index.
- * @returns {Promise<{pr: object|null, via: string}>} The PR and the path that found it (`commit`, `title` or "").
+ * @returns {Promise<{pr: object|null, via: string, listed: object[], checked?: string[]}>} The PR, the path that found it (`commit`, `title` or ""), what the commit lookup listed and, on a miss, why each candidate was rejected.
  */
 export async function resolveReleasePr({ version, releaseCommit, defaultBranch, commitPulls, getPull, titleIndex }) {
+	let listed = [];
+	const checked = [];
 	if (releaseCommit) {
-		const listed = (await commitPulls(releaseCommit)) || [];
+		listed = (await commitPulls(releaseCommit)) || [];
 		for (const cand of releasePrCandidates(listed, { defaultBranch, releaseCommit })) {
-			const full = cand.merge_commit_sha ? cand : await getPull(cand.number);
+			const full = cand.merge_commit_sha && cand.merged_at && cand.base?.ref ? cand : await getPull(cand.number);
 			if (full?.merge_commit_sha === releaseCommit && full.merged_at && full.base?.ref === defaultBranch)
-				return { pr: full, via: "commit" };
+				return { pr: full, via: "commit", listed };
+			checked.push(`#${cand.number}: full PR ${describeListedPulls([full]).replace(/^1 listed: #\S+ /, "")}`);
 		}
 	}
 	const pr = (await titleIndex()).get(version) || null;
-	return { pr, via: pr ? "title" : "" };
+	return { pr, via: pr ? "title" : "", listed, checked };
 }
 
 /**
