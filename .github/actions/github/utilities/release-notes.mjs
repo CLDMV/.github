@@ -261,8 +261,11 @@ export async function resolveReleasePr({ version, releaseCommit, defaultBranch, 
 		listed = (await commitPulls(releaseCommit)) || [];
 		for (const cand of releasePrCandidates(listed, { defaultBranch, releaseCommit })) {
 			const full = cand.merge_commit_sha && cand.merged_at && cand.base?.ref ? cand : await getPull(cand.number);
-			if (full?.merge_commit_sha === releaseCommit && full.merged_at && full.base?.ref === defaultBranch)
-				return { pr: full, via: "commit", listed };
+			// The bot App token gets PRs back without merge_commit_sha (#468). The PR came
+			// from listing the release commit, so a merged PR into the default branch with
+			// no merge_commit_sha still matches; a different merge_commit_sha does not.
+			const shaOk = full?.merge_commit_sha ? full.merge_commit_sha === releaseCommit : Boolean(full);
+			if (shaOk && full.merged_at && full.base?.ref === defaultBranch) return { pr: full, via: "commit", listed };
 			checked.push(`#${cand.number}: full PR ${describeListedPulls([full]).replace(/^1 listed: #\S+ /, "")}`);
 		}
 	}

@@ -18,11 +18,14 @@ export const UNRELEASED_BASE_VERSION = "0.0.0";
  * (onboarding adds the field on next, so master gets it with the first
  * release). That is base 0.0.0, not "unknown": an empty base skips the
  * already-bumped check, and every push to next would bump the version again.
+ * The same goes for a default branch with no package.json at all (a repo
+ * whose first release adds it).
  *
- * @param {string} text - package.json contents ("" when the file is missing).
- * @returns {string} The version, "0.0.0" when the field is missing, or "" when the file is missing or unreadable.
+ * @param {string|null} text - package.json contents, or null when the default branch has no package.json.
+ * @returns {string} The version, "0.0.0" when the file or its version field is missing, or "" when it can't be read.
  */
 export function baseVersionFromPackageJson(text) {
+	if (text === null) return UNRELEASED_BASE_VERSION;
 	if (!text) return "";
 	let pkg;
 	try {
@@ -95,10 +98,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		let baseVersion = "";
 		if (defaultBranch) {
 			console.log(`🔍 Branch divergence point: ${mergeBase.slice(0, 7)} (default branch: ${defaultBranch})`);
-			baseVersion = baseVersionFromPackageJson(tryGitArgs(["show", `origin/${defaultBranch}:package.json`]));
+			const pkgPath = `origin/${defaultBranch}:package.json`;
+			const hasPackageJson = tryGitArgs(["cat-file", "-t", pkgPath]) === "blob";
+			baseVersion = baseVersionFromPackageJson(hasPackageJson ? tryGitArgs(["show", pkgPath]) : null);
 			if (baseVersion === UNRELEASED_BASE_VERSION) {
 				console.log(
-					`📦 origin/${defaultBranch}:package.json has no version field — treating the base as ${UNRELEASED_BASE_VERSION} (never released)`
+					`📦 ${pkgPath} ${hasPackageJson ? "has no version field" : "does not exist"} — treating the base as ${UNRELEASED_BASE_VERSION} (never released)`
 				);
 			}
 		}

@@ -24,7 +24,8 @@ eq(baseVersionFromPackageJson('{"name":"x","version":" 1.2.3 "}'), "1.2.3", "ver
 eq(baseVersionFromPackageJson('{"name":"x"}'), UNRELEASED_BASE_VERSION, "no version field → 0.0.0 (never released)");
 eq(baseVersionFromPackageJson('{"name":"x","version":""}'), UNRELEASED_BASE_VERSION, "empty version → 0.0.0");
 eq(baseVersionFromPackageJson('{"name":"x","version":7}'), UNRELEASED_BASE_VERSION, "non-string version → 0.0.0");
-eq(baseVersionFromPackageJson(""), "", "no package.json → unknown");
+eq(baseVersionFromPackageJson(null), UNRELEASED_BASE_VERSION, "no package.json on the default branch → 0.0.0 (never released)");
+eq(baseVersionFromPackageJson(""), "", "empty / unreadable package.json → unknown");
 eq(baseVersionFromPackageJson("{not json"), "", "unparseable → unknown");
 eq(baseVersionFromPackageJson("[]"), UNRELEASED_BASE_VERSION, "array JSON has no version → 0.0.0");
 eq(baseVersionFromPackageJson("null"), "", "null JSON → unknown");
