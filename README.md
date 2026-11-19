@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.39.2 (November 2026)
+### Latest: v4.39.3 (November 2026)
 
-- **Signed release tags verify again** — tag messages now end with a newline, so the PGP signature sits on its own line instead of being glued onto the last changelog line, and GitHub shows the tag as verified. The runner image also gains pnpm and yarn through corepack, plus build-essential and python3 for native modules.
-- [View full v4.39.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md)
+- **Tag-health re-signs glued signatures** — a tag whose PGP signature is stuck onto the last message line no longer counts as signed, so tag-health re-signs it and GitHub shows it as verified. This covers every tag cut before v4.39.2, and v4.39.2's own tags.
+- [View full v4.39.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md)
 
 ### Recent Releases
 
+- **v4.39.2** (November 2026) — tag messages end with a newline so signed tags verify, and the runner image gains pnpm, yarn and a C/C++ toolchain ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md))
 - **v4.39.1** (November 2026) — a default branch with no `package.json` counts as never released, so `next` stops re-bumping before the first release ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.1.md))
 - **v4.39.0** (November 2026) — `v4-bootstrap` records each repo's branch model in the `branch-model` org custom property ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.0.md))
 - **v4.38.1** (November 2026) — feature-pr reads the commit list from a file, so large PRs no longer fail with "Argument list too long" ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md))
-- **v4.38.0** (November 2026) — `node_project: false` turns off the Node chain for repos with no Node code ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md))
 
 ## 📋 Quick Start
 
