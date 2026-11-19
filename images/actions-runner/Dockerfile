@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -18,7 +18,7 @@
 FROM ghcr.io/actions/actions-runner:latest
 
 LABEL org.opencontainers.image.source="https://github.com/CLDMV/.github"
-LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS for CLDMV self-hosted cldmv-runners"
+LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS, corepack (pnpm/yarn), build-essential, python3 for CLDMV self-hosted cldmv-runners"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Package installs need root; the base runs as the non-root `runner` user.
@@ -61,6 +61,26 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends libatomic1 \
  && rm -rf /var/lib/apt/lists/*
 
+# C/C++ toolchain for native npm modules. node-gyp (node-pty, ssh2's
+# cpu-features, …) needs make, a C++ compiler and python3; without them a pnpm
+# or npm install of such a package fails ("not found: make", "Unable to detect
+# compiler type"). Hosted ubuntu-latest ships build-essential and python3. See #497.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential python3 \
+ && rm -rf /var/lib/apt/lists/*
+
+# pnpm and yarn via corepack. Node 25+ no longer bundles corepack, so the
+# NodeSource Node 26 above has neither, and anything that runs straight in this
+# image (k3s-test pods, run steps that skip the #437 helper) can't install a
+# pnpm workspace. corepack is still published on npm; `corepack enable` puts the
+# pnpm/yarn shims on PATH, and each repo's `packageManager` pin still picks the
+# version. See #497.
+# No interactive "about to download pnpm" prompt in CI or test pods.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN npm install -g corepack@latest \
+ && corepack enable \
+ && npm cache clean --force
+
 # Add further hosted-runner tools here as #210's audit surfaces them.
 
 # Back to the runner user the entrypoint expects.
@@ -68,4 +88,6 @@ USER runner
 
 # Build-time gate: fail the build if any expected tool isn't on PATH.
 RUN gh --version && jq --version && node --version && npm --version \
+ && corepack --version && pnpm --version \
+ && make --version >/dev/null && g++ --version >/dev/null && python3 --version \
  && zip -v >/dev/null && unzip -v >/dev/null

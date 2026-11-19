@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { sh } from "../../../../common/common/core.mjs";
+import { tagMessageText } from "../../../../git/utilities/git-utils.mjs";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
 import { getRefTag, createRefToCommit, forceMoveRefToCommit, createAnnotatedTag, createRefForTagObject } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
@@ -55,14 +56,14 @@ function runGitSmartTag({ repo, token, tag, sha, message, gpg_enabled, tagger_na
 		debugLog(`runGitSmartTag: Creating signed tag: git tag -s -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
 		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
-		fs.writeFileSync(tmpFile, tagMessage, "utf8");
+		fs.writeFileSync(tmpFile, tagMessageText(tagMessage), "utf8");
 		sh(`git tag -s -f --cleanup=verbatim -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else if (willAnnotate) {
 		debugLog(`runGitSmartTag: Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tag} ${sha}`);
 		// Write message to temp file to handle multiline messages properly
 		const tmpFile = `${process.env.RUNNER_TEMP || process.env.TEMP || "/tmp"}/tag-message-${Date.now()}.txt`;
-		fs.writeFileSync(tmpFile, tagMessage, "utf8");
+		fs.writeFileSync(tmpFile, tagMessageText(tagMessage), "utf8");
 		sh(`git tag -a -f --cleanup=verbatim -F "${tmpFile}" ${tag} ${sha}`);
 		fs.unlinkSync(tmpFile);
 	} else {
