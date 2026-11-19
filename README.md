@@ -6,7 +6,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ### Latest: v4.39.2 (November 2026)
 
-- **Signed release tags verify again** — tag messages now end with a newline, so the PGP signature sits on its own line instead of being glued onto the last changelog line, and GitHub shows the tag as verified.
+- **Signed release tags verify again** — tag messages now end with a newline, so the PGP signature sits on its own line instead of being glued onto the last changelog line, and GitHub shows the tag as verified. The runner image also gains pnpm and yarn through corepack.
 - [View full v4.39.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md)
 
 ### Recent Releases
