@@ -6,7 +6,7 @@
  */
 
 import { writeFileSync } from "fs";
-import { gitCommand } from "../../utilities/git-utils.mjs";
+import { gitCommand, hasTagSignature } from "../../utilities/git-utils.mjs";
 
 const DEBUG = process.env.INPUT_DEBUG === "true";
 const MAX_TAGS = parseInt(process.env.INPUT_MAX_TAGS || "100");
@@ -114,7 +114,7 @@ function getTagMetadata(tag) {
 			// The message is deliberately not part of this metadata: tag messages are
 			// whole changelogs, and this JSON is handed to other actions as an input.
 			// Fix actions read the one message they need with readTagMessage().
-			metadata.isSigned = tagContent.includes("-----BEGIN PGP SIGNATURE-----");
+			metadata.isSigned = hasTagSignature(tagContent);
 		} else {
 			// Lightweight tag
 			metadata.isAnnotated = false;
