@@ -178,7 +178,28 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
 }
 
 /**
+ * Tag message text as it must be written to the `-F` message file.
+ *
+ * With `--cleanup=verbatim` git keeps the message byte for byte, so it no
+ * longer adds the final newline. When `-s` then appends the PGP signature, the
+ * `-----BEGIN PGP SIGNATURE-----` line is glued onto the last message line,
+ * and neither `git verify-tag` nor GitHub can find the signature: the tag
+ * shows as unsigned even though it carries one. Ending the message with a
+ * newline keeps the signature on its own line.
+ * @public
+ * @param {string} message - Tag message (may be empty).
+ * @param {string} [fallback=""] - Text to use when the message is empty.
+ * @returns {string} The message, guaranteed to end with `\n`.
+ */
+export function tagMessageText(message, fallback = "") {
+	const text = message || fallback;
+	return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+/**
  * argv for creating (or replacing) an annotated tag from a message file.
+ *
+ * Write the file with {@link tagMessageText} so a signed tag stays verifiable.
  *
  * `--cleanup=verbatim` is required: git's default message cleanup treats every
  * line starting with `#` as a comment and drops it, which stripped all the

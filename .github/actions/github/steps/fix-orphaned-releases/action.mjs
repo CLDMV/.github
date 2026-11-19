@@ -5,9 +5,11 @@
  * Detects and fixes GitHub releases that are missing their associated tags
  */
 
-import { writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { gitCommand } from "../../../git/utilities/git-utils.mjs";
+import { gitCommand, tagMessageText } from "../../../git/utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote } from "../../api/_api/gpg.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
 
@@ -246,27 +248,17 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 		}
 
 		// Create the tag locally using same pattern as working release workflow
-		if (willSign) {
-			console.log(`🔐 Creating signed tag: git tag -s -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
-			// Use temp file for message to handle multiline content properly
-			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
-			writeFileSync(tempFile, tagMessage, "utf8");
-			gitCommand(`git tag -s -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
+		if (willSign || willAnnotate) {
+			console.log(`${willSign ? "🔐 Creating signed" : "🏷️ Creating annotated"} tag ${tagName} at ${targetCommit}`);
+			// The message goes through a file (multiline changelogs) in a private
+			// mkdtemp directory, not a predictable /tmp path other users could pre-create.
+			const dir = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), "tag-msg-"));
+			const messageFile = join(dir, "message.txt");
 			try {
-				require("fs").unlinkSync(tempFile);
-			} catch {
-				// best-effort cleanup of the temp message file; failure here is non-fatal
-			}
-		} else if (willAnnotate) {
-			console.log(`🏷️ Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
-			// Use temp file for message to handle multiline content properly
-			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
-			writeFileSync(tempFile, tagMessage, "utf8");
-			gitCommand(`git tag -a -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
-			try {
-				require("fs").unlinkSync(tempFile);
-			} catch {
-				// best-effort cleanup of the temp message file; failure here is non-fatal
+				writeFileSync(messageFile, tagMessageText(tagMessage), "utf8");
+				gitCommand(`git tag ${willSign ? "-s" : "-a"} -f --cleanup=verbatim -F "${messageFile}" ${tagName} ${targetCommit}`);
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
 			}
 		} else {
 			console.log(`🏷️ Creating lightweight tag: git tag -f ${tagName} ${targetCommit}`);

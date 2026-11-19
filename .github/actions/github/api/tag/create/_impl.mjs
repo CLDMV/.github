@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { ensureGitAuthRemote, configureGitIdentity, importGpgIfNeeded } from "../../_api/gpg.mjs";
 import { getRefTag, getTagObject } from "../../_api/tag.mjs";
 import { debugLog } from "../../../../common/common/core.mjs";
-import { annotatedTagArgs } from "../../../../git/utilities/git-utils.mjs";
+import { annotatedTagArgs, tagMessageText } from "../../../../git/utilities/git-utils.mjs";
 
 /**
  * Create a tag locally with git and (optionally) push it. No shell: every git
@@ -48,7 +48,7 @@ export function createAndPushTag({
 	if (sign || annotate) {
 		const dir = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "tag-msg-"));
 		const messageFile = path.join(dir, "message.txt");
-		fs.writeFileSync(messageFile, message || tag, "utf8");
+		fs.writeFileSync(messageFile, tagMessageText(message, tag), "utf8");
 		try {
 			git(annotatedTagArgs({ tagName: tag, target: sha, messageFile, sign }));
 		} finally {

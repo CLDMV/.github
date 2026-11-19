@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { annotatedTagArgs } from "./git-utils.mjs";
+import { annotatedTagArgs, tagMessageText } from "./git-utils.mjs";
 
 const repo = mkdtempSync(path.join(tmpdir(), "tag-message-"));
 const git = (...args) =>
@@ -43,6 +43,16 @@ try {
 	git("tag", "-a", "-F", msgFile, "v0.0.1", "HEAD");
 	assert.ok(!git("tag", "-l", "--format=%(contents)", "v0.0.1").includes("## Overview"), "default cleanup strips headings (control)");
 
+	// The message file must end with a newline. Verbatim cleanup keeps the bytes
+	// as written, so without it `git tag -s` glues "-----BEGIN PGP SIGNATURE-----"
+	// onto the last line and the signature can't be found (GitHub: unsigned).
+	assert.equal(tagMessageText("last line"), "last line\n", "adds the final newline");
+	assert.equal(tagMessageText("last line\n"), "last line\n", "keeps an existing final newline");
+	assert.equal(tagMessageText("", "v1.0.0"), "v1.0.0\n", "falls back for an empty message");
+	writeFileSync(msgFile, tagMessageText("## Overview\n\nno trailing newline"), "utf8");
+	git(...annotatedTagArgs({ tagName: "v1.2.5", target: "HEAD", messageFile: msgFile }));
+	assert.ok(git("cat-file", "tag", "v1.2.5").endsWith("no trailing newline\n"), "tag object body ends on its own line");
+
 	// Shell-string call sites keep the flag too.
 	const here = path.dirname(fileURLToPath(import.meta.url));
 	for (const rel of [
@@ -51,9 +61,24 @@ try {
 		"../../github/steps/fix-orphaned-releases/action.mjs"
 	]) {
 		const src = readFileSync(path.join(here, rel), "utf8");
-		for (const line of src.split("\n").filter((l) => /\b(sh|gitCommand)\(`git tag -[as] /.test(l) && l.includes("-F"))) {
+		for (const line of src.split("\n").filter((l) => /\b(sh|gitCommand)\(`git tag (-[as] |\$\{)/.test(l) && l.includes("-F"))) {
 			assert.ok(line.includes("--cleanup=verbatim"), `${rel}: ${line.trim()}`);
 		}
+	}
+
+	// Every tag-message file writer goes through tagMessageText.
+	for (const rel of [
+		"../../github/api/tag/create/_impl.mjs",
+		"../../github/api/tag/update/_impl.mjs",
+		"../../github/steps/fix-orphaned-releases/action.mjs",
+		"../steps/fix-non-bot-tags/action.mjs",
+		"../steps/fix-orphaned-tags/action.mjs",
+		"../steps/fix-unsigned-tags/action.mjs"
+	]) {
+		const src = readFileSync(path.join(here, rel), "utf8");
+		const writers = src.split("\n").filter((l) => /writeFileSync\((messageFile|msgFile|tmpFile|tempFile),/.test(l));
+		assert.ok(writers.length > 0, `${rel}: found the message-file writer`);
+		for (const line of writers) assert.ok(line.includes("tagMessageText("), `${rel}: ${line.trim()}`);
 	}
 	console.log("tag-message: all checks passed");
 } finally {
