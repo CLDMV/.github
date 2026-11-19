@@ -61,7 +61,7 @@ try {
 		"../../github/steps/fix-orphaned-releases/action.mjs"
 	]) {
 		const src = readFileSync(path.join(here, rel), "utf8");
-		for (const line of src.split("\n").filter((l) => /\b(sh|gitCommand)\(`git tag -[as] /.test(l) && l.includes("-F"))) {
+		for (const line of src.split("\n").filter((l) => /\b(sh|gitCommand)\(`git tag (-[as] |\$\{)/.test(l) && l.includes("-F"))) {
 			assert.ok(line.includes("--cleanup=verbatim"), `${rel}: ${line.trim()}`);
 		}
 	}
