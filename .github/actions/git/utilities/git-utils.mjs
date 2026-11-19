@@ -142,7 +142,7 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
 			}
 
 			// Check for GPG signature
-			info.isSigned = tagContent.includes("-----BEGIN PGP SIGNATURE-----");
+			info.isSigned = hasTagSignature(tagContent);
 
 			// Extract message
 			const lines = tagContent.split("\n");
@@ -175,6 +175,21 @@ export function getTagInfo(tagName, botPatterns = ["CLDMV Bot", "cldmv-bot", "gi
 		debugLog(`Failed to get tag info for ${tagName}`, { error: error.message });
 		return null;
 	}
+}
+
+/**
+ * Whether a raw tag object (`git cat-file -p <tag>`) carries a signature git
+ * can verify. The armor header has to start its own line: a tag written with
+ * `--cleanup=verbatim` and no final newline has it glued onto the last message
+ * line ("…text-----BEGIN PGP SIGNATURE-----"), and both `git verify-tag` and
+ * GitHub treat that tag as unsigned. Counting it as signed would stop
+ * tag-health from ever re-signing it.
+ * @public
+ * @param {string} tagContent - Raw tag object text.
+ * @returns {boolean} True when a PGP or SSH signature starts on its own line.
+ */
+export function hasTagSignature(tagContent) {
+	return /^-----BEGIN (PGP|SSH) SIGNATURE-----$/m.test(tagContent || "");
 }
 
 /**
