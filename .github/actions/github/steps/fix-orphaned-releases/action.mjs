@@ -7,7 +7,7 @@
 
 import { writeFileSync } from "fs";
 import { execSync } from "node:child_process";
-import { gitCommand } from "../../../git/utilities/git-utils.mjs";
+import { gitCommand, tagMessageText } from "../../../git/utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity, ensureGitAuthRemote } from "../../api/_api/gpg.mjs";
 import { api, parseRepo } from "../../api/_api/core.mjs";
 
@@ -250,7 +250,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			console.log(`🔐 Creating signed tag: git tag -s -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
 			// Use temp file for message to handle multiline content properly
 			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
-			writeFileSync(tempFile, tagMessage, "utf8");
+			writeFileSync(tempFile, tagMessageText(tagMessage), "utf8");
 			gitCommand(`git tag -s -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);
@@ -261,7 +261,7 @@ async function createMissingTag(tagName, targetCommit, releaseName) {
 			console.log(`🏷️ Creating annotated tag: git tag -a -f -m "${tagMessage}" ${tagName} ${targetCommit}`);
 			// Use temp file for message to handle multiline content properly
 			const tempFile = `/tmp/tag-message-${Date.now()}.txt`;
-			writeFileSync(tempFile, tagMessage, "utf8");
+			writeFileSync(tempFile, tagMessageText(tagMessage), "utf8");
 			gitCommand(`git tag -a -f --cleanup=verbatim -F "${tempFile}" ${tagName} ${targetCommit}`);
 			try {
 				require("fs").unlinkSync(tempFile);

@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { getTagInfo, annotatedTagArgs, readTagMessage } from "../../utilities/git-utils.mjs";
+import { getTagInfo, annotatedTagArgs, readTagMessage, tagMessageText } from "../../utilities/git-utils.mjs";
 import { debugLog } from "../../../common/common/core.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
@@ -88,7 +88,7 @@ function fixNonBotTag(tagObj) {
 		// the original tag is untouched. The message goes through a file so free
 		// text never reaches a shell command line.
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
-		writeFileSync(msgFile, tagMessage, "utf8");
+		writeFileSync(msgFile, tagMessageText(tagMessage), "utf8");
 		try {
 			execFileSync("git", annotatedTagArgs({ tagName: tagObj.name, target: tagObj.commitSha, messageFile: msgFile, sign: !!willSign }), {
 				stdio: ["ignore", "inherit", "inherit"]

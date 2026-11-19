@@ -7,7 +7,7 @@
 
 import { writeFileSync, unlinkSync } from "fs";
 import { execFileSync } from "node:child_process";
-import { gitCommand, annotatedTagArgs, readTagMessage } from "../../utilities/git-utils.mjs";
+import { gitCommand, annotatedTagArgs, readTagMessage, tagMessageText } from "../../utilities/git-utils.mjs";
 import { importGpgIfNeeded, configureGitIdentity } from "../../../github/api/_api/gpg.mjs";
 
 console.log("🔍 DEBUG: Orphaned tags action starting...");
@@ -204,7 +204,7 @@ function fixOrphanedTag(tagObj) {
 		// `tag -f` plus a force-updating push is atomic on the remote: on failure
 		// the original tag is untouched.
 		const msgFile = `${process.env.RUNNER_TEMP || "/tmp"}/tag-msg-${Date.now()}.txt`;
-		writeFileSync(msgFile, tagMessage, "utf8");
+		writeFileSync(msgFile, tagMessageText(tagMessage), "utf8");
 		let tagArgs;
 		if (GPG_ENABLED && GPG_PRIVATE_KEY) {
 			// Always create signed annotated tags when GPG is enabled
