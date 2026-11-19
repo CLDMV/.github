@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.39.1 (November 2026)
+### Latest: v4.39.2 (November 2026)
 
-- **First releases without a `package.json` on the default branch** — a default branch with no `package.json` now counts as never released (base 0.0.0), so `next` stops re-bumping on every push until the first release lands.
-- [View full v4.39.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.1.md)
+- **Signed release tags verify again** — tag messages now end with a newline, so the PGP signature sits on its own line instead of being glued onto the last changelog line, and GitHub shows the tag as verified.
+- [View full v4.39.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md)
 
 ### Recent Releases
 
+- **v4.39.1** (November 2026) — a default branch with no `package.json` counts as never released, so `next` stops re-bumping before the first release ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.1.md))
 - **v4.39.0** (November 2026) — `v4-bootstrap` records each repo's branch model in the `branch-model` org custom property ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.0.md))
 - **v4.38.1** (November 2026) — feature-pr reads the commit list from a file, so large PRs no longer fail with "Argument list too long" ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md))
 - **v4.38.0** (November 2026) — `node_project: false` turns off the Node chain for repos with no Node code ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.0.md))
-- **v4.37.0** (November 2026) — `sync-release-notes` takes a `repository` input so a central workflow can sync another repo ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.37.0.md))
 
 ## 📋 Quick Start
 
