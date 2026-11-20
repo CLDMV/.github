@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries + node-gyp headers.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -110,6 +110,20 @@ RUN gh --version && jq --version && node --version && npm --version \
  && make --version >/dev/null && g++ --version >/dev/null && python3 --version \
  && zip -v >/dev/null && unzip -v >/dev/null \
  && rsync --version >/dev/null && sqlite3 --version
+
+# node-gyp headers for the baked-in Node, in ~/.cache/node-gyp/<version>.
+# Without them every native build in a pod downloads the headers itself, and
+# two packages building in parallel (pnpm runs install scripts concurrently)
+# each extract their own copy over the shared directory. The second extract
+# leaves common.gypi newer than the first package's Makefile, make takes the
+# "Regenerating Makefile" path, and that runs gyp_main.py directly, which is
+# 644 in the node-gyp tarball: "Permission denied" (node-pty + cpu-features in
+# rummage, 2026-11-20). With the headers already here, node-gyp skips the
+# download. A job that switches Node with setup-node still downloads headers
+# for that version.
+RUN npx -y node-gyp@latest install \
+ && test -f "$HOME/.cache/node-gyp/$(node -p process.versions.node)/include/node/common.gypi" \
+ && rm -rf "$HOME/.npm"
 
 # Gate: headless chromium launches with the baked-in libraries. The browser and
 # the scratch project are removed afterwards so the image doesn't carry them.
