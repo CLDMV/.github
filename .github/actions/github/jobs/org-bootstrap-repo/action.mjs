@@ -353,31 +353,37 @@ async function main() {
 			ok("enabled automated-security-fixes", "security.auto-fixes.enabled");
 		}
 
-		// Private vulnerability reporting. 404/403 from this endpoint means
-		// the feature isn't available on this repo — usually because the
-		// org-level policy hasn't turned it on. Surface where to enable it.
-		try {
-			const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
-			if (prv?.enabled) {
-				note("private-vulnerability-reporting already enabled");
-				applied.push("security.pvr.already-on");
-			} else {
-				warn("private-vulnerability-reporting was OFF, turning ON");
-				await mutate("PUT", "/private-vulnerability-reporting", null, "enable PVR");
-				ok("enabled private-vulnerability-reporting", "security.pvr.enabled");
-			}
-		} catch (err) {
-			if (err.message.includes("404") || err.message.includes("403")) {
-				const code = err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable";
-				note(
-					`private-vulnerability-reporting unavailable on \`${owner}/${repo}\` (HTTP ${code}). To enable: ` +
-						`https://github.com/${owner}/${repo}/settings/security_analysis → "Private vulnerability reporting" → Enable. ` +
-						`If toggle is greyed out, org admin must allow PVR at ` +
-						`https://github.com/organizations/${owner}/settings/security_analysis first.`
-				);
-				applied.push("security.pvr.unavailable");
-			} else {
-				warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+		// Private vulnerability reporting only exists on public repos. On a
+		// private repo the endpoint 404s and there's no toggle to point at,
+		// so skip the check. On a public repo a 404/403 usually means the
+		// org-level policy hasn't allowed it yet; surface where to enable it.
+		if (repoInfo.private) {
+			note("private-vulnerability-reporting is public-only — skipped on this private repo");
+			applied.push("security.pvr.private-skip");
+		} else {
+			try {
+				const prv = await api("GET", "/private-vulnerability-reporting", null, ctx);
+				if (prv?.enabled) {
+					note("private-vulnerability-reporting already enabled");
+					applied.push("security.pvr.already-on");
+				} else {
+					warn("private-vulnerability-reporting was OFF, turning ON");
+					await mutate("PUT", "/private-vulnerability-reporting", null, "enable PVR");
+					ok("enabled private-vulnerability-reporting", "security.pvr.enabled");
+				}
+			} catch (err) {
+				if (err.message.includes("404") || err.message.includes("403")) {
+					const code = err.message.match(/\b40[34]\b/)?.[0] || "feature-unavailable";
+					note(
+						`private-vulnerability-reporting unavailable on \`${owner}/${repo}\` (HTTP ${code}). To enable: ` +
+							`https://github.com/${owner}/${repo}/settings/security_analysis → "Private vulnerability reporting" → Enable. ` +
+							`If toggle is greyed out, org admin must allow PVR at ` +
+							`https://github.com/organizations/${owner}/settings/security_analysis first.`
+					);
+					applied.push("security.pvr.unavailable");
+				} else {
+					warn(`could not check private-vulnerability-reporting: ${err.message} — skipping`);
+				}
 			}
 		}
 
