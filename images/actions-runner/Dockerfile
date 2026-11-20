@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -18,7 +18,7 @@
 FROM ghcr.io/actions/actions-runner:latest
 
 LABEL org.opencontainers.image.source="https://github.com/CLDMV/.github"
-LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS, corepack (pnpm/yarn), build-essential, python3 for CLDMV self-hosted cldmv-runners"
+LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS, corepack (pnpm/yarn), build-essential, python3, rsync, sqlite3, Playwright system libraries for CLDMV self-hosted cldmv-runners"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Package installs need root; the base runs as the non-root `runner` user.
@@ -81,6 +81,24 @@ RUN npm install -g corepack@latest \
  && corepack enable \
  && npm cache clean --force
 
+# rsync and the sqlite3 CLI, both on hosted ubuntu-latest. Deploy-flow tests
+# shell out to rsync, and storage tests inspect databases with sqlite3.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends rsync sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+
+# System libraries for Playwright's chromium, webkit and firefox (libnspr4,
+# libnss3, libsecret-1, libgtk, gstreamer, …). Browser tests need them, and
+# k3s-test pods and CI jobs run without sudo, so `playwright install-deps`
+# can't add them at run time. Only the libraries are baked in: the browsers
+# stay per-run downloads (`npx playwright install`), pinned by each repo's
+# Playwright version. Built from playwright@latest, so the weekly rebuild tracks
+# its dependency list.
+RUN apt-get update \
+ && npx -y playwright@latest install-deps chromium webkit firefox \
+ && npm cache clean --force \
+ && rm -rf /var/lib/apt/lists/* /root/.npm
+
 # Add further hosted-runner tools here as #210's audit surfaces them.
 
 # Back to the runner user the entrypoint expects.
@@ -90,4 +108,13 @@ USER runner
 RUN gh --version && jq --version && node --version && npm --version \
  && corepack --version && pnpm --version \
  && make --version >/dev/null && g++ --version >/dev/null && python3 --version \
- && zip -v >/dev/null && unzip -v >/dev/null
+ && zip -v >/dev/null && unzip -v >/dev/null \
+ && rsync --version >/dev/null && sqlite3 --version
+
+# Gate: headless chromium launches with the baked-in libraries. The browser and
+# the scratch project are removed afterwards so the image doesn't carry them.
+RUN set -e; d=$(mktemp -d); cd "$d" \
+ && npm init -y >/dev/null && npm install --no-audit --no-fund playwright@latest >/dev/null \
+ && npx playwright install chromium \
+ && node -e 'require("playwright").chromium.launch().then(async (b) => { const p = await b.newPage(); await p.setContent("<p>ok</p>"); if ((await p.textContent("p")) !== "ok") process.exit(1); await b.close(); console.log("chromium headless ok"); })' \
+ && cd / && rm -rf "$d" "$HOME/.cache/ms-playwright" "$HOME/.npm"

@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { annotatedTagArgs, tagMessageText } from "./git-utils.mjs";
+import { annotatedTagArgs, hasTagSignature, tagMessageText } from "./git-utils.mjs";
 
 const repo = mkdtempSync(path.join(tmpdir(), "tag-message-"));
 const git = (...args) =>
@@ -52,6 +52,15 @@ try {
 	writeFileSync(msgFile, tagMessageText("## Overview\n\nno trailing newline"), "utf8");
 	git(...annotatedTagArgs({ tagName: "v1.2.5", target: "HEAD", messageFile: msgFile }));
 	assert.ok(git("cat-file", "tag", "v1.2.5").endsWith("no trailing newline\n"), "tag object body ends on its own line");
+
+	// A signature glued onto the last message line doesn't verify, so it must
+	// not count as signed, or tag-health never re-signs the tag.
+	const sig = "-----BEGIN PGP SIGNATURE-----\n\nabc\n-----END PGP SIGNATURE-----\n";
+	assert.equal(hasTagSignature(`tagger t\n\nbody\n${sig}`), true, "signature on its own line");
+	assert.equal(hasTagSignature(`tagger t\n\n</details>${sig}`), false, "glued signature is not signed");
+	assert.equal(hasTagSignature("tagger t\n\nbody\n-----BEGIN SSH SIGNATURE-----\nx\n"), true, "ssh signature");
+	assert.equal(hasTagSignature("tagger t\n\nbody\n"), false, "no signature");
+	assert.equal(hasTagSignature(undefined), false, "missing content");
 
 	// Shell-string call sites keep the flag too.
 	const here = path.dirname(fileURLToPath(import.meta.url));
