@@ -6,7 +6,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ### Latest: v4.39.3 (November 2026)
 
-- **Tag-health re-signs glued signatures** — a tag whose PGP signature is stuck onto the last message line no longer counts as signed, so tag-health re-signs it and GitHub shows it as verified. This covers every tag cut before v4.39.2, and v4.39.2's own tags.
+- **Tag-health re-signs glued signatures** — a tag whose PGP signature is stuck onto the last message line no longer counts as signed, so tag-health re-signs it and GitHub shows it as verified. This covers every tag cut before v4.39.2, and v4.39.2's own tags. The runner image also gains the system libraries Playwright's browsers need, so browser tests run in CI and k3s-test pods, plus rsync and the sqlite3 CLI.
 - [View full v4.39.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md)
 
 ### Recent Releases
