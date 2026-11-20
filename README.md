@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.39.3 (November 2026)
+### Latest: v4.39.4 (November 2026)
 
-- **Tag-health re-signs glued signatures** — a tag whose PGP signature is stuck onto the last message line no longer counts as signed, so tag-health re-signs it and GitHub shows it as verified. This covers every tag cut before v4.39.2, and v4.39.2's own tags. The runner image also gains the system libraries Playwright's browsers need, so browser tests run in CI and k3s-test pods, plus rsync and the sqlite3 CLI.
-- [View full v4.39.3 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md)
+- **No more node-gyp header races** — the runner image ships the Node headers node-gyp needs, so two native packages building in parallel (node-pty and cpu-features, for example) no longer overwrite each other's headers mid-build and fail with `gyp_main.py: Permission denied`. Bootstrap also stops checking private vulnerability reporting on private repos, where the feature doesn't exist.
+- [View full v4.39.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md)
 
 ### Recent Releases
 
+- **v4.39.3** (November 2026) — tag-health re-signs tags with a glued signature, and the runner image gains Playwright's system libraries, rsync and sqlite3 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md))
 - **v4.39.2** (November 2026) — tag messages end with a newline so signed tags verify, and the runner image gains pnpm, yarn and a C/C++ toolchain ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md))
 - **v4.39.1** (November 2026) — a default branch with no `package.json` counts as never released, so `next` stops re-bumping before the first release ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.1.md))
 - **v4.39.0** (November 2026) — `v4-bootstrap` records each repo's branch model in the `branch-model` org custom property ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.0.md))
-- **v4.38.1** (November 2026) — feature-pr reads the commit list from a file, so large PRs no longer fail with "Argument list too long" ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.38.1.md))
 
 ## 📋 Quick Start
 
