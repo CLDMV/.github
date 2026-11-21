@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.39.4 (November 2026)
+### Latest: v4.40.0 (November 2026)
 
-- **No more node-gyp header races** — the runner image ships the Node headers node-gyp needs, so two native packages building in parallel (node-pty and cpu-features, for example) no longer overwrite each other's headers mid-build and fail with `gyp_main.py: Permission denied`. Bootstrap also stops checking private vulnerability reporting on private repos, where the feature doesn't exist.
-- [View full v4.39.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md)
+- **tmux in the runner image** — cldmv-runners and k3s-test pods now have tmux: the distro 3.4 on PATH and 3.8 at `/opt/tmux-3.8`, built from the release tarball and pinned by checksum. Test suites that start private tmux servers no longer fail before their first test.
+- [View full v4.40.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.0.md)
 
 ### Recent Releases
 
+- **v4.39.4** (November 2026) — the runner image ships the node-gyp headers so parallel native builds stop racing, and bootstrap skips private vulnerability reporting on private repos ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md))
 - **v4.39.3** (November 2026) — tag-health re-signs tags with a glued signature, and the runner image gains Playwright's system libraries, rsync and sqlite3 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md))
 - **v4.39.2** (November 2026) — tag messages end with a newline so signed tags verify, and the runner image gains pnpm, yarn and a C/C++ toolchain ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md))
 - **v4.39.1** (November 2026) — a default branch with no `package.json` counts as never released, so `next` stops re-bumping before the first release ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.1.md))
-- **v4.39.0** (November 2026) — `v4-bootstrap` records each repo's branch model in the `branch-model` org custom property ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.0.md))
 
 ## 📋 Quick Start
 
