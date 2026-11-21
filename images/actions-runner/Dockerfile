@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries + node-gyp headers.
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries + node-gyp headers + tmux (distro and 3.8).
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -15,10 +15,31 @@
 # from GitHub's public apt repo. Runner auth (the GitHub App) lives in the
 # cldmv-runners-github-app Kubernetes Secret at runtime, and per-job GH_TOKEN is
 # injected by Actions — neither is in the image.
+
+# tmux 3.8, built from the release tarball into /opt/tmux-3.8 in its own stage so
+# the compiler and -dev packages stay out of the runner image. Some test suites
+# start real private tmux servers and pin 3.8 at that path (same as on
+# 01.homelab); Ubuntu 24.04 only ships 3.4. The tarball has no
+# signature, so it's pinned by checksum. Same base as the final stage, so the
+# binary links against the libevent/ncurses the final stage installs.
+FROM ghcr.io/actions/actions-runner:latest AS tmux-build
+USER root
+ARG TMUX_VERSION=3.8
+ARG TMUX_SHA256=e79c699c7e949dccd0a4a125e17b8d1261e311b16979dbc8eb34542f3966d82e
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl build-essential pkg-config bison libevent-dev libncurses-dev \
+ && curl -fsSL -o /tmp/tmux.tar.gz "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" \
+ && echo "${TMUX_SHA256}  /tmp/tmux.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/tmux.tar.gz -C /tmp \
+ && cd "/tmp/tmux-${TMUX_VERSION}" \
+ && ./configure --prefix="/opt/tmux-${TMUX_VERSION}" \
+ && make -j"$(nproc)" \
+ && make install
+
 FROM ghcr.io/actions/actions-runner:latest
 
 LABEL org.opencontainers.image.source="https://github.com/CLDMV/.github"
-LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS, corepack (pnpm/yarn), build-essential, python3, rsync, sqlite3, Playwright system libraries for CLDMV self-hosted cldmv-runners"
+LABEL org.opencontainers.image.description="ARC actions-runner + gh, jq, zip/unzip, Node.js LTS, corepack (pnpm/yarn), build-essential, python3, rsync, sqlite3, Playwright system libraries, tmux for CLDMV self-hosted cldmv-runners"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Package installs need root; the base runs as the non-root `runner` user.
@@ -99,6 +120,15 @@ RUN apt-get update \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/* /root/.npm
 
+# tmux: the distro build (3.4) on PATH, plus 3.8 from the tmux-build stage at
+# /opt/tmux-3.8. The distro package also brings the runtime libraries
+# (libevent-core, libutempter) the 3.8 binary needs. Tests that start private
+# tmux servers can't run in k3s-test pods without it.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tmux \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=tmux-build /opt/tmux-3.8 /opt/tmux-3.8
+
 # Add further hosted-runner tools here as #210's audit surfaces them.
 
 # Back to the runner user the entrypoint expects.
@@ -109,7 +139,10 @@ RUN gh --version && jq --version && node --version && npm --version \
  && corepack --version && pnpm --version \
  && make --version >/dev/null && g++ --version >/dev/null && python3 --version \
  && zip -v >/dev/null && unzip -v >/dev/null \
- && rsync --version >/dev/null && sqlite3 --version
+ && rsync --version >/dev/null && sqlite3 --version \
+ && tmux -V && /opt/tmux-3.8/bin/tmux -V \
+ && env -u TERM /opt/tmux-3.8/bin/tmux -L gate new -d && /opt/tmux-3.8/bin/tmux -L gate kill-server \
+ && env -u TERM tmux -L gate new -d && tmux -L gate kill-server
 
 # node-gyp headers for the baked-in Node, in ~/.cache/node-gyp/<version>.
 # Without them every native build in a pod downloads the headers itself, and
