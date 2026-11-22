@@ -11,9 +11,10 @@
  * shipped/verified", per data/github-labels.json.
  *
  * What it does:
- *   1. List the pushed range `before...after`, minus every commit already
- *      reachable from the release base (`base...after`). The exclusion keeps a
- *      hotfix-release master→next sync, or a reset, from re-marking shipped
+ *   1. List every commit on `after` not yet on the release base
+ *      (`base...after`): the whole unreleased queue, so PRs whose own run was
+ *      cancelled by a newer push are still covered (#519). The exclusion keeps
+ *      a hotfix-release master→next sync, or a reset, from re-marking shipped
  *      work.
  *   2. Source PRs = the trailing `(#N)` on each commit subject in that range
  *      (the merge/squash commit GitHub writes per PR), falling back to the
@@ -45,16 +46,6 @@ import {
 const ZERO_SHA_RE = /^0+$/;
 const STATUS_PREFIX = "status:";
 const VERIFIED_LABEL = "status: verified";
-
-/**
- * The unreleased commits (`base...after`) that this push introduced
- * (`before...after`), matched by sha. Pure.
- * @public
- */
-export function unreleasedInPush(unreleased, pushed) {
-	const inPush = new Set((pushed || []).map((c) => c?.sha).filter(Boolean));
-	return (unreleased || []).filter((c) => c?.sha && inPush.has(c.sha));
-}
 
 /**
  * Every `(#N)` PR ref on the subjects of `commits`, in first-seen order. Pure.
@@ -137,15 +128,17 @@ async function main() {
 
 	if (!after) throw new Error("No head SHA — pass `after` or run where GITHUB_SHA is set.");
 
-	// Everything on `after` not yet on the base branch. The pushed range is
-	// narrowed to that set, so commits that arrived via a master→next sync (a
-	// hotfix release) or were already released never count.
-	const unreleased = await listRangeCommits(owner, repo, baseBranch, after, token);
-	let commits = unreleased;
-	if (before && !ZERO_SHA_RE.test(before)) {
-		commits = unreleasedInPush(unreleased, await listRangeCommits(owner, repo, before, after, token));
-	}
-	console.log(`📋 ${commits.length} unreleased commit(s) in this push (${before ? before.slice(0, 7) : "<new>"}..${after.slice(0, 7)}).`);
+	// Everything on `after` not yet on the base branch: the whole unreleased
+	// queue, not just this push. Several PRs merged within seconds each start a
+	// run, concurrency cancels all but the newest, and a run that only looked at
+	// its own `before..after` lost the cancelled pushes' PRs (CLDMV/.github#519).
+	// Issues already at the target label are skipped below, so re-walking the
+	// queue on every push changes nothing for work already marked. Commits that
+	// arrived via a master→next sync (a hotfix release) or already shipped are
+	// on the base branch and never count.
+	const commits = await listRangeCommits(owner, repo, baseBranch, after, token);
+	const pushed = before && !ZERO_SHA_RE.test(before) ? `${before.slice(0, 7)}..${after.slice(0, 7)}` : `<new>..${after.slice(0, 7)}`;
+	console.log(`📋 ${commits.length} unreleased commit(s) on ${branch} not yet on ${baseBranch} (this push: ${pushed}).`);
 	if (commits.length === 0) {
 		setOutput("marked", "");
 		return;
