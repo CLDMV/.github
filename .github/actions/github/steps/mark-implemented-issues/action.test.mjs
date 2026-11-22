@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * @fileoverview Unit tests for mark-implemented-issues pure helpers — range
- * exclusion, source-PR extraction, merged-PR selection, the status-label plan,
+ * @fileoverview Unit tests for mark-implemented-issues pure helpers — source-PR
+ * extraction, merged-PR selection, the status-label plan,
  * and the issue comment. Run: `node action.test.mjs`.
  */
 
-import { unreleasedInPush, sourcePRsFromCommits, pickMergedInto, planLabelChange, implementedComment } from "./action.mjs";
+import { sourcePRsFromCommits, pickMergedInto, planLabelChange, implementedComment } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -21,20 +21,17 @@ function eq(actual, expected, label) {
 
 const commit = (sha, message) => ({ sha, commit: { message } });
 
-console.log("unreleasedInPush:");
+console.log("\nsourcePRsFromCommits — whole unreleased queue (#519):");
 eq(
-	unreleasedInPush([commit("a", "x"), commit("b", "y"), commit("c", "z")], [commit("b", "y"), commit("c", "z"), commit("m", "sync")]).map(
-		(c) => c.sha
-	),
-	["b", "c"],
-	"keeps only unreleased commits this push introduced"
+	sourcePRsFromCommits([
+		commit("d", "fix: four (#177)"),
+		commit("c", "fix: three (#244)"),
+		commit("b", "fix: two (#243)"),
+		commit("a", "fix: one (#242)")
+	]),
+	[177, 244, 243, 242],
+	"every PR merged since the last release counts, not just the newest push's"
 );
-eq(
-	unreleasedInPush([commit("a", "x")], [commit("r", "release squash")]).map((c) => c.sha),
-	[],
-	"master→next sync of released work → nothing"
-);
-eq(unreleasedInPush(null, null), [], "null inputs");
 
 console.log("\nsourcePRsFromCommits:");
 eq(

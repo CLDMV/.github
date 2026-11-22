@@ -8,14 +8,14 @@
 #
 
 name: "Mark Implemented Issues"
-description: "When work lands on an integration branch (next/hotfixes), walk the pushed commit range — commit messages plus each merged source PR's description, comments, and commits — for Fixes/Closes/Resolves #N keywords and `<!-- gh-broker:resolves:N -->` markers, and move every referenced open issue to the `status: implemented` label (replacing any other `status:` label), with a comment naming the resolving PR. Commits already on the release base are excluded, so a master→next sync never re-marks shipped work. The issue itself stays open — close-resolved-issues closes it when the release reaches the default branch. Roll-our-own implementation."
+description: "When work lands on an integration branch (next/hotfixes), walk every commit on the branch not yet on the release base — commit messages plus each merged source PR's description, comments, and commits — for Fixes/Closes/Resolves #N keywords and `<!-- gh-broker:resolves:N -->` markers, and move every referenced open issue to the `status: implemented` label (replacing any other `status:` label), with a comment naming the resolving PR. Commits already on the release base are excluded, so a master→next sync never re-marks shipped work. The issue itself stays open — close-resolved-issues closes it when the release reaches the default branch. Roll-our-own implementation."
 
 inputs:
   github-token:
     description: "App installation token with issues: write and pull-requests: read."
     required: true
   before:
-    description: "SHA the branch pointed at before the push (github.event.before). All-zeros or empty = branch creation; the whole base..after range is used."
+    description: "SHA the branch pointed at before the push (github.event.before). Logged only: the action always walks the whole unreleased base..after range, so PRs whose own run was cancelled by a newer push are still marked."
     required: false
     default: ""
   after:
