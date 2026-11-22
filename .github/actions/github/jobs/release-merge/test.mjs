@@ -90,6 +90,18 @@ const passOne = [{ name: "CI", status: "completed", conclusion: "success" }];
 eq(evaluateChecks(passOne, [], {}).state, "passed", "single passing check → passed");
 eq(evaluateChecks([{ name: "CI", status: "in_progress", conclusion: null }], [], {}).state, "pending", "an in-progress check → pending");
 eq(
+	evaluateChecks([{ name: "Commit Gate", status: "in_progress", conclusion: "success", completed_at: "2026-11-22T07:44:25Z" }], [], {})
+		.state,
+	"passed",
+	"a stale in_progress status with a success conclusion counts as finished (#514)"
+);
+eq(
+	evaluateChecks([{ name: "Commit Gate", status: "in_progress", conclusion: "failure", completed_at: "2026-11-22T07:44:25Z" }], [], {})
+		.state,
+	"failed",
+	"a stale in_progress status with a failure conclusion counts as failed (#514)"
+);
+eq(
 	evaluateChecks(
 		[
 			{ name: "CI", status: "completed", conclusion: "success" },
