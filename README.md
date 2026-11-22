@@ -7,6 +7,7 @@ Shared GitHub Actions workflows for the CLDMV organization.
 ### Latest: v4.41.0 (November 2026)
 
 - **More than one user in a test's user namespace** — the runner image ships `newuidmap`/`newgidmap` (file capabilities, not setuid) and `runner:10000:50000` in `/etc/subuid` and `/etc/subgid`, so k3s-test `--multi-user` runs can map several users with `unshare -U --map-users=auto -r`. Elsewhere the tools fail with EPERM.
+- **mark-implemented labels every merged PR** — when several PRs merge into `next` at once and the next-release runs cancel each other, the surviving run now walks the whole unreleased queue, so no issue misses `status: implemented`.
 - [View full v4.41.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md)
 
 ### Recent Releases
