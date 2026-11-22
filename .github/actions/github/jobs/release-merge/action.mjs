@@ -94,7 +94,7 @@ export function latestApprovalPresent(reviews, { allowedAssociations, requireAss
  * statuses, required and non-required alike — excluding this workflow's own
  * run. Returns "pending" while anything is unfinished, "failed" if anything
  * concluded badly (outside the allow-list), else "passed".
- * @param {Array<{name?: string, status?: string, conclusion?: string}>} checkRuns
+ * @param {Array<{name?: string, status?: string, conclusion?: string|null, completed_at?: string|null}>} checkRuns
  * @param {Array<{context?: string, state?: string}>} statuses - `.statuses` from `/commits/{sha}/status` (legacy); ignored when empty.
  * @param {{selfPattern?: string, allowFailing?: Set<string>}} opts
  * @returns {{state: "pending"|"failed"|"passed", pending: string[], failed: string[]}}
@@ -107,7 +107,11 @@ export function evaluateChecks(checkRuns, statuses, { selfPattern = "", allowFai
 
 	for (const cr of checkRuns || []) {
 		if (isSelf(cr.name)) continue;
-		if (cr.status !== "completed") {
+		// GitHub can return a finished check run with a stale status
+		// ("in_progress" plus a conclusion and completed_at, CLDMV/.github#514).
+		// A conclusion or completed_at means the run is over, whatever status says.
+		const finished = cr.status === "completed" || cr.conclusion != null || !!cr.completed_at;
+		if (!finished) {
 			pending.push(cr.name || "(unnamed check)");
 			continue;
 		}
