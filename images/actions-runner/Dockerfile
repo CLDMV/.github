@@ -1,4 +1,4 @@
-# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries + node-gyp headers + tmux (distro and 3.8).
+# CLDMV self-hosted runner image = the official ARC runner + gh CLI + jq + zip/unzip + Node.js + corepack (pnpm/yarn) + build-essential/python3 + rsync/sqlite3 + Playwright system libraries + node-gyp headers + tmux (distro and 3.8) + uidmap.
 #
 # The stock ghcr.io/actions/actions-runner image is deliberately minimal and
 # ships no gh, jq, or node, unlike GitHub's hosted ubuntu-latest. Once v4.19.1
@@ -129,6 +129,25 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=tmux-build /opt/tmux-3.8 /opt/tmux-3.8
 
+# newuidmap/newgidmap (uidmap) and a subordinate id range for the runner user, so a test
+# can map more than one user into a user namespace it creates
+# (`unshare -U --map-users=auto --map-groups=auto -r`), e.g. to check that one user can't
+# read another's files. k3s-test --multi-user pods run in their own user namespace that owns
+# ids 0-65535 only, so the range sits inside it (10000-59999, clear of the runner's 1001).
+# The tools get file capabilities instead of setuid: they then run as the calling user, who
+# owns the target's uid_map, with just CAP_SETUID/CAP_SETGID (setuid root would need
+# CAP_DAC_OVERRIDE to open it). They only work where no_new_privs is off and the bounding set
+# keeps SETUID/SETGID (k3s-test --multi-user); everywhere else they fail with EPERM.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends uidmap libcap2-bin \
+ && rm -rf /var/lib/apt/lists/* \
+ && chmod u-s /usr/bin/newuidmap /usr/bin/newgidmap \
+ && setcap cap_setuid+ep /usr/bin/newuidmap \
+ && setcap cap_setgid+ep /usr/bin/newgidmap \
+ && sed -i '/^runner:/d' /etc/subuid /etc/subgid \
+ && echo 'runner:10000:50000' >> /etc/subuid \
+ && echo 'runner:10000:50000' >> /etc/subgid
+
 # Add further hosted-runner tools here as #210's audit surfaces them.
 
 # Back to the runner user the entrypoint expects.
@@ -141,6 +160,8 @@ RUN gh --version && jq --version && node --version && npm --version \
  && zip -v >/dev/null && unzip -v >/dev/null \
  && rsync --version >/dev/null && sqlite3 --version \
  && tmux -V && /opt/tmux-3.8/bin/tmux -V \
+ && getcap /usr/bin/newuidmap | grep -q cap_setuid && getcap /usr/bin/newgidmap | grep -q cap_setgid \
+ && grep -qx 'runner:10000:50000' /etc/subuid && grep -qx 'runner:10000:50000' /etc/subgid \
  && env -u TERM /opt/tmux-3.8/bin/tmux -L gate new -d && /opt/tmux-3.8/bin/tmux -L gate kill-server \
  && env -u TERM tmux -L gate new -d && tmux -L gate kill-server
 
