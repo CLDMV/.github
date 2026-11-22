@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.40.1 (November 2026)
+### Latest: v4.41.0 (November 2026)
 
-- **Release PRs no longer stall on a finished check** — GitHub sometimes reports a concluded check run as `in_progress`. release-merge now trusts the conclusion and completion time, so a release PR with a stale check merges instead of waiting forever.
-- [View full v4.40.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md)
+- **More than one user in a test's user namespace** — the runner image ships `newuidmap`/`newgidmap` (file capabilities, not setuid) and `runner:10000:50000` in `/etc/subuid` and `/etc/subgid`, so k3s-test `--multi-user` runs can map several users with `unshare -U --map-users=auto -r`. Elsewhere the tools fail with EPERM.
+- [View full v4.41.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md)
 
 ### Recent Releases
 
+- **v4.40.1** (November 2026) — release-merge trusts a check run's conclusion, so a release PR with a stale `in_progress` check merges instead of waiting ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md))
 - **v4.40.0** (November 2026) — tmux in the runner image: distro 3.4 on PATH and 3.8 at `/opt/tmux-3.8` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.0.md))
 - **v4.39.4** (November 2026) — the runner image ships the node-gyp headers so parallel native builds stop racing, and bootstrap skips private vulnerability reporting on private repos ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md))
 - **v4.39.3** (November 2026) — tag-health re-signs tags with a glued signature, and the runner image gains Playwright's system libraries, rsync and sqlite3 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md))
-- **v4.39.2** (November 2026) — tag messages end with a newline so signed tags verify, and the runner image gains pnpm, yarn and a C/C++ toolchain ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.2.md))
 
 ## 📋 Quick Start
 
