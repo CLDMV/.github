@@ -251,6 +251,7 @@ runs:
         pr-number: ${{ inputs.pr-number }}
         new-version: ${{ steps.display-version.outputs.version }}
         title-suffix: ${{ steps.release-check.outputs.title-suffix }}
+        title-candidates: ${{ steps.release-check.outputs.title-candidates }}
         changelog-content: ${{ steps.changelog.outputs.changelog-content }}
         co-authors: ${{ steps.changelog.outputs.co-authors }}
 

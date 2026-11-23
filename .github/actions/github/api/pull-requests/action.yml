@@ -18,6 +18,10 @@ inputs:
   title:
     description: "PR title"
     required: true
+  title-candidates:
+    description: "Release titles only: JSON array of every suffix a commit in the release range could generate (check-release-commit's title-candidates). When set, the title is treated as a generated `release: vX.Y.Z - <suffix>` title: its length is capped, and on an existing PR a hand-edited title keeps its text and only gets the version prefix updated. Empty (default) = use the title as given."
+    required: false
+    default: ""
   base-branch:
     description: "Base branch for the PR"
     required: true
