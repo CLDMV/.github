@@ -5,7 +5,7 @@
  * doubling on an explicit `release: vX.Y.Z - <desc>` commit. Run: `node test.mjs`.
  */
 
-import { stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix, isAlreadyBumped } from "./action.mjs";
+import { stripConventionalPrefix, stripLeadingVersion, computeTitleSuffix, titleSuffixCandidates, isAlreadyBumped } from "./action.mjs";
 
 let failures = 0;
 function eq(actual, expected, label) {
@@ -51,6 +51,36 @@ eq(
 	"add widgets",
 	"minor bump → feat subject (unaffected by the version strip)"
 );
+
+console.log("\ncomputeTitleSuffix — not truncated (the cap applies to the finished title, #523):");
+eq(
+	computeTitleSuffix(
+		{},
+		[{ subject: "feat(k3s-test): --stall stops a run with no output, --hold keeps the pod for --exec", category: "feature" }],
+		{ versionBump: "minor" }
+	),
+	"--stall stops a run with no output, --hold keeps the pod for --exec",
+	"long feat subject comes back whole"
+);
+
+console.log("\ntitleSuffixCandidates:");
+{
+	const commits = [
+		{ subject: "chore: tidy", category: "chore" },
+		{ subject: "fix: a bug", category: "fix" },
+		{ subject: "feat: newer feature", category: "feature" },
+		{ subject: "release: v2.0.0 - explicit desc", category: "release" },
+		{ subject: "docs: oldest commit", category: "docs" }
+	];
+	const c = titleSuffixCandidates(commits);
+	for (const want of ["a bug", "newer feature", "explicit desc", "v2.0.0 - explicit desc", "oldest commit", "tidy"]) {
+		eq(c.includes(want), true, `includes "${want}"`);
+	}
+	eq(new Set(c).size, c.length, "no duplicates");
+	const capped = titleSuffixCandidates(commits, 40);
+	eq(capped[0], "a bug", "byte cap keeps suffix-driving commits first");
+	eq(capped.includes("tidy"), false, "byte cap drops the rest");
+}
 
 console.log("\nisAlreadyBumped:");
 eq(isAlreadyBumped(new Set(["0.0.1"]), "0.0.1", "0.0.1"), true, "bumped and package.json matches → applied");

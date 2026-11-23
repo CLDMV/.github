@@ -22,6 +22,7 @@
 import { getInput, appendSummary, setOutputs } from "../../../common/common/core.mjs";
 import { api } from "../../api/_api/core.mjs";
 import { releaseTitleVersion, repinBranchLinks } from "../../utilities/release-notes.mjs";
+import { buildReleaseTitle, splitReleaseTitle } from "../../utilities/release-title.mjs";
 
 /** Parse a comma-separated input into a lowercased Set (values trimmed, blanks dropped). */
 function csvSet(input, fallback) {
@@ -271,6 +272,23 @@ async function main() {
 	// commit is exactly the curated PR body (no title-only drop, no UI co-author
 	// auto-append). `sha` pins the merge to the head we just gated.
 	console.log(`🚀 PR #${prNumber}: approved + all checks green — squash-merging with the PR body as the commit message.`);
+	// Read the title again right before the squash: the gates above take a few
+	// API calls, and a last-minute hand edit should be what lands (#523). The
+	// subject must still start with `release: vX.Y.Z` (tagging and publishing
+	// key off it), so the version from the gated title is kept and a removed
+	// prefix is put back.
+	try {
+		const fresh = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
+		const gatedVersion = releaseTitleVersion(pr.title);
+		if (fresh?.title && fresh.title !== pr.title) {
+			const title = gatedVersion ? buildReleaseTitle(gatedVersion, splitReleaseTitle(fresh.title).suffix) : fresh.title;
+			console.log(`📝 PR #${prNumber} title changed since the gates ran; using: ${title}`);
+			pr.title = title;
+		}
+		if (typeof fresh?.body === "string") pr.body = fresh.body;
+	} catch (err) {
+		console.log(`⚠️ Could not re-read PR #${prNumber} before merging (${err.message}); using the title read at the start.`);
+	}
 	// The open PR body pins changelog links to the head branch; the commit on
 	// the release branch is permanent, so point them at the tag created from it.
 	const version = releaseTitleVersion(pr.title);

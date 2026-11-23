@@ -29,6 +29,7 @@
 
 import { api, parseRepo } from "../../api/_api/core.mjs";
 import { getInput } from "../../../common/common/core.mjs";
+import { resolveReleaseTitle, parseCandidates } from "../../utilities/release-title.mjs";
 
 const FALLBACK_BODY = [
 	"## 🚀 What's Changed",
@@ -71,6 +72,7 @@ try {
 	const prNumber = getInput("pr-number", { required: true });
 	const newVersion = getInput("new-version", { required: true });
 	const titleSuffix = (getInput("title-suffix") || "").trim();
+	const titleCandidates = parseCandidates(getInput("title-candidates"));
 	const changelog = getInput("changelog-content");
 	const coAuthors = (getInput("co-authors") || "").trim();
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
@@ -84,9 +86,11 @@ try {
 	// by other actions. Cheap GET; only fires when the workflow already
 	// decided to refresh the PR.
 	let currentBody = "";
+	let currentTitle = "";
 	try {
 		const pr = await api("GET", `/pulls/${prNumber}`, null, { token, owner, repo });
 		currentBody = pr?.body || "";
+		currentTitle = pr?.title || "";
 	} catch (err) {
 		console.log(`⚠️ Could not GET PR #${prNumber} body to preserve sticky blocks: ${err.message}`);
 	}
@@ -101,7 +105,14 @@ try {
 	// badge ABOVE this block on a first add without displacing the trailers from last position.
 	if (coAuthors) composedBody = `${composedBody.replace(/\s+$/, "")}\n\n${coAuthors}`;
 
-	const title = titleSuffix ? `release: v${newVersion} - ${titleSuffix}` : `release: v${newVersion}`;
+	// Keep a hand-edited title's text; regenerate a generated one (#523).
+	const { title, source } = resolveReleaseTitle({
+		currentTitle,
+		version: newVersion,
+		generatedSuffix: titleSuffix,
+		candidates: titleCandidates
+	});
+	if (source === "manual") console.log(`✋ Title was edited by hand; keeping its text: ${currentTitle}`);
 	console.log(`📝 Updating PR title to: ${title}`);
 	await api("PATCH", `/pulls/${prNumber}`, { title, body: composedBody }, { token, owner, repo });
 

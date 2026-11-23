@@ -6,9 +6,16 @@
 
 import { api, parseRepo } from "../_api/core.mjs";
 import { getInput, setOutputs } from "../../../common/common/core.mjs";
+import { buildReleaseTitle, parseCandidates, resolveReleaseTitle, splitReleaseTitle } from "../../utilities/release-title.mjs";
 
 try {
-	const title = getInput("title", { required: true });
+	const givenTitle = getInput("title", { required: true });
+	// A release title (title-candidates set) is capped here, after the suffix
+	// is attached, and a hand-edited title on an existing PR is kept (#523).
+	const releaseTitle = getInput("title-candidates", { default: "" }).trim() !== "";
+	const titleCandidates = parseCandidates(getInput("title-candidates", { default: "" }));
+	const generated = splitReleaseTitle(givenTitle);
+	const title = releaseTitle && generated.hasPrefix ? buildReleaseTitle(generated.version, generated.suffix) : givenTitle;
 	const baseBranch = getInput("base-branch", { required: true });
 	const headBranch = getInput("head-branch", { required: true });
 	const bodyContent = getInput("body-content", { required: true });
@@ -60,7 +67,19 @@ try {
 	 * only add labels it owns).
 	 */
 	async function updatePr(number) {
-		await api("PATCH", `/pulls/${number}`, { title, body: composedBody }, { token, owner, repo });
+		let nextTitle = title;
+		if (releaseTitle && generated.hasPrefix) {
+			const pr = await api("GET", `/pulls/${number}`, null, { token, owner, repo });
+			const resolved = resolveReleaseTitle({
+				currentTitle: pr?.title || "",
+				version: generated.version,
+				generatedSuffix: generated.suffix,
+				candidates: titleCandidates
+			});
+			if (resolved.source === "manual") console.log(`✋ Title was edited by hand; keeping its text: ${pr.title}`);
+			nextTitle = resolved.title;
+		}
+		await api("PATCH", `/pulls/${number}`, { title: nextTitle, body: composedBody }, { token, owner, repo });
 		if (labels.length === 0) return;
 		const currentArr = await api("GET", `/issues/${number}/labels`, null, { token, owner, repo });
 		const current = new Set((currentArr || []).map((l) => l?.name).filter(Boolean));
