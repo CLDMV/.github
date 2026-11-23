@@ -4,18 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.41.0 (November 2026)
+### Latest: v4.41.1 (November 2026)
 
-- **More than one user in a test's user namespace** — the runner image ships `newuidmap`/`newgidmap` (file capabilities, not setuid) and `runner:10000:50000` in `/etc/subuid` and `/etc/subgid`, so k3s-test `--multi-user` runs can map several users with `unshare -U --map-users=auto -r`. Elsewhere the tools fail with EPERM.
-- **mark-implemented labels every merged PR** — when several PRs merge into `next` at once and the next-release runs cancel each other, the surviving run now walks the whole unreleased queue, so no issue misses `status: implemented`.
-- [View full v4.41.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md)
+- **Hand-edited release titles survive** — a release PR refresh keeps a title you wrote and only keeps its `release: vX.Y.Z` prefix current; release-merge re-reads the title right before the squash. Generated titles are no longer cut at 55 characters: the 72-character cap applies to the finished title.
+- [View full v4.41.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md)
 
 ### Recent Releases
 
+- **v4.41.0** (November 2026) — uidmap and a subordinate id range in the runner image for multi-user tests, and mark-implemented walks the whole unreleased queue ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md))
 - **v4.40.1** (November 2026) — release-merge trusts a check run's conclusion, so a release PR with a stale `in_progress` check merges instead of waiting ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md))
 - **v4.40.0** (November 2026) — tmux in the runner image: distro 3.4 on PATH and 3.8 at `/opt/tmux-3.8` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.0.md))
 - **v4.39.4** (November 2026) — the runner image ships the node-gyp headers so parallel native builds stop racing, and bootstrap skips private vulnerability reporting on private repos ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md))
-- **v4.39.3** (November 2026) — tag-health re-signs tags with a glued signature, and the runner image gains Playwright's system libraries, rsync and sqlite3 ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.3.md))
 
 ## 📋 Quick Start
 

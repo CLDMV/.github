@@ -238,18 +238,14 @@ function stripLeadingVersion(s) {
 }
 
 /**
- * Cap a string at ~55 chars, breaking on a word boundary when possible.
- * Used to keep generated PR titles readable in GitHub's list views.
+ * Collapse newlines in a commit subject into spaces and trim it. The length
+ * cap is applied to the finished PR title, not here (see
+ * github/utilities/release-title.mjs).
  * @param {string} s - Input string.
- * @returns {string} Truncated string, with ellipsis if shortened.
+ * @returns {string}
  */
-function truncateForTitle(s) {
-	const cleaned = (s || "").replace(/[\r\n]+/g, " ").trim();
-	if (cleaned.length <= 55) return cleaned;
-	const slice = cleaned.slice(0, 55);
-	const lastSpace = slice.lastIndexOf(" ");
-	const cut = lastSpace > 30 ? slice.slice(0, lastSpace) : slice;
-	return cut + "…";
+function cleanSuffix(s) {
+	return (s || "").replace(/[\r\n]+/g, " ").trim();
 }
 
 /**
@@ -273,14 +269,14 @@ function truncateForTitle(s) {
  * @param {object} releaseAnalysis - Output of findReleaseCommits().
  * @param {Array} actionableCommits - Non-bot-bump commits on the branch.
  * @param {object} versionAnalysis - Output of analyzeVersionBump().
- * @returns {string} The (possibly truncated) summary suffix; "" when nothing fits.
+ * @returns {string} The full (untruncated) summary suffix; "" when nothing fits.
  */
 function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis) {
 	const explicit = releaseAnalysis.breakingRelease || releaseAnalysis.normalRelease;
 	if (explicit) {
 		// strip the conventional prefix AND any leading vX.Y.Z so the title isn't
 		// "release: vX.Y.Z - vX.Y.Z - <desc>".
-		return truncateForTitle(stripLeadingVersion(stripConventionalPrefix(explicit.subject)));
+		return cleanSuffix(stripLeadingVersion(stripConventionalPrefix(explicit.subject)));
 	}
 
 	const bump = versionAnalysis.versionBump;
@@ -295,7 +291,52 @@ function computeTitleSuffix(releaseAnalysis, actionableCommits, versionAnalysis)
 	if (!firstMatch && actionableCommits.length > 0) firstMatch = actionableCommits[actionableCommits.length - 1];
 	if (!firstMatch) return "";
 
-	return truncateForTitle(stripConventionalPrefix(firstMatch.subject));
+	return cleanSuffix(stripConventionalPrefix(firstMatch.subject));
+}
+
+/** Byte budget for the title-candidates output (it is passed on as an action input). */
+const TITLE_CANDIDATES_MAX_BYTES = 60000;
+
+/**
+ * Every title suffix a commit in the release range could generate, so a
+ * refresh can tell a generated PR title from one edited by hand (#523). A new
+ * commit can change which commit the suffix comes from, so comparing against
+ * today's suffix alone isn't enough.
+ *
+ * Each commit contributes its subject with the conventional prefix stripped,
+ * and with any leading version stripped too (the explicit `release:` form).
+ * Commits that can drive the suffix (explicit release, breaking, feat, fix)
+ * come first, then the oldest commit (the fallback), then the rest, so the
+ * byte cap only ever drops commits that could not have produced the title.
+ *
+ * @param {Array<{subject: string, category?: string, isBreaking?: boolean}>} commits - Actionable commits, newest first.
+ * @param {number} [maxBytes]
+ * @returns {string[]}
+ */
+function titleSuffixCandidates(commits, maxBytes = TITLE_CANDIDATES_MAX_BYTES) {
+	const list = commits || [];
+	const drives = (c) =>
+		/^release(\([^)]*\))?!?:/i.test(c.subject || "") ||
+		c.isBreaking ||
+		c.category === "breaking" ||
+		c.category === "feature" ||
+		c.category === "fix";
+	const ordered = [...list.filter(drives), ...list.slice(-1), ...list];
+	const out = [];
+	const seen = new Set();
+	let bytes = 2;
+	for (const c of ordered) {
+		const stripped = stripConventionalPrefix(c.subject);
+		for (const s of [cleanSuffix(stripLeadingVersion(stripped)), cleanSuffix(stripped)]) {
+			if (!s || seen.has(s)) continue;
+			const size = Buffer.byteLength(JSON.stringify(s)) + 1;
+			if (bytes + size > maxBytes) return out;
+			seen.add(s);
+			out.push(s);
+			bytes += size;
+		}
+	}
+	return out;
 }
 
 /**
@@ -430,6 +471,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				`version-bump=${versionAnalysis.versionBump}`,
 				`has-breaking=${versionAnalysis.hasBreaking || false}`,
 				`title-suffix=${titleSuffix}`,
+				`title-candidates=${JSON.stringify(titleSuffixCandidates(actionableCommits))}`,
 				`deps-only=${depsOnly}`
 			];
 			if (versionAnalysis.versionBump === "explicit" && versionAnalysis.explicitVersion) {
@@ -451,6 +493,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		`version-bump=${versionAnalysis.versionBump}`,
 		`has-breaking=${versionAnalysis.hasBreaking || false}`,
 		`title-suffix=${titleSuffix}`,
+		`title-candidates=${JSON.stringify(titleSuffixCandidates(actionableCommits))}`,
 		`deps-only=${depsOnly}`
 	];
 
@@ -474,5 +517,6 @@ export {
 	hasConventionalCommits,
 	stripConventionalPrefix,
 	stripLeadingVersion,
-	computeTitleSuffix
+	computeTitleSuffix,
+	titleSuffixCandidates
 };

@@ -36,8 +36,11 @@ outputs:
     description: "Explicit version when version-bump is explicit"
     value: ${{ steps.check.outputs.explicit-version }}
   title-suffix:
-    description: "Suffix to append after 'release: vX.Y.Z - ' so PRs sharing the same target version are visually distinct. Derived from an explicit release: commit, else the first feat/fix/breaking commit per the calculated bump type."
+    description: "Suffix to append after 'release: vX.Y.Z - ' so PRs sharing the same target version are visually distinct. Derived from an explicit release: commit, else the first feat/fix/breaking commit per the calculated bump type. Not truncated: the length cap applies to the finished title."
     value: ${{ steps.check.outputs.title-suffix }}
+  title-candidates:
+    description: "JSON array of every title suffix a commit in the range could generate. The release PR refresh uses it to tell a generated title from one edited by hand, and keeps a hand-edited one (#523)."
+    value: ${{ steps.check.outputs.title-candidates }}
   deps-only:
     description: "'true' when every change in the range is a devDependencies-only package.json edit, a lockfile, or CI configuration (nothing a consumer installs or runs), and no explicit release: commit is present. Tooling holds such release PRs instead of offering them as releases."
     value: ${{ steps.check.outputs.deps-only }}

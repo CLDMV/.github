@@ -16,6 +16,10 @@ inputs:
     description: "Optional suffix appended after 'release: vX.Y.Z - ' to distinguish PRs that share the same target version. When empty, the plain 'release: vX.Y.Z' form is used."
     required: false
     default: ""
+  title-candidates:
+    description: "JSON array of every suffix a commit in the release range could generate (check-release-commit's title-candidates). When the current title's suffix matches none of them, it was edited by hand and its text is kept; only the release: vX.Y.Z prefix is updated."
+    required: false
+    default: ""
   changelog-content:
     description: "Generated changelog markdown for the PR body"
     required: false

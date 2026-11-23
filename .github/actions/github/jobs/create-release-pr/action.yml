@@ -293,6 +293,9 @@ runs:
         # two open patch PRs both bumping to vX.Y.Z). Empty suffix falls back
         # to the plain "release: vX.Y.Z" form.
         title: "release: v${{ steps.version.outputs.new-version }}${{ steps.commit-check.outputs.title-suffix && format(' - {0}', steps.commit-check.outputs.title-suffix) || '' }}"
+        # Marks this as a release title: the action caps its length, and on an
+        # existing PR keeps a hand-edited title's text (#523).
+        title-candidates: ${{ steps.commit-check.outputs.title-candidates || '[]' }}
         # Passed base wins when non-empty; else fall back to auto-detected default.
         base-branch: ${{ inputs.default-branch != '' && inputs.default-branch || steps.default-branch.outputs.default-branch }}
         head-branch: ${{ github.ref_name }}
