@@ -71,7 +71,7 @@ hotfixes ───────────────────────�
 ### 5.1 Contributor PR (normal path)
 
 1. Contributor branches off **`next`** (not master).
-2. Pushes commits in conventional format (`feat: ...`, `fix(scope): ...`, etc.).
+2. Pushes commits in conventional format (`feat: ...`, `fix(scope): ...`, etc.). CI's `📝 Commit Subjects` job checks every non-merge commit in the branch's range against the types the release bump understands (`feat`, `feature`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`, `ci`, `build`, `style`, `revert`, `deps`, `release`, with an optional `(scope)` and `!`) and fails `✅ Required PR Check` on any other subject, listing the SHAs. The bump guesses a type from the words in a non-conventional subject (`agent add: …` counts as a feature), so a bad subject changes the version.
 3. **First push of a branch matching a known prefix** (`feat/`, `feature/`, `fix/`, `release/`, `chore/`, `refactor/`, `docs/`, `ci/`, `perf/`, `test/`, `style/`) triggers the **auto-feature-PR workflow** (§6.8) — it opens a PR targeting `next` (or `hotfixes` for `hotfix/*`) with a populated categorized-commits body. The contributor doesn't open the PR manually.
 4. **Every subsequent push to the branch** triggers the same workflow's refresh path — the PR body is regenerated from `master..HEAD` (or `<integration>..HEAD`) and edited via `gh pr edit --body-file`. The body always reflects the current commit range.
 5. **PR title normalizer** workflow (§6.4) fires on PR open / sync:
@@ -506,7 +506,6 @@ Migration doc (`docs/migration/v3-to-v4.md`) is written **all at once** as the f
 
 ## 12. Out of scope (deferred)
 
-- **Conventional Commit linter on contributor commit messages.** Not v4's problem — handled by existing audit.
 - **Cross-repo release coordination.** v4 still operates per-repo.
 - **Replacing GitHub's auto-merge with a custom workflow.** §4 covers this — global allow-auto-merge + branch protection is sufficient.
 - **Strict commit-signature enforcement on contributor commits.** Already covered by GPG enforcement rules per-repo.
