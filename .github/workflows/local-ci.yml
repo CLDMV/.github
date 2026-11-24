@@ -140,6 +140,37 @@ jobs:
                       LICENSE
                       .gitignore
 
+    # Fail on a non-conventional commit subject in a feature PR's range. The
+    # release bump reads every subject, and a subject like `agent add: …` is
+    # guessed as a feature (#527). Same gating as paths-gate. See
+    # `.github/actions/common/steps/commit-subjects`.
+    commit-subjects:
+        name: "📝 Commit Subjects"
+        runs-on: ubuntu-latest
+        if: |
+            github.event_name == 'push' || (
+                github.event_name == 'pull_request' && (
+                    github.event.pull_request.head.repo.fork == true ||
+                    github.event.pull_request.head.ref == 'next' ||
+                    github.event.pull_request.head.ref == 'hotfixes'
+                )
+            )
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            ok: ${{ steps.check.outputs.ok }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 1
+            - name: Check commit subjects
+              id: check
+              # Relative path, like paths-gate: the action isn't on the v4 tag
+              # during the PR that adds it.
+              uses: ./.github/actions/common/steps/commit-subjects
+
     validate:
         name: "🧪 Validate workflows + actions"
         needs: [sync-gate, paths-gate]
@@ -431,7 +462,7 @@ jobs:
         # in-repo PR path passes as a no-op under a non-required name. Keep the
         # condition identical to the step's OWNS_STATUS.
         name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes') && '✅ Required PR Check' || '⏭️ Required PR Check (reported by the push run)' }}
-        needs: [sync-gate, paths-gate, validate]
+        needs: [sync-gate, paths-gate, commit-subjects, validate]
         # always(): run when validate is skipped (docs-only / master-sync /
         # in-repo PR paths) or failed.
         if: always()
@@ -443,6 +474,8 @@ jobs:
                   OWNS_STATUS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == true || github.event.pull_request.head.ref == 'next' || github.event.pull_request.head.ref == 'hotfixes' }}
                   IS_MASTER_SYNC: ${{ needs.sync-gate.outputs.is_master_sync }}
                   DOCS_ONLY: ${{ needs.paths-gate.outputs.docs_only }}
+                  SUBJECTS_OK: ${{ needs.commit-subjects.outputs.ok }}
+                  SUBJECTS_RESULT: ${{ needs.commit-subjects.result }}
                   VALIDATE_RESULT: ${{ needs.validate.result }}
               run: |
                   if [ "$OWNS_STATUS" != "true" ]; then
@@ -452,6 +485,10 @@ jobs:
                   if [ "$IS_MASTER_SYNC" = "true" ]; then
                       echo "Branch tip matches master — Required PR Check passes without running validate."
                       exit 0
+                  fi
+                  if [ "$SUBJECTS_OK" = "false" ] || [ "$SUBJECTS_RESULT" = "failure" ]; then
+                      echo "Commit Subjects failed — reword the listed commits."
+                      exit 1
                   fi
                   if [ "$DOCS_ONLY" = "true" ]; then
                       echo "Docs-only change — Required PR Check passes without running validate."
