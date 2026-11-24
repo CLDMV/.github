@@ -19,13 +19,16 @@ on:
         outputs:
             docs_only:
                 description: "true if every changed file matched `paths_ignore`; false otherwise. Callers should green-light their Required PR Check when this is true so docs-only PRs aren't blocked at the ruleset."
-                value: ${{ jobs.paths-gate.outputs.docs_only }}
+                # A failed commit-subject check reports false, so a caller's
+                # Required PR Check falls through to the CI result (a failure)
+                # instead of green-lighting a docs-only PR with bad subjects.
+                value: ${{ jobs.commit-subjects.outputs.ok == 'false' && 'false' || jobs.paths-gate.outputs.docs_only }}
             is_master_sync:
                 description: "true if `next` / `hotfixes` was just force-synced to master (head SHA matches the default branch). Callers should green-light their Required PR Check when this is true — there's no diff to test, no PR to gate."
                 value: ${{ jobs.sync-gate.outputs.is_master_sync }}
             no_node:
                 description: "true when the caller set `node_project: false`. The Node chain (ci, type-check, lint-format, coverage, summary) did not run. Callers should green-light their Required PR Check when this is true."
-                value: ${{ jobs.paths-gate.outputs.no_node }}
+                value: ${{ jobs.commit-subjects.outputs.ok == 'false' && 'false' || jobs.paths-gate.outputs.no_node }}
         inputs:
             node_project:
                 required: false
@@ -269,6 +272,7 @@ on:
 #   - coverage-badge:      contents:write   (pushes to `badges` branch)
 #   - coverage-pr-comment: pull-requests:write (edits PR description)
 #   - ci / commit-gate:    contents:read    (no writes)
+#   - commit-subjects:     contents:read, pull-requests:read (no writes)
 # Jobs that don't need the write surface simply don't exercise it.
 permissions:
     contents: write
@@ -319,6 +323,27 @@ jobs:
             - name: Note skipped Node chain
               if: inputs.node_project == false || inputs.node_project == 'false'
               run: echo "⏭️ Node chain skipped because \`node_project\` is false (no Node project in this repo)." >> "$GITHUB_STEP_SUMMARY"
+
+    # Fail the run when a feature PR carries a non-conventional commit
+    # subject. The release bump reads every subject in the range, and a
+    # subject like `agent add: …` is guessed as a feature (#527). Pushes to
+    # next/hotfixes/master and release PRs aren't checked; their commits were
+    # checked on the way in. The job's failure makes this reusable's result a
+    # failure, and the `docs_only` / `no_node` outputs above report false, so
+    # the caller's Required PR Check fails without any caller change.
+    commit-subjects:
+        name: "📝 Commit Subjects"
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            ok: ${{ steps.check.outputs.ok }}
+        steps:
+            - name: Check commit subjects
+              id: check
+              uses: CLDMV/.github/.github/actions/common/steps/commit-subjects@v4
 
     # Check if we should skip CI based on commit message
     commit-gate:
