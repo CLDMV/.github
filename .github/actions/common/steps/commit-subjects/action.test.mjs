@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { isConventionalSubject, resolvePrBase, findBadSubjects } from "./action.mjs";
+import { isConventionalSubject, resolvePrBase, findBadSubjects, tableCell } from "./action.mjs";
 
 const actionPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "action.mjs");
 
@@ -96,6 +96,11 @@ eq(
 );
 eq(res.checked, 3, "merge commit not counted as checked");
 eq(res.merges, 1, "merge commit exempt");
+
+console.log("tableCell:");
+eq(tableCell("a | b"), "a \\| b", "pipe escaped");
+eq(tableCell("a\\|b"), "a\\\\\\|b", "backslash escaped before the pipe");
+eq(tableCell("`x` *y* _z_ <b> [l]"), "\\`x\\` \\*y\\* \\_z\\_ \\<b\\> \\[l\\]", "markdown punctuation escaped");
 
 // ---- subprocess runs -------------------------------------------------------
 

@@ -164,6 +164,17 @@ async function collectCommits({ token, owner, repo }) {
 	return { commits: null, reason: `event=${eventName} has no commit range` };
 }
 
+/**
+ * Escape a commit subject for a markdown table cell: backslashes first, then
+ * pipes (which would end the cell) and markdown punctuation that would render.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function tableCell(text) {
+	return String(text).replace(/[\\`*_|<>[\]]/g, (c) => `\\${c}`);
+}
+
 /** Escape text for a single-line workflow command. */
 function cmd(text) {
 	return String(text).replace(/%/g, "%25").replace(/\r?\n/g, " ");
@@ -207,7 +218,7 @@ async function main() {
 			"",
 			"| Commit | Subject |",
 			"|---|---|",
-			...bad.map((b) => `| \`${b.sha.slice(0, 7)}\` | ${b.subject.replace(/\|/g, "\\|") || "_(empty)_"} |`),
+			...bad.map((b) => `| \`${b.sha.slice(0, 7)}\` | ${tableCell(b.subject) || "_(empty)_"} |`),
 			"",
 			`Use \`type(scope): summary\` with one of: ${types}. Reword them and force-push the branch.`,
 			""
