@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.41.1 (November 2026)
+### Latest: v4.42.0 (November 2026)
 
-- **Hand-edited release titles survive** — a release PR refresh keeps a title you wrote and only keeps its `release: vX.Y.Z` prefix current; release-merge re-reads the title right before the squash. Generated titles are no longer cut at 55 characters: the 72-character cap applies to the finished title.
-- [View full v4.41.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md)
+- **📝 Commit Subjects check** — CI fails a feature branch or fork PR whose non-merge commits don't use a conventional `type(scope): summary` subject, and lists each one. A subject like `agent add: …` used to fall through to a content guess and bump the release a minor; now it's caught before it reaches `next`, with no caller change.
+- [View full v4.42.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md)
 
 ### Recent Releases
 
+- **v4.41.1** (November 2026) — hand-edited release titles survive a release PR refresh, and generated titles are capped at 72 characters as a whole ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md))
 - **v4.41.0** (November 2026) — uidmap and a subordinate id range in the runner image for multi-user tests, and mark-implemented walks the whole unreleased queue ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md))
 - **v4.40.1** (November 2026) — release-merge trusts a check run's conclusion, so a release PR with a stale `in_progress` check merges instead of waiting ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md))
 - **v4.40.0** (November 2026) — tmux in the runner image: distro 3.4 on PATH and 3.8 at `/opt/tmux-3.8` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.0.md))
-- **v4.39.4** (November 2026) — the runner image ships the node-gyp headers so parallel native builds stop racing, and bootstrap skips private vulnerability reporting on private repos ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.39.4.md))
 
 ## 📋 Quick Start
 
