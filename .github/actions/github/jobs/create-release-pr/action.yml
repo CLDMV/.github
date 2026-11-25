@@ -193,6 +193,8 @@ runs:
       if: inputs.dry-run != 'true'
       uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v4
 
+    # A superseded run (the branch moved on while this one was building, #467)
+    # doesn't open the PR: the newer run queued behind it does.
     - name: Create signed commit
       if: inputs.dry-run != 'true'
       id: commit
@@ -285,7 +287,7 @@ runs:
     # The two `! …` flow labels are in the allowlist so a hotfix → release
     # head-ref change (rare but possible) doesn't strand the wrong label.
     - name: Create pull request
-      if: inputs.dry-run != 'true'
+      if: inputs.dry-run != 'true' && steps.commit.outputs.superseded != 'true'
       id: create-pr
       uses: CLDMV/.github/.github/actions/github/api/pull-requests@v4
       with:

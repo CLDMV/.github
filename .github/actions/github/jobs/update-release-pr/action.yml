@@ -163,7 +163,10 @@ runs:
       if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/git/steps/restore-deleted-src@v4
 
+    # A superseded run (the branch moved on while this one was building, #467)
+    # stops here: the newer run queued behind it refreshes the release PR.
     - name: Create signed commit
+      id: commit
       if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'
       uses: CLDMV/.github/.github/actions/github/api/commit@v4
       with:
@@ -172,14 +175,14 @@ runs:
 
     - name: Determine display version
       id: display-version
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/npm/steps/resolve-version@v4
       with:
         new-version: ${{ steps.version.outputs.new-version }}
 
     - name: Get PR commit range
       id: get-pr-range
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/github/steps/get-pr-commit-range@v4
       with:
         github-token: ${{ inputs.github-token }}
@@ -187,7 +190,7 @@ runs:
 
     - name: Generate updated changelog
       id: changelog
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/git/steps/generate-comprehensive-changelog@v4
       with:
         commit-range: ${{ steps.get-pr-range.outputs.commit-range }}
@@ -223,7 +226,7 @@ runs:
     # first-refresh case where the PR was just opened by create-release-pr.
     - name: Capture previous PR version
       id: prev-version
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
@@ -244,7 +247,7 @@ runs:
         echo "📋 Previous version: ${prev:-<none>}   New version: $NEW_VERSION   Changed: $changed"
 
     - name: Update PR title and description
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/github/steps/update-pr-changelog@v4
       with:
         github-token: ${{ inputs.github-token }}
@@ -261,7 +264,7 @@ runs:
     # Filters bot/merge/release commits + the auto chore-bump (loop noise).
     - name: Compute commit types in PR range
       id: pr-types
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       shell: bash
       env:
         RANGE: ${{ steps.get-pr-range.outputs.commit-range }}
@@ -284,7 +287,7 @@ runs:
 
     - name: Compute raw label aliases
       id: raw-labels
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/github/steps/compute-label-aliases@v4
       with:
         bump-type: ${{ steps.release-check.outputs.version-bump }}
@@ -292,7 +295,7 @@ runs:
 
     - name: Resolve PR label aliases
       id: resolved-labels
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/github/steps/resolve-labels@v4
       with:
         aliases: ${{ steps.raw-labels.outputs.labels }}
@@ -304,7 +307,7 @@ runs:
     # so a glance at the PR list shows which lane each release PR is on.
     - name: Append flow label
       id: final-labels
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       shell: bash
       env:
         HEAD_REF: ${{ inputs.head-ref }}
@@ -352,7 +355,7 @@ runs:
     # Flow labels are IN the allowlist so the right lane indicator wins if
     # the head-ref ever changes between refreshes.
     - name: Sync PR labels
-      if: steps.release-check.outputs.should-create-pr == 'true'
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.commit.outputs.superseded != 'true'
       uses: CLDMV/.github/.github/actions/github/steps/sync-pr-labels@v4
       with:
         github-token: ${{ inputs.github-token }}

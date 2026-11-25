@@ -2,6 +2,11 @@
  * @fileoverview Commit and push badge.json to the badges branch, creating it
  * as an orphan branch on first run and skipping the commit when unchanged.
  * Node entrypoint for the push-badge action.
+ *
+ * Optionally publishes the repo's coverage index next to it (`index-path` →
+ * `index-filename`, CLDMV/.github#540), in the same commit. A repo that
+ * doesn't produce the index is skipped silently.
+ *
  * @module @cldmv/.github.coverage.steps.push-badge
  */
 
@@ -47,6 +52,21 @@ try {
 	if (!badgeFile || badgeFile !== path.basename(badgeFile) || badgeFile === "." || badgeFile === "..") {
 		throw new Error(`push-badge: badge-filename must be a bare filename with no path separators (got "${badgeFile}").`);
 	}
+	/** Reject anything that isn't a bare filename (no separators or traversal). */
+	const assertBareName = (name, input) => {
+		if (!name || name !== path.basename(name) || name === "." || name === "..") {
+			throw new Error(`push-badge: ${input} must be a bare filename with no path separators (got "${name}").`);
+		}
+	};
+	const indexPath = getInput("index-path");
+	const indexFile = getInput("index-filename", { default: "coverage-index.json" });
+	let publishIndex = false;
+	if (indexPath) {
+		assertBareName(indexFile, "index-filename");
+		if (indexFile === badgeFile) throw new Error(`push-badge: index-filename must differ from badge-filename ("${badgeFile}").`);
+		publishIndex = fs.existsSync(indexPath) && fs.statSync(indexPath).isFile();
+		console.log(publishIndex ? `Coverage index found at ${indexPath}; publishing it as ${indexFile}.` : `No coverage index at ${indexPath}; publishing the badge only.`);
+	}
 	const botName = getInput("bot-name", { required: true });
 	const botEmail = getInput("bot-email", { required: true });
 	const repository = getInput("repository", { required: true });
@@ -59,6 +79,8 @@ try {
 	// Stash the computed badge outside the work tree before switching branches.
 	const stashedBadge = path.join(process.env.RUNNER_TEMP || ".", badgeFile);
 	fs.copyFileSync("badge.json", stashedBadge);
+	const stashedIndex = path.join(process.env.RUNNER_TEMP || ".", indexFile);
+	if (publishIndex) fs.copyFileSync(indexPath, stashedIndex);
 
 	// The type-check / coverage runs leave the tree dirty; git won't switch
 	// branches with a dirty tree, so stash everything first.
@@ -105,6 +127,10 @@ try {
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		fs.copyFileSync(stashedBadge, badgeFile);
 		git(["add", badgeFile]);
+		if (publishIndex) {
+			fs.copyFileSync(stashedIndex, indexFile);
+			git(["add", indexFile]);
+		}
 
 		let unchanged = false;
 		try {
@@ -114,11 +140,11 @@ try {
 			unchanged = false;
 		}
 		if (unchanged) {
-			console.log("Badge unchanged — skipping commit.");
+			console.log(publishIndex ? "Badge and coverage index unchanged — skipping commit." : "Badge unchanged — skipping commit.");
 			process.exit(0);
 		}
 
-		git(["commit", "-S", "-m", "ci: update coverage badge"], { stdio: "inherit" });
+		git(["commit", "-S", "-m", publishIndex ? "ci: update coverage badge and index" : "ci: update coverage badge"], { stdio: "inherit" });
 
 		try {
 			// Pipe stderr so a rejection can be classified below; git writes push
