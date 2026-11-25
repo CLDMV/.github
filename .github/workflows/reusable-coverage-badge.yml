@@ -306,7 +306,8 @@ jobs:
             # ── 8. Mint short-lived bot token ───────────────────────────────────
             # Steps 8-11 also run when the tests ran and failed (#565): a red run
             # still publishes the coverage index and uploads the report it
-            # computed. Only the badge itself stays success-only (step 10).
+            # computed. The badge then reads `tests failing` with no number
+            # until a passing run publishes one again (step 10).
             - name: Generate bot token
               id: bot-token
               if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
@@ -327,7 +328,7 @@ jobs:
 
             # ── 10. Push badge to badges branch ─────────────────────────────────
             - name: Push coverage badge to badges branch
-              if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
+              if: ${{ !cancelled() && (steps.tests.outcome == 'failure' || steps.badge.outcome == 'success') }}
               uses: CLDMV/.github/.github/actions/coverage/steps/push-badge@v4
               env:
                   BOT_TOKEN: ${{ steps.bot-token.outputs.token }}
@@ -336,7 +337,7 @@ jobs:
                   badge-filename: ${{ inputs.badge_filename }}
                   index-path: ${{ inputs.coverage_index_path }}
                   index-filename: ${{ inputs.coverage_index_filename }}
-                  publish-badge: ${{ steps.tests.outcome == 'success' && steps.badge.outcome == 'success' }}
+                  tests-failed: ${{ steps.tests.outcome == 'failure' }}
                   bot-name: ${{ secrets.BOT_NAME }}
                   bot-email: ${{ secrets.BOT_EMAIL }}
                   repository: ${{ github.repository }}
