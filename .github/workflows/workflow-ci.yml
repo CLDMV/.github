@@ -360,8 +360,9 @@ jobs:
 
     # Fail the run when a feature PR carries a non-conventional commit
     # subject. The release bump reads every subject in the range, and a
-    # subject like `agent add: …` is guessed as a feature (#527). Pushes to
-    # next/hotfixes/master and release PRs aren't checked; their commits were
+    # subject like `agent add: …` is guessed as a feature (#527). A push to
+    # `dev` (dev-trunk repos) checks the commits that push added (#557).
+    # Pushes to next/hotfixes/master and release PRs aren't checked; their commits were
     # checked on the way in. The job's failure makes this reusable's result a
     # failure, and the `docs_only` / `no_node` outputs above report false, so
     # the caller's Required PR Check fails without any caller change.
