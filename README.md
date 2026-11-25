@@ -4,18 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.45.0 (November 2026)
+### Latest: v4.45.1 (November 2026)
 
-- **Build cache** — `build_cache_paths` / `build_cache_key_files` cache expensive build output (wasm, toolchains, generated code) across the CI, coverage, bundle-size and release builds, keyed on the build command and the files you name.
-- **Browser test job** — `browser_test_command` adds a `🌐 Browser Tests` job that runs once on the latest LTS and blocks the PR through `✅ Required PR Check` when it fails. pnpm and yarn repos now publish their packed artifact with `npm publish`.
-- [View full v4.45.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.0.md)
+- **Branch naming enforced per repo** — a "Branch Naming" ruleset, installed and kept in sync by onboarding with the other three, replaces an org-level ruleset that was never in effect.
+- [View full v4.45.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.1.md)
 
 ### Recent Releases
 
+- **v4.45.0** (November 2026) — an opt-in build cache and browser test job, and pnpm and yarn repos publish their packed artifact with npm ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.0.md))
 - **v4.44.0** (November 2026) — coverage index on the `badges` branch, `dev` and `wip/*` branches in the org ruleset, and superseded next-release runs exit cleanly ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.44.0.md))
 - **v4.43.0** (November 2026) — a Pages deploy mode for the docs publisher, and release PRs stop re-running CI on a commit the push run already tested ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md))
 - **v4.42.0** (November 2026) — CI fails a feature PR whose commit subjects aren't conventional, before a bad subject changes the release version ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md))
-- **v4.41.1** (November 2026) — hand-edited release titles survive a release PR refresh, and generated titles are capped at 72 characters as a whole ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md))
 
 ## 📋 Quick Start
 
