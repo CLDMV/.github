@@ -14,6 +14,8 @@ outputs:
     description: "SHA of the created commit"
   verified:
     description: "Whether the commit was verified"
+  superseded:
+    description: "`true` when the ref update was refused because the branch moved ahead of the commit this run built on (a newer run owns the change); no commit landed. `false` when the commit landed. Empty when there was nothing to commit."
 
 runs:
   using: "node24"
