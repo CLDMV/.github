@@ -28,6 +28,14 @@ inputs:
     description: "Build command. Empty = skip the build (repos with no Node project, node_project: false)."
     required: false
     default: "npm run build:ci"
+  build-cache-paths:
+    description: "Multiline paths to cache around the build (actions/cache path syntax). Empty (default) = no cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
+  build-cache-key-files:
+    description: "Multiline globs whose file contents key the build cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
   default-branch:
     description: "Resolved release base branch. Empty (default) = auto-detect (master/main). When set, it takes precedence for the divergence/version base."
     required: false
@@ -145,12 +153,32 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    # Opt-in build cache (docs/conventions/build-cache.md): restore before the
+    # build, save right after it. A no-op when build-cache-paths is empty.
+    - name: Restore build cache
+      id: build-cache
+      if: inputs.build-cache-paths != '' && steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true' && inputs.build-command != ''
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: restore
+        paths: ${{ inputs.build-cache-paths }}
+        key-files: ${{ inputs.build-cache-key-files }}
+        build-command: ${{ inputs.build-command }}
+
     - name: Build package
       if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true' && inputs.build-command != ''
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
+
+    - name: Save build cache
+      if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true' && inputs.build-command != '' && steps.build-cache.outputs.save == 'true'
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: save
+        paths: ${{ inputs.build-cache-paths }}
+        key: ${{ steps.build-cache.outputs.key }}
 
     - name: Update package version
       if: steps.release-check.outputs.should-create-pr == 'true' && steps.release-check.outputs.bump-already-applied != 'true'

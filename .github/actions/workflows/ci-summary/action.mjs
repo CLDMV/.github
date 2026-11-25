@@ -11,6 +11,7 @@ const packageName = getInput("package-name", { required: true });
 const nodeVersion = getInput("node-version", { default: "lts/*" });
 const packageManager = resolvePackageManager(getInput("package-manager", { default: "auto" }), ".");
 const ciResult = getInput("ci-result");
+const browserTestResult = getInput("browser-test-result");
 const enableCoverageBadge = getBooleanInput("enable-coverage-badge");
 const badgesBranch = getInput("badges-branch", { default: "badges" });
 const coverageBadgeResult = getInput("coverage-badge-result");
@@ -30,6 +31,18 @@ if (ciResult === "success") {
 	appendSummary("❌ **Overall Status**: CI workflow failed");
 	appendSummary("");
 	appendSummary("Check the detailed progress above and workflow logs for specific failure details.");
+}
+
+if (browserTestResult) {
+	appendSummary("");
+	appendSummary("### 🌐 Browser Tests");
+	if (browserTestResult === "success") {
+		appendSummary("✅ Browser tests passed");
+	} else if (browserTestResult === "skipped") {
+		appendSummary("⏭️ Browser tests skipped");
+	} else {
+		appendSummary(`❌ Browser tests did not pass (\`${browserTestResult}\`)`);
+	}
 }
 
 if (enableCoverageBadge) {

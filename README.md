@@ -4,18 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.44.0 (November 2026)
+### Latest: v4.45.0 (November 2026)
 
-- **Coverage index on the `badges` branch** — the coverage-badge job publishes `coverage/coverage-index.json` per branch next to the badge, so a public repo's index can be fetched without auth to run only the tests that reach one source file.
-- **`dev` and `wip/*` branches** — the org ruleset now allows them, and a next-release run that a newer merge overtakes exits cleanly instead of failing.
-- [View full v4.44.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.44.0.md)
+- **Build cache** — `build_cache_paths` / `build_cache_key_files` cache expensive build output (wasm, toolchains, generated code) across the CI, coverage, bundle-size and release builds, keyed on the build command and the files you name.
+- **Browser test job** — `browser_test_command` adds a `🌐 Browser Tests` job that runs once on the latest LTS and blocks the PR through `✅ Required PR Check` when it fails. pnpm and yarn repos now publish their packed artifact with `npm publish`.
+- [View full v4.45.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.0.md)
 
 ### Recent Releases
 
+- **v4.44.0** (November 2026) — coverage index on the `badges` branch, `dev` and `wip/*` branches in the org ruleset, and superseded next-release runs exit cleanly ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.44.0.md))
 - **v4.43.0** (November 2026) — a Pages deploy mode for the docs publisher, and release PRs stop re-running CI on a commit the push run already tested ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md))
 - **v4.42.0** (November 2026) — CI fails a feature PR whose commit subjects aren't conventional, before a bad subject changes the release version ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md))
 - **v4.41.1** (November 2026) — hand-edited release titles survive a release PR refresh, and generated titles are capped at 72 characters as a whole ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md))
-- **v4.41.0** (November 2026) — uidmap and a subordinate id range in the runner image for multi-user tests, and mark-implemented walks the whole unreleased queue ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md))
 
 ## 📋 Quick Start
 
@@ -219,6 +219,7 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[docs/conventions/branch-model.md](docs/conventions/branch-model.md)** — the `branch-model` org custom property: where each repo's work lands (`v4`, `dev-trunk`, `legacy`, `custom`, `none`).
 - **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
+- **[docs/conventions/build-cache.md](docs/conventions/build-cache.md)** — opt-in `build_cache_paths` / `build_cache_key_files` cache around the build steps (CI, coverage, bundle size, release PR, release).
 - **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build and the `<pkg>-dev` condition.
 - **[docs/conventions/readme-format.md](docs/conventions/readme-format.md)** — the shared package README format, with a fill-in skeleton at [`examples/readme/README.template.md`](examples/readme/README.template.md).
 - **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.

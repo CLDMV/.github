@@ -1,0 +1,88 @@
+name: "Build Cache"
+description: "Restore or save expensive build output (compiled artifacts, downloaded toolchains) around a build step. Wraps actions/cache/restore + actions/cache/save (GitHub's own cache service); the key planning is roll-our-own (plan.mjs). No paths = no-op, so callers can wire it unconditionally."
+
+# Usage: one restore step before the build, one save step after it.
+#
+#   - name: Restore build cache
+#     id: build-cache
+#     uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+#     with:
+#       mode: restore
+#       paths: ${{ inputs.build_cache_paths }}
+#       key-files: ${{ inputs.build_cache_key_files }}
+#       build-command: ${{ inputs.build_command }}
+#   - name: Build
+#     ...
+#   - name: Save build cache
+#     if: steps.build-cache.outputs.save == 'true'
+#     uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+#     with:
+#       mode: save
+#       paths: ${{ inputs.build_cache_paths }}
+#       key: ${{ steps.build-cache.outputs.key }}
+#
+# `save` is true only on a push to the default branch, next or hotfixes, and
+# only when the restore missed (an existing key can't be overwritten).
+
+inputs:
+  mode:
+    description: "restore (plan the key, then restore) or save (save under `key`)."
+    required: true
+  paths:
+    description: "Multiline list of paths to cache (actions/cache `path` syntax). Empty = no cache. Save must get the same value as restore."
+    required: false
+    default: ""
+  key-files:
+    description: "Multiline list of globs whose files' contents key the cache (`*`, `**`, `?`, `{a,b}`, `!` excludes, `#` comments; a directory covers its files). Restore only."
+    required: false
+    default: ""
+  build-command:
+    description: "The build command the cache sits around. Part of the key, so jobs with different build commands keep separate entries. Restore only."
+    required: false
+    default: ""
+  key:
+    description: "Save only: the `key` output of the restore step."
+    required: false
+    default: ""
+
+outputs:
+  enabled:
+    description: "true when paths were given (restore mode)."
+    value: ${{ steps.plan.outputs.enabled == 'true' }}
+  key:
+    description: "The cache key (restore mode)."
+    value: ${{ steps.plan.outputs.key }}
+  cache-hit:
+    description: "true when the key matched an existing entry exactly (restore mode)."
+    value: ${{ steps.restore.outputs.cache-hit == 'true' }}
+  save:
+    description: "true when the caller should run the save step after the build: the cache is on, this run may save, and the restore missed."
+    value: ${{ steps.plan.outputs.enabled == 'true' && steps.plan.outputs.save-eligible == 'true' && steps.restore.outputs.cache-hit != 'true' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Plan build cache
+      id: plan
+      if: inputs.mode == 'restore' && inputs.paths != ''
+      shell: bash
+      env:
+        BUILD_CACHE_PATHS: ${{ inputs.paths }}
+        BUILD_CACHE_KEY_FILES: ${{ inputs.key-files }}
+        BUILD_COMMAND: ${{ inputs.build-command }}
+      run: node "${{ github.action_path }}/plan.mjs"
+
+    - name: Restore build cache
+      id: restore
+      if: inputs.mode == 'restore' && steps.plan.outputs.enabled == 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ inputs.paths }}
+        key: ${{ steps.plan.outputs.key }}
+
+    - name: Save build cache
+      if: inputs.mode == 'save' && inputs.paths != '' && inputs.key != ''
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ inputs.paths }}
+        key: ${{ inputs.key }}
