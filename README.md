@@ -4,18 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.43.0 (November 2026)
+### Latest: v4.44.0 (November 2026)
 
-- **Pages deploy mode for docs** — `reusable-docs-publish.yml` takes `deploy_mode: pages` to deploy with the GitHub Pages actions (Pages source "GitHub Actions"), with no `gh-pages` branch or bot secrets.
-- **No duplicate CI on release PRs** — a release PR only runs the matrix itself when its head is the bot's `chore: bump version`; any other head was already tested by its push run. Re-sync `ci.yml` from the template to pick it up.
-- [View full v4.43.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md)
+- **Coverage index on the `badges` branch** — the coverage-badge job publishes `coverage/coverage-index.json` per branch next to the badge, so a public repo's index can be fetched without auth to run only the tests that reach one source file.
+- **`dev` and `wip/*` branches** — the org ruleset now allows them, and a next-release run that a newer merge overtakes exits cleanly instead of failing.
+- [View full v4.44.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.44.0.md)
 
 ### Recent Releases
 
+- **v4.43.0** (November 2026) — a Pages deploy mode for the docs publisher, and release PRs stop re-running CI on a commit the push run already tested ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md))
 - **v4.42.0** (November 2026) — CI fails a feature PR whose commit subjects aren't conventional, before a bad subject changes the release version ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md))
 - **v4.41.1** (November 2026) — hand-edited release titles survive a release PR refresh, and generated titles are capped at 72 characters as a whole ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md))
 - **v4.41.0** (November 2026) — uidmap and a subordinate id range in the runner image for multi-user tests, and mark-implemented walks the whole unreleased queue ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md))
-- **v4.40.1** (November 2026) — release-merge trusts a check run's conclusion, so a release PR with a stale `in_progress` check merges instead of waiting ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md))
 
 ## 📋 Quick Start
 
