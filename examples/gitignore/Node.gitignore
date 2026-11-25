@@ -169,6 +169,7 @@ tmp/
 trash/
 dist/
 types/
+dist-packages/
 /bin/
 .vitest-coverage-blobs/
 .vitest-coverage-tmp/

@@ -27,7 +27,13 @@ dist/             build output (gitignored, rebuilt by prepack)
   index.mjs       tsup bundle of src/index.mjs
   index.cjs       verbatim copy of src/index.cjs
 bin/              CLI build output from src/bin/ (gitignored)
-types/            generated declarations
+types/            generated declarations (gitignored)
+  src/            tsc output for src/: the <pkg>-dev condition and the types package read it
+  stub/           the published re-export stubs
+packaging/
+  <pkg>-types/    authored package.json fields + README for @cldmv/<pkg>-types
+dist-packages/    carved satellite packages (gitignored)
+  <pkg>-types/    the publishable @cldmv/<pkg>-types
 ```
 
 Rules that follow from it:
@@ -98,7 +104,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.mjs",
-	"types": "./types/src/index.d.mts",
+	"types": "./types/stub/index.d.mts",
 	"exports": {
 		".": {
 			"<pkg>-dev": {
@@ -106,20 +112,23 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 				"import": "./src/index.mjs",
 				"require": "./src/index.cjs"
 			},
-			"types": "./types/src/index.d.mts",
+			"types": "./types/stub/index.d.mts",
 			"import": "./dist/index.mjs",
 			"require": "./dist/index.cjs"
 		},
 		"./package.json": "./package.json"
 	},
-	"files": ["dist/", "!dist/**/*.map", "types/"],
+	"files": ["dist/", "!dist/**/*.map", "types/stub/"],
+	"peerDependencies": { "@cldmv/<pkg>-types": "^<major>.0.0" },
+	"peerDependenciesMeta": { "@cldmv/<pkg>-types": { "optional": true } },
 	"engines": { "node": "<runtime floor, e.g. >=18.0.0>" },
 	"devEngines": { "runtime": { "name": "node", "version": ">=22.22.0", "onFail": "error" } },
 	"scripts": {
 		"build": "tsup",
-		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build",
+		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build && npm run build:subpackages && npm run test:types",
+		"build:subpackages": "node tools/build/build-subpackages.mjs",
 		"prepack": "npm run build",
-		"types:build": "tsc -p .configs/tsconfig.json",
+		"types:build": "tsc -p .configs/tsconfig.json && node tools/build/build-typestubs.mjs",
 		"types:check": "tsc -p .configs/tsconfig.json --noEmit",
 		"test": "node tests/run-vitest.mjs && npm run test:cjs && npm run test:dist",
 		"test:cjs": "npm run build && node --conditions=<pkg>-dev --test tests/cjs/entry.test.cjs",
@@ -133,10 +142,47 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 - **`engines.node` is the runtime floor**: the oldest Node.js the published package actually runs on, for consumers. It is the highest of the runtime and peer dependencies' own `engines`, what the shipped code's syntax and APIs need, and the floor the package has always promised. Don't raise it to the dev toolchain's floor: a library built to run on older Node.js (wisp, for example) keeps its low floor. tsup's `target` matches it (`node<major>`).
 - **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5, tsup 9 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
 - **`require()` needs `require(esm)`.** The guard in `index.cjs` rejects a Node.js without it and says `^20.19.0 or >=22.13.0` (22.12 prints an `ExperimentalWarning`), or the runtime floor if that is higher. `import` works down to the runtime floor.
-- **Type scripts use three fixed names.** `types:check` type-checks the source without emitting (`tsc --noEmit`), and it's the script CI runs: `ci.yml` passes `type_check_command: "npm run types:check"`. `types:build` emits the declarations into `types/` and is part of `build:ci`. `test:types` is only for a test of the published types from a consumer's side (for example, compiling a consumer file against the built `.d.mts`), and it runs as part of `test`. Don't use `typecheck`, `build:types` or `test:types` for the plain source check. A repo with nothing to type-check sets `skip_type_check: true` in `ci.yml` and says why.
+- **Type scripts use three fixed names.** `types:check` type-checks the source without emitting (`tsc --noEmit`), and it's the script CI runs: `ci.yml` passes `type_check_command: "npm run types:check"`. `types:build` emits the declarations into `types/src/`, generates the stubs in `types/stub/`, and is part of `build:ci`. `test:types` is only for a test of the published types from a consumer's side (for example, compiling a consumer file against the built `.d.mts`), and it runs as part of `test`. Don't use `typecheck`, `build:types` or `test:types` for the plain source check. A repo with nothing to type-check sets `skip_type_check: true` in `ci.yml` and says why.
 - **`test:cjs` runs the CommonJS tests**: the entry check on the build (`tests/cjs/entry.test.cjs`) and any CommonJS-only tests the repo has (see [Tests](#tests)). **`test:dist` runs the full vitest suite against `dist/` instead of `src/`** (see [Tests](#tests)). Don't swap the two names.
-- **`files` ships `dist/` and `types/`, never `src/`.**
+- **`files` ships `dist/` and `types/stub/`, never `src/` and never the declarations themselves.** They ship in `@cldmv/<pkg>-types` (see [Type declarations](#type-declarations-cldmvpkg-types)).
 - **`dist/` is gitignored** and rebuilt by `prepack`.
+
+## Type declarations (`@cldmv/<pkg>-types`)
+
+A package doesn't publish its own `.d.mts` files. They go in a companion package, `@cldmv/<pkg>-types`, built from the same commit and published at the same version as the runtime. The runtime ships only small stubs that re-export from it. This is the layout `@cldmv/slothlet` uses (its `docs/TYPESCRIPT.md`, "Type Declarations"), and it keeps the declarations out of the runtime tarball for the JavaScript consumers who never read them.
+
+Consumers who want types install both:
+
+```bash
+npm install @cldmv/<pkg>
+npm install -D @cldmv/<pkg>-types
+```
+
+A TypeScript project without the types package gets `Cannot find module '@cldmv/<pkg>-types' or its corresponding type declarations`, which names exactly what to add. The README says so in its install section.
+
+**How the pieces fit.**
+
+| Piece             | Where                                             | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real declarations | `types/src/` (gitignored)                         | `types:build` runs `tsc` on `src/`. The `<pkg>-dev` condition's `types` points here, so the repo's own checks and editors in a checkout use them directly.                                                                                                                                                                                                                                                                                                                                                |
+| Stubs             | `types/stub/` (gitignored, published)             | One `.d.mts` per typed export, generated by `tools/build/build-typestubs.mjs` after `tsc`. `types/stub/index.d.mts` is `export * from "@cldmv/<pkg>-types";`, plus `export { default } from "@cldmv/<pkg>-types";` when the entry has a default export. The default (published) `types` condition points here.                                                                                                                                                                                            |
+| Authored fields   | `packaging/<pkg>-types/package.json`, `README.md` | `description`, `keywords` and any deliberate overrides. Nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Carved package    | `dist-packages/<pkg>-types/` (gitignored)         | `tools/build/build-subpackages.mjs` copies `types/src/**/*.d.mts` (no `.map` files) and writes its `package.json` in three layers: org and legal fields inherited from the root `package.json` (`license`, `author`, `contributors`, `funding`, `repository`, `bugs`, `homepage`, `publishConfig`, `type`), the authored fields, and the computed ones (`name`, `version` = the root version, `exports` with a `types` entry per subpath, `files`). Computed wins over authored, authored over inherited. |
+
+**Version lockstep.** The types package has no version of its own: the carve stamps the root version on it, and the release pipeline publishes it next to the runtime as a satellite. The runtime declares it as an optional peer at the current major, `"@cldmv/<pkg>-types": "^<major>.0.0"`, so npm never installs it for a JavaScript consumer and warns a TypeScript consumer who pairs mismatched majors.
+
+**Publishing.** `publish.yml` names the carve and the satellite (see [satellite-packages.md](satellite-packages.md)):
+
+```yaml
+build_subpackages_command: "npm run build:subpackages"
+extra_packages: '[{ "name": "@cldmv/<pkg>-types", "dir": "dist-packages/<pkg>-types" }]'
+```
+
+A new satellite name needs a one-time manual first publish before OIDC trusted publishing can take over; follow [Bootstrapping a new satellite](satellite-packages.md#bootstrapping-a-new-satellite-first-publish) before the first release that carries it, then register the types package's own Trusted Publisher.
+
+**`test:types`.** It tests the published shape from a consumer's side: build, carve, then type-check `tests/types/consumer.mts` (which imports `@cldmv/<pkg>` and uses its API) with a `tsconfig` whose `paths` map `@cldmv/<pkg>` to the repo root, resolving through the stubs, and `@cldmv/<pkg>-types` to `dist-packages/<pkg>-types`. That proves stub → types package resolution for every typed export. It runs in `build:ci`, so CI and the release build both check it. `types:check` stays the plain `tsc --noEmit` source check.
+
+**Reference implementation.** `@cldmv/slothlet`: `tools/build/build-typestubs.mjs`, `tools/build/build-subpackages.mjs`, `packaging/slothlet-types/` and `tests/validate-typestubs.mjs`. Slothlet carves other satellites too and maps many subpaths; a single-entry library needs only the `index` stub and one carve entry, so copy the shape, not the whole scripts.
 
 ## Build
 
@@ -243,3 +289,17 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
 | No build (`echo` stub) shipping `src/`                                                    | add tsup, ship `dist/`, add the entries and condition                                                                                                                                |
 | CommonJS source                                                                           | convert to ESM, keep the CJS shape in `src/index.cjs`; ship as a major when the new `exports` map closes deep imports                                                                |
 | Has a `devcheck.mjs`                                                                      | remove it with the loader in the entry, its test, the tsup `external` and the `files` exclude                                                                                        |
+| Ships or commits `types/`                                                                 | see [Moving declarations to `@cldmv/<pkg>-types`](#moving-declarations-to-cldmvpkg-types) below                                                                                      |
+
+### Moving declarations to `@cldmv/<pkg>-types`
+
+For a package that publishes `types/` today (and often commits it: uuid, fix-headers, vitest-runner, holdmytask and others):
+
+1. Stop tracking the generated output: `git rm -r --cached types/`, and make sure `.gitignore` carries `types/` and `dist-packages/` (the fleet [`Node.gitignore`](../../examples/gitignore/Node.gitignore) has `types/`).
+2. Point `types:build` at `types/src/` and add `tools/build/build-typestubs.mjs` after `tsc`. Add `packaging/<pkg>-types/package.json` (description, keywords) and its `README.md`, and `tools/build/build-subpackages.mjs` behind a `build:subpackages` script.
+3. Rewrite `package.json`: `types` and the default `types` condition → `./types/stub/index.d.mts`, `<pkg>-dev` `types` → `./types/src/index.d.mts`, `files` → `types/stub/` instead of `types/`, add the optional peer on `@cldmv/<pkg>-types`.
+4. Add `test:types` (consumer type-check against the stub and the carved package) and put `build:subpackages` and `test:types` into `build:ci`.
+5. Set `build_subpackages_command` and `extra_packages` in `publish.yml`, then bootstrap the new name with the manual first publish and register its Trusted Publisher.
+6. Document `npm install -D @cldmv/<pkg>-types` in the README.
+
+Ship it as a major release: a TypeScript consumer's build fails until they add `@cldmv/<pkg>-types` (the error names it), so the upgrade notes say to install it. JavaScript consumers see no change. Slothlet made this move in v4.0.0.
