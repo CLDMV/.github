@@ -9,7 +9,7 @@
  *   - enable always-free security toggles (Dependabot alerts + security
  *     updates, private vulnerability reporting, Dependabot security update
  *     PRs)
- *   - replace the three rulesets from the shared builders module
+ *   - replace the four rulesets (master, next, hotfixes, branch naming) from the shared builders module
  *   - apply the central GHAS-workflow config (data/code-scanning-skips.json)
  *     to the repo's CLDMV_SKIP_CODE_SCANNING / CLDMV_SKIP_DEPENDENCY_REVIEW
  *     Actions variables: private repos default to SKIPPED unless opted into

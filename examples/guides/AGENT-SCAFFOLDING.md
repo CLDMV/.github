@@ -362,7 +362,7 @@ After scaffolding, hand the user this summary (fill in `[brackets]`):
 > **You must still do these manually** (see Phase 4 of `AGENT-SCAFFOLDING.md`):
 >
 > - Dispatch `v4-bootstrap.yml` (dry-run, then real)
-> - Generate + import the 3 rulesets, add bot App to next/hotfixes bypass
+> - Generate + import the 4 rulesets (master, next, hotfixes, branch naming), add bot App to next/hotfixes bypass
 > - `[N]` repo settings changes (listed)
 > - `[N]` secrets to add (listed)
 > - `[N]` bot App permissions to request from org admin (listed)

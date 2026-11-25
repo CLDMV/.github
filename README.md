@@ -91,8 +91,7 @@ The `*-` prefix is convention, not enforced by GitHub Actions. What matters tech
     └── community/                               # CLA, release notifier
 data/github-labels.json                          # org label catalog
 docs/conventions/                                # branch-naming, embedded-tests-ci, package-layout, readme-format, release-flow-v4
-docs/tools/ruleset-generator/                   # browser tool — emits master/next/hotfixes ruleset JSON
-scripts/setup-org-rulesets.mjs                  # one-shot installer for the org-wide branch-naming ruleset
+docs/tools/ruleset-generator/                   # browser tool — emits master/next/hotfixes/branch-naming ruleset JSON
 examples/
 ├── guides/                                      # setup, scaffolding, dry-run, and rolling-tag guides
 ├── repo-seeds/.cla-signatures/                  # initial content for the org CLA-signatures ledger

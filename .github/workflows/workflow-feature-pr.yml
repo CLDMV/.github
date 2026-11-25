@@ -83,12 +83,12 @@ jobs:
                   # is, not a blanket "feature". (Previously every next-lane branch
                   # got `! feature → next`, mislabelling docs/fix/chore PRs.)
                   # NOTE: the `release/*` and `hotfix/*` arms below are
-                  # deliberately loose. The org branch-naming ruleset
-                  # (scripts/setup-org-rulesets.mjs) is the authoritative
-                  # creation gate and permits only strictly-numeric
-                  # `release/X.Y.Z` / `hotfix/X.Y.Z`. That gate is not absolute:
-                  # an `OrganizationAdmin` can bypass it (logged), and a consumer
-                  # repo without the org ruleset installed has no such gate at
+                  # deliberately loose. The per-repo "Branch Naming" ruleset
+                  # (docs/tools/ruleset-generator/builders.mjs) is the
+                  # authoritative creation gate and permits only
+                  # `release/<digit>…` / `hotfix/<digit>…`. That gate is not
+                  # absolute: admins and the bot App bypass it, and a consumer
+                  # repo that hasn't been bootstrapped has no such gate at
                   # all — so a non-numeric `release/foo` CAN still reach this
                   # case. The loose glob handles that on purpose: route it to the
                   # right lane rather than silently dropping it.

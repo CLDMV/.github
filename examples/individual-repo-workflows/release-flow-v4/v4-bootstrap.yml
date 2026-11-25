@@ -29,7 +29,7 @@
 #     master). Per-branch ruleset allowed_merge_methods picks the method.
 #   - security toggles: dependabot alerts + security updates, secret
 #     scanning + push protection, private vulnerability reporting
-#   - rulesets: replaces the three rulesets (Protect Master/Next/Hotfixes)
+#   - rulesets: replaces the four rulesets (Protect Master/Next/Hotfixes, Branch Naming)
 #     with the org canonical defaults
 #   - the repo's `branch-model` org custom property, set to `branch_model`
 #     (default `v4`; pass `dev-trunk` for a dev-trunk onboarding). Needs

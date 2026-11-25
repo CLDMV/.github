@@ -1,6 +1,6 @@
 # CLDMV branch naming convention
 
-Branch creation is enforced at the git layer via an org-level GitHub Ruleset (see `scripts/setup-org-rulesets.mjs`). Pushing a new branch whose name doesn't match one of the allowed patterns is rejected by the server.
+Branch creation is enforced at the git layer by a per-repo GitHub Ruleset named "Branch Naming", built by `buildBranchNaming()` in [`docs/tools/ruleset-generator/builders.mjs`](../tools/ruleset-generator/builders.mjs) (pattern list: `ALLOWED_BRANCH_PATTERNS`). Pushing a new branch whose name doesn't match one of the allowed patterns is rejected by the server. Existing branches aren't affected: the rule only governs creation.
 
 ## Allowed patterns
 
@@ -26,20 +26,26 @@ The **Auto-PR target** column shows where the v4 [`feature-pr.yml`](../../exampl
 | `dev`             | Dev-trunk working branch            | normal CI                                                                                                                                                      | — (merged into `next` by hand)   |
 | `wip/<who>-<n>`   | In-progress side branch off `dev`   | normal CI                                                                                                                                                      | — (merges into `dev`)            |
 | `master` / `main` | Default branch                      | publish + tag-health                                                                                                                                           | — (the target, not a source)     |
+| `next`            | Integration branch                  | normal CI, next-release                                                                                                                                        | — (release PR into `master`)     |
+| `hotfixes`        | Hotfix lane                         | normal CI, hotfixes-release                                                                                                                                    | — (release PR into `master`)     |
 | `badges`          | Coverage-badge JSON (bot-published) | excluded from CI / release triggers                                                                                                                            | —                                |
 | `gh-pages`        | Docs site (bot-published)           | excluded from CI / release triggers                                                                                                                            | —                                |
 
-## How to install
+`release/` and `hotfix/` branches must start with a digit (`release/4.45.0`). The other prefixes accept any name below them, nested ones included (`feat/ci/cache`).
 
-```bash
-GH_TOKEN=<token-with-org-admin> node scripts/setup-org-rulesets.mjs
-```
+## How it's installed
 
-The script is idempotent — re-running updates the existing ruleset (matched by name "CLDMV branch naming convention").
+The `rulesets` step of `org-bootstrap-repo` writes it with the other three rulesets (`Protect Master`, `Protect Next`, `Protect Hotfixes`), so `v4-bootstrap.yml` and the org onboarding fanout keep every onboarded repo in sync. Re-running either replaces the ruleset by name. To change the allowed names, edit `ALLOWED_BRANCH_PATTERNS` and this table, release, then re-run onboarding. For a single repo, import `data/rulesets/naming.json` (or the generator's `naming.json`) under Settings → Rules → Rulesets.
+
+GitHub's `creation` rule takes no list of names, so the ruleset targets every branch, excludes the allowed patterns, and blocks creating the rest. Patterns use fnmatch: `*` stops at `/`, `**` crosses it.
 
 ## Bypass
 
-Org admins can bypass the ruleset (configured in the script). Useful for one-off emergency branches that don't fit the convention. Bypass is logged in the audit log.
+Org admins and the bot App bypass the ruleset, so release automation and one-off emergency branches aren't blocked. Bypasses are logged in the audit log.
+
+## Forks
+
+A ruleset only applies to the repo it's on. A contributor's fork belongs to them, so their branch names are up to them, and their PRs arrive as `refs/pull/*`, not as branches in our repo. CLDMV-owned forks are skipped by onboarding by default (`include_forks: false`), so they don't get the ruleset, which keeps upstream branch syncs working.
 
 ## Branch retention rules
 
