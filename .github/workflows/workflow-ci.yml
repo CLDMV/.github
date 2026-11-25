@@ -358,14 +358,15 @@ jobs:
               if: inputs.node_project == false || inputs.node_project == 'false'
               run: echo "⏭️ Node chain skipped because \`node_project\` is false (no Node project in this repo)." >> "$GITHUB_STEP_SUMMARY"
 
-    # Fail the run when a feature PR carries a non-conventional commit
+    # Fail the run when a push or PR adds a commit with a non-conventional
     # subject. The release bump reads every subject in the range, and a
-    # subject like `agent add: …` is guessed as a feature (#527). A push to
-    # `dev` (dev-trunk repos) checks the commits that push added (#557).
-    # Pushes to next/hotfixes/master and release PRs aren't checked; their commits were
-    # checked on the way in. The job's failure makes this reusable's result a
-    # failure, and the `docs_only` / `no_node` outputs above report false, so
-    # the caller's Required PR Check fails without any caller change.
+    # subject like `agent add: …` is guessed as a feature (#527). Feature
+    # branches are checked against their PR base; every other branch (dev,
+    # next, hotfixes, copilot/*, …) per push (#557, #560). The default branch,
+    # badges, gh-pages, dependabot/* and release PRs aren't checked. The job's
+    # failure makes this reusable's result a failure, and the `docs_only` /
+    # `no_node` outputs above report false, so the caller's Required PR Check
+    # fails without any caller change.
     commit-subjects:
         name: "📝 Commit Subjects"
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}

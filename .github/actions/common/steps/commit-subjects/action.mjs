@@ -1,5 +1,5 @@
 /**
- * @fileoverview Fail a feature PR whose commit subjects aren't conventional.
+ * @fileoverview Fail a push or PR that adds a commit whose subject isn't conventional.
  *
  * The release bump (get-commit-range → check-release-commit) reads every
  * commit subject in the release range. A conventional `type(scope)!:` subject
@@ -15,15 +15,17 @@
  *     checked on their way in.
  *   - push to a feature branch → GET /compare/{base}...{after}, where {base}
  *     is the branch its PR targets, routed like feature-pr.yml: `hotfix/**` →
- *     hotfixes, the captured prefixes → next.
- *   - push to `dev` (the dev-trunk working branch) → GET
- *     /compare/{before}...{after}, only the commits that push added. `dev`
- *     never gets a feature PR, so this is the one place its subjects are
- *     checked before `dev` is promoted to `next` (CLDMV/.github#557). Older
- *     history on `dev` isn't rechecked. A new `dev` (before all zeros) is
- *     skipped.
- *   - A push to any other branch (integration branches, `dependabot/*`,
- *     `copilot/*`, names feature-pr.yml doesn't capture) is skipped.
+ *     hotfixes, the captured prefixes → next. The whole branch is checked.
+ *   - push to any other branch (`dev`, `next`, `hotfixes`, `copilot/*`,
+ *     `wip/*`, …) → GET /compare/{before}...{after}, only the commits that
+ *     push added (CLDMV/.github#557, #560). That catches a direct commit to
+ *     `next` (a fix for a review on the release PR) and Copilot's `Initial
+ *     plan` commits; a normal PR merge passes because merge commits are
+ *     exempt. A new branch is compared against `next`, except a new `dev`,
+ *     `next` or `hotfixes`, which is skipped. A push that rewrote history is
+ *     skipped (silently on `next` / `hotfixes`, which every release resets).
+ *   - pushes to the default branch, `master`, `main`, `badges`, `gh-pages`
+ *     and `dependabot/*` aren't checked.
  *   - anything else (workflow_dispatch, schedule) → skipped.
  *
  * Merge commits (two or more parents) are exempt: the v4 flow titles them
@@ -117,37 +119,84 @@ export function findBadSubjects(commits) {
 	return { bad, checked, merges };
 }
 
-/** Dev-trunk working branch. Pushes to it are checked push by push. */
-const DEV_BRANCH = "dev";
+/**
+ * Branches whose pushes are never checked: the release branch (only the
+ * release commit lands there; master-commit-audit checks it), the bot-only
+ * `badges` / `gh-pages`, and Dependabot's own branches.
+ *
+ * @param {string} branch - Pushed branch name (without refs/heads/).
+ * @param {string} defaultBranch - The repository's default branch.
+ * @returns {boolean}
+ */
+export function isUncheckedBranch(branch, defaultBranch = "") {
+	if (!branch) return true;
+	if (["master", "main", "badges", "gh-pages"].includes(branch)) return true;
+	if (defaultBranch && branch === defaultBranch) return true;
+	return branch.startsWith("dependabot/");
+}
+
+/** Integration branches the release flow force-resets after a release. */
+const RESET_BRANCHES = ["next", "hotfixes"];
 
 /**
- * Commits a push to `dev` added: compare {before}...{after}.
+ * Pick the base a brand-new branch is compared against, or null when a new
+ * branch shouldn't be checked (a new `dev`, `next` or `hotfixes` would drag
+ * in history that was never meant to be checked).
+ *
+ * @param {string} branch
+ * @returns {string|null}
+ */
+export function newBranchBase(branch) {
+	if (branch === "dev" || RESET_BRANCHES.includes(branch)) return null;
+	return "next";
+}
+
+/**
+ * Compare two refs and turn the result into the commits to check.
  *
  * @returns {Promise<{commits: any[] | null, reason: string, warn?: boolean}>}
  */
-async function collectDevPush({ token, owner, repo, event, after }) {
-	const before = event.before || "";
-	if (!after || /^0+$/.test(after)) return { commits: null, reason: `push deleted ${DEV_BRANCH}` };
-	if (!before || /^0+$/.test(before)) return { commits: null, reason: `push created ${DEV_BRANCH}; no earlier tip to compare against` };
-	const range = `${before.slice(0, 7)}...${after.slice(0, 7)}`;
+async function compareRange({ token, owner, repo, base, head, label }) {
 	try {
-		const compare = await api("GET", `/compare/${before}...${after}`, null, { token, owner, repo });
-		if (compare?.status === "diverged" || compare?.status === "behind") {
-			return { commits: null, warn: true, reason: `push to ${DEV_BRANCH} rewrote history (compare ${range} is ${compare.status})` };
-		}
+		const compare = await api("GET", `/compare/${encodeURIComponent(base)}...${head}`, null, { token, owner, repo });
 		const commits = compare?.commits || [];
 		const total = Number(compare?.total_commits ?? commits.length);
 		if (total > commits.length) {
 			return {
 				commits,
 				warn: true,
-				reason: `compare ${range} on ${DEV_BRANCH} lists ${commits.length} of ${total} commits (the API's cap); only those were checked`
+				reason: `${label} lists ${commits.length} of ${total} commits (the API's cap); only those were checked`
 			};
 		}
-		return { commits, reason: `push to ${DEV_BRANCH} (${range})` };
+		return { commits, reason: label, status: compare?.status };
 	} catch (error) {
-		return { commits: null, warn: true, reason: `compare ${range} on ${DEV_BRANCH} failed (${error.message})` };
+		return { commits: null, warn: true, reason: `${label} failed (${error.message})` };
 	}
+}
+
+/**
+ * Commits a push to a non-feature branch added (`dev`, `next`, `hotfixes`,
+ * `copilot/*`, `wip/*`, …): compare {before}...{after}. A new branch is
+ * compared against `next` instead (see newBranchBase).
+ *
+ * @returns {Promise<{commits: any[] | null, reason: string, warn?: boolean}>}
+ */
+async function collectPushRange({ token, owner, repo, event, branch, after }) {
+	const before = event.before || "";
+	if (!before || /^0+$/.test(before)) {
+		const base = newBranchBase(branch);
+		if (!base) return { commits: null, reason: `push created ${branch}; no earlier tip to compare against` };
+		return compareRange({ token, owner, repo, base, head: after, label: `new branch ${branch}, compare ${base}...${branch}` });
+	}
+	const range = `${before.slice(0, 7)}...${after.slice(0, 7)}`;
+	const result = await compareRange({ token, owner, repo, base: before, head: after, label: `push to ${branch} (${range})` });
+	if (result.status === "diverged" || result.status === "behind") {
+		// next/hotfixes are force-reset to master after every release, so a
+		// rewrite there is routine; anywhere else it's worth a warning.
+		const expected = RESET_BRANCHES.includes(branch);
+		return { commits: null, warn: !expected, reason: `push to ${branch} rewrote history (compare ${range} is ${result.status})` };
+	}
+	return result;
 }
 
 /**
@@ -180,25 +229,18 @@ async function collectCommits({ token, owner, repo }) {
 		const ref = event.ref || process.env.GITHUB_REF || "";
 		const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : "";
 		const after = event.after || process.env.GITHUB_SHA || "";
-		if (branch === DEV_BRANCH) return collectDevPush({ token, owner, repo, event, after });
-		const base = resolvePrBase(branch);
-		if (!base) return { commits: null, reason: `push to ${branch || ref}, which feature-pr.yml doesn't open a PR for` };
-		if (!after || /^0+$/.test(after)) return { commits: null, reason: `push deleted ${branch}` };
-		try {
-			const compare = await api("GET", `/compare/${encodeURIComponent(base)}...${after}`, null, { token, owner, repo });
-			const commits = compare?.commits || [];
-			const total = Number(compare?.total_commits ?? commits.length);
-			if (total > commits.length) {
-				return {
-					commits,
-					warn: true,
-					reason: `compare ${base}...${branch} lists ${commits.length} of ${total} commits (the API's cap); only those were checked`
-				};
-			}
-			return { commits, reason: `compare ${base}...${branch}` };
-		} catch (error) {
-			return { commits: null, warn: true, reason: `compare ${base}...${branch} failed (${error.message})` };
+		if (isUncheckedBranch(branch, event.repository?.default_branch || "")) {
+			return { commits: null, reason: `push to ${branch || ref}, which isn't checked` };
 		}
+		if (!after || /^0+$/.test(after)) return { commits: null, reason: `push deleted ${branch}` };
+		// Feature branches: everything the branch has that its PR base
+		// doesn't, so the whole branch is checked before it can merge.
+		const base = resolvePrBase(branch);
+		if (base) return compareRange({ token, owner, repo, base, head: after, label: `compare ${base}...${branch}` });
+		// Everything else (dev, next, hotfixes, copilot/*, wip/*, …): the
+		// commits this push added. A PR merge into next passes because its
+		// merge commit is exempt and its commits were checked on the branch.
+		return collectPushRange({ token, owner, repo, event, branch, after });
 	}
 
 	return { commits: null, reason: `event=${eventName} has no commit range` };
