@@ -70,15 +70,9 @@ If you adopt the new automations, the CLDMV-bot App needs these permissions in a
 - **Repository → Pull requests: Write** — for `labeler.yml`, `welcome.yml`, `dependabot-auto-merge.yml`.
 - **Repository → Contents: Write** — for `branch-retention.yml`, `docs.yml`, the CLA-record commit.
 
-### Org-wide branch-naming Ruleset (optional)
+### Branch-naming Ruleset
 
-If you want the org-wide branch name convention enforced (`master`, `release/*`, `hotfix/*`, `feat/*`, `fix/*`, …):
-
-```bash
-GH_TOKEN=<token-with-org-admin> node scripts/setup-org-rulesets.mjs
-```
-
-Idempotent — re-running updates the existing ruleset.
+Branch naming is enforced per repo by the "Branch Naming" ruleset that `v4-bootstrap` / org onboarding installs. See [branch-naming.md](../conventions/branch-naming.md). (v3 shipped an org-level installer script for this; it never applied a working ruleset and was removed.)
 
 ## Migration steps for an existing v2 consumer repo
 

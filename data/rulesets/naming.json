@@ -1,0 +1,52 @@
+{
+	"name": "Branch Naming",
+	"target": "branch",
+	"enforcement": "active",
+	"conditions": {
+		"ref_name": {
+			"include": ["~ALL"],
+			"exclude": [
+				"refs/heads/master",
+				"refs/heads/main",
+				"refs/heads/next",
+				"refs/heads/hotfixes",
+				"refs/heads/dev",
+				"refs/heads/badges",
+				"refs/heads/gh-pages",
+				"refs/heads/release/[0-9]*",
+				"refs/heads/hotfix/[0-9]*",
+				"refs/heads/feat/**",
+				"refs/heads/feature/**",
+				"refs/heads/fix/**",
+				"refs/heads/chore/**",
+				"refs/heads/deps/**",
+				"refs/heads/docs/**",
+				"refs/heads/ci/**",
+				"refs/heads/refactor/**",
+				"refs/heads/perf/**",
+				"refs/heads/test/**",
+				"refs/heads/style/**",
+				"refs/heads/wip/**",
+				"refs/heads/dependabot/**",
+				"refs/heads/copilot/**"
+			]
+		}
+	},
+	"rules": [
+		{
+			"type": "creation"
+		}
+	],
+	"bypass_actors": [
+		{
+			"actor_id": null,
+			"actor_type": "OrganizationAdmin",
+			"bypass_mode": "always"
+		},
+		{
+			"actor_id": 1910694,
+			"actor_type": "Integration",
+			"bypass_mode": "always"
+		}
+	]
+}

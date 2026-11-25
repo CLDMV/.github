@@ -137,7 +137,8 @@
 		<h1>CLDMV/.github v4 — Ruleset Generator</h1>
 
 		<p>
-			Generates GitHub Ruleset JSON for the three v4 branches. After downloading, import each in your consumer repo:
+			Generates GitHub Ruleset JSON for the three v4 branches, plus the branch-naming ruleset that applies to every branch. After
+			downloading, import each in your consumer repo:
 			<strong>Settings → Rules → Rulesets → New ruleset → "Import a ruleset"</strong>.
 		</p>
 
@@ -235,6 +236,12 @@
 			<h2><code>hotfixes.json</code> — hotfixes lane</h2>
 			<button data-branch="hotfixes">Download hotfixes.json</button>
 			<pre id="preview-hotfixes"></pre>
+		</div>
+
+		<div class="branch-block">
+			<h2><code>naming.json</code> — branch naming (all branches)</h2>
+			<button data-branch="naming">Download naming.json</button>
+			<pre id="preview-naming"></pre>
 		</div>
 
 		<div class="note">

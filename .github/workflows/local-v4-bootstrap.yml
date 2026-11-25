@@ -17,7 +17,7 @@
 #   - repo settings flipped to v4 defaults
 #   - security toggles (Dependabot alerts + security updates, secret
 #     scanning + push protection, private vulnerability reporting)
-#   - the three rulesets installed (overwrite-with-warn for divergences)
+#   - the four rulesets installed: master, next, hotfixes and branch naming (overwrite-with-warn for divergences)
 #   - the repo's `branch-model` org custom property (skips legacy/custom
 #     repos unless `force` is set)
 #

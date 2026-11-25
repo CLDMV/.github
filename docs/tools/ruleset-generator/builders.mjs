@@ -170,7 +170,68 @@ export function buildHotfix(opts) {
 	};
 }
 
-export const BUILDERS = { master: buildMaster, next: buildNext, hotfixes: buildHotfix };
+/**
+ * Branch names a non-bypass actor may create. Ruleset ref conditions use
+ * fnmatch: `*` stops at `/`, `**` crosses it. Keep this list in step with
+ * docs/conventions/branch-naming.md and the auto-PR `case` in
+ * workflow-feature-pr.yml.
+ */
+export const ALLOWED_BRANCH_PATTERNS = Object.freeze([
+	// Long-lived branches.
+	"master",
+	"main",
+	"next",
+	"hotfixes",
+	"dev",
+	"badges",
+	"gh-pages",
+	// Release / hotfix prep: must start with a digit (X.Y.Z).
+	"release/[0-9]*",
+	"hotfix/[0-9]*",
+	// Work branches; feature-pr.yml auto-opens most of them into next.
+	"feat/**",
+	"feature/**",
+	"fix/**",
+	"chore/**",
+	"deps/**",
+	"docs/**",
+	"ci/**",
+	"refactor/**",
+	"perf/**",
+	"test/**",
+	"style/**",
+	// Dev-trunk side branches off `dev`.
+	"wip/**",
+	// Opened by the tools themselves.
+	"dependabot/**",
+	"copilot/**"
+]);
+
+/**
+ * Branch-naming ruleset. GitHub's `creation` rule has no name list, so the
+ * ruleset targets every branch, excludes the allowed patterns, and blocks
+ * creating what's left. It only governs creation: existing branches that
+ * don't match keep working. Admins and the bot App bypass it.
+ *
+ * @param {object} opts - { includeBot, botAppId }
+ */
+export function buildBranchNaming(opts) {
+	return {
+		name: "Branch Naming",
+		target: "branch",
+		enforcement: "active",
+		conditions: {
+			ref_name: {
+				include: ["~ALL"],
+				exclude: ALLOWED_BRANCH_PATTERNS.map((pattern) => `refs/heads/${pattern}`)
+			}
+		},
+		rules: [{ type: "creation" }],
+		bypass_actors: bypassWithBot(opts.includeBot, opts.botAppId)
+	};
+}
+
+export const BUILDERS = { master: buildMaster, next: buildNext, hotfixes: buildHotfix, naming: buildBranchNaming };
 
 /**
  * Map a rough team-size bucket to a sensible required-approvals default.
@@ -203,14 +264,15 @@ export const DEFAULT_OPTS = Object.freeze({
 });
 
 /**
- * Build all three rulesets in one call with the org defaults. Returns
- * `{ master, next, hotfixes }`. Used by the bootstrap action; callers can
+ * Build all four rulesets in one call with the org defaults. Returns
+ * `{ master, next, hotfixes, naming }`. Used by the bootstrap action; callers can
  * spread a partial override (e.g. `{ ...DEFAULT_OPTS, copilotReview: true }`).
  */
 export function buildAll(opts = DEFAULT_OPTS) {
 	return {
 		master: buildMaster(opts),
 		next: buildNext(opts),
-		hotfixes: buildHotfix(opts)
+		hotfixes: buildHotfix(opts),
+		naming: buildBranchNaming(opts)
 	};
 }
