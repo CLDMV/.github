@@ -49,4 +49,21 @@ echo "ok 3 - unchanged badge+index skips the commit"
 d=$(mk e)
 if run "$d" 'INPUT_BADGE-FILENAME=coverage.json' 'INPUT_INDEX-PATH=x' 'INPUT_INDEX-FILENAME=../evil.json' >"$W/out4" 2>&1; then echo "FAIL 4"; exit 1; fi
 echo "ok 4 - path-like index filename rejected"
+# 5. tests failed → index only, badge left as it was
+before_badge=$(git --git-dir="$W/remote.git" show badges:coverage-next.json)
+d=$(mk f); mkdir -p "$d/coverage"; echo '{"src/b.mjs":["u.test.mjs"]}' > "$d/coverage/coverage-index.json"; rm "$d/badge.json"
+run "$d" 'INPUT_BADGE-FILENAME=coverage-next.json' 'INPUT_INDEX-PATH=coverage/coverage-index.json' 'INPUT_INDEX-FILENAME=coverage-index-next.json' 'INPUT_PUBLISH-BADGE=false'
+[ "$(git --git-dir="$W/remote.git" show badges:coverage-next.json)" = "$before_badge" ] || { echo "FAIL 5: badge changed"; exit 1; }
+[ "$(git --git-dir="$W/remote.git" show badges:coverage-index-next.json)" = '{"src/b.mjs":["u.test.mjs"]}' ] || { echo "FAIL 5: index not updated"; exit 1; }
+msg=$(git --git-dir="$W/remote.git" log -1 --format=%s badges)
+[ "$msg" = "ci: update coverage index (tests failed)" ] || { echo "FAIL 5 msg: $msg"; exit 1; }
+echo "ok 5 - failed run publishes the index and keeps the badge"
+
+# 6. tests failed and no index → nothing to do, exit 0
+before=$(git --git-dir="$W/remote.git" rev-parse badges)
+d=$(mk g); rm "$d/badge.json"
+run "$d" 'INPUT_BADGE-FILENAME=coverage.json' 'INPUT_INDEX-PATH=coverage/coverage-index.json' 'INPUT_PUBLISH-BADGE=false' > "$W/out6"
+[ "$(git --git-dir="$W/remote.git" rev-parse badges)" = "$before" ] || { echo "FAIL 6: committed"; exit 1; }
+grep -q "nothing to do" "$W/out6" || { echo "FAIL 6: no message"; exit 1; }
+echo "ok 6 - failed run with no index is a no-op"
 echo "all push-badge e2e checks passed"
