@@ -18,6 +18,10 @@ inputs:
     description: "Filename for the coverage index on the badges branch (bare filename, must differ from badge-filename)"
     required: false
     default: "coverage-index.json"
+  publish-badge:
+    description: "\"false\" publishes only the coverage index, leaving the badge as it was. The coverage workflow passes false when the tests failed, so a red run still publishes the index it computed (CLDMV/.github#565). Nothing to publish (no index) exits quietly."
+    required: false
+    default: "true"
   bot-name:
     description: "Git committer name"
     required: true
