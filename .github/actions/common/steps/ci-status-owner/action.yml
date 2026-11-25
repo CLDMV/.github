@@ -1,0 +1,19 @@
+name: "CI Status Owner"
+description: "Decide whether this CI run owns the `✅ Required PR Check` status for its head SHA. Push runs own it. A pull_request run owns it only for a fork PR, or for a release PR (head `next` / `hotfixes`) whose head commit is one the push run doesn't test (the bot's `chore: bump version`). Any other release-PR head was already tested by its push run, so the pull_request run skips the matrix instead of running it a second time on the same SHA."
+inputs:
+  bump_prefixes:
+    description: "Comma-separated commit-message prefixes the push run's commit-gate skips. Keep in step with workflow-ci.yml's commit-gate `prefixes`."
+    required: false
+    default: "chore: bump version"
+  github-token:
+    description: "Token for GitHub REST API calls (defaults to github.token)."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  owns:
+    description: "`true` when this run must run CI and report `✅ Required PR Check`; `false` when the push run on the same SHA reports it."
+  reason:
+    description: "One line saying why."
+runs:
+  using: "node24"
+  main: "action.mjs"
