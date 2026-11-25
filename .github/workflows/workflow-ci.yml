@@ -90,6 +90,20 @@ on:
                 type: string
                 default: "npm test"
                 description: "Command to run tests"
+            # ── Browser tests ────────────────────────────────────────────────
+            # Opt-in. Browser results don't depend on the Node version, so they
+            # run once in the 🌐 Browser Tests job instead of in `test_command`
+            # on every matrix leg.
+            browser_test_command:
+                required: false
+                type: string
+                default: ""
+                description: "Command that runs the browser test suite (e.g. `npm run test:browser`). Runs once, on the latest LTS Node, in its own 🌐 Browser Tests job after install and build. A failure fails the run like a failed matrix leg. Empty (default) skips the job."
+            browser_install_command:
+                required: false
+                type: string
+                default: ""
+                description: "Optional command run after the dependency install and before the build in the 🌐 Browser Tests job, to fetch the browsers the suite needs (e.g. `npx playwright install --with-deps chromium-headless-shell`). Runs as written. Ignored when `browser_test_command` is empty."
             # ── Lint & format (autofix) ──────────────────────────────────────
             # The lint-format job runs these. On internal branches it applies safe
             # fixes and commits them back (bot-signed); on fork PRs it runs the
@@ -490,6 +504,93 @@ jobs:
                   echo "▶ $cmd"
                   eval "$cmd"
 
+    # Browser tests, once per run on the latest LTS Node (#546). Opt-in:
+    # skipped unless `browser_test_command` is set, and a skipped job doesn't
+    # fail the run. Gated like `ci` (docs-only, no-Node, master-sync and bump
+    # commits skip it), so it runs on the same events the Node legs do,
+    # including the release PR's bump commit. A failure fails this reusable's
+    # result, which the caller's `✅ Required PR Check` mirrors, so no caller
+    # change is needed. Builds with the src-preserving `coverage_build_command`
+    # (like `type-check`) because `build_command` may end with
+    # `ci:cleanup-src`, and browser suites usually import from `src/`.
+    browser-test:
+        name: "🌐 Browser Tests"
+        needs: [sync-gate, paths-gate, commit-gate]
+        if: |
+            !cancelled() &&
+            inputs.browser_test_command != '' &&
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
+            needs.sync-gate.outputs.is_master_sync != 'true'
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout code
+              uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
+              with:
+                  persist-credentials: "false"
+
+            - name: Resolve package manager
+              id: pm
+              uses: CLDMV/.github/.github/actions/npm/utilities/detect-package-manager@v4
+              with:
+                  package-manager: ${{ inputs.package_manager }}
+
+            - name: Setup Node.js
+              uses: CLDMV/.github/.github/actions/common/steps/setup-node@v4
+              with:
+                  node-version: "lts/*"
+
+            - name: Install dependencies
+              uses: CLDMV/.github/.github/actions/npm/steps/install-dependencies@v4
+              env:
+                  CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+              with:
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
+
+            # Run as written: `npx playwright install` resolves the repo's own
+            # playwright under every package manager, while a `pnpm dlx`
+            # rewrite would fetch the latest one and install the wrong browsers.
+            - name: Install browsers
+              if: inputs.browser_install_command != ''
+              shell: bash
+              env:
+                  CMD: ${{ inputs.browser_install_command }}
+              run: |
+                  echo "▶ $CMD"
+                  eval "$CMD"
+
+            - name: Build
+              if: ${{ !(inputs.skip_build == true || inputs.skip_build == 'true') }}
+              shell: bash
+              env:
+                  PM: ${{ steps.pm.outputs.package-manager }}
+                  CMD: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
+              run: |
+                  cmd="$CMD"
+                  script=$(printf '%s' "$cmd" | sed -nE 's/^(npm|pnpm|yarn) run ([^ ]+).*/\2/p')
+                  if [ -n "$script" ] && ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script"; then
+                    echo "::notice::No \"$script\" script in package.json; skipping the build."
+                    exit 0
+                  fi
+                  if [ "$PM" != "npm" ]; then
+                    case "$cmd" in
+                      "npm "*) cmd="$PM ${cmd#npm }" ;;
+                      "npx "*) if [ "$PM" = "pnpm" ]; then cmd="pnpm dlx ${cmd#npx }"; fi ;;
+                    esac
+                  fi
+                  echo "▶ $cmd"
+                  eval "$cmd"
+
+            - name: Run browser tests
+              uses: CLDMV/.github/.github/actions/common/steps/run-tests@v4
+              with:
+                  test-command: ${{ inputs.browser_test_command }}
+                  package-manager: ${{ steps.pm.outputs.package-manager }}
+                  environment: ${{ inputs.test_environment }}
+
     # Lint + format autofix, POST-MERGE only. Runs on a push to next / hotfixes
     # (i.e. after a feature PR squash-merges in), applies safe fixes, and commits
     # them straight back onto that integration branch — NOT on feature PRs and
@@ -684,7 +785,7 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [ sync-gate, paths-gate, commit-gate, ci, lint-format, coverage-badge, coverage-pr-comment ]
+        needs: [ sync-gate, paths-gate, commit-gate, ci, browser-test, lint-format, coverage-badge, coverage-pr-comment ]
         # `always()` is already there so skipped gates don't suppress the
         # summary; the sync-gate / paths-gate / commit-gate output checks
         # then decide whether the summary is meaningful enough to produce.
@@ -698,6 +799,7 @@ jobs:
                   node-version: ${{ inputs.node_version }}
                   package-manager: ${{ inputs.package_manager }}
                   ci-result: ${{ needs.ci.result }}
+                  browser-test-result: ${{ inputs.browser_test_command != '' && needs.browser-test.result || '' }}
                   enable-coverage-badge: ${{ inputs.enable_coverage_badge }}
                   badges-branch: ${{ inputs.badges_branch }}
                   coverage-badge-result: ${{ needs.coverage-badge.result }}
