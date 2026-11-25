@@ -15,9 +15,15 @@
  *     checked on their way in.
  *   - push to a feature branch → GET /compare/{base}...{after}, where {base}
  *     is the branch its PR targets, routed like feature-pr.yml: `hotfix/**` →
- *     hotfixes, the captured prefixes → next. A push to any other branch
- *     (integration branches, `dependabot/*`, `copilot/*`, names feature-pr.yml
- *     doesn't capture) is skipped.
+ *     hotfixes, the captured prefixes → next.
+ *   - push to `dev` (the dev-trunk working branch) → GET
+ *     /compare/{before}...{after}, only the commits that push added. `dev`
+ *     never gets a feature PR, so this is the one place its subjects are
+ *     checked before `dev` is promoted to `next` (CLDMV/.github#557). Older
+ *     history on `dev` isn't rechecked. A new `dev` (before all zeros) is
+ *     skipped.
+ *   - A push to any other branch (integration branches, `dependabot/*`,
+ *     `copilot/*`, names feature-pr.yml doesn't capture) is skipped.
  *   - anything else (workflow_dispatch, schedule) → skipped.
  *
  * Merge commits (two or more parents) are exempt: the v4 flow titles them
@@ -111,6 +117,39 @@ export function findBadSubjects(commits) {
 	return { bad, checked, merges };
 }
 
+/** Dev-trunk working branch. Pushes to it are checked push by push. */
+const DEV_BRANCH = "dev";
+
+/**
+ * Commits a push to `dev` added: compare {before}...{after}.
+ *
+ * @returns {Promise<{commits: any[] | null, reason: string, warn?: boolean}>}
+ */
+async function collectDevPush({ token, owner, repo, event, after }) {
+	const before = event.before || "";
+	if (!after || /^0+$/.test(after)) return { commits: null, reason: `push deleted ${DEV_BRANCH}` };
+	if (!before || /^0+$/.test(before)) return { commits: null, reason: `push created ${DEV_BRANCH}; no earlier tip to compare against` };
+	const range = `${before.slice(0, 7)}...${after.slice(0, 7)}`;
+	try {
+		const compare = await api("GET", `/compare/${before}...${after}`, null, { token, owner, repo });
+		if (compare?.status === "diverged" || compare?.status === "behind") {
+			return { commits: null, warn: true, reason: `push to ${DEV_BRANCH} rewrote history (compare ${range} is ${compare.status})` };
+		}
+		const commits = compare?.commits || [];
+		const total = Number(compare?.total_commits ?? commits.length);
+		if (total > commits.length) {
+			return {
+				commits,
+				warn: true,
+				reason: `compare ${range} on ${DEV_BRANCH} lists ${commits.length} of ${total} commits (the API's cap); only those were checked`
+			};
+		}
+		return { commits, reason: `push to ${DEV_BRANCH} (${range})` };
+	} catch (error) {
+		return { commits: null, warn: true, reason: `compare ${range} on ${DEV_BRANCH} failed (${error.message})` };
+	}
+}
+
 /**
  * List the commits to check for the current event.
  *
@@ -141,6 +180,7 @@ async function collectCommits({ token, owner, repo }) {
 		const ref = event.ref || process.env.GITHUB_REF || "";
 		const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : "";
 		const after = event.after || process.env.GITHUB_SHA || "";
+		if (branch === DEV_BRANCH) return collectDevPush({ token, owner, repo, event, after });
 		const base = resolvePrBase(branch);
 		if (!base) return { commits: null, reason: `push to ${branch || ref}, which feature-pr.yml doesn't open a PR for` };
 		if (!after || /^0+$/.test(after)) return { commits: null, reason: `push deleted ${branch}` };

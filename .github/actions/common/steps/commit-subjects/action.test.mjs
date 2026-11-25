@@ -202,6 +202,44 @@ try {
 	r = run({ eventName: "push", event: pushTo("next") });
 	eq([r.status, r.ok], [0, ""], "push to next → not checked");
 
+	console.log("push to dev:");
+	const BEFORE = "1".repeat(40);
+	const devPush = { ref: "refs/heads/dev", before: BEFORE, after: AFTER };
+	const devRoute = `/compare/${BEFORE}...${AFTER}`;
+	r = run({
+		eventName: "push",
+		event: devPush,
+		routes: { [devRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("a".repeat(40), "feat: x")] } } }
+	});
+	eq([r.status, r.ok], [0, "true"], "dev push with clean subjects passes");
+
+	r = run({
+		eventName: "push",
+		event: devPush,
+		routes: {
+			[devRoute]: {
+				status: 200,
+				body: { status: "ahead", total_commits: 2, commits: [commit("a".repeat(40), "feat: x"), commit("b".repeat(40), "agent add: z")] }
+			}
+		}
+	});
+	eq([r.status, r.ok], [1, "false"], "dev push with a bad subject fails");
+
+	r = run({ eventName: "push", event: { ...devPush, before: "0".repeat(40) } });
+	eq([r.status, r.ok, r.warnings.length], [0, "", 0], "new dev branch → not checked");
+
+	r = run({
+		eventName: "push",
+		event: devPush,
+		routes: {
+			[devRoute]: { status: 200, body: { status: "diverged", total_commits: 1, commits: [commit("b".repeat(40), "agent add: z")] } }
+		}
+	});
+	eq([r.status, r.ok, r.warnings.length], [0, "", 1], "force-pushed dev → not checked, with a warning");
+
+	r = run({ eventName: "push", event: devPush, routes: { [devRoute]: { status: 404, body: { message: "Not Found" } } } });
+	eq([r.status, r.ok, r.warnings.length], [0, "", 1], "dev compare failure → warning, exit 0");
+
 	r = run({ eventName: "push", event: pushTo("dependabot/npm_and_yarn/x") });
 	eq([r.status, r.ok], [0, ""], "dependabot branch → not checked");
 
