@@ -9,8 +9,15 @@
 
 # Individual repo: .github/workflows/docs.yml
 #
-# Builds docs and pushes to gh-pages branch on master push. Only adopt this
-# template in repos that actually publish docs (e.g. @cldmv/slothlet).
+# Builds docs on master push and publishes them to GitHub Pages. Only adopt
+# this template in repos that actually publish docs (e.g. @cldmv/slothlet).
+#
+# Two ways to deploy, picked by `deploy_mode`:
+#   - `branch` (default, below): pushes the build to the `gh-pages` branch as a
+#     bot commit. Pages source: Settings → Pages → "Deploy from a branch".
+#   - `pages`: deploys with the GitHub Pages actions. Pages source: Settings →
+#     Pages → "GitHub Actions". No gh-pages branch or bot secrets. Swap the
+#     `publish` job for the commented one at the bottom.
 #
 # Batch 6.1 from tmp/plan-future-workflows.md.
 name: 📖 Publish Docs
@@ -41,3 +48,15 @@ jobs:
             BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
             TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
             TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+
+    # `pages` mode: use this job instead of the one above.
+    # publish:
+    #     permissions:
+    #         contents: read
+    #         pages: write
+    #         id-token: write
+    #     uses: CLDMV/.github/.github/workflows/reusable-docs-publish.yml@v4
+    #     with:
+    #         deploy_mode: "pages"
+    #         build_command: "npm run docs:build" # the site's base path is in $PAGES_BASE_PATH
+    #         output_dir: "docs/dist"

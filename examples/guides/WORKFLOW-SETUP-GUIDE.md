@@ -590,15 +590,18 @@ Builds and pushes a Docker image to GHCR on every push to default (and manual di
 
 **File:** `packaging-docs/docs.yml` &nbsp;·&nbsp; **Calls:** `reusable-docs-publish.yml@v4`
 
-On pushes to default touching `docs/`, source, or markdown files, builds docs and pushes the output to the `gh-pages` branch as a signed bot commit.
+On pushes to default touching `docs/`, source, or markdown files, builds docs and publishes them to GitHub Pages. `deploy_mode` picks how:
+
+- `branch` (default) pushes the output to the `gh-pages` branch as a signed bot commit. Pages source: "Deploy from a branch".
+- `pages` uploads the output with `actions/upload-pages-artifact` and deploys it with `actions/deploy-pages`. Pages source: "GitHub Actions". No bot secrets or `gh-pages` branch; the calling job grants `contents: read`, `pages: write` and `id-token: write`, and the build command gets the site's base path in `PAGES_BASE_PATH`. `cname`, `target_branch`, `include_nojekyll` and `commit_message` don't apply; set a custom domain in Settings → Pages.
 
 **Required `package.json` scripts** — `docs:build` (default `npm run docs:build`; configurable via `build_command`).
 
-**Required secrets** — bot App credentials, plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for signed commits.
+**Required secrets** — `branch` mode: bot App credentials, plus `CLDMV_BOT_NAME` / `CLDMV_BOT_EMAIL` for signed commits. `pages` mode: none.
 
-**Prereqs** — `gh-pages` branch must exist (orphan: `git checkout --orphan gh-pages && git commit --allow-empty -m "init" && git push origin gh-pages`). Build output must land at `output_dir` (default `docs/dist`).
+**Prereqs** — `branch` mode: the `gh-pages` branch must exist (orphan: `git checkout --orphan gh-pages && git commit --allow-empty -m "init" && git push origin gh-pages`). Build output must land at `output_dir` (default `docs/dist`).
 
-**Key inputs** — `build_command`, `output_dir`, `cname` (custom domain — sets the `CNAME` file).
+**Key inputs** — `deploy_mode`, `build_command`, `output_dir`, `cname` (`branch` mode custom domain — sets the `CNAME` file).
 
 ---
 
