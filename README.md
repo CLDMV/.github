@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.45.1 (November 2026)
+### Latest: v4.45.2 (November 2026)
 
-- **Branch naming enforced per repo** — a "Branch Naming" ruleset, installed and kept in sync by onboarding with the other three, replaces an org-level ruleset that was never in effect.
-- [View full v4.45.1 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.1.md)
+- **Commit subjects checked on every branch** — pushes to `dev`, direct commits to `next`/`hotfixes` and Copilot branches now get the same conventional-subject check as feature branches, and the org-onboarding template runs past the 256-repo matrix cap.
+- [View full v4.45.2 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.2.md)
 
 ### Recent Releases
 
+- **v4.45.1** (November 2026) — branch naming enforced by a per-repo ruleset that onboarding keeps in sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.1.md))
 - **v4.45.0** (November 2026) — an opt-in build cache and browser test job, and pnpm and yarn repos publish their packed artifact with npm ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.0.md))
 - **v4.44.0** (November 2026) — coverage index on the `badges` branch, `dev` and `wip/*` branches in the org ruleset, and superseded next-release runs exit cleanly ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.44.0.md))
 - **v4.43.0** (November 2026) — a Pages deploy mode for the docs publisher, and release PRs stop re-running CI on a commit the push run already tested ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md))
-- **v4.42.0** (November 2026) — CI fails a feature PR whose commit subjects aren't conventional, before a bad subject changes the release version ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md))
 
 ## 📋 Quick Start
 
