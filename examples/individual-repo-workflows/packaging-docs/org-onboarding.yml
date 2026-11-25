@@ -130,7 +130,10 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             repos: ${{ steps.resolve.outputs.repos }}
+            repos_2: ${{ steps.resolve.outputs.repos_2 }}
             count: ${{ steps.resolve.outputs.count }}
+            count_1: ${{ steps.resolve.outputs.count_1 }}
+            count_2: ${{ steps.resolve.outputs.count_2 }}
             mode: ${{ steps.resolve.outputs.mode }}
         steps:
             - name: Checkout (for repos_file lookup)
@@ -265,25 +268,33 @@ jobs:
 
                   count=$(printf '%s\n' "$list" | wc -l)
 
-                  # Matrix cap (GitHub Actions limit = 256). For larger orgs,
-                  # use repos_file batches instead.
-                  if [ "$count" -gt 256 ]; then
-                      echo "::warning::$count repos exceeds GitHub Actions matrix cap (256). Truncating; split into batches via repos_file for full coverage." >&2
-                      list=$(printf '%s\n' "$list" | head -n 256)
-                      count=256
+                  # A matrix holds at most 256 jobs, so the list is split
+                  # across two matrix jobs (`bootstrap` takes the first 256,
+                  # `bootstrap-2` the rest). Past 512 the run fails rather
+                  # than silently dropping repos; add a third batch or
+                  # split the run with `repos_file` then.
+                  if [ "$count" -gt 512 ]; then
+                      echo "::error::$count repos exceeds the two-batch limit (512). Split the run with repos_file." >&2
+                      exit 1
                   fi
+                  batch_1=$(printf '%s\n' "$list" | head -n 256)
+                  batch_2=$(printf '%s\n' "$list" | tail -n +257)
+                  count_1=$(printf '%s\n' "$batch_1" | awk 'NF' | wc -l | tr -d ' ')
+                  count_2=$(printf '%s\n' "$batch_2" | awk 'NF' | wc -l | tr -d ' ')
 
-                  json=$(printf '%s\n' "$list" | jq -R . | jq -sc .)
                   {
                       echo "count=$count"
-                      echo "repos=$json"
+                      echo "count_1=$count_1"
+                      echo "count_2=$count_2"
+                      echo "repos=$(printf '%s\n' "$batch_1" | awk 'NF' | jq -R . | jq -sc .)"
+                      echo "repos_2=$(printf '%s\n' "$batch_2" | awk 'NF' | jq -R . | jq -sc .)"
                       echo "mode=$mode"
                   } >> "$GITHUB_OUTPUT"
                   {
                       echo "## 📋 Onboarding batch"
                       echo ""
                       echo "**Source:** \`$mode\`"
-                      echo "**Count:** $count repo(s)"
+                      echo "**Count:** $count repo(s) (batch 1: $count_1, batch 2: $count_2)"
                       echo "**Dry run:** \`${{ github.event.inputs.dry_run }}\`"
                       if [ -n "$permanent_skipped" ]; then
                           echo "**Permanently excluded:** $(printf '%s' "$permanent_skipped" | awk 'NF' | paste -sd ',' | sed 's/,/, /g') (\`$PERMANENT_EXCLUDES\`)"
@@ -336,7 +347,7 @@ jobs:
         # cleanly to the source-of-truth repo, the matrix doesn't fire and
         # no other repos get the broken baseline.
         needs: [plan, bootstrap-self]
-        if: needs.plan.outputs.count != '0'
+        if: needs.plan.outputs.count_1 != '0'
         runs-on: ubuntu-latest
         # `max-parallel` honors the user's `concurrency` input; matrix continues
         # on individual failures so one bad repo doesn't block the rest.
@@ -345,7 +356,7 @@ jobs:
             max-parallel: ${{ fromJSON(github.event.inputs.concurrency || '10') }}
             matrix:
                 repo: ${{ fromJSON(needs.plan.outputs.repos) }}
-        steps:
+        steps: &bootstrap-steps
             - name: Split owner / name from target_repo
               id: target
               shell: bash
@@ -383,13 +394,28 @@ jobs:
                   code_security: ${{ github.event.inputs.code_security }}
                   secret_protection: ${{ github.event.inputs.secret_protection }}
 
+    # Repos 257-512 of the list. Runs after the first batch so the
+    # `concurrency` input still caps the whole run; `always()` so a failed
+    # repo in batch 1 doesn't skip batch 2. Same steps as `bootstrap`.
+    bootstrap-2:
+        name: "🏗️ ${{ matrix.repo }}"
+        needs: [plan, bootstrap-self, bootstrap]
+        if: always() && needs.bootstrap-self.result == 'success' && needs.plan.outputs.count_2 != '0'
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            max-parallel: ${{ fromJSON(github.event.inputs.concurrency || '10') }}
+            matrix:
+                repo: ${{ fromJSON(needs.plan.outputs.repos_2) }}
+        steps: *bootstrap-steps
+
     summary:
         name: "📊 Aggregate summary"
         # `always()` so we still emit the summary when bootstrap-self failed
         # and the matrix was skipped — the user needs to see WHY the matrix
         # didn't run. Plan + bootstrap-self always exist; bootstrap may be
         # skipped when count is 0 (self-only run).
-        needs: [plan, bootstrap-self, bootstrap]
+        needs: [plan, bootstrap-self, bootstrap, bootstrap-2]
         if: always()
         runs-on: ubuntu-latest
         steps:
@@ -402,5 +428,6 @@ jobs:
                       echo "See individual per-repo job pages for the warn-on-diff details — each repo's run summary lists every divergence that was overwritten."
                       echo ""
                       echo "**Source-of-truth bootstrap (${{ github.repository_owner }}/.github):** \`${{ needs.bootstrap-self.result }}\`"
-                      echo "**Matrix bootstrap overall:** \`${{ needs.bootstrap.result }}\` (count=${{ needs.plan.outputs.count }})"
+                      echo "**Matrix bootstrap, batch 1:** \`${{ needs.bootstrap.result }}\` (count=${{ needs.plan.outputs.count_1 }})"
+                      echo "**Matrix bootstrap, batch 2:** \`${{ needs.bootstrap-2.result }}\` (count=${{ needs.plan.outputs.count_2 }})"
                   } >> "$GITHUB_STEP_SUMMARY"
