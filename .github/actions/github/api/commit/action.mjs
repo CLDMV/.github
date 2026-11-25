@@ -2,12 +2,62 @@
  * @fileoverview Create a signed commit via the GitHub API: build blobs and a
  * tree from the staged changes, create the commit, and move the branch ref.
  * Node entrypoint for the github/api/commit action.
+ *
+ * Superseded runs (CLDMV/.github#467): when two PRs merge into `next` a few
+ * seconds apart, the earlier next-release run plans and builds its bump commit
+ * on the old tip. The ref update is then refused with 422 "Update is not a
+ * fast forward". If the branch moved forward from the commit this run started
+ * from, a newer run (queued behind this one by the workflow's concurrency
+ * group) owns the release, so the action reports `superseded=true` and exits
+ * 0 instead of leaving a red run. Any other refusal still fails.
  * @module @cldmv/.github.github.api.commit
  */
 
 import { execSync } from "node:child_process";
 import { api, parseRepo } from "../_api/core.mjs";
 import { getInput, setOutput } from "../../../common/common/core.mjs";
+
+/**
+ * Whether an api() error is GitHub refusing a ref update as non-fast-forward.
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isNotFastForward(error) {
+	const msg = String(error?.message || "");
+	return /-> 422:/.test(msg) && /not a fast[ -]forward/i.test(msg);
+}
+
+/**
+ * After a refused ref update, decide whether the branch moved ahead of the
+ * commit this run planned from (a newer run owns it) or something else
+ * happened (fail).
+ *
+ * @param {object} args
+ * @param {string} args.branch - Branch whose ref update was refused.
+ * @param {string} args.baseSha - The commit this run built its commit on.
+ * @param {(method: string, path: string) => Promise<any>} args.get - api() bound to the repo.
+ * @returns {Promise<{superseded: boolean, tip: string, reason: string}>}
+ */
+export async function checkSuperseded({ branch, baseSha, get }) {
+	const ref = await get("GET", `/git/ref/heads/${branch}`);
+	const tip = ref?.object?.sha || "";
+	if (!tip) return { superseded: false, tip, reason: `could not read ${branch}'s tip` };
+	if (tip === baseSha) return { superseded: false, tip, reason: `${branch} is still at ${baseSha.slice(0, 7)}` };
+	const cmp = await get("GET", `/compare/${baseSha}...${tip}`);
+	if (cmp?.status === "ahead") {
+		return {
+			superseded: true,
+			tip,
+			reason: `${branch} moved from ${baseSha.slice(0, 7)} to ${tip.slice(0, 7)} (${cmp.ahead_by} commit(s)) while this run was building; the newer run handles the release`
+		};
+	}
+	return {
+		superseded: false,
+		tip,
+		reason: `${branch} is at ${tip.slice(0, 7)}, which isn't ahead of ${baseSha.slice(0, 7)} (compare: ${cmp?.status || "unknown"})`
+	};
+}
 
 const BIG_BUFFER = 1024 * 1024 * 256;
 
@@ -17,7 +67,7 @@ const gitStr = (cmd) =>
 		.toString()
 		.trim();
 
-try {
+async function main() {
 	const commitMessage = getInput("commit-message", { required: true });
 	const token = getInput("github-token", { required: true });
 	const { owner, repo } = parseRepo(process.env.GITHUB_REPOSITORY);
@@ -32,7 +82,7 @@ try {
 	}
 	if (!hasChanges) {
 		console.log("No changes to commit");
-		process.exit(0);
+		return;
 	}
 
 	const currentBranch = process.env.GITHUB_REF_NAME;
@@ -83,8 +133,7 @@ try {
 	}
 
 	if (treeItems.length === 0) {
-		console.error("::error::No staged tree items were generated for API commit");
-		process.exit(1);
+		throw new Error("No staged tree items were generated for API commit");
 	}
 	console.log(`✅ Prepared ${treeItems.length} tree items`);
 
@@ -92,8 +141,7 @@ try {
 	const baseTree = gitStr("git rev-parse HEAD^{tree}");
 	const treeRes = await api("POST", "/git/trees", { base_tree: baseTree, tree: treeItems }, { token, owner, repo });
 	if (!treeRes || !treeRes.sha) {
-		console.error("::error::Failed to create tree via API");
-		process.exit(1);
+		throw new Error("Failed to create tree via API");
 	}
 	console.log(`✅ Created tree via API: ${treeRes.sha}`);
 
@@ -105,8 +153,7 @@ try {
 		{ token, owner, repo }
 	);
 	if (!commitRes || !commitRes.sha) {
-		console.error("::error::Failed to create commit via API");
-		process.exit(1);
+		throw new Error("Failed to create commit via API");
 	}
 	const newCommitSha = commitRes.sha;
 	const verified = commitRes.verification?.verified;
@@ -114,12 +161,32 @@ try {
 	console.log(`🔐 Verified: ${verified} (reason: ${commitRes.verification?.reason})`);
 
 	console.log("📌 Updating branch reference...");
-	await api("PATCH", `/git/refs/heads/${currentBranch}`, { sha: newCommitSha }, { token, owner, repo });
+	try {
+		await api("PATCH", `/git/refs/heads/${currentBranch}`, { sha: newCommitSha }, { token, owner, repo });
+	} catch (error) {
+		if (!isNotFastForward(error)) throw error;
+		const check = await checkSuperseded({
+			branch: currentBranch,
+			baseSha,
+			get: (method, path) => api(method, path, null, { token, owner, repo })
+		});
+		if (!check.superseded) throw new Error(`${error.message} (${check.reason})`, { cause: error });
+		console.log(`::notice title=Superseded run::${check.reason}`);
+		setOutput("superseded", "true");
+		return;
+	}
 	console.log(`✅ Updated branch ${currentBranch} to signed commit`);
 
 	setOutput("commit-sha", newCommitSha);
 	setOutput("verified", String(verified));
-} catch (error) {
-	console.error(`::error::${error.message}`);
-	process.exit(1);
+	setOutput("superseded", "false");
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+	try {
+		await main();
+	} catch (error) {
+		console.error(`::error::${error.message}`);
+		process.exit(1);
+	}
 }
