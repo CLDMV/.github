@@ -80,6 +80,21 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
+            build_cache_paths:
+                description: "Multiline list of paths to cache around the build step (actions/cache
+                    `path` syntax), e.g. a downloaded toolchain or an expensive compiled output. Empty
+                    (default) = no cache. Restored before the build; saved only on pushes to the default
+                    branch, next and hotfixes. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
+            build_cache_key_files:
+                description: "Multiline globs whose file contents key the build cache (`*`, `**`, `?`,
+                    `{a,b}`, `!` excludes). The key also covers the OS, arch, build command and
+                    cached paths. Ignored when build_cache_paths is empty. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
             build_subpackages_command:
                 description: "Optional command run after the main build to carve satellite
                     packages into dist-packages/<name>/. Empty (default) skips it. See
@@ -191,6 +206,8 @@ jobs:
                   package-manager: ${{ inputs.package_manager }}
                   test-command: ${{ inputs.test_command }}
                   build-command: ${{ inputs.build_command }}
+                  build-cache-paths: ${{ inputs.build_cache_paths }}
+                  build-cache-key-files: ${{ inputs.build_cache_key_files }}
                   build-subpackages-command: ${{ inputs.build_subpackages_command }}
                   skip-performance-tests: ${{ inputs.skip_performance_tests }}
                   test-environment: ${{ inputs.test_environment }}

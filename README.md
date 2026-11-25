@@ -219,6 +219,7 @@ The jobs themselves delegate to actions under `.github/actions/`
 - **[docs/conventions/branch-model.md](docs/conventions/branch-model.md)** — the `branch-model` org custom property: where each repo's work lands (`v4`, `dev-trunk`, `legacy`, `custom`, `none`).
 - **[docs/conventions/bot-commands.md](docs/conventions/bot-commands.md)** — `@cldmv-bot <command>` PR comment commands (`rebase`).
 - **[docs/conventions/embedded-tests-ci.md](docs/conventions/embedded-tests-ci.md)** — opt-in private-test-repo feature for `ci.yml`.
+- **[docs/conventions/build-cache.md](docs/conventions/build-cache.md)** — opt-in `build_cache_paths` / `build_cache_key_files` cache around the build steps (CI, coverage, bundle size, release PR, release).
 - **[docs/conventions/package-layout.md](docs/conventions/package-layout.md)** — library source layout: `src/index.mjs` + `src/index.cjs` entries, tsup build and the `<pkg>-dev` condition.
 - **[docs/conventions/readme-format.md](docs/conventions/readme-format.md)** — the shared package README format, with a fill-in skeleton at [`examples/readme/README.template.md`](examples/readme/README.template.md).
 - **[docs/migration/v3-to-v4.md](docs/migration/v3-to-v4.md)** — cutover guide for repos moving from `@v3` to `@v4`.

@@ -128,6 +128,21 @@ on:
                 description: "Command to build package (matrix test legs). May end with
                     `ci:cleanup-src` for a dist-only publish — the coverage legs use
                     `coverage_build_command` instead so they keep `src/`."
+            build_cache_paths:
+                description: "Multiline list of paths to cache around the build step (actions/cache
+                    `path` syntax), e.g. a downloaded toolchain or an expensive compiled output. Empty
+                    (default) = no cache. Restored before the build; saved only on pushes to the default
+                    branch, next and hotfixes. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
+            build_cache_key_files:
+                description: "Multiline globs whose file contents key the build cache (`*`, `**`, `?`,
+                    `{a,b}`, `!` excludes). The key also covers the OS, arch, build command and
+                    cached paths. Ignored when build_cache_paths is empty. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
             docs_check_command:
                 required: false
                 type: string
@@ -390,6 +405,8 @@ jobs:
             package_manager: ${{ inputs.package_manager }}
             test_command: ${{ inputs.test_command }}
             build_command: ${{ inputs.build_command }}
+            build_cache_paths: ${{ inputs.build_cache_paths }}
+            build_cache_key_files: ${{ inputs.build_cache_key_files }}
             docs_check_command: ${{ inputs.docs_check_command }}
             skip_performance_tests: ${{ inputs.skip_performance_tests }}
             skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
@@ -447,6 +464,18 @@ jobs:
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
 
+            # Opt-in build cache (docs/conventions/build-cache.md): restore before the build, save right after it.
+            # Skipped when build_cache_paths is empty.
+            - name: Restore build cache
+              id: build-cache
+              if: ${{ inputs.build_cache_paths != '' && !(inputs.skip_build == true || inputs.skip_build == 'true') }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: restore
+                  paths: ${{ inputs.build_cache_paths }}
+                  key-files: ${{ inputs.build_cache_key_files }}
+                  build-command: ${{ inputs.coverage_build_command != '' && inputs.coverage_build_command || inputs.build_command }}
+
             - name: Build
               if: ${{ !(inputs.skip_build == true || inputs.skip_build == 'true') }}
               shell: bash
@@ -468,6 +497,14 @@ jobs:
                   fi
                   echo "▶ $cmd"
                   eval "$cmd"
+
+            - name: Save build cache
+              if: ${{ !(inputs.skip_build == true || inputs.skip_build == 'true') && steps.build-cache.outputs.save == 'true' }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: save
+                  paths: ${{ inputs.build_cache_paths }}
+                  key: ${{ steps.build-cache.outputs.key }}
 
             - name: Type check
               shell: bash
@@ -574,6 +611,8 @@ jobs:
             build_command: ${{ inputs.build_command }}
             coverage_build_command: ${{ inputs.coverage_build_command }}
             skip_build: ${{ inputs.skip_build }}
+            build_cache_paths: ${{ inputs.build_cache_paths }}
+            build_cache_key_files: ${{ inputs.build_cache_key_files }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}
             skip_type_check: ${{ inputs.skip_type_check }}
@@ -671,6 +710,8 @@ jobs:
             build_command: ${{ inputs.build_command }}
             coverage_build_command: ${{ inputs.coverage_build_command }}
             skip_build: ${{ inputs.skip_build }}
+            build_cache_paths: ${{ inputs.build_cache_paths }}
+            build_cache_key_files: ${{ inputs.build_cache_key_files }}
             type_check_command: ${{ inputs.type_check_command }}
             coverage_command: ${{ inputs.coverage_command }}
             coverage_summary_path: ${{ inputs.coverage_summary_path }}

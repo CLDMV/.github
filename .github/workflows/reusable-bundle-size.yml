@@ -30,6 +30,21 @@ on:
                 required: false
                 type: string
                 default: "npm run build"
+            build_cache_paths:
+                description: "Multiline list of paths to cache around the build step (actions/cache
+                    `path` syntax), e.g. a downloaded toolchain or an expensive compiled output. Empty
+                    (default) = no cache. Restored before the build; saved only on pushes to the default
+                    branch, next and hotfixes. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
+            build_cache_key_files:
+                description: "Multiline globs whose file contents key the build cache (`*`, `**`, `?`,
+                    `{a,b}`, `!` excludes). The key also covers the OS, arch, build command and
+                    cached paths. Ignored when build_cache_paths is empty. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
             dist_paths:
                 required: false
                 type: string
@@ -105,6 +120,19 @@ jobs:
                   CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
+
+            # Opt-in build cache (docs/conventions/build-cache.md): restore before the build, save right after it.
+            # Skipped when build_cache_paths is empty.
+            - name: Restore build cache
+              id: build-cache
+              if: ${{ inputs.build_cache_paths != '' }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: restore
+                  paths: ${{ inputs.build_cache_paths }}
+                  key-files: ${{ inputs.build_cache_key_files }}
+                  build-command: ${{ inputs.build_command }}
+
             - name: Build
               shell: bash
               env:
@@ -120,6 +148,15 @@ jobs:
                   fi
                   echo "▶ $cmd"
                   eval "$cmd"
+
+            - name: Save build cache
+              if: ${{ steps.build-cache.outputs.save == 'true' }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: save
+                  paths: ${{ inputs.build_cache_paths }}
+                  key: ${{ steps.build-cache.outputs.key }}
+
             - name: Measure
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4
               with:
@@ -156,6 +193,19 @@ jobs:
                   CLDMV_SKIP_FROZEN_LOCKFILE: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
+
+            # Opt-in build cache (docs/conventions/build-cache.md): restore before the build, save right after it.
+            # Skipped when build_cache_paths is empty.
+            - name: Restore build cache
+              id: build-cache
+              if: ${{ inputs.build_cache_paths != '' }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: restore
+                  paths: ${{ inputs.build_cache_paths }}
+                  key-files: ${{ inputs.build_cache_key_files }}
+                  build-command: ${{ inputs.build_command }}
+
             - name: Build
               id: build
               shell: bash
@@ -196,6 +246,15 @@ jobs:
                     echo "⚠️ $message" >> "$GITHUB_STEP_SUMMARY"
                     echo "skip=true" >> "$GITHUB_OUTPUT"
                   fi
+
+            - name: Save build cache
+              if: ${{ steps.build.outputs.skip != 'true' && steps.build-cache.outputs.save == 'true' }}
+              uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+              with:
+                  mode: save
+                  paths: ${{ inputs.build_cache_paths }}
+                  key: ${{ steps.build-cache.outputs.key }}
+
             - name: Measure
               if: steps.build.outputs.skip != 'true'
               uses: CLDMV/.github/.github/actions/npm/jobs/bundle-size@v4

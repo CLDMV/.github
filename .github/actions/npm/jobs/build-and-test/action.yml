@@ -18,6 +18,14 @@ inputs:
     description: "Command to build package"
     required: false
     default: "npm run build:ci"
+  build-cache-paths:
+    description: "Multiline paths to cache around the build (actions/cache path syntax). Empty (default) = no cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
+  build-cache-key-files:
+    description: "Multiline globs whose file contents key the build cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
   build-subpackages-command:
     description: "Optional command run after the main build to carve satellite packages
       into dist-packages/<name>/. Leave empty (default) to skip, or fold the carve into
@@ -81,6 +89,18 @@ runs:
       with:
         label: ${{ (inputs.node-version == 'lts/*' || inputs.node-version == 'lts') && 'lts' || '' }}
 
+    # Opt-in build cache (docs/conventions/build-cache.md): restore before the
+    # build, save right after it. A no-op when build-cache-paths is empty.
+    - name: Restore build cache
+      id: build-cache
+      if: inputs.build-cache-paths != ''
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: restore
+        paths: ${{ inputs.build-cache-paths }}
+        key-files: ${{ inputs.build-cache-key-files }}
+        build-command: ${{ inputs.build-command }}
+
     - name: Run pre-build tests
       id: pre-tests
       uses: CLDMV/.github/.github/actions/common/steps/run-tests@v4
@@ -94,6 +114,14 @@ runs:
       with:
         build-command: ${{ inputs.build-command }}
         environment: production
+
+    - name: Save build cache
+      if: steps.build-cache.outputs.save == 'true'
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: save
+        paths: ${{ inputs.build-cache-paths }}
+        key: ${{ steps.build-cache.outputs.key }}
 
     # Carve satellite packages from the build output into dist-packages/<name>/.
     # Optional; satellites also supported by folding the carve into build-command.

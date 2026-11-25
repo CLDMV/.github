@@ -49,6 +49,15 @@ jobs:
         with:
             package_name: "@your-org/your-package"
             build_command: "npm run build:ci"
+            # Optional build cache around every build step (release-PR build) (expensive output such as
+            # a compiled wasm module or a downloaded toolchain). The paths must be
+            # gitignored. No paths = no cache. See docs/conventions/build-cache.md.
+            # build_cache_paths: |
+            #     .cache/toolchains
+            #     .cache/build
+            # build_cache_key_files: |
+            #     src/c/**
+            #     scripts/build-wasm.mjs
             # node_project: false # config/infra repo with no Node project: skip the release build (default true)
         secrets:
             # Map your repo/org secrets to the expected names.
