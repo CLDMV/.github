@@ -153,7 +153,13 @@ jobs:
                   VULN: ${{ steps.depreview.outputs['vulnerable-changes'] }}
                   LICENSES: ${{ steps.depreview.outputs['invalid-license-changes'] }}
                   DENIED: ${{ steps.depreview.outputs['denied-changes'] }}
-                  ALL_CHANGES: ${{ steps.depreview.outputs['dependency-changes'] }}
+                  # The full dependency-changes list is NOT passed here: on a PR
+                  # that adds a whole lockfile it passes Linux's 128 KiB limit for
+                  # one env string and node can't start (#569). The script reads
+                  # it from the dependency-graph compare API instead, the same
+                  # source the review step used.
+                  BASE_REF: ${{ inputs.base_ref }}
+                  HEAD_REF: ${{ inputs.head_ref }}
                   SCORECARD_LEVEL: ${{ inputs.warn_on_openssf_scorecard_level }}
                   ALLOW_LICENSES: ${{ inputs.allow_licenses }}
                   DENY_LICENSES: ${{ inputs.deny_licenses }}
@@ -169,7 +175,25 @@ jobs:
                       const vuln = parse(process.env.VULN) || [];
                       const lic = parse(process.env.LICENSES) || {};
                       const denied = parse(process.env.DENIED) || [];
-                      const all = parse(process.env.ALL_CHANGES) || [];
+                      // Every dependency change in the PR, read from the compare API
+                      // (see the env comment above). Only the Scorecard leg needs it.
+                      const loadAllChanges = async () => {
+                          const pr = context.payload.pull_request || {};
+                          const base = process.env.BASE_REF || (pr.base && pr.base.sha);
+                          const head = process.env.HEAD_REF || (pr.head && pr.head.sha);
+                          if (!base || !head) return [];
+                          try {
+                              const res = await github.request("GET /repos/{owner}/{repo}/dependency-graph/compare/{basehead}", {
+                                  owner,
+                                  repo,
+                                  basehead: `${base}...${head}`
+                              });
+                              return Array.isArray(res.data) ? res.data : [];
+                          } catch (error) {
+                              core.warning(`Couldn't list dependency changes for the Scorecard check: ${error.message}`);
+                              return [];
+                          }
+                      };
                       const scLevel = Number(process.env.SCORECARD_LEVEL || "0");
                       // invalid-license-changes = { forbidden(incompatible), unresolved(invalid SPDX), unlicensed(unknown) }
                       const forbidden = lic.forbidden || [];
@@ -189,6 +213,7 @@ jobs:
                       let scorecard = [];
                       let scorecardCapped = false;
                       if (scLevel > 0) {
+                          const all = await loadAllChanges();
                           const seen = new Set();
                           const targets = [];
                           for (const c of all) {
