@@ -4,17 +4,18 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.42.0 (November 2026)
+### Latest: v4.43.0 (November 2026)
 
-- **📝 Commit Subjects check** — CI fails a feature branch or fork PR whose non-merge commits don't use a conventional `type(scope): summary` subject, and lists each one. A subject like `agent add: …` used to fall through to a content guess and bump the release a minor; now it's caught before it reaches `next`, with no caller change.
-- [View full v4.42.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md)
+- **Pages deploy mode for docs** — `reusable-docs-publish.yml` takes `deploy_mode: pages` to deploy with the GitHub Pages actions (Pages source "GitHub Actions"), with no `gh-pages` branch or bot secrets.
+- **No duplicate CI on release PRs** — a release PR only runs the matrix itself when its head is the bot's `chore: bump version`; any other head was already tested by its push run. Re-sync `ci.yml` from the template to pick it up.
+- [View full v4.43.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.43.0.md)
 
 ### Recent Releases
 
+- **v4.42.0** (November 2026) — CI fails a feature PR whose commit subjects aren't conventional, before a bad subject changes the release version ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.42.0.md))
 - **v4.41.1** (November 2026) — hand-edited release titles survive a release PR refresh, and generated titles are capped at 72 characters as a whole ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.1.md))
 - **v4.41.0** (November 2026) — uidmap and a subordinate id range in the runner image for multi-user tests, and mark-implemented walks the whole unreleased queue ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.41.0.md))
 - **v4.40.1** (November 2026) — release-merge trusts a check run's conclusion, so a release PR with a stale `in_progress` check merges instead of waiting ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.1.md))
-- **v4.40.0** (November 2026) — tmux in the runner image: distro 3.4 on PATH and 3.8 at `/opt/tmux-3.8` ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.40.0.md))
 
 ## 📋 Quick Start
 
