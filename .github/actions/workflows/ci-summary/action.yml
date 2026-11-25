@@ -16,6 +16,10 @@ inputs:
   ci-result:
     description: "Result of the CI (build & test) job"
     required: true
+  browser-test-result:
+    description: "Result of the browser test job. Empty when the caller didn't set browser_test_command."
+    required: false
+    default: ""
   enable-coverage-badge:
     description: "Whether the coverage badge job was enabled"
     required: false
