@@ -41,6 +41,21 @@ on:
                 required: false
                 type: string
                 default: "npm run build:ci"
+            build_cache_paths:
+                description: "Multiline list of paths to cache around the build step (actions/cache
+                    `path` syntax), e.g. a downloaded toolchain or an expensive compiled output. Empty
+                    (default) = no cache. Restored before the build; saved only on pushes to the default
+                    branch, next and hotfixes. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
+            build_cache_key_files:
+                description: "Multiline globs whose file contents key the build cache (`*`, `**`, `?`,
+                    `{a,b}`, `!` excludes). The key also covers the OS, arch, build command and
+                    cached paths. Ignored when build_cache_paths is empty. See docs/conventions/build-cache.md."
+                required: false
+                type: string
+                default: ""
             node_project:
                 description: "Set false for config/infra repos with no Node project. The release PR is still created/refreshed (version bump, changelog), but the build step is skipped and `build_command` is ignored."
                 required: false
@@ -203,6 +218,8 @@ jobs:
                   # always falls through to cmd ('' is falsy). Both boolean and string
                   # forms are checked: a boolean passed through `${{ }}` arrives as a string.
                   build-command: ${{ !(inputs.node_project == false || inputs.node_project == 'false') && inputs.build_command || '' }}
+                  build-cache-paths: ${{ inputs.build_cache_paths }}
+                  build-cache-key-files: ${{ inputs.build_cache_key_files }}
                   default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR
@@ -242,6 +259,8 @@ jobs:
                   # always falls through to cmd ('' is falsy). Both boolean and string
                   # forms are checked: a boolean passed through `${{ }}` arrives as a string.
                   build-command: ${{ !(inputs.node_project == false || inputs.node_project == 'false') && inputs.build_command || '' }}
+                  build-cache-paths: ${{ inputs.build_cache_paths }}
+                  build-cache-key-files: ${{ inputs.build_cache_key_files }}
                   default-branch: ${{ needs.plan.outputs.default-branch }}
                   github-token: ${{ steps.app-token.outputs.token }}
                   # Caller YAML input wins, else the caller's CLDMV_CHANGELOG_DIR

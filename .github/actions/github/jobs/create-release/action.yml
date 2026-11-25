@@ -57,6 +57,14 @@ inputs:
     description: "Command to build package (used if no artifacts available)"
     required: false
     default: "npm run build:ci"
+  build-cache-paths:
+    description: "Multiline paths to cache around the build (actions/cache path syntax). Empty (default) = no cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
+  build-cache-key-files:
+    description: "Multiline globs whose file contents key the build cache. See docs/conventions/build-cache.md."
+    required: false
+    default: ""
   dry-run:
     description: "Dry run mode - validate everything but don't create release"
     required: false
@@ -189,12 +197,32 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
 
+    # Opt-in build cache (docs/conventions/build-cache.md): restore before the
+    # build, save right after it. A no-op when build-cache-paths is empty.
+    - name: Restore build cache
+      id: build-cache
+      if: inputs.build-cache-paths != '' && inputs.release-source-only == 'false'
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: restore
+        paths: ${{ inputs.build-cache-paths }}
+        key-files: ${{ inputs.build-cache-key-files }}
+        build-command: ${{ inputs.build-command || 'npm run build:ci' }}
+
     - name: Build package (if no artifacts available)
       if: inputs.release-source-only == 'false'
       uses: CLDMV/.github/.github/actions/common/steps/build-project@v4
       with:
         build-command: ${{ inputs.build-command || 'npm run build:ci' }}
         environment: production
+
+    - name: Save build cache
+      if: inputs.release-source-only == 'false' && steps.build-cache.outputs.save == 'true'
+      uses: CLDMV/.github/.github/actions/common/steps/build-cache@v4
+      with:
+        mode: save
+        paths: ${{ inputs.build-cache-paths }}
+        key: ${{ steps.build-cache.outputs.key }}
 
     - name: Create npm package (if no artifacts available)
       if: inputs.release-source-only == 'false'
