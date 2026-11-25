@@ -48,6 +48,10 @@ const RULESET = {
 					"style/*",
 					"dependabot/*",
 					"copilot/*",
+					// Dev-trunk work: `dev` and its `wip/<who>-<issue>` side branches.
+					// Neither is in feature-pr.yml's auto-PR list (CLDMV/.github#455).
+					"dev",
+					"wip/*",
 					"master",
 					"main",
 					"badges",
