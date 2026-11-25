@@ -200,8 +200,15 @@ export function matchKeyFiles(root, patterns) {
  */
 function hashFile(abs) {
 	const hash = crypto.createHash("sha256");
-	const stat = fs.lstatSync(abs);
-	hash.update(stat.isSymbolicLink() ? `symlink:${fs.readlinkSync(abs)}` : fs.readFileSync(abs));
+	// Try readlink first instead of lstat-then-read, so there is no check/use gap:
+	// it throws EINVAL for anything that isn't a symlink, which then gets read as a file.
+	let target;
+	try {
+		target = fs.readlinkSync(abs);
+	} catch (error) {
+		if (error.code !== "EINVAL") throw error;
+	}
+	hash.update(target === undefined ? fs.readFileSync(abs) : `symlink:${target}`);
 	return hash.digest("hex");
 }
 
