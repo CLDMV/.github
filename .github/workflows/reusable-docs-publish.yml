@@ -7,8 +7,21 @@
 # @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
-# gh-pages docs publisher (org-level, reusable).
-# Batch 6.1 from tmp/plan-future-workflows.md.
+# Docs publisher (org-level, reusable). Builds the docs, then deploys them one
+# of two ways, picked by `deploy_mode`:
+#   - `branch` (default): pushes `output_dir` to a `gh-pages` branch as a bot
+#     commit. Pages source: "Deploy from a branch". Needs the bot App secrets.
+#   - `pages`: uploads `output_dir` with actions/upload-pages-artifact and
+#     deploys it with actions/deploy-pages. Pages source: "GitHub Actions". No
+#     bot token or gh-pages branch (CLDMV/.github#533).
+#
+# Permissions come from the calling job. Nothing in this file declares a
+# `permissions:` block on purpose: GitHub rejects a called workflow at startup
+# when any job in it asks for a scope the caller didn't grant, even a job that
+# would be skipped, so a `pages: write` here would break every branch-mode
+# caller. Branch mode needs `contents: write` (the push itself goes out with the
+# App token); pages mode needs `contents: read`, `pages: write` and
+# `id-token: write`.
 name: 📖 Docs Publish (Org-Level)
 
 on:
@@ -19,9 +32,15 @@ on:
                 type: string
                 default: ""
                 description: "Runner label for every job in this workflow chain. Empty = auto, in order: the caller's RUNS_ON_DEFAULT Actions variable (all trigger types incl. schedule); else CLDMV-owned private callers route to cldmv-runners; else ubuntu-latest."
+            deploy_mode:
+                required: false
+                type: string
+                default: "branch"
+                description: "`branch` pushes the build to `target_branch` (Pages source: Deploy from a branch). `pages` deploys it with the GitHub Pages actions (Pages source: GitHub Actions; the caller grants `pages: write` and `id-token: write`)."
             build_command:
                 required: true
                 type: string
+                description: "Builds the site into `output_dir`. In `pages` mode the site's base path (e.g. `/repo`) is in the PAGES_BASE_PATH env var."
             output_dir:
                 required: true
                 type: string
@@ -29,14 +48,17 @@ on:
                 required: false
                 type: string
                 default: "gh-pages"
+                description: "`branch` mode only."
             cname:
                 required: false
                 type: string
                 default: ""
+                description: "`branch` mode only (writes the CNAME file). In `pages` mode set the custom domain in Settings → Pages."
             include_nojekyll:
                 required: false
                 type: boolean
                 default: true
+                description: "`branch` mode only. `pages` mode serves the artifact as-is, with no Jekyll step."
             package_manager:
                 required: false
                 type: string
@@ -49,18 +71,17 @@ on:
                 required: false
                 type: string
                 default: "docs: update docs site"
+                description: "`branch` mode only."
         secrets:
+            # Required in `branch` mode; unused in `pages` mode.
             BOT_APP_CLIENT_ID:
-                required: true
+                required: false
             BOT_APP_PRIVATE_KEY:
-                required: true
+                required: false
             TAGGER_NAME:
                 required: false
             TAGGER_EMAIL:
                 required: false
-
-permissions:
-    contents: write
 
 concurrency:
     group: docs-publish-${{ github.repository }}
@@ -70,6 +91,16 @@ jobs:
     publish:
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         steps:
+            - name: Check deploy_mode
+              shell: bash
+              env:
+                  MODE: ${{ inputs.deploy_mode }}
+              run: |
+                  case "$MODE" in
+                    branch|pages) echo "deploy_mode=$MODE" ;;
+                    *) echo "::error::deploy_mode must be 'branch' or 'pages', got '$MODE'"; exit 1 ;;
+                  esac
+
             - name: Checkout
               uses: CLDMV/.github/.github/actions/common/steps/checkout-code@v4
               with:
@@ -93,11 +124,20 @@ jobs:
               with:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
 
+            # Reads the Pages site config (its base path, for builds that need
+            # it). Fails here, before the build, when Pages isn't enabled or its
+            # source isn't "GitHub Actions".
+            - name: Configure Pages
+              id: pages
+              if: inputs.deploy_mode == 'pages'
+              uses: actions/configure-pages@v6
+
             - name: Build docs
               shell: bash
               env:
                   PM: ${{ steps.pm.outputs.package-manager }}
                   CMD: ${{ inputs.build_command }}
+                  PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
               run: |
                   cmd="$CMD"
                   if [ "$PM" != "npm" ]; then
@@ -109,8 +149,15 @@ jobs:
                   echo "▶ $cmd"
                   eval "$cmd"
 
+            - name: Upload Pages artifact
+              if: inputs.deploy_mode == 'pages'
+              uses: actions/upload-pages-artifact@v5
+              with:
+                  path: ${{ inputs.output_dir }}
+
             - name: Create App token
               id: app-token
+              if: inputs.deploy_mode == 'branch'
               uses: CLDMV/.github/.github/actions/github/steps/create-app-token@v4
               with:
                   client_id: ${{ secrets.BOT_APP_CLIENT_ID }}
@@ -120,6 +167,7 @@ jobs:
                   BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
             - name: Publish to gh-pages
+              if: inputs.deploy_mode == 'branch'
               uses: CLDMV/.github/.github/actions/common/jobs/publish-gh-pages@v4
               with:
                   output_dir: ${{ inputs.output_dir }}
@@ -131,3 +179,16 @@ jobs:
               env:
                   TAGGER_NAME: ${{ secrets.TAGGER_NAME }}
                   TAGGER_EMAIL: ${{ secrets.TAGGER_EMAIL }}
+
+    deploy:
+        name: 🚀 Deploy to GitHub Pages
+        needs: publish
+        if: inputs.deploy_mode == 'pages'
+        runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy
+              id: deployment
+              uses: actions/deploy-pages@v5
