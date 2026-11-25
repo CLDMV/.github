@@ -7,9 +7,11 @@
  * `index-filename`, CLDMV/.github#540), in the same commit. A repo that
  * doesn't produce the index is skipped silently.
  *
- * `publish-badge: false` publishes the index alone (CLDMV/.github#565): the
- * coverage workflow passes it when the tests failed, so a red run keeps the
- * badge as it was but still publishes the index it computed.
+ * `tests-failed: true` publishes a `tests failing` badge with no percentage
+ * in place of the computed one (CLDMV/.github#565): a failing run's coverage
+ * isn't accurate and the last good number would be stale. The next passing
+ * run publishes a number again. `publish-badge: false` publishes the index
+ * alone and leaves the badge as it is.
  *
  * @module @cldmv/.github.coverage.steps.push-badge
  */
@@ -30,6 +32,9 @@ import { getInput } from "../../../common/common/core.mjs";
  * @returns {Buffer|string} execFileSync result.
  */
 const git = (args, opts = {}) => execFileSync("git", args, opts);
+
+/** Badge published when the tests failed: no percentage, since none is accurate. */
+export const FAILING_BADGE = Object.freeze({ schemaVersion: 1, label: "coverage", message: "tests failing", color: "red" });
 
 // The push token is read inside the try below (so a missing token surfaces as a
 // clear, caught error instead of an `...:undefined@...` auth failure). It's
@@ -71,6 +76,7 @@ try {
 		publishIndex = fs.existsSync(indexPath) && fs.statSync(indexPath).isFile();
 		console.log(publishIndex ? `Coverage index found at ${indexPath}; publishing it as ${indexFile}.` : `No coverage index at ${indexPath}; publishing the badge only.`);
 	}
+	const testsFailed = getInput("tests-failed", { default: "false" }) === "true";
 	const publishBadge = getInput("publish-badge", { default: "true" }) !== "false";
 	if (!publishBadge && !publishIndex) {
 		console.log("Badge not published (publish-badge: false) and no coverage index to publish — nothing to do.");
@@ -87,7 +93,11 @@ try {
 
 	// Stash the computed badge outside the work tree before switching branches.
 	const stashedBadge = path.join(process.env.RUNNER_TEMP || ".", badgeFile);
-	if (publishBadge) fs.copyFileSync("badge.json", stashedBadge);
+	if (publishBadge && testsFailed) {
+		fs.writeFileSync(stashedBadge, JSON.stringify(FAILING_BADGE));
+	} else if (publishBadge) {
+		fs.copyFileSync("badge.json", stashedBadge);
+	}
 	const stashedIndex = path.join(process.env.RUNNER_TEMP || ".", indexFile);
 	if (publishIndex) fs.copyFileSync(indexPath, stashedIndex);
 
@@ -155,9 +165,13 @@ try {
 			process.exit(0);
 		}
 
-		const message = !publishBadge
-			? "ci: update coverage index (tests failed)"
-			: publishIndex
+		const message = testsFailed
+			? publishBadge
+				? `ci: mark coverage badge as tests failing${publishIndex ? " and update index" : ""}`
+				: "ci: update coverage index (tests failed)"
+			: !publishBadge
+				? "ci: update coverage index"
+				: publishIndex
 				? "ci: update coverage badge and index"
 				: "ci: update coverage badge";
 		git(["commit", "-S", "-m", message], { stdio: "inherit" });
