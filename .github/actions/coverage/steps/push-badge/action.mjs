@@ -7,6 +7,10 @@
  * `index-filename`, CLDMV/.github#540), in the same commit. A repo that
  * doesn't produce the index is skipped silently.
  *
+ * `publish-badge: false` publishes the index alone (CLDMV/.github#565): the
+ * coverage workflow passes it when the tests failed, so a red run keeps the
+ * badge as it was but still publishes the index it computed.
+ *
  * @module @cldmv/.github.coverage.steps.push-badge
  */
 
@@ -67,6 +71,11 @@ try {
 		publishIndex = fs.existsSync(indexPath) && fs.statSync(indexPath).isFile();
 		console.log(publishIndex ? `Coverage index found at ${indexPath}; publishing it as ${indexFile}.` : `No coverage index at ${indexPath}; publishing the badge only.`);
 	}
+	const publishBadge = getInput("publish-badge", { default: "true" }) !== "false";
+	if (!publishBadge && !publishIndex) {
+		console.log("Badge not published (publish-badge: false) and no coverage index to publish — nothing to do.");
+		process.exit(0);
+	}
 	const botName = getInput("bot-name", { required: true });
 	const botEmail = getInput("bot-email", { required: true });
 	const repository = getInput("repository", { required: true });
@@ -78,7 +87,7 @@ try {
 
 	// Stash the computed badge outside the work tree before switching branches.
 	const stashedBadge = path.join(process.env.RUNNER_TEMP || ".", badgeFile);
-	fs.copyFileSync("badge.json", stashedBadge);
+	if (publishBadge) fs.copyFileSync("badge.json", stashedBadge);
 	const stashedIndex = path.join(process.env.RUNNER_TEMP || ".", indexFile);
 	if (publishIndex) fs.copyFileSync(indexPath, stashedIndex);
 
@@ -125,8 +134,10 @@ try {
 	const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		fs.copyFileSync(stashedBadge, badgeFile);
-		git(["add", badgeFile]);
+		if (publishBadge) {
+			fs.copyFileSync(stashedBadge, badgeFile);
+			git(["add", badgeFile]);
+		}
 		if (publishIndex) {
 			fs.copyFileSync(stashedIndex, indexFile);
 			git(["add", indexFile]);
@@ -140,11 +151,16 @@ try {
 			unchanged = false;
 		}
 		if (unchanged) {
-			console.log(publishIndex ? "Badge and coverage index unchanged — skipping commit." : "Badge unchanged — skipping commit.");
+			console.log(`${publishBadge ? (publishIndex ? "Badge and coverage index" : "Badge") : "Coverage index"} unchanged — skipping commit.`);
 			process.exit(0);
 		}
 
-		git(["commit", "-S", "-m", publishIndex ? "ci: update coverage badge and index" : "ci: update coverage badge"], { stdio: "inherit" });
+		const message = !publishBadge
+			? "ci: update coverage index (tests failed)"
+			: publishIndex
+				? "ci: update coverage badge and index"
+				: "ci: update coverage badge";
+		git(["commit", "-S", "-m", message], { stdio: "inherit" });
 
 		try {
 			// Pipe stderr so a rejection can be classified below; git writes push
