@@ -210,6 +210,11 @@ on:
                 type: string
                 default: "coverage.json"
                 description: "Filename for the badge JSON committed to the badges branch"
+            coverage_index_path:
+                required: false
+                type: string
+                default: "coverage/coverage-index.json"
+                description: "Repo-relative path of the coverage index the coverage run writes. When it exists, the coverage-badge job publishes it to the badges branch per branch (coverage-index.json / coverage-index-next.json / coverage-index-hotfixes.json). Skipped silently when the repo doesn't produce it; empty disables it."
             upload_coverage_artifact:
                 required: false
                 type: boolean
@@ -598,6 +603,11 @@ jobs:
                 inputs.badge_filename || (github.ref_name == 'next' &&
                 'coverage-next.json') || (github.ref_name == 'hotfixes' &&
                 'coverage-hotfixes.json') || 'coverage.json' }}
+            # The coverage index (#540) follows the same per-branch naming.
+            coverage_index_path: ${{ inputs.coverage_index_path }}
+            coverage_index_filename: ${{ (github.ref_name == 'next' &&
+                'coverage-index-next.json') || (github.ref_name == 'hotfixes' &&
+                'coverage-index-hotfixes.json') || 'coverage-index.json' }}
             upload_coverage_artifact: ${{ inputs.upload_coverage_artifact }}
             debug: ${{ inputs.debug }}
         secrets:

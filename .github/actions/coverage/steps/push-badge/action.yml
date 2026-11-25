@@ -1,5 +1,5 @@
 name: "Push Coverage Badge"
-description: "Commit and push badge.json to the badges branch (creating it as an orphan if needed)"
+description: "Commit and push badge.json (and optionally the coverage index) to the badges branch, creating it as an orphan if needed"
 
 inputs:
   badges-branch:
@@ -10,6 +10,14 @@ inputs:
     description: "Filename for the badge JSON on the badges branch"
     required: false
     default: "coverage.json"
+  index-path:
+    description: "Repo-relative path of a coverage index to publish next to the badge (e.g. coverage/coverage-index.json). Empty = badge only. A path that doesn't exist is skipped silently."
+    required: false
+    default: ""
+  index-filename:
+    description: "Filename for the coverage index on the badges branch (bare filename, must differ from badge-filename)"
+    required: false
+    default: "coverage-index.json"
   bot-name:
     description: "Git committer name"
     required: true
