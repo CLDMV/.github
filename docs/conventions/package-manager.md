@@ -17,7 +17,7 @@ The single source of truth is `.github/actions/npm/utilities/detect-package-mana
 
 - **install** — `pnpm install` (`--frozen-lockfile` per the frozen rule below); pnpm/yarn are provisioned via **corepack** (bundled with Node — no third-party action, keeping the Scorecard Pinned-Dependencies check green).
 - **run / exec** — script and tool invocations route through the resolved manager (`pnpm run …`, `pnpm exec` / `pnpm dlx`), a no-op for npm.
-- **publish** — pnpm uses `pnpm publish`, so `workspace:*` dependencies are rewritten to real versions in the published tarball. npm keeps `npm publish` (with `--provenance` on public packages). Every generated publish command also passes `--ignore-scripts` — see [Publishing from the build artifact](#publishing-from-the-build-artifact).
+- **pack / publish** — the package is packed with the resolved manager (`pnpm pack` rewrites `workspace:*` dependencies to real versions in the tarball), then published from that packed artifact with `npm publish` for every manager, with `--provenance` on public npm packages. Every generated publish command also passes `--ignore-scripts` — see [Publishing from the build artifact](#publishing-from-the-build-artifact).
 - **setup-node cache** — the cache key is manager-aware for npm/yarn (with a lockfile); pnpm store caching is intentionally left off for now to avoid `actions/setup-node`'s pre-install pnpm ordering failure. This is a caching optimization, not a correctness gap.
 
 ## Frozen installs are the CI default
@@ -47,15 +47,15 @@ This is a deliberate escape hatch for the rare repository that genuinely cannot 
 
 ## Publishing from the build artifact
 
-The publish jobs never run in the repo checkout. `build-and-test` runs `build_command`, then `npm pack`, expands the tarball into `package-contents/`, and uploads it; the publish jobs download that artifact and publish from it. That directory has no `node_modules` and no lockfile, and nothing left to build.
+The publish jobs never run in the repo checkout. `build-and-test` runs `build_command`, then packs with the resolved manager (`npm pack` / `pnpm pack` / `yarn pack`), expands the tarball into `package-contents/`, and uploads it; the publish jobs download that artifact and publish from it. That directory has no `node_modules` and no lockfile, and nothing left to build.
 
-So the default publish command — for both npm and GitHub Packages, with any package manager — passes `--ignore-scripts`:
+So the default publish command — for both npm and GitHub Packages, with any package manager — is `npm publish` and passes `--ignore-scripts`:
 
 | Target          | Public repo                                                 | Private repo                                       |
 | --------------- | ----------------------------------------------------------- | -------------------------------------------------- |
 | npm             | `npm publish --access public --ignore-scripts --provenance` | `npm publish --access restricted --ignore-scripts` |
 | GitHub Packages | `npm publish --access public --ignore-scripts`              | `npm publish --access restricted --ignore-scripts` |
 
-(`pnpm publish` / `yarn publish` replace `npm publish` when that manager is resolved; `--provenance` is npm-CLI-only.) Without it, lifecycle scripts such as `prepack` or `prepublishOnly` would fire a second time inside the artifact, and any that need devDependencies — a bundler build behind `"prepack": "npm run build"`, for example — fail with `command not found` and abort the publish. A repo does not need to guard its own `prepack` against this.
+The npm CLI is used even for pnpm and yarn repos: the manager-specific work (resolving `workspace:*`) already happened at pack time, `pnpm publish` refuses to run from the artifact directory because its git checks see the untracked files, and the publish jobs don't provision pnpm or yarn. Without `--ignore-scripts`, lifecycle scripts such as `prepack` or `prepublishOnly` would fire a second time inside the artifact, and any that need devDependencies — a bundler build behind `"prepack": "npm run build"`, for example — fail with `command not found` and abort the publish. A repo does not need to guard its own `prepack` against this.
 
 The builder lives in `.github/actions/npm/utilities/publish-command/build.mjs`. A caller-supplied `publish_command` / `github_packages_publish_command` is used verbatim, with no flags added — include `--ignore-scripts` in a custom command too unless a lifecycle script genuinely has to run against the packed tree.

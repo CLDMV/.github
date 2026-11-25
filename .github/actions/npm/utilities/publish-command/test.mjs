@@ -28,14 +28,14 @@ eq(
 	"npm publish --access restricted --ignore-scripts"
 );
 eq(
-	"pnpm, public → no provenance",
+	"pnpm, public → npm CLI with provenance (#544)",
 	buildPublishCommand({ packageManager: "pnpm", isPrivate: false, registry: "npm" }),
-	"pnpm publish --access public --ignore-scripts"
+	"npm publish --access public --ignore-scripts --provenance"
 );
 eq(
-	"yarn, public → no provenance",
+	"yarn, public → npm CLI with provenance (#544)",
 	buildPublishCommand({ packageManager: "yarn", isPrivate: false, registry: "npm" }),
-	"yarn publish --access public --ignore-scripts"
+	"npm publish --access public --ignore-scripts --provenance"
 );
 
 console.log("buildPublishCommand — GitHub Packages:");
@@ -50,9 +50,9 @@ eq(
 	"npm publish --access restricted --ignore-scripts"
 );
 eq(
-	"pnpm, private → restricted",
+	"pnpm, private → npm CLI, restricted (#544)",
 	buildPublishCommand({ packageManager: "pnpm", isPrivate: true, registry: "github-packages" }),
-	"pnpm publish --access restricted --ignore-scripts"
+	"npm publish --access restricted --ignore-scripts"
 );
 
 if (failures) {
