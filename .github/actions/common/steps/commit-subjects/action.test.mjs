@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { isConventionalSubject, resolvePrBase, findBadSubjects, tableCell } from "./action.mjs";
+import { isConventionalSubject, resolvePrBase, isUncheckedBranch, newBranchBase, findBadSubjects, tableCell } from "./action.mjs";
 
 const actionPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "action.mjs");
 
@@ -71,15 +71,24 @@ for (const s of [
 	eq(isConventionalSubject(s), false, JSON.stringify(s));
 }
 
+console.log("isUncheckedBranch / newBranchBase:");
+for (const b of ["master", "main", "badges", "gh-pages", "dependabot/npm_and_yarn/x", ""])
+	eq(isUncheckedBranch(b), true, `${b || "(empty)"} → unchecked`);
+for (const b of ["next", "hotfixes", "dev", "copilot/fix-1", "wip/x", "feat/x"]) eq(isUncheckedBranch(b), false, `${b} → checked`);
+eq(isUncheckedBranch("trunk", "trunk"), true, "default branch → unchecked");
+eq(newBranchBase("copilot/fix-1"), "next", "new copilot branch → compare against next");
+eq(newBranchBase("wip/x"), "next", "new wip branch → compare against next");
+for (const b of ["dev", "next", "hotfixes"]) eq(newBranchBase(b), null, `new ${b} → skipped`);
+
 console.log("resolvePrBase:");
 eq(resolvePrBase("feat/x"), "next", "feat/* → next");
 eq(resolvePrBase("docs/v1-notes"), "next", "docs/* → next");
 eq(resolvePrBase("hotfix/1.2.3"), "hotfixes", "hotfix/* → hotfixes");
-eq(resolvePrBase("next"), null, "next itself → not checked");
-eq(resolvePrBase("master"), null, "master → not checked");
-eq(resolvePrBase("dependabot/npm_and_yarn/x"), null, "dependabot/* → not checked");
-eq(resolvePrBase("copilot/fix-1"), null, "copilot/* → not checked");
-eq(resolvePrBase("dev"), null, "dev → not checked");
+eq(resolvePrBase("next"), null, "next itself → no PR base");
+eq(resolvePrBase("master"), null, "master → no PR base");
+eq(resolvePrBase("dependabot/npm_and_yarn/x"), null, "dependabot/* → no PR base");
+eq(resolvePrBase("copilot/fix-1"), null, "copilot/* → no PR base");
+eq(resolvePrBase("dev"), null, "dev → no PR base");
 
 console.log("findBadSubjects:");
 const commit = (sha, message, parents = 1) => ({ sha, commit: { message }, parents: Array.from({ length: parents }, () => ({})) });
@@ -200,7 +209,7 @@ try {
 	eq(r.ok, "false", "hotfix/* is checked against hotfixes");
 
 	r = run({ eventName: "push", event: pushTo("next") });
-	eq([r.status, r.ok], [0, ""], "push to next → not checked");
+	eq([r.status, r.ok], [0, ""], "push creating next → not checked");
 
 	console.log("push to dev:");
 	const BEFORE = "1".repeat(40);
@@ -239,6 +248,63 @@ try {
 
 	r = run({ eventName: "push", event: devPush, routes: { [devRoute]: { status: 404, body: { message: "Not Found" } } } });
 	eq([r.status, r.ok, r.warnings.length], [0, "", 1], "dev compare failure → warning, exit 0");
+
+	console.log("push to next / hotfixes / copilot / wip:");
+	const nextRoute = `/compare/${BEFORE}...${AFTER}`;
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/next", before: BEFORE, after: AFTER },
+		routes: {
+			[nextRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("b".repeat(40), "address review")] } }
+		}
+	});
+	eq([r.status, r.ok], [1, "false"], "direct commit to next with a bad subject fails");
+
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/next", before: BEFORE, after: AFTER },
+		routes: {
+			[nextRoute]: {
+				status: 200,
+				body: {
+					status: "ahead",
+					total_commits: 2,
+					commits: [commit("a".repeat(40), "Merge pull request #9", 2), commit("c".repeat(40), "fix: y")]
+				}
+			}
+		}
+	});
+	eq([r.status, r.ok], [0, "true"], "PR merge into next passes");
+
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/hotfixes", before: BEFORE, after: AFTER },
+		routes: { [nextRoute]: { status: 200, body: { status: "diverged", total_commits: 1, commits: [commit("b".repeat(40), "x")] } } }
+	});
+	eq([r.status, r.ok, r.warnings.length], [0, "", 0], "hotfixes reset after a release → skipped, no warning");
+
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/copilot/fix-thing", before: "0".repeat(40), after: AFTER },
+		routes: {
+			[compareRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("b".repeat(40), "Initial plan")] } }
+		}
+	});
+	eq([r.status, r.ok], [1, "false"], "new copilot branch is compared against next and fails on Initial plan");
+
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/wip/idea", before: BEFORE, after: AFTER },
+		routes: { [nextRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("a".repeat(40), "chore: wip")] } } }
+	});
+	eq([r.status, r.ok], [0, "true"], "wip push with a clean subject passes");
+
+	for (const b of ["master", "main", "badges", "gh-pages"]) {
+		r = run({ eventName: "push", event: { ref: `refs/heads/${b}`, before: BEFORE, after: AFTER } });
+		eq([r.status, r.ok], [0, ""], `push to ${b} → not checked`);
+	}
+	r = run({ eventName: "push", event: { ref: "refs/heads/trunk", before: BEFORE, after: AFTER, repository: { default_branch: "trunk" } } });
+	eq([r.status, r.ok], [0, ""], "push to the default branch → not checked");
 
 	r = run({ eventName: "push", event: pushTo("dependabot/npm_and_yarn/x") });
 	eq([r.status, r.ok], [0, ""], "dependabot branch → not checked");

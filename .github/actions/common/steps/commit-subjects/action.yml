@@ -1,5 +1,5 @@
 name: "Commit Subjects"
-description: "Fail a feature PR, or a push to `dev`, whose commit subjects aren't conventional. The release bump reads every subject in the range, so a subject like `agent add: …` changes the version."
+description: "Fail a push or PR that adds a commit whose subject isn't conventional. The release bump reads every subject in the range, so a subject like `agent add: …` changes the version."
 inputs:
   github-token:
     description: "Token for GitHub REST API calls (defaults to github.token)."
@@ -7,7 +7,7 @@ inputs:
     default: ${{ github.token }}
 outputs:
   ok:
-    description: "`false` when at least one commit has a non-conventional subject, `true` when every subject passes, empty when nothing was checked (an integration-branch push, a release PR, a branch with no PR target, workflow_dispatch / schedule, or a range the API couldn't list)."
+    description: "`false` when at least one commit has a non-conventional subject, `true` when every subject passes, empty when nothing was checked (a push to the default branch, badges, gh-pages or dependabot/*, a new dev/next/hotfixes branch, a force-push, a release PR, workflow_dispatch / schedule, or a range the API couldn't list)."
 runs:
   using: "node24"
   main: "action.mjs"
