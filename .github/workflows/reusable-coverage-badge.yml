@@ -99,6 +99,18 @@ on:
                 type: string
                 default: "coverage.json"
 
+            coverage_index_path:
+                description: "Repo-relative path of the coverage index the coverage run writes. When the file exists it's published to the badges branch next to the badge JSON, so it's fetchable without auth on a public repo. A repo that doesn't produce it is skipped silently. Empty disables it."
+                required: false
+                type: string
+                default: "coverage/coverage-index.json"
+
+            coverage_index_filename:
+                description: "Filename for the coverage index on the badges branch"
+                required: false
+                type: string
+                default: "coverage-index.json"
+
             # ── Artifact upload ─────────────────────────────────────────────────
             upload_coverage_artifact:
                 description: "Upload the full coverage/ directory as a workflow artifact"
@@ -280,6 +292,8 @@ jobs:
               with:
                   badges-branch: ${{ inputs.badges_branch }}
                   badge-filename: ${{ inputs.badge_filename }}
+                  index-path: ${{ inputs.coverage_index_path }}
+                  index-filename: ${{ inputs.coverage_index_filename }}
                   bot-name: ${{ secrets.BOT_NAME }}
                   bot-email: ${{ secrets.BOT_EMAIL }}
                   repository: ${{ github.repository }}

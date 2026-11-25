@@ -5,7 +5,7 @@ node_modules/
 .env.local
 dist/
 build/
-coverage/
+/coverage/
 reference/
 tmp/
 trash/
