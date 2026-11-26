@@ -249,6 +249,9 @@ jobs:
             # per-version regression. workflow_dispatch can still opt out (set false).
             lts_only_matrix: ${{ github.event.inputs.lts_only_matrix != 'false' }}
             # max_parallel: 2 # Node matrix legs run at once (default 2, 0 = no cap); hosted slots are shared org-wide
+            # Extra OS build check, one job per runner label on the latest LTS Node, for builds that
+            # depend on the host platform. macOS runners are scarce; list only what you need.
+            # extra_build_os: '["macos-latest", "macos-15-intel"]'
             package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
             test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
             # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
