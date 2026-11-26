@@ -102,6 +102,20 @@ on:
                 type: string
                 default: "npm run build:ci"
                 description: "Command to build package"
+            build_cache_paths:
+                required: false
+                type: string
+                default: ""
+                description: "Multiline list of paths to cache around the build step (actions/cache
+                    `path` syntax), e.g. a downloaded toolchain or an expensive compiled output. Empty
+                    (default) = no cache. Forwarded to the build-and-test and publish builds. See
+                    docs/conventions/build-cache.md."
+            build_cache_key_files:
+                required: false
+                type: string
+                default: ""
+                description: "Multiline globs whose file contents key the build cache. Ignored when
+                    build_cache_paths is empty. See docs/conventions/build-cache.md."
             node_project:
                 required: false
                 type: boolean
@@ -284,6 +298,8 @@ jobs:
             test_command: ${{ inputs.test_command }}
             build_command: ${{ inputs.build_command }}
             build_subpackages_command: ${{ inputs.build_subpackages_command }}
+            build_cache_paths: ${{ inputs.build_cache_paths }}
+            build_cache_key_files: ${{ inputs.build_cache_key_files }}
             skip_performance_tests: ${{ inputs.skip_performance_tests }}
             skip_matrix_tests: ${{ inputs.skip_matrix_tests }}
             test_environment: ${{ inputs.test_environment }}
@@ -321,6 +337,8 @@ jobs:
             is_prerelease: ${{ inputs.is_prerelease }}
             release_source_only: ${{ inputs.release_source_only }}
             build_command: ${{ inputs.build_command }}
+            build_cache_paths: ${{ inputs.build_cache_paths }}
+            build_cache_key_files: ${{ inputs.build_cache_key_files }}
             use_gpg: ${{ inputs.use_gpg }}
             # SBOM forwarding (Batch 4.2)
             generate_sbom: ${{ inputs.generate_sbom }}
