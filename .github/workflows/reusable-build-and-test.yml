@@ -65,6 +65,11 @@ on:
                 required: false
                 type: boolean
                 default: false
+            max_parallel:
+                description: "Most Node matrix legs this run executes at once. 0 (default) = no cap."
+                required: false
+                type: number
+                default: 0
             package_manager:
                 description: "Package manager: auto (default, detect), or explicit npm | yarn | pnpm"
                 required: false
@@ -189,6 +194,8 @@ jobs:
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         needs: set-matrix
         strategy:
+            # 256 is GitHub's per-matrix job cap, so 0 means no cap.
+            max-parallel: ${{ inputs.max_parallel > 0 && inputs.max_parallel || 256 }}
             matrix:
                 node-version: ${{ fromJson(needs.set-matrix.outputs.node-matrix) }}
         # Make the bot App credentials available to nested composites

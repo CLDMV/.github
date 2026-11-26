@@ -271,6 +271,37 @@ try {
 	eq(r.docsOnly, "false", "a 300-file compare (API cap) → docs_only=false");
 	eq(/cap/.test(r.notices[0] || ""), true, "notice names the file cap");
 
+	console.log("push to next / hotfixes — judged by the unreleased range (#588):");
+	r = run({
+		eventName: "push",
+		event: branchPush("next", BEFORE),
+		routes: {
+			[compareRoute]: { status: 200, body: { status: "ahead", files: [{ filename: "docs/changelogs/v1.2.3.md" }] } },
+			[`/compare/master...${AFTER}`]: {
+				status: 200,
+				body: { status: "ahead", files: [{ filename: "docs/changelogs/v1.2.3.md" }, { filename: "src/a.mjs" }] }
+			}
+		}
+	});
+	eq(r.docsOnly, "false", "docs-only last merge on top of unreleased code → docs_only=false");
+
+	r = run({
+		eventName: "push",
+		event: branchPush("hotfixes", BEFORE),
+		routes: { [`/compare/master...${AFTER}`]: { status: 200, body: docsFiles } }
+	});
+	eq(r.docsOnly, "true", "hotfixes with only docs unreleased → docs_only=true");
+
+	r = run({
+		eventName: "push",
+		event: branchPush("next", BEFORE),
+		routes: {
+			[`/compare/master...${AFTER}`]: { status: 500, body: { message: "Server Error" } },
+			[compareRoute]: { status: 200, body: { status: "ahead", files: [{ filename: "README.md" }] } }
+		}
+	});
+	eq(r.docsOnly, "true", "unreleased compare failing → the push's own range decides");
+
 	r = run({ eventName: "push", event: branchPush("next") });
 	eq(r.docsOnly, "false", "push to next with a zero before still falls back (integration branch)");
 	eq(/zero SHA/.test(r.notices[0] || ""), true, "notice names the zero-SHA reason");
