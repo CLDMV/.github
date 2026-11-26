@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.45.5 (November 2026)
+### Latest: v4.45.6 (November 2026)
 
-- **release-merge and CodeQL fixes** — release-merge judges each check by its newest run, so a stale failed run no longer blocks a release that has since gone green. Docs-only PRs into `next` or `hotfixes` skip CodeQL the same way they skip tests, and only master's ruleset requires CodeQL results.
-- [View full v4.45.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.5.md)
+- **Build cache for publish runs** — `workflow-publish.yml` forwards `build_cache_paths` / `build_cache_key_files`, so publish-time builds can reuse the same cache as CI instead of rebuilding from scratch.
+- [View full v4.45.6 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.6.md)
 
 ### Recent Releases
 
+- **v4.45.5** (November 2026) — release-merge judges each check by its newest run, and docs-only PRs skip CodeQL with the rule on master only ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.5.md))
 - **v4.45.4** (November 2026) — a `tests failing` coverage badge on failed runs, and a Dependency Review comment that survives large lockfiles ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.4.md))
 - **v4.45.3** (November 2026) — a failed coverage run still publishes the coverage index and uploads the report ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.3.md))
 - **v4.45.2** (November 2026) — commit subjects checked on every branch's pushes, and the org-onboarding template runs past the 256-repo matrix cap ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.2.md))
-- **v4.45.1** (November 2026) — branch naming enforced by a per-repo ruleset that onboarding keeps in sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.1.md))
 
 ## 📋 Quick Start
 
