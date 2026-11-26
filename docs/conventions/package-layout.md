@@ -71,7 +71,9 @@ if (!process.features?.require_module) {
 module.exports = require("./index.mjs");
 ```
 
-When the package's CommonJS shape is something other than the ESM namespace, map it here, for example `module.exports = require("./index.mjs").default` for a package whose CJS export is a single function or plugin object, adding named properties on top where the historical shape had them.
+That line is the whole file after the guard. `require()` returns exactly the module object `import` gives, so `require(x).default`, `require(x).named` and `const { named } = require(x)` all match the ESM side. Never unwrap the default (`require("./index.mjs").default`) and never attach properties by hand: an unwrapped default only works for a package with a single function, and hand-attached names drift from the ESM exports. A package that unwraps today changes this in its next major, since `require(x)(…)` callers then need `require(x).default(…)`.
+
+The one possible exception is a plugin whose host loads it with `require()` and expects the plugin object itself (ESLint's legacy config loader, Prettier's plugin loader). Check that the host really loads it that way before keeping an unwrap, and say so in a comment in `index.cjs`.
 
 ### Deprecating an existing `./main` subpath
 
@@ -300,7 +302,8 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
 | `src/cjs-shim.cjs` or `src/cjs/index.cjs`                                                                 | `git mv` to `src/index.cjs` beside `src/index.mjs`; rename a differently named ESM entry (`runner.mjs`, `fix-header.mjs`) to `src/index.mjs`; copy with `onSuccess`, not `publicDir`   |
 | No build (`echo` stub) shipping `src/`                                                                    | add the per-file build, ship `dist/`, add the entries and condition                                                                                                                    |
 | tsup (or any) bundle: `dist/index.mjs` bundle, `bin/<name>.mjs` CLI bundle, `splitting` / `chunk-*` files | replace it with the per-file build; move `"bin"` to `dist/bin/<name>.mjs`, import the library there by relative path, drop tsup from devDependencies and the `bin/` entry from `files` |
-| CommonJS source                                                                                           | convert to ESM, keep the CJS shape in `src/index.cjs`; ship as a major when the new `exports` map closes deep imports                                                                  |
+| CommonJS source                                                                                           | convert to ESM; `src/index.cjs` re-exports the ESM module unchanged; ship as a major                                                                                                   |
+| `index.cjs` unwraps `.default` or attaches properties                                                     | reduce it to the guard plus `module.exports = require("./index.mjs")`; ship as a major                                                                                                 |
 | Has a `devcheck.mjs`                                                                                      | remove it with the loader in the entry, its test, any bundler `external` and the `files` exclude                                                                                       |
 | Ships or commits `types/`                                                                                 | see [Moving declarations to `@cldmv/<pkg>-types`](#moving-declarations-to-cldmvpkg-types) below                                                                                        |
 
