@@ -36,8 +36,9 @@ Every job that runs a build restores before it and saves right after it:
 | `reusable-bundle-size.yml` (called directly by `bundle-size.yml`) | the HEAD and BASE builds                                                                  |
 | `workflow-next-release.yml`, `workflow-hotfixes-release.yml`      | the release-PR create and refresh builds                                                  |
 | `reusable-publishing.yml`                                         | the create-release build                                                                  |
+| `workflow-publish.yml`                                            | forwards both inputs to its build-and-test and publish (create-release) builds            |
 
-`workflow-publish.yml` doesn't forward the inputs yet. This repo publishes itself through `workflow-publish.yml`, which calls the reusables at `@v4`, and passing an input that the current `@v4` reusable doesn't declare fails the run. The forwarding lands in the release after the reusables ship (the same two-phase rollout as [satellite packages](satellite-packages.md#rollout)).
+`workflow-publish.yml` forwards the inputs since v4.45.6. It shipped a release after the reusables, because this repo publishes itself through `workflow-publish.yml` at `@v4` and an input the tagged reusable doesn't declare fails the run (the same two-phase rollout as [satellite packages](satellite-packages.md#rollout)). Set the same values in `publish.yml` as in `ci.yml` so publish-time builds hit the same cache.
 
 ## Key
 
