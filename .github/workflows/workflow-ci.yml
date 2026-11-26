@@ -99,6 +99,11 @@ on:
                 type: string
                 default: ""
                 description: "Command that runs the browser test suite (e.g. `npm run test:browser`). Runs once, on the latest LTS Node, in its own 🌐 Browser Tests job after install and build. A failure fails the run like a failed matrix leg. Empty (default) skips the job."
+            extra_build_os:
+                required: false
+                type: string
+                default: "[]"
+                description: "JSON list of extra runner labels to build and test on, e.g. '[\"macos-latest\", \"macos-15-intel\"]'. Each gets one 🍎 Build & Test (<os>) job on the latest LTS Node: install, `build_command`, `test_command`. No coverage, lint or Node matrix. Skipped on docs-only changes; a failure fails the run (and the Required PR Check) like a failed matrix leg. Default `[]` (off). macOS runners are scarce, so list only the OSes the build depends on."
             browser_install_command:
                 required: false
                 type: string
@@ -630,6 +635,47 @@ jobs:
                   package-manager: ${{ steps.pm.outputs.package-manager }}
                   environment: ${{ inputs.test_environment }}
 
+    # Extra OS build check (#585). Opt-in: skipped unless `extra_build_os` lists
+    # runner labels. One job per OS on the latest LTS Node, using the same
+    # build-and-test step as the Linux matrix legs, for repos whose build
+    # depends on the host platform (per-platform toolchains, host make/cc).
+    # Gated like `ci`, so docs-only and no-Node changes skip it, and it is part
+    # of this run, so it cancels with it. A failure fails this reusable's
+    # result, which the caller's `✅ Required PR Check` mirrors.
+    extra-os:
+        name: "🍎 Build & Test (${{ matrix.os }})"
+        needs: [sync-gate, paths-gate, commit-gate]
+        if: |
+            !cancelled() &&
+            inputs.extra_build_os != '' &&
+            inputs.extra_build_os != '[]' &&
+            needs.commit-gate.outputs.should_skip != 'true' &&
+            needs.paths-gate.outputs.docs_only != 'true' &&
+            needs.paths-gate.outputs.no_node != 'true' &&
+            needs.sync-gate.outputs.is_master_sync != 'true'
+        strategy:
+            fail-fast: false
+            matrix:
+                # The fallback only keeps the expression valid when the input is
+                # empty; the job's `if:` skips it then.
+                os: ${{ fromJson(inputs.extra_build_os != '' && inputs.extra_build_os != '[]' && inputs.extra_build_os || '["ubuntu-latest"]') }}
+        runs-on: ${{ matrix.os }}
+        permissions:
+            contents: read
+        steps:
+            - name: Build and Test
+              uses: CLDMV/.github/.github/actions/npm/jobs/build-and-test@v4
+              with:
+                  node-version: "lts/*"
+                  package-manager: ${{ inputs.package_manager }}
+                  test-command: ${{ inputs.test_command }}
+                  build-command: ${{ inputs.build_command }}
+                  build-cache-paths: ${{ inputs.build_cache_paths }}
+                  build-cache-key-files: ${{ inputs.build_cache_key_files }}
+                  skip-performance-tests: "true"
+                  test-environment: ${{ inputs.test_environment }}
+                  skip-frozen-lockfile: ${{ vars.CLDMV_SKIP_FROZEN_LOCKFILE }}
+
     # Lint + format autofix, POST-MERGE only. Runs on a push to next / hotfixes
     # (i.e. after a feature PR squash-merges in), applies safe fixes, and commits
     # them straight back onto that integration branch — NOT on feature PRs and
@@ -828,7 +874,7 @@ jobs:
 
     summary:
         name: "📊 CI Summary"
-        needs: [ sync-gate, paths-gate, commit-gate, ci, browser-test, lint-format, coverage-badge, coverage-pr-comment ]
+        needs: [ sync-gate, paths-gate, commit-gate, ci, browser-test, extra-os, lint-format, coverage-badge, coverage-pr-comment ]
         # `always()` is already there so skipped gates don't suppress the
         # summary; the sync-gate / paths-gate / commit-gate output checks
         # then decide whether the summary is meaningful enough to produce.
