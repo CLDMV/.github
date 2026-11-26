@@ -66,7 +66,7 @@ on:
                 type: boolean
                 default: false
             docs_only_paths:
-                description: "Multiline list of GitHub paths-ignore-style globs, same shape and default as workflow-ci.yml's `paths_ignore`. On a pull_request where every changed file matches, analysis is skipped and an empty, 0-alert SARIF is uploaded so the `code_scanning` ruleset rule still gets a result. Never applies to push or schedule runs, so the default branch is always fully analyzed. Empty opts out."
+                description: "Per-repo override for which files count as docs. A pull_request into next or hotfixes whose changed files all match these globs skips analysis. The default matches workflow-ci.yml's `paths_ignore`, so callers don't need to set it. PRs into the default branch, pushes and scheduled runs always analyze."
                 required: false
                 type: string
                 default: |
@@ -99,13 +99,14 @@ jobs:
               with:
                   csv: ${{ inputs.languages }}
 
-            # A docs-only PR changes no code, so there is nothing new to
-            # analyze, the same reason CI skips its test matrix. Only PRs are
-            # gated: push and schedule runs always analyze, so the default
-            # branch's alert state stays accurate.
+            # A docs-only PR changes no code, so there's nothing new to
+            # analyze, the same reason CI skips its test matrix. Only PRs into
+            # next/hotfixes are gated: the code_scanning ruleset rule lives on
+            # the default branch only, so release PRs, pushes and scheduled
+            # runs always analyze.
             - name: Decide docs-only
               id: gate
-              if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+              if: ${{ github.event_name == 'pull_request' && github.base_ref != github.event.repository.default_branch }}
               uses: CLDMV/.github/.github/actions/common/steps/paths-gate@v4
               with:
                   paths_ignore: ${{ inputs.docs_only_paths }}
@@ -113,6 +114,8 @@ jobs:
     analyze:
         name: "🔍 Analyze ${{ matrix.language }}"
         needs: setup
+        # Docs-only PRs into next/hotfixes skip analysis (see the setup job).
+        if: ${{ needs.setup.outputs.docs_only != 'true' }}
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         # Repo-variable escape hatch for repos with NO CodeQL-analyzable source
         # (e.g. a declarative VS Code grammar extension: only a TextMate grammar,
@@ -132,9 +135,7 @@ jobs:
         # with (== true || == 'true') because an expression-passed boolean
         # input arrives as a string.
         env:
-            # A docs-only PR (see the setup job's paths gate) takes the same
-            # empty-SARIF path, so the ruleset still gets a passing result.
-            SKIP_CODE_SCANNING: ${{ ((inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') || needs.setup.outputs.docs_only == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
+            SKIP_CODE_SCANNING: ${{ (inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
         strategy:
             fail-fast: false
             matrix:

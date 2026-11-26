@@ -119,15 +119,19 @@ export function buildMaster(opts) {
  */
 export function buildNext(opts) {
 	// next is where feature PRs land. This is the primary code-review
-	// gate, so the Copilot opt-in (and code-scanning, status checks)
-	// belong here — not on master. Merge-commit only (signatures preserved
-	// vs. "Rebase and merge" which strips them server-side).
+	// gate, so the Copilot opt-in and status checks belong here — not on
+	// master. Merge-commit only (signatures preserved vs. "Rebase and
+	// merge" which strips them server-side).
+	//
+	// No code_scanning rule here or on hotfixes: CodeQL still runs on PRs
+	// into next and reports its findings, but docs-only PRs skip it, and a
+	// skipped analysis would leave the rule waiting for results forever.
+	// The rule sits on master, where every release PR is fully analyzed.
 	const rules = [
 		{ type: "deletion" },
 		{ type: "non_fast_forward" },
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: false, mergeMethods: ["merge"] }),
-		...(opts.codeScanning !== false ? [codeScanningRule()] : []),
 		requiredStatusChecksRule()
 	];
 	if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
@@ -156,7 +160,6 @@ export function buildHotfix(opts) {
 		{ type: "non_fast_forward" },
 		{ type: "required_signatures" },
 		pullRequestRule({ approvals: opts.approvals, requireCodeOwner: opts.hotfixCodeOwner, mergeMethods: ["merge"] }),
-		...(opts.codeScanning !== false ? [codeScanningRule()] : []),
 		requiredStatusChecksRule()
 	];
 	if (opts.copilotReview) rules.push({ type: "copilot_code_review" });
