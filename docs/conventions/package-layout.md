@@ -208,7 +208,7 @@ A new satellite name needs a one-time manual first publish before OIDC trusted p
 
 ## Build
 
-The build minifies every source file in place into `dist/`. It doesn't bundle. For a plain `.mjs` package, esbuild with `bundle: false` does it in one call:
+The build minifies every source file in place into `dist/`. It doesn't bundle. For a plain `.mjs` package, esbuild with `bundle: false` does it in one call. The reference is [`CLDMV/vitest-runner`](https://github.com/CLDMV/vitest-runner) `scripts/build.mjs` (v1.11.1): its CLI is `dist/bin/` importing `../index.mjs`, and its helper scripts exist once, under `dist/core/`. `@cldmv/fix-headers` 2.5.1 builds the same way. A minimal version:
 
 ```js
 // tools/build/build.mjs
@@ -247,7 +247,7 @@ for (const file of files.filter((file) => file.endsWith(".cjs"))) {
 - **Obfuscation**, where a repo wants it, also runs per file, on the files in `dist/`. It never merges files.
 - **Non-JS files** a module loads at runtime (JSON, `.wasm`, templates) are copied into `dist/` at the same relative path, so `new URL("./x.json", import.meta.url)` resolves the same from `src/` and `dist/`.
 - **Runtime discovery works.** Because `dist/` keeps the file tree, `readdir` + `import()` of computed paths behaves the same as in `src/`.
-- **TypeScript sources** compile with `tsc` first, then get minified in place. The reference is [`CLDMV/lib-sqlite-wasm`](https://github.com/CLDMV/lib-sqlite-wasm) `scripts/build-js.mjs`: `tsc` emits `dist/**/*.mjs` from `src/**/*.mts` with `rewriteRelativeImportExtensions`, esbuild minifies each file in place (`allowOverwrite`, `outbase: "dist"`) with source maps chained back to `src/`, and the `.cjs` entries are copied verbatim.
+- **TypeScript sources** compile with `tsc` first, then get minified in place. The reference is [`CLDMV/lib-sqlite-wasm`](https://github.com/CLDMV/lib-sqlite-wasm) `scripts/build-js.mjs` (v0.2.1): `tsc` emits `dist/**/*.mjs` from `src/**/*.mts` with `rewriteRelativeImportExtensions`, esbuild minifies each file in place (`allowOverwrite`, `outbase: "dist"`) with source maps chained back to `src/`, and the `.cjs` entries are copied verbatim.
 
 ## Libraries built on slothlet
 
