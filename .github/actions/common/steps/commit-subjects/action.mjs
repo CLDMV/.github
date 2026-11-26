@@ -237,9 +237,25 @@ async function collectCommits({ token, owner, repo }) {
 		// doesn't, so the whole branch is checked before it can merge.
 		const base = resolvePrBase(branch);
 		if (base) return compareRange({ token, owner, repo, base, head: after, label: `compare ${base}...${branch}` });
-		// Everything else (dev, next, hotfixes, copilot/*, wip/*, …): the
-		// commits this push added. A PR merge into next passes because its
-		// merge commit is exempt and its commits were checked on the branch.
+		// next/hotfixes: everything not yet released (the default branch
+		// compared to the pushed tip), not just this push's range. CI cancels
+		// superseded runs there (#583), so a cancelled push's commits are
+		// checked by the next run. A new next/hotfixes is still skipped.
+		const before = event.before || "";
+		if (RESET_BRANCHES.includes(branch) && before && !/^0+$/.test(before)) {
+			const releaseBase = event.repository?.default_branch || "master";
+			return compareRange({
+				token,
+				owner,
+				repo,
+				base: releaseBase,
+				head: after,
+				label: `compare ${releaseBase}...${branch} (unreleased commits)`
+			});
+		}
+		// Everything else (dev, copilot/*, wip/*, …): the commits this push
+		// added. A PR merge passes because its merge commit is exempt and its
+		// commits were checked on the branch.
 		return collectPushRange({ token, owner, repo, event, branch, after });
 	}
 
