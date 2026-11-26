@@ -22,7 +22,7 @@
 #   dist_paths — comma-separated globs (relative to the repo root) of the files
 #       the package publishes. Take them from `npm pack --dry-run` or from
 #       package.json `files`, not from a guess:
-#           "dist/**"               bundled output in dist/
+#           "dist/**"               build output in dist/
 #           "index.mjs,src/**"      source-shipped: entry file + src/ tree
 #           "bin/**,lib/**"         source-shipped CLI: bin/ + lib/ trees
 #       Only `*` (within one path segment) and `**` (any depth) are

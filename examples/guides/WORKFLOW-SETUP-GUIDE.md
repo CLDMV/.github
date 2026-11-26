@@ -127,7 +127,7 @@ After a release, creates or force-updates the floating `vX.Y` and `vX` tags poin
 **Per-repo inputs** — set both:
 
 - `build_command` — the repo's real build.
-- `dist_paths` — comma-separated globs (relative to the repo root) of the files the package publishes. Take them from `npm pack --dry-run` or `package.json` `files`. Examples: `dist/**` (bundled output), `index.mjs,src/**` or `bin/**,lib/**` (source-shipped packages). Only `*` (one path segment) and `**` (any depth) are supported; a plain path such as `index.mjs` matches that one file. If the globs match no files, the measure step emits a `::warning::` and the size table is empty — the job still passes, so check the log after the first run.
+- `dist_paths` — comma-separated globs (relative to the repo root) of the files the package publishes. Take them from `npm pack --dry-run` or `package.json` `files`. Examples: `dist/**` (build output in `dist/`), `index.mjs,src/**` or `bin/**,lib/**` (source-shipped packages). Only `*` (one path segment) and `**` (any depth) are supported; a plain path such as `index.mjs` matches that one file. If the globs match no files, the measure step emits a `::warning::` and the size table is empty — the job still passes, so check the log after the first run.
 
 **Other inputs** — `warning_pct`, `warning_bytes`, `comment_mode`.
 
