@@ -251,11 +251,12 @@ try {
 
 	console.log("push to next / hotfixes / copilot / wip:");
 	const nextRoute = `/compare/${BEFORE}...${AFTER}`;
+	const unreleasedRoute = `/compare/master...${AFTER}`;
 	r = run({
 		eventName: "push",
 		event: { ref: "refs/heads/next", before: BEFORE, after: AFTER },
 		routes: {
-			[nextRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("b".repeat(40), "address review")] } }
+			[unreleasedRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("b".repeat(40), "address review")] } }
 		}
 	});
 	eq([r.status, r.ok], [1, "false"], "direct commit to next with a bad subject fails");
@@ -264,7 +265,7 @@ try {
 		eventName: "push",
 		event: { ref: "refs/heads/next", before: BEFORE, after: AFTER },
 		routes: {
-			[nextRoute]: {
+			[unreleasedRoute]: {
 				status: 200,
 				body: {
 					status: "ahead",
@@ -279,9 +280,24 @@ try {
 	r = run({
 		eventName: "push",
 		event: { ref: "refs/heads/hotfixes", before: BEFORE, after: AFTER },
-		routes: { [nextRoute]: { status: 200, body: { status: "diverged", total_commits: 1, commits: [commit("b".repeat(40), "x")] } } }
+		routes: {
+			[unreleasedRoute]: { status: 200, body: { status: "ahead", total_commits: 1, commits: [commit("b".repeat(40), "x")] } },
+			[nextRoute]: { status: 200, body: { status: "ahead", total_commits: 0, commits: [] } }
+		}
 	});
-	eq([r.status, r.ok, r.warnings.length], [0, "", 0], "hotfixes reset after a release → skipped, no warning");
+	eq([r.status, r.ok], [1, "false"], "hotfixes checks every unreleased commit, not just this push's range (#583)");
+
+	r = run({
+		eventName: "push",
+		event: { ref: "refs/heads/next", before: BEFORE, after: AFTER, repository: { default_branch: "main" } },
+		routes: {
+			[`/compare/main...${AFTER}`]: {
+				status: 200,
+				body: { status: "ahead", total_commits: 1, commits: [commit("a".repeat(40), "fix: y")] }
+			}
+		}
+	});
+	eq([r.status, r.ok], [0, "true"], "next compares against the repo's default branch (main)");
 
 	r = run({
 		eventName: "push",
