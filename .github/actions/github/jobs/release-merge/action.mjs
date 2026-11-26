@@ -93,7 +93,7 @@ export function latestApprovalPresent(reviews, { allowedAssociations, requireAss
 /**
  * Evaluate the FULL check set on the head — check-runs and legacy commit
  * statuses, required and non-required alike — excluding this workflow's own
- * run. Returns "pending" while anything is unfinished, "failed" if anything
+ * run. A check that ran more than once counts by its newest run only. Returns "pending" while anything is unfinished, "failed" if anything
  * concluded badly (outside the allow-list), else "passed".
  * @param {Array<{name?: string, status?: string, conclusion?: string|null, completed_at?: string|null}>} checkRuns
  * @param {Array<{context?: string, state?: string}>} statuses - `.statuses` from `/commits/{sha}/status` (legacy); ignored when empty.
@@ -106,7 +106,7 @@ export function evaluateChecks(checkRuns, statuses, { selfPattern = "", allowFai
 	const isSelf = (name) => !!selfPattern && !!name && name.includes(selfPattern);
 	const okConclusion = new Set(["success", "neutral", "skipped"]);
 
-	for (const cr of checkRuns || []) {
+	for (const cr of latestCheckRuns(checkRuns)) {
 		if (isSelf(cr.name)) continue;
 		// GitHub can return a finished check run with a stale status
 		// ("in_progress" plus a conclusion and completed_at, CLDMV/.github#514).
@@ -134,6 +134,29 @@ export function evaluateChecks(checkRuns, statuses, { selfPattern = "", allowFai
 	if (failed.length) return { state: "failed", pending, failed };
 	if (pending.length) return { state: "pending", pending, failed };
 	return { state: "passed", pending, failed };
+}
+
+/**
+ * Keep only the newest check run per check name (and app). The commit
+ * check-runs API dedupes `filter=latest` within a check suite only, so a
+ * workflow that ran again in a new suite on the same head SHA comes back
+ * twice: the old failing run next to the fresh passing one
+ * (CLDMV/.github#574). Branch rulesets judge a check by its latest run, and
+ * so does this gate. Newest = latest `started_at`, then the higher `id`.
+ * @param {Array<{id?: number, name?: string, started_at?: string|null, app?: {id?: number}|null}>} checkRuns
+ * @returns {Array<object>}
+ */
+export function latestCheckRuns(checkRuns) {
+	const newest = new Map();
+	const time = (cr) => (cr.started_at ? Date.parse(cr.started_at) || 0 : 0);
+	for (const cr of checkRuns || []) {
+		const key = `${cr.app?.id ?? ""}|${cr.name ?? ""}`;
+		const seen = newest.get(key);
+		if (!seen || time(cr) > time(seen) || (time(cr) === time(seen) && (cr.id ?? 0) > (seen.id ?? 0))) {
+			newest.set(key, cr);
+		}
+	}
+	return [...newest.values()];
 }
 
 /** All check-runs for a ref, following pagination (the response wraps them in `check_runs`). */
