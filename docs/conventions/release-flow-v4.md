@@ -418,7 +418,7 @@ Everything else is hardcoded into the templates from v4's intended flow:
 | `required_signatures` (GPG)                        | yes          | yes                                    | yes                                       |
 | `required_linear_history`                          | yes          | **no** (allows §7.2 API merge commits) | **no** (same merge-commit policy as next) |
 | `required_status_checks: ["✅ Required PR Check"]` | yes          | yes                                    | yes                                       |
-| `code_scanning` (CodeQL `high_or_higher`)          | yes          | yes                                    | yes                                       |
+| `code_scanning` (CodeQL `high_or_higher`)          | yes          | no (CodeQL runs, docs-only PRs skip)   | no (CodeQL runs, docs-only PRs skip)      |
 | `copilot_code_review` (asked)                      | optional     | no                                     | optional                                  |
 | `allowed_merge_methods`                            | `["squash"]` | `["merge"]`                            | `["merge"]`                               |
 | `required_review_thread_resolution`                | yes          | yes                                    | yes                                       |
