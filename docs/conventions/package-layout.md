@@ -57,6 +57,8 @@ The module graph reachable from `src/index.mjs` must not use top-level `await` a
 
 ### `src/index.cjs`
 
+Every library uses the same file, [`examples/package-layout/src/index.cjs`](../../examples/package-layout/src/index.cjs). Only the package name in the message and the Node.js floor change per repo:
+
 ```js
 "use strict";
 
@@ -68,12 +70,27 @@ if (!process.features?.require_module) {
 	throw error;
 }
 
-module.exports = require("./index.mjs");
+// Same exports as `import`. One distinct exported value (aliases of it count once) comes back as that value,
+// so require(x)(...) works; anything else comes back as the module object ({ default, ...named }).
+const esm = require("./index.mjs");
+const values = new Set(
+	Object.keys(esm)
+		.filter((key) => key !== "__esModule")
+		.map((key) => esm[key])
+);
+module.exports = values.size === 1 ? values.values().next().value : esm;
 ```
 
-That line is the whole file after the guard. `require()` returns exactly the module object `import` gives, so `require(x).default`, `require(x).named` and `const { named } = require(x)` all match the ESM side. Never unwrap the default (`require("./index.mjs").default`) and never attach properties by hand: an unwrapped default only works for a package with a single function, and hand-attached names drift from the ESM exports. A package that unwraps today changes this in its next major, since `require(x)(…)` callers then need `require(x).default(…)`.
+The shim works out the CommonJS shape from the ESM exports, so nothing is hand-written per package:
 
-The one possible exception is a plugin whose host loads it with `require()` and expects the plugin object itself (ESLint's legacy config loader, Prettier's plugin loader). Check that the host really loads it that way before keeping an unwrap, and say so in a comment in `index.cjs`.
+| ESM exports                                                       | `require(x)` returns                                       |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| one value, under one or more names (`default` plus an alias)      | that value, so `require(x)(…)` works                       |
+| more than one distinct value (`default` plus other named exports) | the module object, `{ default, …named }`, same as `import` |
+
+Don't unwrap `.default` or attach properties by hand. Hand-written lists drift from the ESM exports, and an unwrap breaks named exports as soon as a package has more than one. Other CommonJS entries use the same pattern (`src/drizzle.cjs` → `./drizzle.mjs`). A package whose `require()` result changes when it adopts the shim (it returned the default alone while also exporting other values) adopts it in its next major, since `require(x)(…)` callers then need `require(x).default(…)` or the named export.
+
+The one possible exception is a plugin whose host `require()`s it and needs the plugin object itself while the package also exports other values (ESLint's legacy config loader, for example). Check how the host loads it first; if it really needs the object, keep a plugin-specific shim and say why in a comment.
 
 ### Deprecating an existing `./main` subpath
 
@@ -303,7 +320,7 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
 | No build (`echo` stub) shipping `src/`                                                                    | add the per-file build, ship `dist/`, add the entries and condition                                                                                                                    |
 | tsup (or any) bundle: `dist/index.mjs` bundle, `bin/<name>.mjs` CLI bundle, `splitting` / `chunk-*` files | replace it with the per-file build; move `"bin"` to `dist/bin/<name>.mjs`, import the library there by relative path, drop tsup from devDependencies and the `bin/` entry from `files` |
 | CommonJS source                                                                                           | convert to ESM; `src/index.cjs` re-exports the ESM module unchanged; ship as a major                                                                                                   |
-| `index.cjs` unwraps `.default` or attaches properties                                                     | reduce it to the guard plus `module.exports = require("./index.mjs")`; ship as a major                                                                                                 |
+| A hand-written `index.cjs` (`.default` unwrap, attached aliases)                                          | replace it with the generic shim; a major when the `require()` result changes                                                                                                          |
 | Has a `devcheck.mjs`                                                                                      | remove it with the loader in the entry, its test, any bundler `external` and the `files` exclude                                                                                       |
 | Ships or commits `types/`                                                                                 | see [Moving declarations to `@cldmv/<pkg>-types`](#moving-declarations-to-cldmvpkg-types) below                                                                                        |
 
