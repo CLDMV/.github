@@ -65,6 +65,16 @@ on:
                 required: false
                 type: boolean
                 default: false
+            docs_only_paths:
+                description: "Multiline list of GitHub paths-ignore-style globs, same shape and default as workflow-ci.yml's `paths_ignore`. On a pull_request where every changed file matches, analysis is skipped and an empty, 0-alert SARIF is uploaded so the `code_scanning` ruleset rule still gets a result. Never applies to push or schedule runs, so the default branch is always fully analyzed. Empty opts out."
+                required: false
+                type: string
+                default: |
+                    **.md
+                    docs/**
+                    *.md
+                    LICENSE
+                    .gitignore
 
 permissions:
     security-events: write # upload SARIF results
@@ -81,12 +91,24 @@ jobs:
         runs-on: ${{ inputs.runs_on != '' && inputs.runs_on || (vars.RUNS_ON_DEFAULT != '' && vars.RUNS_ON_DEFAULT || ((github.repository_owner == 'CLDMV' && github.event.repository.private) && 'cldmv-runners' || 'ubuntu-latest')) }}
         outputs:
             languages: ${{ steps.parse.outputs.json }}
+            docs_only: ${{ steps.gate.outputs.docs_only }}
         steps:
             - name: Parse languages CSV
               id: parse
               uses: CLDMV/.github/.github/actions/common/utilities/parse-csv-list@v4
               with:
                   csv: ${{ inputs.languages }}
+
+            # A docs-only PR changes no code, so there is nothing new to
+            # analyze, the same reason CI skips its test matrix. Only PRs are
+            # gated: push and schedule runs always analyze, so the default
+            # branch's alert state stays accurate.
+            - name: Decide docs-only
+              id: gate
+              if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+              uses: CLDMV/.github/.github/actions/common/steps/paths-gate@v4
+              with:
+                  paths_ignore: ${{ inputs.docs_only_paths }}
 
     analyze:
         name: "🔍 Analyze ${{ matrix.language }}"
@@ -110,7 +132,9 @@ jobs:
         # with (== true || == 'true') because an expression-passed boolean
         # input arrives as a string.
         env:
-            SKIP_CODE_SCANNING: ${{ (inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
+            # A docs-only PR (see the setup job's paths gate) takes the same
+            # empty-SARIF path, so the ruleset still gets a passing result.
+            SKIP_CODE_SCANNING: ${{ ((inputs.skip_code_scanning == true || inputs.skip_code_scanning == 'true') || needs.setup.outputs.docs_only == 'true') && '1' || vars.CLDMV_SKIP_CODE_SCANNING }}
         strategy:
             fail-fast: false
             matrix:
