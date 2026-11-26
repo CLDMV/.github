@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.45.4 (November 2026)
+### Latest: v4.45.5 (November 2026)
 
-- **Honest coverage badge and a sturdier Dependency Review comment** — a failed test run shows a `tests failing` badge instead of a stale number, and the Dependency Review summary comment no longer fails on PRs that add a large lockfile.
-- [View full v4.45.4 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.4.md)
+- **release-merge and CodeQL fixes** — release-merge judges each check by its newest run, so a stale failed run no longer blocks a release that has since gone green. Docs-only PRs into `next` or `hotfixes` skip CodeQL the same way they skip tests, and only master's ruleset requires CodeQL results.
+- [View full v4.45.5 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.5.md)
 
 ### Recent Releases
 
+- **v4.45.4** (November 2026) — a `tests failing` coverage badge on failed runs, and a Dependency Review comment that survives large lockfiles ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.4.md))
 - **v4.45.3** (November 2026) — a failed coverage run still publishes the coverage index and uploads the report ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.3.md))
 - **v4.45.2** (November 2026) — commit subjects checked on every branch's pushes, and the org-onboarding template runs past the 256-repo matrix cap ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.2.md))
 - **v4.45.1** (November 2026) — branch naming enforced by a per-repo ruleset that onboarding keeps in sync ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.1.md))
-- **v4.45.0** (November 2026) — an opt-in build cache and browser test job, and pnpm and yarn repos publish their packed artifact with npm ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.0.md))
 
 ## 📋 Quick Start
 
