@@ -1,6 +1,6 @@
 # Package layout: entry points, build and dev condition
 
-Every CLDMV JavaScript library published to npm uses one source layout: the code lives in `src/`, tsup bundles it into `dist/`, the package has exactly two entry points (`index.mjs` for ESM and `index.cjs` for CommonJS), and a namespaced `<pkg>-dev` export condition switches a source checkout between `src/` and `dist/`. There is no development check: the condition is how a developer picks `src/` or `dist/`, and both are legitimate (see [No devcheck](#no-devcheck)).
+Every CLDMV JavaScript library published to npm uses one source layout: the code lives in `src/`, the build writes `dist/` as a minified mirror of it (one file per module, never a bundle), the package has exactly two entry points (`index.mjs` for ESM and `index.cjs` for CommonJS), and a namespaced `<pkg>-dev` export condition switches a source checkout between `src/` and `dist/`. There is no development check: the condition is how a developer picks `src/` or `dist/`, and both are legitimate (see [No devcheck](#no-devcheck)).
 
 The reference implementation is [`CLDMV/llm-translator`](https://github.com/CLDMV/llm-translator).
 
@@ -18,15 +18,16 @@ This applies to published JavaScript **libraries**: packages whose consumers `im
 ```text
 package.json      "." → { "<pkg>-dev": { import: ./src/index.mjs, require: ./src/index.cjs },
                           import: ./dist/index.mjs, require: ./dist/index.cjs }
-tsup.config.mjs
+tools/build/build.mjs   per-file build (see Build)
 src/
   index.mjs       ESM entry: the public exports
   index.cjs       CJS entry: require(esm) guard + require("./index.mjs")
   …               the rest of the source
 dist/             build output (gitignored, rebuilt by prepack)
-  index.mjs       tsup bundle of src/index.mjs
+  index.mjs       src/index.mjs, minified in place
   index.cjs       verbatim copy of src/index.cjs
-bin/              CLI build output from src/bin/ (gitignored)
+  …               every other src/ module at the same relative path
+  bin/<name>.mjs  the CLI, from src/bin/<name>.mjs
 types/            generated declarations (gitignored)
   src/            tsc output for src/: the <pkg>-dev condition and the types package read it
   stub/           the published re-export stubs
@@ -38,10 +39,11 @@ dist-packages/    carved satellite packages (gitignored)
 
 Rules that follow from it:
 
-- **`bin/` only holds build output.** A CLI's source is `src/bin/<name>.mjs`, and tsup builds it: into `bin/<name>.mjs` for a bundled build (see [Build](#build)), or into `dist/bin/<name>.mjs` when `dist/` mirrors `src/` file by file (see [Libraries built on slothlet](#libraries-built-on-slothlet)); `"bin"` in `package.json` points at the built file. Either way the published package ships no `src/`. Nothing in `bin/` is hand-written or committed, not even a thin launcher, and vendored binaries live outside it (for example `vendor/`). The fleet `.gitignore` ([`examples/gitignore/Node.gitignore`](../../examples/gitignore/Node.gitignore)) ignores `/bin/`.
-- **`index.mjs` and `index.cjs` are the only entry points.** There is no `./main` subpath and no self-import by package name (`import … from "@cldmv/<pkg>/main"`). Extra public subpaths (e.g. `./cli`, `./parser`) are fine; each gets its own tsup entry and its own `<pkg>-dev` mapping.
-- **The CJS entry is a sibling of the ESM entry, with the same name.** It is `src/index.cjs`, published as `dist/index.cjs`. It does not live in a `src/cjs/` folder, is not copied via tsup's `publicDir`, and is not named differently (`cjs-shim.cjs`) and renamed during the build. Because the two files sit side by side in both `src/` and `dist/`, `require("./index.mjs")` resolves in a checkout and in the published package, so the CJS entry can be tested from source.
-- **The CJS entry is never a second bundle.** It is a few lines of hand-written code that loads the ESM build through Node's synchronous `require(esm)`. Bundling the library a second time with `format: ["cjs"]` duplicates the whole package.
+- **`dist/` mirrors `src/`, one file per module.** The build never moves code between files, merges files or copies code into a second place to suit a tool: no bundling, no `splitting`, no `chunk-*` files, and no module shipped twice. Every module exists once in the package, and entries that share code share it through ordinary relative imports, so classes keep one identity (`instanceof` works across entries).
+- **A CLI is a module like any other.** Its source is `src/bin/<name>.mjs`, it builds to `dist/bin/<name>.mjs`, and `"bin"` in `package.json` points there. It imports the library by relative path (`../index.mjs`), so in the package it runs on `dist/`, never on a copy of the library. There is no top-level `bin/` build output and nothing hand-written or committed in one, not even a thin launcher; vendored binaries live outside it (for example `vendor/`). The fleet `.gitignore` ([`examples/gitignore/Node.gitignore`](../../examples/gitignore/Node.gitignore)) still ignores `/bin/` for repos that haven't migrated.
+- **`index.mjs` and `index.cjs` are the only entry points.** There is no `./main` subpath and no self-import by package name (`import … from "@cldmv/<pkg>/main"`). Extra public subpaths (e.g. `./cli`, `./parser`) are fine; each points at its module's file in `dist/` and gets its own `<pkg>-dev` mapping.
+- **The CJS entry is a sibling of the ESM entry, with the same name.** It is `src/index.cjs`, published as `dist/index.cjs`. It does not live in a `src/cjs/` folder, is not copied via a bundler's `publicDir`, and is not named differently (`cjs-shim.cjs`) and renamed during the build. Because the two files sit side by side in both `src/` and `dist/`, `require("./index.mjs")` resolves in a checkout and in the published package, so the CJS entry can be tested from source.
+- **The CJS entry is never a second build.** It is a few lines of hand-written code that loads the ESM build through Node's synchronous `require(esm)`. Compiling the library a second time to CommonJS duplicates the whole package.
 
 ## Entry points
 
@@ -55,6 +57,8 @@ The module graph reachable from `src/index.mjs` must not use top-level `await` a
 
 ### `src/index.cjs`
 
+Every library uses the same file, [`examples/package-layout/src/index.cjs`](../../examples/package-layout/src/index.cjs). Only the package name in the message and the Node.js floor change per repo:
+
 ```js
 "use strict";
 
@@ -66,10 +70,27 @@ if (!process.features?.require_module) {
 	throw error;
 }
 
-module.exports = require("./index.mjs");
+// Same exports as `import`. One distinct exported value (aliases of it count once) comes back as that value,
+// so require(x)(...) works; anything else comes back as the module object ({ default, ...named }).
+const esm = require("./index.mjs");
+const values = new Set(
+	Object.keys(esm)
+		.filter((key) => key !== "__esModule")
+		.map((key) => esm[key])
+);
+module.exports = values.size === 1 ? values.values().next().value : esm;
 ```
 
-When the package's CommonJS shape is something other than the ESM namespace, map it here, for example `module.exports = require("./index.mjs").default` for a package whose CJS export is a single function or plugin object, adding named properties on top where the historical shape had them.
+The shim works out the CommonJS shape from the ESM exports, so nothing is hand-written per package:
+
+| ESM exports                                                       | `require(x)` returns                                       |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| one value, under one or more names (`default` plus an alias)      | that value, so `require(x)(…)` works                       |
+| more than one distinct value (`default` plus other named exports) | the module object, `{ default, …named }`, same as `import` |
+
+Don't unwrap `.default` or attach properties by hand. Hand-written lists drift from the ESM exports, and an unwrap breaks named exports as soon as a package has more than one. Other CommonJS entries use the same pattern (`src/drizzle.cjs` → `./drizzle.mjs`). A package whose `require()` result changes when it adopts the shim (it returned the default alone while also exporting other values) adopts it in its next major, since `require(x)(…)` callers then need `require(x).default(…)` or the named export.
+
+The one possible exception is a plugin whose host `require()`s it and needs the plugin object itself while the package also exports other values (ESLint's legacy config loader, for example). Check how the host loads it first; if it really needs the object, keep a plugin-specific shim and say why in a comment.
 
 ### Deprecating an existing `./main` subpath
 
@@ -95,7 +116,7 @@ export { default } from "./index.mjs";
 }
 ```
 
-The alias re-exports the root, so `./main` and `"."` return the same objects, and the warning prints once per process (`node --no-deprecation` silences it). Build it as its own tsup entry with `./index.mjs` marked external, so `dist/main.mjs` imports `dist/index.mjs` instead of carrying a second copy. Before switching, check that the root exports everything the old `./main` target exported, as the same values; if it doesn't, fix the root first. Adding the alias is a minor release; removing it waits for a major.
+The alias re-exports the root, so `./main` and `"."` return the same objects, and the warning prints once per process (`node --no-deprecation` silences it). The per-file build turns it into `dist/main.mjs`, which imports `dist/index.mjs`, so there is no second copy. Before switching, check that the root exports everything the old `./main` target exported, as the same values; if it doesn't, fix the root first. Adding the alias is a minor release; removing it waits for a major.
 
 ## `package.json`
 
@@ -124,7 +145,7 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 	"engines": { "node": "<runtime floor, e.g. >=18.0.0>" },
 	"devEngines": { "runtime": { "name": "node", "version": ">=22.22.0", "onFail": "error" } },
 	"scripts": {
-		"build": "tsup",
+		"build": "node tools/build/build.mjs",
 		"build:ci": "npm run lint && npm run format:check && npm run types:build && npm run build && npm run build:subpackages && npm run test:types",
 		"build:subpackages": "node tools/build/build-subpackages.mjs",
 		"prepack": "npm run build",
@@ -139,8 +160,8 @@ The alias re-exports the root, so `./main` and `"."` return the same objects, an
 }
 ```
 
-- **`engines.node` is the runtime floor**: the oldest Node.js the published package actually runs on, for consumers. It is the highest of the runtime and peer dependencies' own `engines`, what the shipped code's syntax and APIs need, and the floor the package has always promised. Don't raise it to the dev toolchain's floor: a library built to run on older Node.js (wisp, for example) keeps its low floor. tsup's `target` matches it (`node<major>`).
-- **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5, tsup 9 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
+- **`engines.node` is the runtime floor**: the oldest Node.js the published package actually runs on, for consumers. It is the highest of the runtime and peer dependencies' own `engines`, what the shipped code's syntax and APIs need, and the floor the package has always promised. Don't raise it to the dev toolchain's floor: a library built to run on older Node.js (wisp, for example) keeps its low floor. The build's esbuild `target` matches it (`node<major>`).
+- **`devEngines.runtime` is the dev floor**: the Node.js the toolchain needs to build and test the package (`>=22.22.0` for vitest 5 and the rest), or the runtime floor if that is higher. npm checks `devEngines` on the project's own `install`, `ci` and `run`, never for consumers. CI's `min_node_version` in `ci.yml` and `publish.yml` follows the dev floor, since the toolchain can't run below it; the README states both floors.
 - **`require()` needs `require(esm)`.** The guard in `index.cjs` rejects a Node.js without it and says `^20.19.0 or >=22.13.0` (22.12 prints an `ExperimentalWarning`), or the runtime floor if that is higher. `import` works down to the runtime floor.
 - **Type scripts use three fixed names.** `types:check` type-checks the source without emitting (`tsc --noEmit`), and it's the script CI runs: `ci.yml` passes `type_check_command: "npm run types:check"`. `types:build` emits the declarations into `types/src/`, generates the stubs in `types/stub/`, and is part of `build:ci`. `test:types` is only for a test of the published types from a consumer's side (for example, compiling a consumer file against the built `.d.mts`), and it runs as part of `test`. Don't use `typecheck`, `build:types` or `test:types` for the plain source check. A repo with nothing to type-check sets `skip_type_check: true` in `ci.yml` and says why.
 - **`test:cjs` runs the CommonJS tests**: the entry check on the build (`tests/cjs/entry.test.cjs`) and any CommonJS-only tests the repo has (see [Tests](#tests)). **`test:dist` runs the full vitest suite against `dist/` instead of `src/`** (see [Tests](#tests)). Don't swap the two names.
@@ -187,44 +208,53 @@ A new satellite name needs a one-time manual first publish before OIDC trusted p
 
 ## Build
 
-```js
-import { copyFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+The build minifies every source file in place into `dist/`. It doesn't bundle. For a plain `.mjs` package, esbuild with `bundle: false` does it in one call. The reference is [`CLDMV/vitest-runner`](https://github.com/CLDMV/vitest-runner) `scripts/build.mjs` (v1.11.1): its CLI is `dist/bin/` importing `../index.mjs`, and its helper scripts exist once, under `dist/core/`. `@cldmv/fix-headers` 2.5.1 builds the same way. A minimal version:
 
-export default defineConfig({
-	entry: { index: "src/index.mjs" },
-	format: ["esm"],
-	outDir: "dist",
-	target: "node20",
+```js
+// tools/build/build.mjs
+import { copyFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { build } from "esbuild";
+
+rmSync("dist", { recursive: true, force: true });
+
+const files = readdirSync("src", { recursive: true }).map(String);
+
+await build({
+	entryPoints: files.filter((file) => file.endsWith(".mjs")).map((file) => join("src", file)),
+	outdir: "dist",
+	outbase: "src",
+	outExtension: { ".js": ".mjs" },
+	bundle: false,
+	format: "esm",
 	platform: "node",
-	splitting: false,
-	sourcemap: true,
-	dts: false,
+	target: "node20",
 	minify: true,
 	keepNames: true,
-	removeNodeProtocol: false,
-	clean: true,
-	outExtension() {
-		return { js: ".mjs" };
-	},
-	onSuccess() {
-		copyFileSync("src/index.cjs", "dist/index.cjs");
-	}
+	sourcemap: true,
+	logLevel: "warning"
 });
+
+// Hand-written CommonJS files (src/index.cjs and any other .cjs) are copied as they are.
+for (const file of files.filter((file) => file.endsWith(".cjs"))) {
+	mkdirSync(dirname(join("dist", file)), { recursive: true });
+	copyFileSync(join("src", file), join("dist", file));
+}
 ```
 
+- **`bundle: false`** is the rule, not an option: each output file is its source file minified, at the same relative path, and its imports stay as written. There is no `splitting` and no `external` list to maintain, because nothing is inlined.
 - **`keepNames: true`** keeps function and class names through minification (stack traces, `fn.name`).
-- **`removeNodeProtocol: false`** keeps `node:` specifiers on built-in imports.
-- A CLI gets a second entry (e.g. `{ "<name>": "src/bin/<name>.mjs" }` into `bin/`); if it imports the library entry, mark that entry `external` so the CLI doesn't carry a second copy. Runtime dependencies stay external (tsup's default for `dependencies` / `peerDependencies`).
-- Code that discovers modules at runtime (`readdir` + `import()` of computed paths) doesn't survive bundling; use static imports.
+- **Obfuscation**, where a repo wants it, also runs per file, on the files in `dist/`. It never merges files.
+- **Non-JS files** a module loads at runtime (JSON, `.wasm`, templates) are copied into `dist/` at the same relative path, so `new URL("./x.json", import.meta.url)` resolves the same from `src/` and `dist/`.
+- **Runtime discovery works.** Because `dist/` keeps the file tree, `readdir` + `import()` of computed paths behaves the same as in `src/`.
+- **TypeScript sources** compile with `tsc` first, then get minified in place. The reference is [`CLDMV/lib-sqlite-wasm`](https://github.com/CLDMV/lib-sqlite-wasm) `scripts/build-js.mjs` (v0.2.1): `tsc` emits `dist/**/*.mjs` from `src/**/*.mts` with `rewriteRelativeImportExtensions`, esbuild minifies each file in place (`allowOverwrite`, `outbase: "dist"`) with source maps chained back to `src/`, and the `.cjs` entries are copied verbatim.
 
 ## Libraries built on slothlet
 
 A library that composes its own API with `@cldmv/slothlet` (`slothlet({ base: <dir>/api, … })`) keeps the layout above but publishes a different `dist/`. [`CLDMV/llm-translator`](https://github.com/CLDMV/llm-translator) is the reference implementation. This is not the host-loaded api folder case from [Scope](#scope): here the package itself owns the `api/` folder and boots slothlet from its entry point.
 
-- **`dist/` mirrors `src/` file by file.** Slothlet scans the `api/` folder at runtime and derives endpoint names from the file tree, so a single bundle leaves nothing to discover. The tsup config uses `entry: ["src/**/*.mjs"]` with `bundle: false` (keep `minify`, `keepNames`, `removeNodeProtocol: false`, `outExtension` → `.mjs`, `clean`). The result is `dist/index.mjs`, `dist/api/**`, `dist/lib/**` and, for a CLI, `dist/bin/**`, with the same relative paths as in `src/`. `index.mjs` resolves the folder with `new URL("./api", import.meta.url)`, which then works unchanged from `src/` and from `dist/`.
+- **The standard per-file build is what slothlet needs.** Slothlet scans the `api/` folder at runtime and derives endpoint names from the file tree, and [Build](#build) keeps that tree: `dist/index.mjs`, `dist/api/**`, `dist/lib/**` and, for a CLI, `dist/bin/**`. `index.mjs` resolves the folder with `new URL("./api", import.meta.url)`, which works unchanged from `src/` and from `dist/`.
 - **Internals stay outside `api/`.** Helpers live in `src/lib/` and are imported by relative path, so they never show up as endpoints. Because the build keeps every file, those relative imports keep working in `dist/`.
-- **`src/index.cjs` is still copied verbatim** to `dist/index.cjs` in `onSuccess`; with `bundle: false` it is not part of the `entry` glob, so nothing else produces it.
 - **No top-level `await` in `index.mjs` or anything it imports statically.** `index.cjs` loads the ESM entry through `require(esm)`, which rejects a module graph that contains one. Leaves that slothlet imports at runtime are loaded with `import()` and are not part of this graph, but prefer an explicit async `load()` over a top-level `await` there too.
 - **`test:cjs` composes the built API.** After `npm run build`, `tests/cjs/entry.test.cjs` should `require("dist/index.cjs")`, call the library's factory, and exercise a few endpoints, so a missing or misplaced file under `dist/api/` fails the test. Also assert that the expected `dist/api/**` and `dist/bin/**` files exist.
 - **Vitest coverage.** Create instances in tests with `slothlet: { import: (url) => import(url) }` so leaves load through Vite's module graph and attribute coverage (see slothlet's `docs/TESTING.md`).
@@ -272,25 +302,27 @@ Packages don't ship or keep a `devcheck.mjs`. Consumers only get `dist/`, so a c
   `test:dist` builds, then runs `node tests/run-vitest.mjs --mode=dist` (one token: the runner treats a bare word as a test file pattern). Without a build it fails to resolve the package, it never falls back to `src/`.
 
 - **A resolve test guards the switch.** `tests/resolve.test.vitest.mjs` imports the package by name and checks its exports are the same objects as `../dist/index.mjs`'s when `import.meta.env.MODE === "dist"`, and as `../src/index.mjs`'s otherwise. Reference: [`CLDMV/gitmulti`](https://github.com/CLDMV/gitmulti).
-- **An unbundled build can redirect `src/` instead.** When tsup runs with `bundle: false`, `dist/` mirrors `src/` file by file, so in dist mode the vitest config can redirect every resolved `src/` path to the same path under `dist/`. That runs the tests of internal modules against the build too, and existing `../src/…` imports keep working unchanged. It only works when the file layout matches, so a bundled build uses the by-name imports above. Reference: [`CLDMV/llm-translator#126`](https://github.com/CLDMV/llm-translator/pull/126).
+- **Internal modules can run against `dist/` too.** Because `dist/` mirrors `src/` file by file, in dist mode the vitest config can redirect every resolved `src/` path to the same path under `dist/`. That runs the tests of internal modules against the build as well, and existing `../src/…` imports keep working unchanged. Reference: [`CLDMV/llm-translator#126`](https://github.com/CLDMV/llm-translator/pull/126).
 - **A source-level CJS test** loads `src/index.cjs` through `createRequire` and checks it exports the same keys and values as `src/index.mjs`.
 - **`tests/cjs/entry.test.cjs`** (run by `test:cjs` through `node --test`, after a build) checks the build itself: that `dist/index.cjs` re-exports `dist/index.mjs`. Don't put it under `tests/dist/`: the usual `dist/` gitignore rule matches that folder too. Other CommonJS-only tests go in `tests/cjs/` as well and are added to `test:cjs`.
 
 ## CI wiring
 
 - `ci.yml`: `coverage_build_command: "npm run build:ci"`, so the coverage legs run the real build. Don't use `skip_build: true` or a no-op `build` script for a library.
-- `bundle-size.yml`: `build_command: "npm run build:ci"` and `dist_paths` set to the published files, e.g. `dist/**.mjs,dist/**.cjs`.
+- `bundle-size.yml`: `build_command: "npm run build:ci"` and `dist_paths` set to the published files, e.g. `dist/**/*.mjs,dist/**/*.cjs`.
 
 ## Migrating an existing package
 
-| Starting point                                                                            | Change                                                                                                                                                                               |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hand-written root `index.mjs` / `index.cjs` reaching the code through `@cldmv/<pkg>/main` | `git mv` both into `src/`, import the code by relative path, move `<pkg>-dev` onto `"."`, keep `./main` as a deprecated alias, replace the custom build with tsup                    |
-| `src/cjs-shim.cjs` or `src/cjs/index.cjs`                                                 | `git mv` to `src/index.cjs` beside `src/index.mjs`; rename a differently named ESM entry (`runner.mjs`, `fix-header.mjs`) to `src/index.mjs`; copy with `onSuccess`, not `publicDir` |
-| No build (`echo` stub) shipping `src/`                                                    | add tsup, ship `dist/`, add the entries and condition                                                                                                                                |
-| CommonJS source                                                                           | convert to ESM, keep the CJS shape in `src/index.cjs`; ship as a major when the new `exports` map closes deep imports                                                                |
-| Has a `devcheck.mjs`                                                                      | remove it with the loader in the entry, its test, the tsup `external` and the `files` exclude                                                                                        |
-| Ships or commits `types/`                                                                 | see [Moving declarations to `@cldmv/<pkg>-types`](#moving-declarations-to-cldmvpkg-types) below                                                                                      |
+| Starting point                                                                                            | Change                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hand-written root `index.mjs` / `index.cjs` reaching the code through `@cldmv/<pkg>/main`                 | `git mv` both into `src/`, import the code by relative path, move `<pkg>-dev` onto `"."`, keep `./main` as a deprecated alias, replace the custom build with the per-file build        |
+| `src/cjs-shim.cjs` or `src/cjs/index.cjs`                                                                 | `git mv` to `src/index.cjs` beside `src/index.mjs`; rename a differently named ESM entry (`runner.mjs`, `fix-header.mjs`) to `src/index.mjs`; copy with `onSuccess`, not `publicDir`   |
+| No build (`echo` stub) shipping `src/`                                                                    | add the per-file build, ship `dist/`, add the entries and condition                                                                                                                    |
+| tsup (or any) bundle: `dist/index.mjs` bundle, `bin/<name>.mjs` CLI bundle, `splitting` / `chunk-*` files | replace it with the per-file build; move `"bin"` to `dist/bin/<name>.mjs`, import the library there by relative path, drop tsup from devDependencies and the `bin/` entry from `files` |
+| CommonJS source                                                                                           | convert to ESM; `src/index.cjs` re-exports the ESM module unchanged; ship as a major                                                                                                   |
+| A hand-written `index.cjs` (`.default` unwrap, attached aliases)                                          | replace it with the generic shim; a major when the `require()` result changes                                                                                                          |
+| Has a `devcheck.mjs`                                                                                      | remove it with the loader in the entry, its test, any bundler `external` and the `files` exclude                                                                                       |
+| Ships or commits `types/`                                                                                 | see [Moving declarations to `@cldmv/<pkg>-types`](#moving-declarations-to-cldmvpkg-types) below                                                                                        |
 
 ### Moving declarations to `@cldmv/<pkg>-types`
 

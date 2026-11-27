@@ -171,6 +171,21 @@ async function collectChangedFiles({ token, owner, repo }) {
 			return { files: null, fallback: true, reason: `compare against the PR base failed (${failures.join("; ")})` };
 		}
 
+		// next/hotfixes: judge the push by everything it would release (the
+		// default branch compared to the pushed tip), not by this push alone.
+		// The release PR takes its required check from this run, so a docs-only
+		// last merge (the changelog PR) must not skip the tests for the code
+		// merged before it (#588). If that compare fails, fall through to the
+		// push's own range below.
+		if ((branch === "next" || branch === "hotfixes") && defaultBranch && before && !/^0+$/.test(before)) {
+			try {
+				const unreleased = await api("GET", `/compare/${encodeURIComponent(defaultBranch)}...${after}`, null, { token, owner, repo });
+				return compareFiles(unreleased, `compare ${defaultBranch}...${branch} (unreleased changes)`);
+			} catch (error) {
+				console.log(`ℹ️ compare ${defaultBranch}...${branch} failed (${error.message}); using the push's own range.`);
+			}
+		}
+
 		if (!before || /^0+$/.test(before)) {
 			return {
 				files: null,

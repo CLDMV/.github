@@ -102,6 +102,12 @@ try {
 	r = measure("src/*.mjs");
 	eq(r.paths, ["src/b.mjs"], "`src/*.mjs` does not descend into src/sub/");
 
+	r = measure("lib/**/*.mjs");
+	eq(r.paths, ["lib/deep/more.mjs", "lib/util.mjs"], "`lib/**/*.mjs` matches files at every depth, including directly under lib/");
+
+	r = measure("lib/**.mjs");
+	eq(r.paths, ["lib/deep/more.mjs", "lib/util.mjs"], "`lib/**.mjs` matches at every depth too (`**` may span `/`)");
+
 	console.log("measure — zero matches warn but pass:");
 	r = measure("dist/**");
 	eq(r.status, 0, "missing dist/ exits 0");
