@@ -4,17 +4,17 @@ Shared GitHub Actions workflows for the CLDMV organization.
 
 ## ✨ What's New
 
-### Latest: v4.46.0 (November 2026)
+### Latest: v4.47.0 (November 2026)
 
-- **No more bundling, a shared CJS shim, and CI that stops when it should** — the package convention ships `dist/` as one minified file per module with one generic `index.cjs`; CI cancels superseded runs on `next`/`hotfixes` and caps its Node matrix; and an optional `extra_build_os` adds a build check on macOS or any other runner OS.
-- [View full v4.46.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.46.0.md)
+- **One Dependabot PR for the CLDMV dev tools** — the example `dependabot.yml` gains `cldmv-dev` and `cldmv` groups, so a fleet dev-tool release arrives in one PR, and the generic patch and minor groups exclude every named family, so the groups no longer depend on the order Dependabot reads them in.
+- [View full v4.47.0 Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.47.0.md)
 
 ### Recent Releases
 
+- **v4.46.0** (November 2026) — no more bundling, one generic `index.cjs`, CI cancels superseded runs on `next`/`hotfixes` and caps its Node matrix, and an optional `extra_build_os` build check ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.46.0.md))
 - **v4.45.6** (November 2026) — publish-time builds use the same build cache as CI ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.6.md))
 - **v4.45.5** (November 2026) — release-merge judges each check by its newest run, and docs-only PRs skip CodeQL with the rule on master only ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.5.md))
 - **v4.45.4** (November 2026) — a `tests failing` coverage badge on failed runs, and a Dependency Review comment that survives large lockfiles ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.4.md))
-- **v4.45.3** (November 2026) — a failed coverage run still publishes the coverage index and uploads the report ([Changelog](https://github.com/CLDMV/.github/blob/master/docs/changelogs/v4.45.3.md))
 
 ## 📋 Quick Start
 
